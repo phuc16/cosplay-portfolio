@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 dark:bg-cosplay-dark dark:text-slate-200 antialiased;
+  }
+}
+
+/* Masonry column fix */
+.break-inside-avoid {
+  break-inside: avoid;
+}
