@@ -5,14 +5,14 @@ services:
     image: mysql:8
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: cosplay
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:-root}
+      MYSQL_DATABASE: ${DB_NAME:-cosplay}
     ports:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
       interval: 3s
       timeout: 5s
       retries: 10
@@ -37,6 +37,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
 
   backend:
+    image: phuc16/cosplay-backend:latest
     build: ./backend
     restart: always
     ports:
@@ -51,20 +52,21 @@ services:
     environment:
       DB_HOST: mysql
       DB_USER: root
-      DB_PASS: root
-      DB_NAME: cosplay
+      DB_PASS: ${DB_PASS:-root}
+      DB_NAME: ${DB_NAME:-cosplay}
       REDIS_HOST: redis
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET: cosplay
+      MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       NODE_ENV: production
 
   worker:
+    image: phuc16/cosplay-backend:latest
     build: ./backend
     restart: always
     command: node worker.js
@@ -78,16 +80,17 @@ services:
     environment:
       DB_HOST: mysql
       DB_USER: root
-      DB_PASS: root
-      DB_NAME: cosplay
+      DB_PASS: ${DB_PASS:-root}
+      DB_NAME: ${DB_NAME:-cosplay}
       REDIS_HOST: redis
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET: cosplay
+      MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
 
   frontend:
+    image: phuc16/cosplay-frontend:latest
     build: ./frontend
     restart: always
     ports:
