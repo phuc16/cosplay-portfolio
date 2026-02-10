@@ -44,12 +44,32 @@ app.use((err, req, res, next) => {
   next(err)
 })
 
-// LOGIN ADMIN - check env (RAM), no DB
+// LOGIN ADMIN - check env (RAM), no DB + brute force protection
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin"
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin"
+const LOGIN_MAX_ATTEMPTS = 5
+const LOGIN_LOCKOUT_MINUTES = 15
+
+function getClientIp(req) {
+  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+}
 
 app.post(`${API_PREFIX}/login`, async (req, res) => {
   try {
+    const ip = getClientIp(req)
+    const lockKey = `login_lock:${ip}`
+    const attemptKey = `login_fail:${ip}`
+
+    const lockedUntil = await redis.get(lockKey)
+    if (lockedUntil) {
+      const ttl = await redis.ttl(lockKey)
+      console.warn(`[LOGIN] IP ${ip} bị khóa, còn ${ttl}s`)
+      return res.status(429).json({
+        error: "too_many_attempts",
+        message: `Đăng nhập sai quá nhiều lần. Thử lại sau ${Math.ceil(ttl / 60)} phút.`,
+      })
+    }
+
     const { username, password } = req.body
     if (!username || !password) {
       console.warn("[LOGIN] Thiếu username hoặc password")
@@ -57,10 +77,23 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
     }
 
     if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-      console.warn(`[LOGIN] Sai: ${username}`)
+      const attempts = await redis.incr(attemptKey)
+      if (attempts === 1) await redis.expire(attemptKey, 60 * LOGIN_LOCKOUT_MINUTES)
+      if (attempts >= LOGIN_MAX_ATTEMPTS) {
+        await redis.set(lockKey, "1", "EX", 60 * LOGIN_LOCKOUT_MINUTES)
+        await redis.del(attemptKey)
+        console.warn(`[LOGIN] IP ${ip} bị khóa 15 phút sau ${attempts} lần sai`)
+        return res.status(429).json({
+          error: "too_many_attempts",
+          message: `Đăng nhập sai quá ${LOGIN_MAX_ATTEMPTS} lần. Thử lại sau ${LOGIN_LOCKOUT_MINUTES} phút.`,
+        })
+      }
+      console.warn(`[LOGIN] Sai: ${username} (IP ${ip}, lần ${attempts})`)
       return res.status(401).json({ error: "unauthorized", message: "Sai tên đăng nhập hoặc mật khẩu" })
     }
 
+    await redis.del(attemptKey)
+    await redis.del(lockKey)
     const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
     console.log(`[LOGIN] Đăng nhập thành công: ${username}`)
     res.json({ token })
@@ -95,12 +128,16 @@ const invalidateSettings = () => redis.del("settings")
 
 // GET SETTINGS (public, cached)
 const DEFAULT_SETTINGS = {
-  artistName: "Kamidayhehe Cosplay",
-  tagline: "Cosplayer • Prop Maker • Photographer Friend",
-  about: "",
+  heroImageUrl: "",
+  artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" },
+  tagline: { vi: "Cosplayer • Prop Maker • Photographer Friend", en: "Cosplayer • Prop Maker • Photographer Friend" },
+  about: { vi: "", en: "" },
   hero: {
-    subtitle: "Cosplay portfolio & highlights",
-    description: "Portfolio for cosplay photos, props, and booking info. Optimized for mobile and photo gallery.",
+    subtitle: { vi: "Cosplay portfolio & highlights", en: "Cosplay portfolio & highlights" },
+    description: {
+      vi: "Trang portfolio trưng bày ảnh cosplay, props, và thông tin đặt lịch.",
+      en: "Portfolio for cosplay photos, props, and booking info.",
+    },
   },
   upcomingEvents: [],
   contact: { email: "", info: [], social: [], supports: [] },
@@ -254,6 +291,41 @@ app.delete(`${API_PREFIX}/albums/:id`, auth, async (req, res) => {
 const sharp = require("sharp")
 const MAX_FULL_WIDTH = 1920
 const JPEG_QUALITY = 85
+
+// Upload ảnh hero/profile (không cần album)
+app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
+  try {
+    const { base64 } = req.body
+    if (!base64) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    }
+    const buffer = Buffer.from(base64, "base64")
+    const sizeKb = Math.round(buffer.length / 1024)
+    console.log(`[UPLOAD/HERO] size≈${sizeKb}KB`)
+
+    let finalBuffer = buffer
+    const meta = await sharp(buffer).metadata()
+    const pipeline = sharp(buffer).rotate()
+    if (meta.width > MAX_FULL_WIDTH) {
+      finalBuffer = await pipeline
+        .resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer()
+    } else {
+      finalBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
+    }
+
+    const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const key = `site/hero-${uuid}.jpg`
+    await storage.upload(key, finalBuffer)
+    const url = storage.proxyUrl(key)
+    console.log(`[UPLOAD/HERO] Đã lưu: ${key}`)
+    res.json({ url })
+  } catch (err) {
+    console.error("[UPLOAD/HERO] Lỗi:", err.message)
+    res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
+  }
+})
 
 app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
   try {

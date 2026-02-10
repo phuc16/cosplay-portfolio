@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react"
-import { Link } from "react-router-dom"
 import axios from "axios"
 import Navbar from "../components/Navbar"
 import Gallery from "../components/Gallery"
@@ -10,9 +9,10 @@ import UpcomingEvents from "../components/UpcomingEvents"
 import Supports from "../components/Supports"
 import { SITE_CONFIG } from "../config"
 import { useLanguage } from "../contexts/LanguageContext"
+import { getLocalized } from "../utils/localize"
 
 export default function Portfolio() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [gallery, setGallery] = useState([])
   const [settings, setSettings] = useState(null)
   const [active, setActive] = useState({ open: false, src: "", caption: "" })
@@ -30,17 +30,37 @@ export default function Portfolio() {
 
   const cfg = settings || SITE_CONFIG
 
+  useEffect(() => {
+    document.title = getLocalized(cfg.artistName, lang) || "Cosplay Portfolio"
+  }, [cfg.artistName, lang])
+
   const totalPhotos = gallery.reduce((s, g) => s + (g.items?.length || 0), 0)
-  const heroImage = (() => {
+  const galleryHero = (() => {
     const all = gallery.flatMap((g) => g.items || [])
     const landscape = all.find((img) => img.width != null && img.height != null && img.width > img.height)
     return landscape || all[0] || null
   })()
-  const profileImage = heroImage || null
+  const heroImage = cfg.heroImageUrl
+    ? { src: cfg.heroImageUrl, url: cfg.heroImageUrl }
+    : galleryHero
+  const profileImage = heroImage
+
+  useEffect(() => {
+    const href = heroImage?.src || heroImage?.url
+    if (href) {
+      let link = document.querySelector('link[rel="icon"]')
+      if (!link) {
+        link = document.createElement("link")
+        link.rel = "icon"
+        document.head.appendChild(link)
+      }
+      link.href = href
+    }
+  }, [heroImage?.src, heroImage?.url])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-cosplay-dark text-gray-900 dark:text-slate-200">
-      <Navbar artistName={cfg.artistName} tagline={cfg.tagline} />
+      <Navbar artistName={getLocalized(cfg.artistName, lang)} tagline={getLocalized(cfg.tagline, lang)} heroImageUrl={heroImage?.src || heroImage?.url} />
 
       {/* Hero */}
       <section id="home" className="relative">
@@ -50,14 +70,14 @@ export default function Portfolio() {
             <div className="p-4 sm:p-6 md:p-12 order-2 md:order-1">
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">
                 <span className="bg-gradient-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent">
-                  {cfg.artistName}
+                  {getLocalized(cfg.artistName, lang)}
                 </span>
                 <span className="block text-gray-600 dark:text-slate-400 mt-1 sm:mt-2 text-lg sm:text-xl md:text-2xl">
-                  {cfg.hero?.subtitle || "Cosplay portfolio & highlights"}
+                  {getLocalized(cfg.hero?.subtitle, lang) || "Cosplay portfolio & highlights"}
                 </span>
               </h1>
               <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600 dark:text-slate-400 line-clamp-3 sm:line-clamp-none">
-                {cfg.hero?.description || "Portfolio for cosplay photos, props, and booking info. Optimized for mobile and photo gallery."}
+                {getLocalized(cfg.hero?.description, lang) || "Portfolio for cosplay photos, props, and booking info. Optimized for mobile and photo gallery."}
               </p>
               <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <a
@@ -131,7 +151,7 @@ export default function Portfolio() {
             </div>
             <div className="md:col-span-2">
               <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-slate-100">{t("aboutMe")}</h3>
-              <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-600 dark:text-slate-400">{cfg.about}</p>
+              <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-600 dark:text-slate-400">{getLocalized(cfg.about, lang)}</p>
               <div className="mt-4 flex gap-3 flex-wrap">
                 {(cfg.contact?.social || []).map((s) => (
                   <a
@@ -186,7 +206,7 @@ export default function Portfolio() {
               <h4 className="font-medium text-base sm:text-lg text-gray-900 dark:text-slate-200">{t("quickInfo")}</h4>
               <ul className="mt-2 sm:mt-3 text-sm text-gray-600 dark:text-slate-400 space-y-2">
                 {(cfg.contact?.info || []).map((item, i) => (
-                  <li key={i}>{item}</li>
+                  <li key={i}>{getLocalized(item, lang)}</li>
                 ))}
               </ul>
             </div>
@@ -198,10 +218,9 @@ export default function Portfolio() {
       <footer className="mt-8 sm:mt-12 border-t border-gray-200 dark:border-cosplay-border bg-gray-100 dark:bg-cosplay-darker">
         <ScrollReveal>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 text-xs sm:text-sm text-gray-500 dark:text-slate-500 flex flex-col md:flex-row justify-between items-center gap-2 text-center md:text-left">
-          <div>© {new Date().getFullYear()} {cfg.artistName}. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} {getLocalized(cfg.artistName, lang)}. All rights reserved.</div>
           <div className="flex gap-3 sm:gap-4 items-center flex-wrap justify-center">
             <span>{t("builtWith")}</span>
-            <Link to="/admin" className="text-gray-500 dark:text-slate-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors">{t("admin")}</Link>
           </div>
         </div>
         </ScrollReveal>

@@ -1,8 +1,9 @@
 import ScrollReveal from "./ScrollReveal"
 import { useLanguage } from "../contexts/LanguageContext"
+import { getLocalized } from "../utils/localize"
 
 export default function UpcomingEvents({ events = [] }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const count = events?.length || 0
 
   return (
@@ -24,12 +25,12 @@ export default function UpcomingEvents({ events = [] }) {
                         rel="noreferrer"
                         className="text-pink-500 dark:text-pink-400 hover:text-pink-600 dark:hover:text-pink-300 hover:underline"
                       >
-                        {ev.title}
+                        {getLocalized(ev.title, lang)}
                         {ev.date && <span className="text-gray-500 dark:text-slate-500 ml-2">({ev.date})</span>}
                       </a>
                     ) : (
                       <span className="text-gray-700 dark:text-slate-300">
-                        {ev.title}
+                        {getLocalized(ev.title, lang)}
                         {ev.date && <span className="text-gray-500 dark:text-slate-500 ml-2">({ev.date})</span>}
                       </span>
                     )}

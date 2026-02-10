@@ -3,7 +3,7 @@ import MobileMenu from "./MobileMenu"
 import { useTheme } from "../contexts/ThemeContext"
 import { useLanguage } from "../contexts/LanguageContext"
 
-export default function Navbar({ artistName = "Kamidayhehe", tagline = "Cosplayer • Prop Maker" }) {
+export default function Navbar({ artistName = "Kamidayhehe", tagline = "Cosplayer • Prop Maker", heroImageUrl }) {
   const { theme, toggleTheme } = useTheme()
   const { lang, setLang, t } = useLanguage()
 
@@ -13,9 +13,13 @@ export default function Navbar({ artistName = "Kamidayhehe", tagline = "Cosplaye
         <div className="flex items-center justify-between h-14 sm:h-16 min-h-[3.5rem]">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <Link to="/" className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-md bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white font-bold shadow-pink-glow text-sm sm:text-base">
-                C
-              </div>
+              {heroImageUrl ? (
+                <img src={heroImageUrl} alt="" className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-md object-cover shadow-pink-glow" />
+              ) : (
+                <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-md bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white font-bold shadow-pink-glow text-sm sm:text-base">
+                  C
+                </div>
+              )}
               <div className="min-w-0">
                 <span className="font-semibold text-base sm:text-lg text-gray-900 dark:text-slate-100 truncate block">{artistName}</span>
                 <div className="text-xs text-gray-500 dark:text-slate-500 truncate sm:block">{tagline}</div>

@@ -101,7 +101,7 @@ export const translations = {
 
     // Contact
     contactBooking: "Liên hệ",
-    contactDesc: "Muốn book hoặc hợp tác? Nhắn tin Zalo để bắt đầu.",
+    contactDesc: "Muốn đặt lịch hoặc hợp tác? Nhắn tin Zalo để bắt đầu.",
     phone: "Số điện thoại",
     messageZalo: "Nhắn tin Zalo",
 
