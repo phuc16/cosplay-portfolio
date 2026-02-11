@@ -129,6 +129,7 @@ const invalidateSettings = () => redis.del("settings")
 // GET SETTINGS (public, cached)
 const DEFAULT_SETTINGS = {
   heroImageUrl: "",
+  thumbnailImageUrl: "",
   artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" },
   tagline: { vi: "Cosplayer • Prop Maker • Photographer Friend", en: "Cosplayer • Prop Maker • Photographer Friend" },
   about: { vi: "", en: "" },
@@ -140,7 +141,7 @@ const DEFAULT_SETTINGS = {
     },
   },
   upcomingEvents: [],
-  contact: { email: "", info: [], social: [], supports: [] },
+  contact: { email: "", contactLinks: [], social: [], supports: [] },
 }
 
 app.get(`${API_PREFIX}/settings`, async (req, res) => {
@@ -161,7 +162,7 @@ app.get(`${API_PREFIX}/settings`, async (req, res) => {
       merged.contact = { ...DEFAULT_SETTINGS.contact, ...merged.contact }
       merged.contact.social = merged.contact.social || []
       merged.contact.supports = merged.contact.supports || []
-      merged.contact.info = merged.contact.info || []
+      merged.contact.contactLinks = merged.contact.contactLinks || []
     }
     merged.hero = { ...DEFAULT_SETTINGS.hero, ...merged.hero }
     merged.upcomingEvents = merged.upcomingEvents || []
@@ -323,6 +324,74 @@ app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
     res.json({ url })
   } catch (err) {
     console.error("[UPLOAD/HERO] Lỗi:", err.message)
+    res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
+  }
+})
+
+app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
+  try {
+    const { base64 } = req.body
+    if (!base64) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    }
+    const buffer = Buffer.from(base64, "base64")
+    const sizeKb = Math.round(buffer.length / 1024)
+    console.log(`[UPLOAD/THUMB] size≈${sizeKb}KB`)
+
+    let finalBuffer = buffer
+    const meta = await sharp(buffer).metadata()
+    const pipeline = sharp(buffer).rotate()
+    if (meta.width > MAX_FULL_WIDTH) {
+      finalBuffer = await pipeline
+        .resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer()
+    } else {
+      finalBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
+    }
+
+    const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const key = `site/thumb-${uuid}.jpg`
+    await storage.upload(key, finalBuffer)
+    const url = storage.proxyUrl(key)
+    console.log(`[UPLOAD/THUMB] Đã lưu: ${key}`)
+    res.json({ url })
+  } catch (err) {
+    console.error("[UPLOAD/THUMB] Lỗi:", err.message)
+    res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
+  }
+})
+
+app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
+  try {
+    const { base64 } = req.body
+    if (!base64) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    }
+    const buffer = Buffer.from(base64, "base64")
+    const sizeKb = Math.round(buffer.length / 1024)
+    console.log(`[UPLOAD/EVENT] size≈${sizeKb}KB`)
+
+    let finalBuffer = buffer
+    const meta = await sharp(buffer).metadata()
+    const pipeline = sharp(buffer).rotate()
+    if (meta.width > MAX_FULL_WIDTH) {
+      finalBuffer = await pipeline
+        .resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer()
+    } else {
+      finalBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
+    }
+
+    const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const key = `site/event-${uuid}.jpg`
+    await storage.upload(key, finalBuffer)
+    const url = storage.proxyUrl(key)
+    console.log(`[UPLOAD/EVENT] Đã lưu: ${key}`)
+    res.json({ url })
+  } catch (err) {
+    console.error("[UPLOAD/EVENT] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
 })

@@ -1,5 +1,6 @@
 export const SITE_CONFIG = {
   heroImageUrl: "",
+  thumbnailImageUrl: "",
   artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" },
   tagline: { vi: "Cosplayer • Prop Maker • Photographer Friend", en: "Cosplayer • Prop Maker • Photographer Friend" },
   about: {
@@ -16,11 +17,7 @@ export const SITE_CONFIG = {
   upcomingEvents: [],
   contact: {
     phone: "",
-    info: [
-      { vi: "Phục trang: tự làm / commission", en: "Costumes: self-made / commission" },
-      { vi: "Chụp ảnh: có", en: "Photography: available" },
-      { vi: "Sẵn sàng đi sự kiện trong nước và quốc tế", en: "Ready for events nationwide and international" },
-    ],
+    contactLinks: [],
     social: [
       { label: "Facebook", url: "https://facebook.com/kamimoe1911" },
       { label: "Instagram", url: "https://instagram.com/kamidayhehe" },

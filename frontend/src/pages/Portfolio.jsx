@@ -10,6 +10,7 @@ import Supports from "../components/Supports"
 import { SITE_CONFIG } from "../config"
 import { useLanguage } from "../contexts/LanguageContext"
 import { getLocalized } from "../utils/localize"
+import { contactPlatforms, getSocialIcon } from "../utils/platformIcons"
 
 export default function Portfolio() {
   const { t, lang } = useLanguage()
@@ -17,6 +18,7 @@ export default function Portfolio() {
   const [settings, setSettings] = useState(null)
   const [active, setActive] = useState({ open: false, src: "", caption: "" })
   const [loading, setLoading] = useState(true)
+  const [eventPopup, setEventPopup] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -43,6 +45,9 @@ export default function Portfolio() {
   const heroImage = cfg.heroImageUrl
     ? { src: cfg.heroImageUrl, url: cfg.heroImageUrl }
     : galleryHero
+  const heroSectionImage = cfg.thumbnailImageUrl
+    ? { src: cfg.thumbnailImageUrl, url: cfg.thumbnailImageUrl }
+    : heroImage || galleryHero
   const profileImage = heroImage
 
   useEffect(() => {
@@ -58,8 +63,82 @@ export default function Portfolio() {
     }
   }, [heroImage?.src, heroImage?.url])
 
+  const previewImageUrl = cfg.thumbnailImageUrl || heroImage?.src || heroImage?.url
+  useEffect(() => {
+    if (!previewImageUrl) return
+    const absolute = previewImageUrl.startsWith("http") ? previewImageUrl : `${window.location.origin}${previewImageUrl.startsWith("/") ? "" : "/"}${previewImageUrl}`
+    for (const { selector, key, val } of [
+      { selector: 'meta[property="og:image"]', key: "property", val: "og:image" },
+      { selector: 'meta[name="twitter:image"]', key: "name", val: "twitter:image" },
+    ]) {
+      let el = document.querySelector(selector)
+      if (!el) {
+        el = document.createElement("meta")
+        el.setAttribute(key, val)
+        document.head.appendChild(el)
+      }
+      el.setAttribute("content", absolute)
+    }
+  }, [previewImageUrl])
+
+  useEffect(() => {
+    if (!settings) return
+    const events = settings.upcomingEvents || []
+    const idx = events.findIndex((ev) => ev.showPopup)
+    if (idx === -1) return
+    const key = `eventPopup_${idx}`
+    if (sessionStorage.getItem(key)) return
+    const payload = { event: events[idx], key }
+    const id = setTimeout(() => setEventPopup(payload), 0)
+    return () => clearTimeout(id)
+  }, [settings])
+
+  const closeEventPopup = () => {
+    if (eventPopup) {
+      sessionStorage.setItem(eventPopup.key, "1")
+      setEventPopup(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-cosplay-dark text-gray-900 dark:text-slate-200">
+      {eventPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={closeEventPopup} aria-modal="true" role="dialog" aria-label={t("eventPopupTitle")}>
+          <div
+            className="bg-white dark:bg-cosplay-card rounded-xl shadow-xl border border-gray-200 dark:border-cosplay-border max-w-md w-full p-5 sm:p-6 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">{t("eventPopupTitle")}</h3>
+            {eventPopup.event.imageUrl && (
+              <img src={eventPopup.event.imageUrl} alt="" className="mt-2 w-full aspect-video object-cover rounded-lg" />
+            )}
+            <p className="mt-2 text-base font-medium text-pink-500 dark:text-pink-400">{getLocalized(eventPopup.event.title, lang)}</p>
+            {eventPopup.event.date && (
+              <p className="mt-1 text-sm text-gray-500 dark:text-slate-500">{eventPopup.event.date}</p>
+            )}
+            <div className="mt-4 flex gap-2 flex-wrap">
+              {eventPopup.event.url && (
+                <a
+                  href={eventPopup.event.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block px-4 py-2 rounded-md font-medium text-white bg-pink-500 hover:bg-pink-400"
+                >
+                  {t("eventPopupViewLink")}
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={closeEventPopup}
+                className="inline-block px-4 py-2 rounded-md border border-gray-300 dark:border-cosplay-border text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-cosplay-darker"
+              >
+                {t("eventPopupClose")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Navbar artistName={getLocalized(cfg.artistName, lang)} tagline={getLocalized(cfg.tagline, lang)} heroImageUrl={heroImage?.src || heroImage?.url} />
 
       {/* Hero */}
@@ -76,7 +155,7 @@ export default function Portfolio() {
                   {getLocalized(cfg.hero?.subtitle, lang) || "Cosplay portfolio & highlights"}
                 </span>
               </h1>
-              <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600 dark:text-slate-400 line-clamp-3 sm:line-clamp-none">
+              <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600 dark:text-slate-400 line-clamp-3 sm:line-clamp-none whitespace-pre-line">
                 {getLocalized(cfg.hero?.description, lang) || "Portfolio for cosplay photos, props, and booking info. Optimized for mobile and photo gallery."}
               </p>
               <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -100,9 +179,9 @@ export default function Portfolio() {
               </div>
             </div>
             <div className="h-56 sm:h-72 md:h-96 bg-gray-100 dark:bg-cosplay-darker flex items-center justify-center overflow-hidden md:border-l border-gray-200 dark:border-cosplay-border order-1 md:order-2">
-              {heroImage ? (
+              {heroSectionImage ? (
                 <img
-                  src={heroImage.src || heroImage.url}
+                  src={heroSectionImage.src || heroSectionImage.url}
                   alt="hero cosplay"
                   className="object-cover w-full h-full"
                 />
@@ -114,22 +193,6 @@ export default function Portfolio() {
         </div>
         </ScrollReveal>
       </section>
-
-      {/* Gallery */}
-      <section id="gallery" className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 mt-8 sm:mt-10">
-        <ScrollReveal delay={100}>
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100">{t("gallery")}</h2>
-        <p className="text-sm sm:text-base text-gray-600 dark:text-slate-400 mt-1 sm:mt-2">{t("galleryDesc")}</p>
-        {loading ? (
-          <div className="mt-6 text-gray-500 dark:text-slate-500">{t("loading")}</div>
-        ) : (
-          <Gallery gallery={gallery} onOpenLightbox={setActive} />
-        )}
-        </ScrollReveal>
-      </section>
-
-      {/* Sự kiện sắp tới */}
-      <UpcomingEvents events={cfg.upcomingEvents} />
 
       {/* About */}
       <section id="about" className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8 mt-8 sm:mt-12 pb-8 sm:pb-12">
@@ -151,23 +214,45 @@ export default function Portfolio() {
             </div>
             <div className="md:col-span-2">
               <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-slate-100">{t("aboutMe")}</h3>
-              <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-600 dark:text-slate-400">{getLocalized(cfg.about, lang)}</p>
-              <div className="mt-4 flex gap-3 flex-wrap">
-                {(cfg.contact?.social || []).map((s) => (
-                  <a
-                    key={s.label}
-                    href={s.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-pink-500 dark:text-pink-400 hover:text-pink-600 dark:hover:text-pink-300 hover:underline"
-                  >
-                    {s.label}
-                  </a>
-                ))}
+              <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-600 dark:text-slate-400 whitespace-pre-line">{getLocalized(cfg.about, lang)}</p>
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {(cfg.contact?.social || []).filter((s) => s?.url).map((s) => {
+                  const meta = getSocialIcon(s.label)
+                  const style = meta ? meta.borderClass : "border-gray-300 dark:border-cosplay-border hover:border-pink-500 dark:hover:border-pink-400"
+                  return (
+                    <a
+                      key={s.label + s.url}
+                      href={s.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border text-sm font-medium transition-colors ${style}`}
+                      style={meta?.color ? { color: meta.color } : {}}
+                    >
+                      {meta?.Icon ? <meta.Icon /> : null}
+                      {s.label}
+                    </a>
+                  )
+                })}
               </div>
             </div>
           </div>
         </div>
+        </ScrollReveal>
+      </section>
+
+      {/* Events */}
+      <UpcomingEvents events={cfg.upcomingEvents} />
+
+      {/* Gallery */}
+      <section id="gallery" className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 mt-8 sm:mt-10">
+        <ScrollReveal delay={100}>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100">{t("gallery")}</h2>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-slate-400 mt-1 sm:mt-2">{t("galleryDesc")}</p>
+        {loading ? (
+          <div className="mt-6 text-gray-500 dark:text-slate-500">{t("loading")}</div>
+        ) : (
+          <Gallery gallery={gallery} onOpenLightbox={setActive} />
+        )}
         </ScrollReveal>
       </section>
 
@@ -183,32 +268,76 @@ export default function Portfolio() {
           <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-slate-100">{t("contactBooking")}</h3>
           <p className="text-sm sm:text-base text-gray-600 dark:text-slate-400 mt-1 sm:mt-2">{t("contactDesc")}</p>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">{t("phone")}</label>
-              <div className="mt-1 flex flex-col sm:flex-row sm:flex-wrap gap-2 items-start sm:items-center">
-                <span className="text-gray-900 dark:text-slate-200 font-medium text-sm sm:text-base break-all">{cfg.contact?.phone ?? cfg.contact?.email ?? "—"}</span>
-                {(cfg.contact?.phone ?? cfg.contact?.email) && (() => {
-                    const raw = String(cfg.contact?.phone ?? cfg.contact?.email ?? "").replace(/\D/g, "")
-                    const zaloPhone = raw.startsWith("0") ? "84" + raw.slice(1) : raw.startsWith("84") ? raw : "84" + raw
-                    return (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">{t("phone")}</label>
+                {cfg.contact?.phone ? (
                   <a
-                    href={`https://zalo.me/${zaloPhone}`}
+                    href={`https://zalo.me/${(v => {
+                      const r = String(v).replace(/\D/g, "")
+                      return r.startsWith("0") ? "84" + r.slice(1) : r.startsWith("84") ? r : "84" + r
+                    })(cfg.contact.phone)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-block px-4 py-2.5 sm:py-2 rounded-md text-white bg-pink-500 hover:bg-pink-400 transition-colors text-center text-sm sm:text-base"
+                    className="mt-1 block text-gray-900 dark:text-slate-200 font-medium text-sm sm:text-base break-all hover:text-pink-500 dark:hover:text-pink-400"
                   >
-                    {t("messageZalo")}
+                    {cfg.contact.phone}
                   </a>
-                )})()}
+                ) : (
+                  <span className="mt-1 block text-gray-500 dark:text-slate-500 text-sm">—</span>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">{t("email")}</label>
+                {cfg.contact?.email ? (
+                  <a href={`mailto:${cfg.contact.email}`} className="mt-1 block text-gray-900 dark:text-slate-200 font-medium text-sm sm:text-base break-all hover:text-pink-500 dark:hover:text-pink-400">
+                    {cfg.contact.email}
+                  </a>
+                ) : (
+                  <span className="mt-1 block text-gray-500 dark:text-slate-500 text-sm">—</span>
+                )}
               </div>
             </div>
             <div>
-              <h4 className="font-medium text-base sm:text-lg text-gray-900 dark:text-slate-200">{t("quickInfo")}</h4>
-              <ul className="mt-2 sm:mt-3 text-sm text-gray-600 dark:text-slate-400 space-y-2">
-                {(cfg.contact?.info || []).map((item, i) => (
-                  <li key={i}>{getLocalized(item, lang)}</li>
-                ))}
-              </ul>
+              <h4 className="font-medium text-base sm:text-lg text-gray-900 dark:text-slate-200">{t("contactLinks")}</h4>
+              <div className="mt-2 sm:mt-3 flex flex-wrap gap-2">
+                {(cfg.contact?.contactLinks || []).filter((c) => c?.value?.trim()).map((c, i) => {
+                  const type = (c.type || "zalo").toLowerCase()
+                  const value = String(c.value || "").trim()
+                  const meta = contactPlatforms[type]
+                  let href = "#"
+                  let label = type
+                  if (type === "zalo") {
+                    const raw = value.replace(/\D/g, "")
+                    const num = raw.startsWith("0") ? "84" + raw.slice(1) : raw.startsWith("84") ? raw : "84" + raw
+                    href = `https://zalo.me/${num}`
+                    label = "Zalo"
+                  } else if (type === "whatsapp") {
+                    const raw = value.replace(/\D/g, "")
+                    const num = raw.startsWith("0") ? "84" + raw.slice(1) : raw.startsWith("84") ? raw : "84" + raw
+                    href = `https://wa.me/${num}`
+                    label = "WhatsApp"
+                  } else if (type === "gmail") {
+                    href = value ? `mailto:${value}` : "#"
+                    label = "Gmail"
+                  }
+                  const borderClass = meta?.borderClass ?? "border-gray-300 dark:border-cosplay-border hover:border-pink-500"
+                  return (
+                    <a
+                      key={i}
+                      href={href}
+                      target={type === "gmail" ? "_self" : "_blank"}
+                      rel={type === "gmail" ? undefined : "noreferrer"}
+                      onClick={type === "gmail" && value ? (e) => { e.preventDefault(); window.location.href = `mailto:${value}` } : undefined}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-md font-medium text-sm sm:text-base border transition-colors ${borderClass}`}
+                      style={meta?.color ? { color: meta.color } : {}}
+                    >
+                      {meta?.Icon ? <meta.Icon /> : null}
+                      {label}
+                    </a>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>

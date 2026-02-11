@@ -33,10 +33,14 @@ export const translations = {
     eventCount: "{n} event",
     eventCountPlural: "{n} events",
     noUpcomingEvents: "No upcoming events.",
+    eventPopupTitle: "Announcement",
+    eventPopupClose: "Close",
+    eventPopupViewLink: "View details",
 
     // About
     aboutMe: "About me",
     quickInfo: "Quick info",
+    contactLinks: "Contact",
 
     // Supports
     supportsTitle: "Supports",
@@ -46,6 +50,7 @@ export const translations = {
     contactBooking: "Contact",
     contactDesc: "Want to book or collaborate? Message Zalo to get started.",
     phone: "Phone",
+    email: "Email",
     messageZalo: "Message Zalo",
 
     // Footer
@@ -71,7 +76,7 @@ export const translations = {
     btnViewGallery: "Xem bộ sưu tập",
     btnAboutMe: "Về mình",
     photos: "Ảnh",
-    albums: "Albums",
+    albums: "Bộ ảnh",
     upcomingEvents: "Sự kiện sắp tới",
 
     // Gallery
@@ -80,9 +85,9 @@ export const translations = {
     noImages: "Chưa có ảnh",
     showMorePhotos: "Xem thêm {n} ảnh",
     showLess: "Ẩn bớt",
-    noAlbumsOrImages: "Chưa có album hoặc ảnh nào.",
-    noImagesInAlbum: "Chưa có ảnh trong album. Thêm ảnh qua Admin.",
-    showMoreAlbums: "Xem thêm {n} album",
+    noAlbumsOrImages: "Chưa có bộ ảnh hoặc ảnh nào.",
+    noImagesInAlbum: "Chưa có ảnh trong bộ ảnh. Thêm ảnh qua Admin.",
+    showMoreAlbums: "Xem thêm {n} bộ ảnh",
     photosCount: "{n} ảnh",
 
     // Upcoming Events
@@ -90,10 +95,14 @@ export const translations = {
     eventCount: "{n} sự kiện",
     eventCountPlural: "{n} sự kiện",
     noUpcomingEvents: "Chưa có sự kiện sắp tới.",
+    eventPopupTitle: "Thông báo",
+    eventPopupClose: "Đóng",
+    eventPopupViewLink: "Xem chi tiết",
 
     // About
     aboutMe: "Về mình",
     quickInfo: "Thông tin nhanh",
+    contactLinks: "Thông tin liên hệ",
 
     // Supports
     supportsTitle: "Hỗ trợ",
@@ -103,6 +112,7 @@ export const translations = {
     contactBooking: "Liên hệ",
     contactDesc: "Muốn đặt lịch hoặc hợp tác? Nhắn tin Zalo để bắt đầu.",
     phone: "Số điện thoại",
+    email: "Email",
     messageZalo: "Nhắn tin Zalo",
 
     // Footer

@@ -1,4 +1,5 @@
 import { useLanguage } from "../contexts/LanguageContext"
+import { supportPlatforms } from "../utils/platformIcons"
 
 export default function Supports({ supports = {} }) {
   const { t } = useLanguage()
@@ -22,18 +23,24 @@ export default function Supports({ supports = {} }) {
         <p className="text-sm sm:text-base text-gray-600 dark:text-slate-400 mt-1 sm:mt-2">
           {t("supportsDesc")}
         </p>
-        <div className="mt-4 flex gap-3 flex-wrap">
-        {items.map((s) => (
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+        {items.map((s) => {
+          const meta = supportPlatforms[s.label?.toLowerCase()]
+          const borderClass = meta?.borderClass ?? "border-gray-300 dark:border-cosplay-border hover:border-pink-500/50"
+          return (
           <a
             key={s.label}
             href={s.url}
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-2.5 rounded-md border border-gray-300 dark:border-cosplay-border text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-cosplay-card hover:border-pink-500/50 hover:text-pink-500 dark:hover:text-pink-400 transition-colors font-medium"
+            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-md border font-medium transition-colors ${borderClass}`}
+            style={meta?.color ? { color: meta.color } : {}}
           >
+            {meta?.Icon ? <meta.Icon /> : null}
             {s.label}
           </a>
-        ))}
+          )
+        })}
         </div>
       </div>
     </section>

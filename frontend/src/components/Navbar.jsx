@@ -22,7 +22,7 @@ export default function Navbar({ artistName = "Kamidayhehe", tagline = "Cosplaye
               )}
               <div className="min-w-0">
                 <span className="font-semibold text-base sm:text-lg text-gray-900 dark:text-slate-100 truncate block">{artistName}</span>
-                <div className="text-xs text-gray-500 dark:text-slate-500 truncate sm:block">{tagline}</div>
+                <div className="text-xs text-gray-500 dark:text-slate-500 sm:block whitespace-pre-line">{tagline}</div>
               </div>
             </Link>
           </div>
@@ -31,14 +31,14 @@ export default function Navbar({ artistName = "Kamidayhehe", tagline = "Cosplaye
             <a href="#home" className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors">
               {t("home")}
             </a>
-            <a href="#gallery" className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors">
-              {t("gallery")}
+            <a href="#about" className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors">
+              {t("about")}
             </a>
             <a href="#events" className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors">
               {t("events")}
             </a>
-            <a href="#about" className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors">
-              {t("about")}
+            <a href="#gallery" className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors">
+              {t("gallery")}
             </a>
             <a href="#supports" className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors">
               {t("supports")}

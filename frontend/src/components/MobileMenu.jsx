@@ -24,9 +24,9 @@ export default function MobileMenu() {
 
   const links = [
     { href: "#home", label: t("home") },
-    { href: "#gallery", label: t("gallery") },
-    { href: "#events", label: t("events") },
     { href: "#about", label: t("about") },
+    { href: "#events", label: t("events") },
+    { href: "#gallery", label: t("gallery") },
     { href: "#supports", label: t("supports") },
     { href: "#contact", label: t("contact") },
   ]
