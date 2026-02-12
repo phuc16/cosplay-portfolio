@@ -164,7 +164,7 @@ export default function Lightbox({ src, caption = "", images = [], currentIndex 
         </button>
       )}
 
-      <div className="relative z-10 w-full max-w-5xl h-[70vh] sm:h-[85vh] md:h-[90vh] flex items-center justify-center px-8 sm:px-12 md:px-16 overflow-hidden">
+      <div className="relative z-10 w-full max-w-5xl h-[70vh] sm:h-[85vh] md:h-[90vh] flex items-center justify-center px-8 sm:px-12 md:px-16 overflow-hidden sm:ml-[6.5rem] md:ml-[7.5rem] sm:mr-[6.5rem] md:mr-[7.5rem]">
         {hasMultiple && (
           <button
             type="button"
@@ -179,7 +179,7 @@ export default function Lightbox({ src, caption = "", images = [], currentIndex 
           </button>
         )}
 
-        <div className="relative flex-1 min-w-0 h-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="relative flex-1 min-w-0 h-full overflow-hidden p-4 sm:p-5" onClick={(e) => e.stopPropagation()}>
           {hasMultiple ? (
             <>
               <div
