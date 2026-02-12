@@ -19,11 +19,26 @@ export default {
       },
       animation: {
         "reveal-up": "revealUp 0.7s ease-out forwards",
+        "lightbox-in": "lightboxIn 0.35s ease-out forwards",
+        "lightbox-slide-next": "lightboxSlideNext 0.35s ease-out forwards",
+        "lightbox-slide-prev": "lightboxSlidePrev 0.35s ease-out forwards",
       },
       keyframes: {
         revealUp: {
           "0%": { opacity: "0", transform: "translateY(2rem)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        lightboxIn: {
+          "0%": { opacity: "0", transform: "scale(0.98)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        lightboxSlideNext: {
+          "0%": { opacity: "0", transform: "translateX(40px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        lightboxSlidePrev: {
+          "0%": { opacity: "0", transform: "translateX(-40px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
         },
       },
     },

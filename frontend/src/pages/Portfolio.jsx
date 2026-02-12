@@ -350,6 +350,12 @@ export default function Portfolio() {
           <div>© {new Date().getFullYear()} {getLocalized(cfg.artistName, lang)}. All rights reserved.</div>
           <div className="flex gap-3 sm:gap-4 items-center flex-wrap justify-center">
             <span>{t("builtWith")}</span>
+            <a
+              href="/admin"
+              className="text-gray-500 dark:text-slate-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors"
+            >
+              {t("admin")}
+            </a>
           </div>
         </div>
         </ScrollReveal>
@@ -359,7 +365,9 @@ export default function Portfolio() {
         <Lightbox
           src={active.src}
           caption={active.caption}
-          onClose={() => setActive({ open: false, src: "", caption: "" })}
+          images={active.images}
+          currentIndex={active.currentIndex ?? 0}
+          onClose={() => setActive({ open: false, src: "", caption: "", images: [], currentIndex: 0 })}
         />
       )}
     </div>

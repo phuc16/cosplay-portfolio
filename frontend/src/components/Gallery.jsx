@@ -112,6 +112,8 @@ function AlbumSection({ group, onOpenLightbox, t }) {
                   open: true,
                   src: img.fullSrc,
                   caption: `${group.group} — ${idx + 1}`,
+                  images: items.map((i, j) => ({ src: i.fullSrc || i.src, caption: `${group.group} — ${j + 1}` })),
+                  currentIndex: idx,
                 })
               }
             />
@@ -153,6 +155,8 @@ function AlbumSection({ group, onOpenLightbox, t }) {
                     open: true,
                     src: img.fullSrc,
                     caption: `${group.group} — ${idx + 1}`,
+                    images: items.map((i, j) => ({ src: i.fullSrc || i.src, caption: `${group.group} — ${j + 1}` })),
+                    currentIndex: idx,
                   })
                 }
               />
