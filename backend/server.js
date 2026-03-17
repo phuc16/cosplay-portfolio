@@ -205,8 +205,8 @@ app.get(`${API_PREFIX}/gallery`, async (req, res) => {
       return res.json(JSON.parse(cache))
     }
 
-    const [albums] = await db.query("SELECT * FROM albums ORDER BY id")
-    const [images] = await db.query("SELECT * FROM images ORDER BY id")
+    const [albums] = await db.query("SELECT * FROM albums ORDER BY sort_order ASC, id ASC")
+    const [images] = await db.query("SELECT * FROM images ORDER BY sort_order ASC, id ASC")
     console.log(`[GALLERY] DB: ${albums.length} albums, ${images.length} images`)
 
     const grouped = albums.map((a) => ({
@@ -234,7 +234,7 @@ app.get(`${API_PREFIX}/gallery`, async (req, res) => {
 // ALBUMS CRUD
 app.get(`${API_PREFIX}/albums`, auth, async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT * FROM albums ORDER BY id")
+    const [rows] = await db.query("SELECT * FROM albums ORDER BY sort_order ASC, id ASC")
     console.log(`[ALBUMS] List: ${rows.length} albums`)
     res.json(rows)
   } catch (err) {
@@ -246,9 +246,10 @@ app.get(`${API_PREFIX}/albums`, auth, async (req, res) => {
 app.post(`${API_PREFIX}/albums`, auth, async (req, res) => {
   try {
     const { title, description } = req.body
+    const [[{ nextOrder }]] = await db.query("SELECT COALESCE(MAX(sort_order), 0) + 1 AS nextOrder FROM albums")
     const [r] = await db.query(
-      "INSERT INTO albums(title, description) VALUES(?,?)",
-      [title || "Untitled", description || null]
+      "INSERT INTO albums(title, description, sort_order) VALUES(?,?,?)",
+      [title || "Untitled", description || null, nextOrder]
     )
     invalidateGallery()
     console.log(`[ALBUMS] Created: ${title || "Untitled"} (id=${r.insertId})`)
@@ -256,6 +257,28 @@ app.post(`${API_PREFIX}/albums`, auth, async (req, res) => {
   } catch (err) {
     console.error("[ALBUMS] Lỗi create:", err)
     res.status(500).json({ error: "server_error", message: "Không tạo được album." })
+  }
+})
+
+app.put(`${API_PREFIX}/albums/reorder`, auth, async (req, res) => {
+  try {
+    const { albumIds } = req.body
+    if (!Array.isArray(albumIds) || albumIds.length === 0) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần mảng albumIds." })
+    }
+    const placeholders = albumIds.map((_, i) => `WHEN ? THEN ?`).join(" ")
+    const values = albumIds.flatMap((id, i) => [id, i])
+    const idsList = albumIds.map(() => "?").join(",")
+    await db.query(
+      `UPDATE albums SET sort_order = CASE id ${placeholders} END WHERE id IN (${idsList})`,
+      [...values, ...albumIds]
+    )
+    invalidateGallery()
+    console.log(`[ALBUMS] Reordered ${albumIds.length} albums`)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error("[ALBUMS] Lỗi reorder:", err)
+    res.status(500).json({ error: "server_error", message: "Không đổi thứ tự album." })
   }
 })
 
@@ -429,9 +452,13 @@ app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
     const width = outputMeta.width || null
     const height = outputMeta.height || null
 
+    const [[{ nextOrder }]] = await db.query(
+      "SELECT COALESCE(MAX(sort_order), 0) + 1 AS nextOrder FROM images WHERE album_id = ?",
+      [album_id]
+    )
     await db.query(
-      "INSERT INTO images(album_id, url, width, height) VALUES(?,?,?,?)",
-      [album_id, url, width, height]
+      "INSERT INTO images(album_id, url, width, height, sort_order) VALUES(?,?,?,?,?)",
+      [album_id, url, width, height, nextOrder]
     )
 
     invalidateGallery()
@@ -467,6 +494,29 @@ app.delete(`${API_PREFIX}/image/:id`, auth, async (req, res) => {
   } catch (err) {
     console.error("[IMAGE] Lỗi delete:", err)
     res.status(500).json({ error: "server_error", message: "Không xóa được ảnh." })
+  }
+})
+
+app.put(`${API_PREFIX}/albums/:id/images/reorder`, auth, async (req, res) => {
+  try {
+    const albumId = req.params.id
+    const { imageIds } = req.body
+    if (!Array.isArray(imageIds) || imageIds.length === 0) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần mảng imageIds." })
+    }
+    const placeholders = imageIds.map((_, i) => `WHEN ? THEN ?`).join(" ")
+    const values = imageIds.flatMap((id, i) => [id, i])
+    const idsList = imageIds.map(() => "?").join(",")
+    await db.query(
+      `UPDATE images SET sort_order = CASE id ${placeholders} END WHERE album_id = ? AND id IN (${idsList})`,
+      [...values, albumId, ...imageIds]
+    )
+    invalidateGallery()
+    console.log(`[ALBUMS] Reordered ${imageIds.length} images in album ${albumId}`)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error("[ALBUMS] Lỗi reorder:", err)
+    res.status(500).json({ error: "server_error", message: "Không đổi thứ tự được." })
   }
 })
 
