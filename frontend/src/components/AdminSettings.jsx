@@ -103,6 +103,7 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState("")
+  const [draggedEventIdx, setDraggedEventIdx] = useState(null)
 
   useEffect(() => {
     axios
@@ -195,6 +196,54 @@ export default function AdminSettings() {
       setArr(next, arrKey, arr)
       return next
     })
+  }
+
+  const reorderEvents = (fromIdx, toIdx) => {
+    const events = config.upcomingEvents || []
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= events.length || toIdx >= events.length) return
+    const next = [...events]
+    const [removed] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, removed)
+    const nextConfig = { ...config, upcomingEvents: next }
+    setConfig(nextConfig)
+    setSaving(true)
+    setMsg("")
+    axios
+      .put("/api/settings", nextConfig)
+      .then(() => setMsg("Đã lưu thứ tự."))
+      .catch(() => setMsg("Lỗi lưu thứ tự."))
+      .finally(() => setSaving(false))
+  }
+
+  const onEventDragStart = (e, idx) => {
+    setDraggedEventIdx(idx)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", String(idx))
+    e.currentTarget.closest("[data-event-row]")?.classList.add("opacity-50", "ring-2", "ring-pink-500")
+  }
+  const onEventDragEnd = (e) => {
+    e.currentTarget.closest("[data-event-row]")?.classList.remove("opacity-50", "ring-2", "ring-pink-500")
+    setDraggedEventIdx(null)
+  }
+  const onEventDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = "move"
+  }
+  const onEventDrop = (e, toIdx) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.currentTarget.closest("[data-event-row]")?.classList.remove("ring-2", "ring-pink-400")
+    const fromIdx = draggedEventIdx
+    if (fromIdx == null || fromIdx === toIdx) return
+    reorderEvents(fromIdx, toIdx)
+    setDraggedEventIdx(null)
+  }
+  const onEventDragEnter = (e, idx) => {
+    if (draggedEventIdx != null && idx !== draggedEventIdx) e.currentTarget.closest("[data-event-row]")?.classList.add("ring-2", "ring-pink-400")
+  }
+  const onEventDragLeave = (e) => {
+    e.currentTarget.closest("[data-event-row]")?.classList.remove("ring-2", "ring-pink-400")
   }
 
   const [heroUploading, setHeroUploading] = useState(false)
@@ -425,10 +474,26 @@ export default function AdminSettings() {
 
       <div className="bg-white dark:bg-cosplay-card border border-gray-200 dark:border-cosplay-border rounded-lg p-4 space-y-4">
         <h3 className="font-medium text-gray-800 dark:text-slate-200">Sự kiện sắp tới</h3>
-        <p className="text-xs text-gray-500 dark:text-slate-500">Mỗi sự kiện: tên (vi/en), ngày, link (tùy chọn). Tick 1 sự kiện để hiện popup thông báo khi mở trang.</p>
+        <p className="text-xs text-gray-500 dark:text-slate-500">Kéo thả để đổi thứ tự. Mỗi sự kiện: tên (vi/en), ngày, link (tùy chọn). Tick 1 sự kiện để hiện popup thông báo khi mở trang.</p>
         {(config.upcomingEvents || []).map((ev, i) => (
-          <div key={i} className="flex flex-col gap-2 p-2 border border-gray-200 dark:border-cosplay-border rounded-md">
-            <div className="flex items-center gap-2 flex-wrap">
+          <div
+            key={i}
+            data-event-row
+            onDragOver={onEventDragOver}
+            onDrop={(e) => onEventDrop(e, i)}
+            onDragEnter={(e) => onEventDragEnter(e, i)}
+            onDragLeave={onEventDragLeave}
+            className="flex flex-col gap-2 p-2 border border-gray-200 dark:border-cosplay-border rounded-md transition-shadow"
+          >
+            <div
+              draggable
+              onDragStart={(e) => onEventDragStart(e, i)}
+              onDragEnd={onEventDragEnd}
+              className="flex items-center gap-2 flex-wrap cursor-grab active:cursor-grabbing touch-none"
+              title="Kéo để đổi thứ tự"
+            >
+              <span className="shrink-0 text-gray-400 dark:text-slate-500 select-none" aria-hidden="true">⋮⋮</span>
+            <div className="flex items-center gap-2 flex-wrap flex-1">
               <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-400 cursor-pointer">
                 <input
                   type="checkbox"
@@ -448,6 +513,7 @@ export default function AdminSettings() {
                 />
                 Hiển thị popup khi mở trang
               </label>
+            </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input

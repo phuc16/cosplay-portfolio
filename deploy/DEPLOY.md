@@ -79,7 +79,9 @@ docker compose version
 
 ---
 
-## Bước 5: Clone project lên server
+## Bước 5: Chuẩn bị thư mục deploy
+
+Chỉ cần clone repo để lấy `docker-compose.pull.yml` và `.env.example`:
 
 ```bash
 cd /opt
@@ -88,6 +90,8 @@ cd cosplay-portfolio
 ```
 
 (Thay `YOUR_USERNAME` bằng username GitHub của bạn.)
+
+**Lưu ý:** Deploy dùng **pre-built images** từ Docker Hub (`phuc16/cosplay-backend`, `phuc16/cosplay-frontend`), không cần build trên server. Maintainer cần chạy `./scripts/build-push.sh` lần đầu để push images lên Docker Hub.
 
 ---
 
@@ -134,28 +138,22 @@ openssl rand -base64 16
 
 Lưu file: `Ctrl+O`, `Enter`, `Ctrl+X`.
 
-**Lưu ý:** Nếu dùng `DB_PASS` khác `root`, cần sửa MySQL healthcheck trong `docker-compose.yml`:
-
-```yaml
-healthcheck:
-  test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
-```
-
-Và thêm `MYSQL_ROOT_PASSWORD: ${DB_PASS}` vào `environment` của MySQL.
-
 ---
 
-## Bước 7: Chạy Docker Compose
+## Bước 7: Pull images và chạy
 
 ```bash
 cd /opt/cosplay-portfolio
-docker compose up -d --build
+docker compose -f docker-compose.pull.yml pull
+docker compose -f docker-compose.pull.yml up -d
 ```
+
+Chỉ cần **pull** và **up** – không build trên server.
 
 Kiểm tra:
 
 ```bash
-docker compose ps
+docker compose -f docker-compose.pull.yml ps
 ```
 
 Các service phải ở trạng thái `running`.
@@ -165,7 +163,7 @@ Các service phải ở trạng thái `running`.
 ## Bước 8: Chạy database migrations
 
 ```bash
-docker compose exec backend npm run migrate
+docker compose -f docker-compose.pull.yml exec backend npm run migrate
 ```
 
 ---
@@ -245,21 +243,40 @@ ufw status
 ## Tóm tắt lệnh sau khi setup
 
 ```bash
-# Vào thư mục project
 cd /opt/cosplay-portfolio
 
-# Pull code mới
-git pull
-
-# Build lại và chạy
-docker compose up -d --build
+# Cập nhật images mới (khi maintainer push phiên bản mới)
+docker compose -f docker-compose.pull.yml pull
+docker compose -f docker-compose.pull.yml up -d
 
 # Chạy migration (nếu có thay đổi)
-docker compose exec backend npm run migrate
+docker compose -f docker-compose.pull.yml exec backend npm run migrate
 
 # Xem logs
-docker compose logs -f
+docker compose -f docker-compose.pull.yml logs -f
 ```
+
+---
+
+## Phụ lục: Build và push images (cho maintainer)
+
+Khi thay đổi code, cần build và push images lên Docker Hub:
+
+```bash
+# Đăng nhập Docker Hub
+docker login
+
+# Chạy script (Linux/Mac)
+./scripts/build-push.sh
+
+# Hoặc Windows PowerShell
+.\scripts\build-push.ps1
+
+# Push với tag cụ thể (vd: v1.0)
+./scripts/build-push.sh v1.0
+```
+
+Images: `phuc16/cosplay-backend:latest`, `phuc16/cosplay-frontend:latest`
 
 ---
 
