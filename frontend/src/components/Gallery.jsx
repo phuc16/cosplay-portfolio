@@ -53,11 +53,10 @@ function LazyImage({ src, alt, onClick, large = false, noMargin = false }) {
   )
 }
 
-/** Số cột responsive khi expanded */
-function getColumnsClass(itemCount) {
-  if (itemCount <= 2) return "columns-1 sm:columns-2"
-  if (itemCount <= 6) return "columns-1 sm:columns-2 md:columns-3"
-  return "columns-2 sm:columns-3 md:columns-3 lg:columns-4"
+function getGridClass(itemCount) {
+  if (itemCount <= 2) return "grid-cols-1 sm:grid-cols-2"
+  if (itemCount <= 6) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
+  return "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4"
 }
 
 function AlbumSection({ group, onOpenLightbox, t }) {
@@ -70,7 +69,7 @@ function AlbumSection({ group, onOpenLightbox, t }) {
   const remainder = count - shown
 
   const largeThumbs = count <= 3
-  const colsClass = getColumnsClass(count)
+  const colsClass = getGridClass(count)
 
   if (count === 0) {
     return (
@@ -140,16 +139,14 @@ function AlbumSection({ group, onOpenLightbox, t }) {
         </div>
       ) : (
         <>
-          <div
-            className={`${colsClass} gap-3 sm:gap-4`}
-            style={{ columnFill: "balance" }}
-          >
+          <div className={`grid ${colsClass} gap-3 sm:gap-4`}>
             {visible.map((img, idx) => (
               <LazyImage
                 key={img.id || idx}
                 src={img.src}
                 alt={group.group}
                 large={largeThumbs}
+                noMargin
                 onClick={() =>
                   onOpenLightbox({
                     open: true,

@@ -7,16 +7,75 @@ if (!process.env.JWT_SECRET) {
 const express = require("express")
 const cors = require("cors")
 const jwt = require("jsonwebtoken")
+const { rateLimit } = require("express-rate-limit")
+const { RedisStore } = require("rate-limit-redis")
 const db = require("./db")
 const redis = require("./redis")
 const auth = require("./auth")
 const storage = require("./storage")
 
 const app = express()
-const BODY_LIMIT = "500mb"
+const UPLOAD_LIMIT = "500mb"
+const largeJson = express.json({ limit: UPLOAD_LIMIT })
+const smallJson = express.json({ limit: "1mb" })
 
 app.use(cors())
-app.use(express.json({ limit: BODY_LIMIT }))
+app.use((req, res, next) => {
+  if (req.method === "POST" && /^\/api\/(image$|upload\/)/.test(req.path)) {
+    return largeJson(req, res, next)
+  }
+  return smallJson(req, res, next)
+})
+
+// Rate limiting (chống DDoS)
+const keyGen = (req) =>
+  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+
+const makeStore = (prefix) =>
+  new RedisStore({ sendCommand: (...args) => redis.call(...args), prefix })
+
+// Public API: 120 req/phút
+const publicLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:public:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Public IP ${keyGen(req)} bị chặn: ${req.method} ${req.url}`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều yêu cầu. Thử lại sau." })
+  },
+})
+
+// Storage proxy: 300 req/phút (ảnh được load nhiều hơn)
+const storageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:storage:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Storage IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều yêu cầu. Thử lại sau." })
+  },
+})
+
+// Global: 600 req/phút hard ceiling per IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:global:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Global IP ${keyGen(req)} bị chặn: ${req.method} ${req.url}`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều yêu cầu. Thử lại sau." })
+  },
+})
+app.use(globalLimiter)
 
 // Request logging
 app.use((req, res, next) => {
@@ -35,10 +94,10 @@ const API_PREFIX = "/api"
 // Error handler for payload too large (413)
 app.use((err, req, res, next) => {
   if (err.type === "entity.too.large") {
-    console.error(`[ERROR] Payload too large: ${req.url} - limit ${BODY_LIMIT}`)
+    console.error(`[ERROR] Payload too large: ${req.url} - limit ${UPLOAD_LIMIT}`)
     return res.status(413).json({
       error: "payload_too_large",
-      message: `Ảnh quá lớn. Giới hạn: ${BODY_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
+      message: `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
     })
   }
   next(err)
@@ -106,7 +165,7 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 const invalidateGallery = () => redis.del("gallery")
 
 // GET /api/storage/:path+ - proxy file từ MinIO (public)
-app.get(new RegExp(`^${API_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/storage/(.+)$`), async (req, res) => {
+app.get(new RegExp(`^${API_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/storage/(.+)$`), storageLimiter, async (req, res) => {
   try {
     const key = decodeURIComponent(req.path.replace(/^\/api\/storage\//, ""))
     if (!key || key.includes("..")) {
@@ -144,7 +203,7 @@ const DEFAULT_SETTINGS = {
   contact: { email: "", contactLinks: [], social: [], supports: [] },
 }
 
-app.get(`${API_PREFIX}/settings`, async (req, res) => {
+app.get(`${API_PREFIX}/settings`, publicLimiter, async (req, res) => {
   try {
     const cache = await redis.get("settings")
     if (cache) {
@@ -197,7 +256,7 @@ app.put(`${API_PREFIX}/settings`, auth, async (req, res) => {
 })
 
 // GET GALLERY - grouped by album (CACHE REDIS)
-app.get(`${API_PREFIX}/gallery`, async (req, res) => {
+app.get(`${API_PREFIX}/gallery`, publicLimiter, async (req, res) => {
   try {
     const cache = await redis.get("gallery")
     if (cache) {
@@ -538,5 +597,5 @@ app.listen(5000, () => {
   }).catch((e) => {
     console.warn("[SERVER] MinIO init failed:", e.message, "- uploads may fail")
   })
-  console.log(`[SERVER] Backend listening on :5000, body limit ${BODY_LIMIT}`)
+  console.log(`[SERVER] Backend listening on :5000, body limit ${UPLOAD_LIMIT}`)
 })
