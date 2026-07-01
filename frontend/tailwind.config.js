@@ -16,6 +16,7 @@ export default {
       boxShadow: {
         "pink-glow": "0 0 20px rgba(236, 72, 153, 0.3)",
         "pink-soft": "0 4px 14px rgba(236, 72, 153, 0.15)",
+        "pink-hover": "0 20px 25px -5px rgba(236, 72, 153, 0.20), 0 8px 10px -6px rgba(236, 72, 153, 0.20)",
       },
       animation: {
         "reveal-up": "revealUp 0.7s ease-out forwards",

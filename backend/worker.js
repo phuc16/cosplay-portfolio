@@ -16,13 +16,17 @@ async function getImageBuffer(img) {
 async function processImage(img) {
   const buffer = await getImageBuffer(img)
 
-  const thumb = await sharp(buffer)
+  // Preserve transparency: PNG source with alpha → PNG thumb (keeps tách-nền); else JPEG.
+  const meta = await sharp(buffer).metadata()
+  const base = sharp(buffer)
     .rotate() // auto-orient từ EXIF (ảnh điện thoại)
     .resize(THUMB_WIDTH, null, { withoutEnlargement: true })
-    .jpeg({ quality: JPEG_QUALITY })
-    .toBuffer()
+  const thumb = await (meta.hasAlpha
+    ? base.png({ compressionLevel: 9 })
+    : base.jpeg({ quality: JPEG_QUALITY })).toBuffer()
+  const ext = meta.hasAlpha ? "png" : "jpg"
 
-  const thumbKey = `thumbs/${img.album_id}/${Date.now()}-${img.id}.jpg`
+  const thumbKey = `thumbs/${img.album_id}/${Date.now()}-${img.id}.${ext}`
   await storage.upload(thumbKey, thumb)
   const thumbUrl = storage.proxyUrl(thumbKey)
 

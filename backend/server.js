@@ -15,7 +15,7 @@ const auth = require("./auth")
 const storage = require("./storage")
 
 const app = express()
-const UPLOAD_LIMIT = "500mb"
+const UPLOAD_LIMIT = "50mb"
 const largeJson = express.json({ limit: UPLOAD_LIMIT })
 const smallJson = express.json({ limit: "1mb" })
 
@@ -25,6 +25,18 @@ app.use((req, res, next) => {
     return largeJson(req, res, next)
   }
   return smallJson(req, res, next)
+})
+
+// Error handler for payload too large (413) — must be immediately after body-parser
+app.use((err, req, res, next) => {
+  if (err.type === "entity.too.large") {
+    console.error(`[ERROR] Payload too large: ${req.url} - limit ${UPLOAD_LIMIT}`)
+    return res.status(413).json({
+      error: "payload_too_large",
+      message: `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
+    })
+  }
+  next(err)
 })
 
 // Rate limiting (chống DDoS)
@@ -91,17 +103,6 @@ app.use((req, res, next) => {
 
 const API_PREFIX = "/api"
 
-// Error handler for payload too large (413)
-app.use((err, req, res, next) => {
-  if (err.type === "entity.too.large") {
-    console.error(`[ERROR] Payload too large: ${req.url} - limit ${UPLOAD_LIMIT}`)
-    return res.status(413).json({
-      error: "payload_too_large",
-      message: `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
-    })
-  }
-  next(err)
-})
 
 // LOGIN ADMIN - check env (RAM), no DB + brute force protection
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin"
@@ -153,7 +154,7 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 
     await redis.del(attemptKey)
     await redis.del(lockKey)
-    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: "8h" })
     console.log(`[LOGIN] Đăng nhập thành công: ${username}`)
     res.json({ token })
   } catch (err) {
@@ -173,9 +174,11 @@ app.get(new RegExp(`^${API_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/storag
     }
     const buffer = await storage.getBuffer(key)
     const ext = key.split(".").pop()?.toLowerCase() || "jpg"
-    const ct = ext === "png" ? "image/png" : "image/jpeg"
+    const MIME = { png: "image/png", gif: "image/gif", webp: "image/webp", jpg: "image/jpeg", jpeg: "image/jpeg" }
+    const ct = MIME[ext] || "application/octet-stream"
     res.setHeader("Content-Type", ct)
     res.setHeader("Cache-Control", "public, max-age=86400")
+    res.setHeader("Access-Control-Allow-Origin", "*")
     res.send(buffer)
   } catch (err) {
     if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404) return res.status(404).end()
@@ -187,11 +190,20 @@ const invalidateSettings = () => redis.del("settings")
 
 // GET SETTINGS (public, cached)
 const DEFAULT_SETTINGS = {
+  colorScheme: "pink",
   heroImageUrl: "",
   thumbnailImageUrl: "",
+  heroImages: ["/refassets/hero1.svg", "/refassets/hero2.svg", "/refassets/hero3.svg"],
+  heroAccents: [],
+  heroCover: "/refassets/cover.svg",
+  logoUrl: "",
+  footerChar: "/refassets/footer.svg",
   artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" },
-  tagline: { vi: "Cosplayer • Prop Maker • Photographer Friend", en: "Cosplayer • Prop Maker • Photographer Friend" },
-  about: { vi: "", en: "" },
+  tagline: { vi: "Cosplayer • Prop Maker", en: "Cosplayer • Prop Maker" },
+  about: {
+    vi: "Xin chào! Mình làm cosplay chủ yếu theo thể loại anime/game, tự làm đồ, props và có kinh nghiệm chụp hình sự kiện. Nhận đặt lịch cho convention, photoshoot và collab.",
+    en: "Hi! I do cosplay mostly in anime/game genres, make my own costumes and props, and have experience shooting at events. Booking open for conventions, photoshoots and collabs.",
+  },
   hero: {
     subtitle: { vi: "Cosplay portfolio & highlights", en: "Cosplay portfolio & highlights" },
     description: {
@@ -199,8 +211,30 @@ const DEFAULT_SETTINGS = {
       en: "Portfolio for cosplay photos, props, and booking info.",
     },
   },
-  upcomingEvents: [],
-  contact: { email: "", contactLinks: [], social: [], supports: [] },
+  achievements: [
+    { title: { vi: "100+ Cosplay", en: "100+ Cosplays" }, description: { vi: "Anime, game & thiết kế gốc từ 2018", en: "Anime, game & original designs since 2018" } },
+    { title: { vi: "20+ Convention", en: "20+ Conventions" }, description: { vi: "Khách mời & thí sinh tại các sự kiện lớn ở VN", en: "Guest & competitor at major VN events" } },
+    { title: { vi: "10K+ Người theo dõi", en: "10K+ Followers" }, description: { vi: "Trên Facebook, Instagram & TikTok", en: "Across Facebook, Instagram & TikTok" } },
+  ],
+  upcomingEvents: [
+    { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "#", showPopup: true, imageUrl: "" },
+    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "#", showPopup: false, imageUrl: "" },
+    { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "#", showPopup: false, imageUrl: "" },
+  ],
+  contact: {
+    email: "hello@kamidayhehe.com",
+    phone: "+84 90 123 4567",
+    contactLinks: [],
+    social: [
+      { platform: "facebook", label: "Facebook", url: "https://facebook.com/kamimoe1911" },
+      { platform: "instagram", label: "Instagram", url: "https://instagram.com/kamidayhehe" },
+      { platform: "page", label: "Page", url: "https://facebook.com/kamimoe1911" },
+      { platform: "x", label: "X", url: "https://x.com/Kamidayhehe" },
+      { platform: "tiktok", label: "TikTok", url: "https://tiktok.com/@kamidayhehe" },
+      { platform: "discord", label: "Discord", url: "https://discord.gg/kamidayhehe" },
+    ],
+    supports: { gumroad: "https://kamidayhehe.gumroad.com", gank: "https://ganknow.com/kamidayhehe", paypal: "https://paypal.com/kamidayhehe" },
+  },
 }
 
 app.get(`${API_PREFIX}/settings`, publicLimiter, async (req, res) => {
@@ -217,10 +251,12 @@ app.get(`${API_PREFIX}/settings`, publicLimiter, async (req, res) => {
       : DEFAULT_SETTINGS
 
     const merged = { ...DEFAULT_SETTINGS, ...config }
+    merged.heroImages = merged.heroImages || []
+    merged.achievements = merged.achievements || []
     if (merged.contact) {
       merged.contact = { ...DEFAULT_SETTINGS.contact, ...merged.contact }
       merged.contact.social = merged.contact.social || []
-      merged.contact.supports = merged.contact.supports || []
+      merged.contact.supports = merged.contact.supports || { gumroad: "", gank: "", paypal: "" }
       merged.contact.contactLinks = merged.contact.contactLinks || []
     }
     merged.hero = { ...DEFAULT_SETTINGS.hero, ...merged.hero }
@@ -234,9 +270,30 @@ app.get(`${API_PREFIX}/settings`, publicLimiter, async (req, res) => {
   }
 })
 
+const ALLOWED_SETTINGS_KEYS = [
+  "colorScheme", "artistName", "tagline", "about", "heroImageUrl", "thumbnailImageUrl",
+  "heroImages", "heroAccents", "heroCover", "logoUrl", "footerChar", "achievements", "hero",
+  "upcomingEvents", "contact",
+]
+
+function sanitizeSettings(body) {
+  const out = {}
+  for (const key of ALLOWED_SETTINGS_KEYS) {
+    if (key in body) out[key] = body[key]
+  }
+  if (out.heroImages !== undefined && !Array.isArray(out.heroImages)) out.heroImages = []
+  if (out.heroAccents !== undefined && !Array.isArray(out.heroAccents)) out.heroAccents = []
+  if (out.achievements !== undefined && !Array.isArray(out.achievements)) out.achievements = []
+  if (out.upcomingEvents !== undefined && !Array.isArray(out.upcomingEvents)) out.upcomingEvents = []
+  for (const key of ["colorScheme", "heroImageUrl", "thumbnailImageUrl", "heroCover", "logoUrl", "footerChar"]) {
+    if (key in out && typeof out[key] !== "string") out[key] = ""
+  }
+  return out
+}
+
 app.put(`${API_PREFIX}/settings`, auth, async (req, res) => {
   try {
-    const config = JSON.stringify(req.body)
+    const config = JSON.stringify(sanitizeSettings(req.body))
     const [rows] = await db.query("SELECT id FROM site_settings LIMIT 1")
     if (rows.length > 0) {
       await db.query("UPDATE site_settings SET config=?, updated_at=NOW() WHERE id=?", [
@@ -325,6 +382,9 @@ app.put(`${API_PREFIX}/albums/reorder`, auth, async (req, res) => {
     if (!Array.isArray(albumIds) || albumIds.length === 0) {
       return res.status(400).json({ error: "invalid_input", message: "Cần mảng albumIds." })
     }
+    if (albumIds.some((id) => { const n = parseInt(id, 10); return isNaN(n) || n <= 0 || String(n) !== String(id).trim() })) {
+      return res.status(400).json({ error: "invalid_input", message: "albumIds phải là số nguyên dương." })
+    }
     const placeholders = albumIds.map((_, i) => `WHEN ? THEN ?`).join(" ")
     const values = albumIds.flatMap((id, i) => [id, i])
     const idsList = albumIds.map(() => "?").join(",")
@@ -375,6 +435,45 @@ const sharp = require("sharp")
 const MAX_FULL_WIDTH = 1920
 const JPEG_QUALITY = 85
 
+// Resize (honoring EXIF orientation) and re-encode. Transparency is preserved:
+// images WITH an alpha channel are written as PNG so background-removed
+// (tách nền) uploads stay transparent; opaque images stay JPEG for size.
+async function processImage(buffer) {
+  const meta = await sharp(buffer).metadata()
+  let pipeline = sharp(buffer).rotate()
+  if (meta.width > MAX_FULL_WIDTH) {
+    pipeline = pipeline.resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
+  }
+  if (meta.hasAlpha) {
+    return { buffer: await pipeline.png({ compressionLevel: 9 }).toBuffer(), ext: "png" }
+  }
+  return { buffer: await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer(), ext: "jpg" }
+}
+
+// ── Hero accent color: computed ONCE here at upload (no client-side canvas). ──
+// EXACT replication of the design's extractDominantColor + colorToTheme
+// (portfolio_standalone.html): saturation-weighted dominant color of the subject
+// (skip transparent a≤100 and near-black/near-white), then boost ×1.4.
+function _sat(r, g, b) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; return d === 0 ? 0 : d / (1 - Math.abs(mx + mn - 1)) }
+function _hex(r, g, b) { return "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("") }
+async function extractAccentHex(buffer) {
+  try {
+    const { data } = await sharp(buffer).resize(80, 80, { fit: "fill" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    let r = 0, g = 0, b = 0, tw = 0
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3], br = (data[i] + data[i + 1] + data[i + 2]) / 3
+      const sat = _sat(data[i], data[i + 1], data[i + 2])
+      if (a > 100 && br > 20 && br < 235) {
+        const w = 0.1 + sat * 6
+        r += data[i] * w; g += data[i + 1] * w; b += data[i + 2] * w; tw += w
+      }
+    }
+    const dom = tw > 0 ? [r / tw, g / tw, b / tw] : [100, 60, 180]
+    const boost = (v) => Math.min(255, Math.round(v * 1.4))
+    return _hex(boost(dom[0]), boost(dom[1]), boost(dom[2]))
+  } catch { return "#db2777" }
+}
+
 // Upload ảnh hero/profile (không cần album)
 app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
   try {
@@ -386,24 +485,14 @@ app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/HERO] size≈${sizeKb}KB`)
 
-    let finalBuffer = buffer
-    const meta = await sharp(buffer).metadata()
-    const pipeline = sharp(buffer).rotate()
-    if (meta.width > MAX_FULL_WIDTH) {
-      finalBuffer = await pipeline
-        .resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
-        .jpeg({ quality: JPEG_QUALITY })
-        .toBuffer()
-    } else {
-      finalBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
-    }
-
+    const { buffer: finalBuffer, ext } = await processImage(buffer)
     const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const key = `site/hero-${uuid}.jpg`
+    const key = `site/hero-${uuid}.${ext}`
     await storage.upload(key, finalBuffer)
     const url = storage.proxyUrl(key)
-    console.log(`[UPLOAD/HERO] Đã lưu: ${key}`)
-    res.json({ url })
+    const accentColor = await extractAccentHex(finalBuffer)
+    console.log(`[UPLOAD/HERO] Đã lưu: ${key} accent=${accentColor}`)
+    res.json({ url, accentColor })
   } catch (err) {
     console.error("[UPLOAD/HERO] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
@@ -420,24 +509,14 @@ app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/THUMB] size≈${sizeKb}KB`)
 
-    let finalBuffer = buffer
-    const meta = await sharp(buffer).metadata()
-    const pipeline = sharp(buffer).rotate()
-    if (meta.width > MAX_FULL_WIDTH) {
-      finalBuffer = await pipeline
-        .resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
-        .jpeg({ quality: JPEG_QUALITY })
-        .toBuffer()
-    } else {
-      finalBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
-    }
-
+    const { buffer: finalBuffer, ext } = await processImage(buffer)
     const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const key = `site/thumb-${uuid}.jpg`
+    const key = `site/thumb-${uuid}.${ext}`
     await storage.upload(key, finalBuffer)
     const url = storage.proxyUrl(key)
-    console.log(`[UPLOAD/THUMB] Đã lưu: ${key}`)
-    res.json({ url })
+    const accentColor = await extractAccentHex(finalBuffer)
+    console.log(`[UPLOAD/THUMB] Đã lưu: ${key} accent=${accentColor}`)
+    res.json({ url, accentColor })
   } catch (err) {
     console.error("[UPLOAD/THUMB] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
@@ -454,20 +533,9 @@ app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/EVENT] size≈${sizeKb}KB`)
 
-    let finalBuffer = buffer
-    const meta = await sharp(buffer).metadata()
-    const pipeline = sharp(buffer).rotate()
-    if (meta.width > MAX_FULL_WIDTH) {
-      finalBuffer = await pipeline
-        .resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
-        .jpeg({ quality: JPEG_QUALITY })
-        .toBuffer()
-    } else {
-      finalBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
-    }
-
+    const { buffer: finalBuffer, ext } = await processImage(buffer)
     const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const key = `site/event-${uuid}.jpg`
+    const key = `site/event-${uuid}.${ext}`
     await storage.upload(key, finalBuffer)
     const url = storage.proxyUrl(key)
     console.log(`[UPLOAD/EVENT] Đã lưu: ${key}`)
@@ -490,20 +558,9 @@ app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[IMAGE] Upload: album=${album_id}, size≈${sizeKb}KB`)
 
-    let finalBuffer = buffer
-    const meta = await sharp(buffer).metadata()
-    const pipeline = sharp(buffer).rotate() // auto-orient từ EXIF (ảnh điện thoại)
-    if (meta.width > MAX_FULL_WIDTH) {
-      finalBuffer = await pipeline
-        .resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
-        .jpeg({ quality: JPEG_QUALITY })
-        .toBuffer()
-    } else {
-      finalBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
-    }
-
+    const { buffer: finalBuffer, ext } = await processImage(buffer)
     const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const key = `images/${album_id}/${uuid}.jpg`
+    const key = `images/${album_id}/${uuid}.${ext}`
     await storage.upload(key, finalBuffer)
     const url = storage.proxyUrl(key)
 
@@ -525,7 +582,7 @@ app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
     res.json({ ok: true })
   } catch (err) {
     console.error("[IMAGE] Lỗi upload:", err.message)
-    res.status(500).json({ error: "server_error", message: "Upload thất bại. Kiểm tra kích thước ảnh (max 500MB) hoặc thử lại." })
+    res.status(500).json({ error: "server_error", message: `Upload thất bại. Kiểm tra kích thước ảnh (max ${UPLOAD_LIMIT}) hoặc thử lại.` })
   }
 })
 
@@ -562,6 +619,9 @@ app.put(`${API_PREFIX}/albums/:id/images/reorder`, auth, async (req, res) => {
     const { imageIds } = req.body
     if (!Array.isArray(imageIds) || imageIds.length === 0) {
       return res.status(400).json({ error: "invalid_input", message: "Cần mảng imageIds." })
+    }
+    if (imageIds.some((id) => { const n = parseInt(id, 10); return isNaN(n) || n <= 0 || String(n) !== String(id).trim() })) {
+      return res.status(400).json({ error: "invalid_input", message: "imageIds phải là số nguyên dương." })
     }
     const placeholders = imageIds.map((_, i) => `WHEN ? THEN ?`).join(" ")
     const values = imageIds.flatMap((id, i) => [id, i])

@@ -4,12 +4,14 @@ export default function AdminAlbumForm({ album, onSave, onCancel, title }) {
   const [titleVal, setTitleVal] = useState(album?.title || "")
   const [desc, setDesc] = useState(album?.description || "")
 
+  /* eslint-disable react-hooks/set-state-in-effect -- sync form fields when the edited album prop changes */
   useEffect(() => {
     if (album) {
       setTitleVal(album.title || "")
       setDesc(album.description || "")
     }
   }, [album])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const submit = (e) => {
     e.preventDefault()

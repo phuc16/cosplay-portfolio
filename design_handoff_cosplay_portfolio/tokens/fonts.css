@@ -1,0 +1,9 @@
+/* ===========================================================================
+   FONTS — Cosplay Portfolio
+   The source app intentionally uses the native system-UI sans stack (no
+   @font-face, no Google Fonts). There are therefore no webfont binaries to
+   ship. Font FAMILY tokens live in tokens/typography.css.
+
+   If a future brand refresh introduces a custom display face, declare its
+   @font-face rules here and point tokens/typography.css --font-display at it.
+   =========================================================================== */

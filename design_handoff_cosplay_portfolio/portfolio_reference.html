@@ -1,0 +1,1004 @@
+<!-- @dsCard group="Cosplay Portfolio" viewport="1280x820" name="Portfolio — Genshin Layout" subtitle="Info · Project · Contact&SP — dark pink, Genshin-style dashboard" -->
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cosplay Portfolio</title>
+<link rel="stylesheet" href="../../styles.css" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-page); color: var(--text-strong); font-family: var(--font-sans); }
+  a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: var(--cosplay-border); border-radius: 3px; }
+
+  /* ── Responsive (portfolio page) ─────────────────────────────── */
+  @media (max-width: 980px) {
+    .info-grid    { grid-template-columns: 1fr !important; }
+    .proj-grid    { grid-template-columns: 1fr !important; }
+    .contact-card { grid-template-columns: 1fr !important; }
+  }
+  @media (max-width: 760px) {
+    .nav-links    { display: none !important; }
+    .nav-inner    { padding: 0 16px !important; }
+    .sec-wrap     { padding-left: 16px !important; padding-right: 16px !important; }
+    .album-grid   { grid-template-columns: 1fr 1fr !important; }
+    .hero-card    { height: 440px !important; }
+    .hero-left    { max-width: 100% !important; padding: 0 24px 28px !important; }
+    .hero-title   { font-size: 36px !important; }
+    .contact-card { padding: 24px 20px !important; gap: 24px !important; }
+    .footer-char  { display: none !important; }
+  }
+  @media (max-width: 460px) {
+    .hero-card    { height: 400px !important; }
+    .hero-left    { padding: 0 18px 22px !important; }
+    .hero-title   { font-size: 30px !important; }
+    .album-grid   { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+/* ── COLOR SCHEMES ──────────────────────────────────────────────────────────
+   Admin picks a scheme → stored as settings.colorScheme in site_settings.
+   Frontend applies CSS vars on load from the cached /api/settings response.
+   ─────────────────────────────────────────────────────────────────────────── */
+const SCHEMES = {
+  pink:   { name:"Pink",   brand:"#ec4899", hover:"#f472b6", strong:"#db2777", glow:"rgba(236,72,153,.30)", soft:"rgba(236,72,153,.15)", grad1:"#f472b6", grad2:"#fb7185" },
+  blue:   { name:"Blue",   brand:"#3b82f6", hover:"#60a5fa", strong:"#2563eb", glow:"rgba(59,130,246,.30)",  soft:"rgba(59,130,246,.15)",  grad1:"#60a5fa", grad2:"#818cf8" },
+  purple: { name:"Purple", brand:"#8b5cf6", hover:"#a78bfa", strong:"#7c3aed", glow:"rgba(139,92,246,.30)", soft:"rgba(139,92,246,.15)", grad1:"#a78bfa", grad2:"#c084fc" },
+  amber:  { name:"Amber",  brand:"#f59e0b", hover:"#fbbf24", strong:"#d97706", glow:"rgba(245,158,11,.30)",  soft:"rgba(245,158,11,.15)",  grad1:"#fbbf24", grad2:"#fb923c" },
+  rose:   { name:"Rose",   brand:"#f43f5e", hover:"#fb7185", strong:"#e11d48", glow:"rgba(244,63,94,.30)",   soft:"rgba(244,63,94,.15)",   grad1:"#fb7185", grad2:"#fda4af" },
+};
+
+function applyScheme(name) {
+  const sc = SCHEMES[name] || SCHEMES.pink;
+  const r = document.documentElement;
+  r.style.setProperty('--brand',             sc.brand);
+  r.style.setProperty('--brand-hover',       sc.hover);
+  r.style.setProperty('--brand-strong',      sc.strong);
+  r.style.setProperty('--brand-soft',        sc.soft);
+  r.style.setProperty('--border-brand',      sc.soft.replace('rgba(', 'rgba(').replace('.15)', '.50)'));
+  r.style.setProperty('--text-link',         sc.brand);
+  r.style.setProperty('--shadow-pink-glow',  '0 0 20px ' + sc.glow);
+  r.style.setProperty('--shadow-pink-soft',  '0 4px 14px ' + sc.soft);
+  r.style.setProperty('--shadow-pink-hover', '0 20px 25px -5px ' + sc.glow + ', 0 8px 10px -6px ' + sc.glow);
+  r.style.setProperty('--pink-400',          sc.grad1);
+  r.style.setProperty('--rose-400',          sc.grad2);
+  r.style.setProperty('--pink-500',          sc.brand);
+}
+
+const P = (n) => `../../assets/placeholders/cos-${n}.jpg`;
+
+/* ── MOCK DATA ───────────────────────────────────────────────────────────────
+   In production every field below maps to a real backend source.
+   Replace this object with live API calls:
+     GET /api/settings  → all settings.* fields
+     GET /api/gallery   → albums[] + latestPhotos[]
+   ─────────────────────────────────────────────────────────────────────────── */
+const DATA = {
+  // GET /api/settings → config.colorScheme (admin-picked palette key)
+  colorScheme: "pink",
+
+  // GET /api/settings → config.artistName
+  artistName: "Kamidayhehe",
+
+  // GET /api/settings → config.tagline
+  tagline: "Cosplayer • Prop Maker • Photographer Friend",
+
+  // GET /api/settings → config.about  (vi / en localized)
+  about: "Hi! I do cosplay mostly in anime/game genres, make my own costumes and props, and have experience shooting at events. Booking open for conventions, photoshoots and collabs.",
+
+  // GET /api/settings → config.heroImages[]  (slideshow, falls back to config.heroImageUrl)
+  heroImages: [
+    "../../uploads/CFF23FE0-D463-4200-A297-AEB6CD8D36FF.png",
+    "../../uploads/2304F3E6-D7AE-459F-972F-6E4E1B14366F.png",
+    "../../uploads/8A70578C-2A23-4EB5-9AE8-F7A1BF01D5AE.png",
+  ],
+
+  heroCutouts: [true, true, true],
+  heroBlend:   ['normal','normal','normal'],
+
+  // Full-bleed cover image behind the gradient (GET /api/settings → config.heroCoverUrl)
+  heroCover: "../../uploads/Web1.png",
+
+  // Per-slide gradient theme — matches each character's dominant color
+  heroThemes: [
+    { c1:"#12042a", c2:"#3b1278", c3:"#0d0918", glow:"rgba(139,92,246,0.55)" },  // Raiden — deep violet
+    { c1:"#021a08", c2:"#0f4a20", c3:"#061209", glow:"rgba(34,197,94,0.45)"  },  // Nahida  — forest green
+    { c1:"#040e1e", c2:"#0d2d5c", c3:"#060c1a", glow:"rgba(96,165,250,0.45)" },  // Shenhe  — ice blue
+  ],
+
+  // GET /api/gallery → flatten all album items, take first 4 thumb_url values
+  latestPhotos: [
+    "../../uploads/CFF23FE0-D463-4200-A297-AEB6CD8D36FF.png",
+    "../../uploads/BC851DB6-6120-41B1-BD7A-FC19B7DF0DED.png",
+    "../../uploads/035E5BAD-139E-4F44-B99A-628540AEC7FA.png",
+    "../../uploads/8A70578C-2A23-4EB5-9AE8-F7A1BF01D5AE.png",
+  ],
+
+  // GET /api/gallery → albums[].{ id, title, cover (= items[0].thumb_url), count (= items.length), items[] (already returned by API — each item has thumb_url) }
+  albums: [
+    { id: 1, title: "Cosplay", count: 48,
+      cover: "../../uploads/CFF23FE0-D463-4200-A297-AEB6CD8D36FF.png",
+      items: [
+        "../../uploads/CFF23FE0-D463-4200-A297-AEB6CD8D36FF.png",
+        "../../uploads/BC851DB6-6120-41B1-BD7A-FC19B7DF0DED.png",
+        "../../uploads/82E81993-12BD-46D4-9DA4-5FABCE2F9FFF.png",
+        "../../uploads/AB43AB07-5E3D-4789-9347-4EEF28E3A8D4.png",
+        "../../uploads/F4F27ECA-B5E1-4BA9-A76C-6D657EB9A7C9-5843803f.png",
+        "../../uploads/Raiden-shogun-arm.png",
+      ] },
+    { id: 2, title: "Event", count: 23,
+      cover: "../../uploads/035E5BAD-139E-4F44-B99A-628540AEC7FA.png",
+      items: [
+        "../../uploads/035E5BAD-139E-4F44-B99A-628540AEC7FA.png",
+        "../../uploads/759C5381-4097-41CF-87ED-3E5433981584.png",
+        "../../uploads/Web1.png",
+        "../../uploads/67f895b8-0c32-4a5b-9ce4-e312b76d97a5.jpeg",
+      ] },
+    { id: 3, title: "Non-cos", count: 17,
+      cover: "../../uploads/8A70578C-2A23-4EB5-9AE8-F7A1BF01D5AE.png",
+      items: [
+        "../../uploads/8A70578C-2A23-4EB5-9AE8-F7A1BF01D5AE.png",
+        "../../uploads/Genshin_Nefer_Portrait.webp",
+        "../../uploads/Shenhe_Skin.webp",
+        "../../uploads/d63120fe-d974-4b48-a32d-1c3815654c3c.jpeg",
+      ] },
+  ],
+
+  // GET /api/settings → config.contact.social[]  { platform, label, url }
+  socials: [
+    { platform: "facebook", label: "Facebook", url: "https://facebook.com/kamimoe1911" },
+    { platform: "instagram",label: "Instagram",url: "https://instagram.com/kamidayhehe" },
+    { platform: "page",     label: "Page",     url: "https://facebook.com/kamimoe1911" },
+    { platform: "x",        label: "X",        url: "https://x.com/Kamidayhehe" },
+    { platform: "tiktok",   label: "TikTok",   url: "https://tiktok.com/@kamidayhehe" },
+    { platform: "discord",  label: "Discord",  url: "https://discord.gg/kamidayhehe" },
+  ],
+
+  // GET /api/settings → config.contact.supports  { gumroad, gank, paypal URLs }
+  supports: [
+    { platform: "gumroad", label: "Gumroad", url: "https://kamidayhehe.gumroad.com", color: "#FF90E8" },
+    { platform: "gank",    label: "Gank",    url: "https://ganknow.com/kamidayhehe",  color: "#E84C3D", icon: "../../assets/gank.png" },
+    { platform: "paypal",  label: "PayPal",  url: "https://paypal.com/kamidayhehe",   color: "#003087" },
+  ],
+
+  // GET /api/settings → config.achievements[]  { title, description }
+  // ⚠️  NEW FIELD — add to your site_settings JSON config in Admin → Site settings.
+  // Format: [{ "title": "100+ Cosplays", "description": "Since 2018" }, ...]
+  achievements: [
+    { title: "100+ Cosplays",      description: "Anime, game & original designs since 2018" },
+    { title: "20+ Conventions",    description: "Guest & competitor at major VN events" },
+    { title: "10K+ Followers",     description: "Across Facebook, Instagram & TikTok" },
+  ],
+
+  // GET /api/settings → config.upcomingEvents[]  { title, date, url, showPopup, imageUrl }
+  // Admin sets showPopup:true on any event to trigger the first-visit modal
+  upcomingEvents: [
+    { title: "Comic Con Vietnam 2026",   date: "Aug 15, 2026", url: "#", showPopup: true, imageUrl: "" },
+    { title: "AniMate Festival — guest", date: "Sep 02, 2026", url: "#" },
+    { title: "Studio drop (collab)",     date: "Sep 20, 2026", url: "#" },
+  ],
+
+  // GET /api/settings → config.contact.{ phone, email }
+  contact: { phone: "+84 90 123 4567", email: "hello@kamidayhehe.com" },
+
+  // GET /api/settings → config.footerChar  (transparent PNG, portrait)
+  footerChar: "../../uploads/BC851DB6-6120-41B1-BD7A-FC19B7DF0DED.png",
+};
+
+/* ── SVG ICONS ───────────────────────────────────────────────────────────── */
+const icons = {
+  moon: <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>,
+  sun:  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>,
+  chevL:<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>,
+  chevR:<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>,
+  cal:  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" strokeWidth="2"/><path strokeLinecap="round" strokeWidth="2" d="M16 2v4M8 2v4M3 10h18"/></svg>,
+  star: <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
+  ext:  <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>,
+};
+const socialIcons = {
+  gumroad: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1C5.92 1 1 5.92 1 12s4.92 11 11 11 11-4.92 11-11S18.08 1 12 1zm.78 15.6c-2.86 0-4.62-2.06-4.62-4.86 0-2.92 1.94-4.92 4.74-4.92 2.5 0 3.94 1.46 4.16 3.34h-2.4c-.16-.86-.74-1.42-1.74-1.42-1.4 0-2.26 1.1-2.26 2.96 0 1.84.84 2.94 2.3 2.94 1.04 0 1.78-.56 2.02-1.62h-2.02v-1.7h4.32V16.4h-1.78l-.18-1.06c-.5.78-1.36 1.26-2.56 1.26z"/></svg>,
+  paypal: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944 3.72a.77.77 0 01.758-.633h5.165c2.35 0 4.128.633 5.33 1.898 1.205 1.264 1.794 2.995 1.77 5.193-.048 3.19-.882 5.358-2.505 6.506-1.623 1.148-3.735 1.707-6.337 1.676H9.38l-.598 3.48a.641.641 0 01-.633.548z"/></svg>,
+  discord:  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.566 18.566 0 0 0-5.487 0 12.36 12.36 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 20.03 20.03 0 0 0 5.993 2.98.078.078 0 0 0 .084-.026c.462-.62.874-1.275 1.226-1.963.021-.04.001-.088-.041-.104a13.201 13.201 0 0 1-1.872-.878.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028 19.963 19.963 0 0 0 6.002-2.981.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>,
+  facebook: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>,
+  instagram:<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>,
+  page:     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>,
+  x:        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>,
+  tiktok:   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/></svg>,
+};
+const socialColors = { facebook:"#1877F2", instagram:"#E4405F", page:"#1877F2", x:"var(--slate-300)", tiktok:"var(--slate-300)", discord:"#5865F2" };
+
+/* ── NAVBAR ─────────────────────────────────────────────────────────────── */
+function Navbar({ theme, onToggleTheme, lang, onSetLang, onAdmin }) {
+  const navLinks = [
+    { label: lang==="vi"?"Thông tin":"Info",    href: "#info" },
+    { label: lang==="vi"?"Dự án":"Project",   href: "#project" },
+    { label: lang==="vi"?"Liên hệ":"Contact", href: "#contact" },
+  ];
+  const s = {
+    header: { position:"sticky", top:0, zIndex:30, background:"color-mix(in srgb, var(--bg-page) 55%, transparent)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", borderBottom:"1px solid color-mix(in srgb, var(--border-default) 40%, transparent)" },
+    inner:  { maxWidth:1280, margin:"0 auto", padding:"0 32px", height:64, display:"flex", alignItems:"center", justifyContent:"space-between" },
+    logo:   { display:"flex", alignItems:"center", gap:10 },
+    mark:   { width:36, height:36, borderRadius:8, background:"linear-gradient(135deg,var(--pink-500),var(--rose-600))", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:16, boxShadow:"var(--shadow-pink-glow)", flexShrink:0 },
+    name:   { fontWeight:600, fontSize:"var(--text-base)", color:"var(--text-strong)" },
+    tag:    { fontSize:"var(--text-xs)", color:"var(--text-muted)" },
+    nav:    { display:"flex", alignItems:"center", gap:28 },
+    link:   { fontSize:"var(--text-sm)", fontWeight:500, color:"var(--text-body)", transition:"color .15s", padding:"4px 0", borderBottom:"2px solid transparent" },
+    right:  { display:"flex", alignItems:"center", gap:10 },
+    langBtn:(active) => ({ padding:"3px 8px", borderRadius:6, border:"none", cursor:"pointer", fontSize:11, fontWeight:500, background: active ? "var(--brand)" : "transparent", color: active ? "#fff" : "var(--text-muted)" }),
+    iconBtn:{ width:32, height:32, borderRadius:8, border:"none", background:"transparent", color:"var(--text-body)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" },
+    adminBtn:{ fontSize:"var(--text-sm)", fontWeight:500, color:"var(--text-muted)", background:"transparent", border:"1px solid var(--border-default)", borderRadius:8, padding:"5px 14px", cursor:"pointer" },
+  };
+  return (
+    <header style={s.header}>
+      <div className="nav-inner" style={s.inner}>
+        <div style={s.logo}>
+          <div style={s.mark}>C</div>
+          <div>
+            <div style={s.name}>Kamidayhehe</div>
+            <div style={s.tag}>Cosplayer • Prop Maker</div>
+          </div>
+        </div>
+        <nav className="nav-links" style={s.nav}>
+          {navLinks.map(l => (
+            <a key={l.label} href={l.href} style={s.link}
+              onMouseEnter={e => e.target.style.color="var(--text-link)"}
+              onMouseLeave={e => e.target.style.color="var(--text-body)"}>{l.label}</a>
+          ))}
+        </nav>
+        <div style={s.right}>
+          <div style={{display:"flex",gap:2}}>
+            {["vi","en"].map(l => <button key={l} style={s.langBtn(lang===l)} onClick={()=>onSetLang(l)}>{l.toUpperCase()}</button>)}
+          </div>
+          <button style={s.iconBtn} onClick={onToggleTheme}>{theme==="dark" ? icons.moon : icons.sun}</button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ── COLOR EXTRACTION (auto-theme hero from image) ─────────────────────── */
+function getSaturation(r,g,b){
+  r/=255;g/=255;b/=255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+  return d===0?0:d/(1-Math.abs(max+min-1));
+}
+function extractDominantColor(src, cb) {
+  const img = new Image();
+  img.onload = () => {
+    const sz = 80;
+    const cv = document.createElement('canvas');
+    cv.width = sz; cv.height = sz;
+    const cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0, sz, sz);
+    const d = cx.getImageData(0,0,sz,sz).data;
+    let r=0,g=0,b=0,tw=0;
+    for(let i=0;i<d.length;i+=4){
+      const a=d[i+3],br=(d[i]+d[i+1]+d[i+2])/3;
+      const sat=getSaturation(d[i],d[i+1],d[i+2]);
+      if(a>100&&br>20&&br<235){
+        const w=0.1+sat*6;
+        r+=d[i]*w;g+=d[i+1]*w;b+=d[i+2]*w;tw+=w;
+      }
+    }
+    cb(tw>0?[Math.round(r/tw),Math.round(g/tw),Math.round(b/tw)]:[100,60,180]);
+  };
+  img.onerror=()=>cb([100,60,180]);
+  img.src=src;
+}
+function colorToTheme([r,g,b]){
+  const boost=v=>Math.min(255,Math.round(v*1.4));
+  const br=boost(r), bg_=boost(g), bb=boost(b);
+  return {
+    accent:    `rgb(${br},${bg_},${bb})`,
+    darkBase:  `rgb(${Math.round(r*.10)},${Math.round(g*.10)},${Math.round(b*.14)})`,
+    lightBase: `rgb(${Math.min(255,Math.round(r*.18+205))},${Math.min(255,Math.round(g*.18+205))},${Math.min(255,Math.round(b*.18+205))})`,
+    glow:      `rgba(${r},${g},${b},.55)`,
+  };
+}
+
+/* ── HERO BANNER ─────────────────────────────────────────────────────────── */
+function HeroBanner({ data, theme, lang }) {
+  const imgs = data.heroImages;
+  const [idx, setIdx] = useState(0);
+  const [prev, setPrev] = useState(null);
+  const [themes, setThemes] = useState({});
+  const [aspects, setAspects] = useState({});
+  const isCutout = (src, i) => {
+    if (data.heroCutouts && i !== undefined) return !!data.heroCutouts[i];
+    return src && (src.endsWith('.png') || src.endsWith('.webp'));
+  };
+
+  useEffect(() => {
+    imgs.forEach((src, i) => {
+      extractDominantColor(src, (rgb) => {
+        setThemes(prev => ({...prev, [i]: colorToTheme(rgb)}));
+      });
+      const probe = new Image();
+      probe.onload = () => setAspects(prev => ({...prev, [i]: probe.naturalWidth / probe.naturalHeight}));
+      probe.src = src;
+    });
+  }, [imgs]);
+
+  const isLandscape = (aspects[idx] || 1) > 1.2;
+
+  const colorTheme = themes[idx] || data.heroThemes?.[idx] || { c1:"#12042a", c2:"#3b1278", c3:"#0d0918", glow:"rgba(139,92,246,.55)" };
+  const isDark = theme !== "light";
+  const extractedTheme = themes[idx];
+  const accent    = extractedTheme?.accent    || data.heroThemes?.[idx]?.c2   || "#3b1278";
+  const glowColor = extractedTheme?.glow      || data.heroThemes?.[idx]?.glow || "rgba(139,92,246,.5)";
+  const darkBase  = extractedTheme?.darkBase  || "#08050f";
+  const lightBase = extractedTheme?.lightBase || "#ede8f8";
+  const baseBg = isDark ? "#080810" : "#ffffff";
+
+  const timerRef = useRef(null);
+
+  const advance = useCallback((dir) => {
+    const next = (idx + dir + imgs.length) % imgs.length;
+    setPrev(idx); setIdx(next);
+    setTimeout(() => setPrev(null), 750);
+  }, [idx, imgs.length]);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => advance(1), 4000);
+    return () => clearInterval(timerRef.current);
+  }, [advance]);
+
+  const s = {
+    wrap: { maxWidth:1280, margin:"0 auto", padding:"20px 32px 0", position:"relative" },
+    cardBg: { position:"relative", height:500, borderRadius:"var(--radius-lg)", overflow:"visible", border:"none",
+      boxShadow:`0 0 40px ${glowColor}`,
+      background:`linear-gradient(to right, ${baseBg} 0%, ${accent} 65%)`,
+      transition:"background 0.8s ease, box-shadow 0.8s ease" },
+    img:  (anim) => ({ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"center 25%", animation: anim, borderRadius:"var(--radius-lg)" }),
+    grad: { position:"absolute", inset:0, zIndex:3, background:"linear-gradient(90deg, rgba(13,13,20,.95) 0%, rgba(13,13,20,.75) 42%, rgba(13,13,20,.05) 100%)" },
+    left: { position:"absolute", inset:0, padding:"0 48px 36px", display:"flex", flexDirection:"column", justifyContent:"flex-end", maxWidth:520, zIndex:4 },
+    title:{ margin:0, fontSize:48, fontWeight:800, letterSpacing:-.02, background:"linear-gradient(90deg,var(--pink-400),var(--rose-400))", WebkitBackgroundClip:"text", backgroundClip:"text", color:"transparent" },
+    desc: { color:"var(--slate-300)", fontSize:"var(--text-base)", lineHeight:1.6, marginTop:10, marginBottom:24 },
+    btn:  { display:"inline-flex", alignItems:"center", gap:6, padding:"10px 22px", borderRadius:"var(--radius-sm)", background:"var(--brand)", color:"#fff", fontWeight:500, fontSize:"var(--text-sm)", border:"none", cursor:"pointer", boxShadow:"var(--shadow-pink-soft)" },
+    arrowL:{ position:"absolute", left:16, top:"50%", zIndex:5, transform:"translateY(-50%)", width:40, height:40, borderRadius:"var(--radius-full)", background:"rgba(236,72,153,.25)", border:"1px solid rgba(236,72,153,.4)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", cursor:"pointer", border:"none" },
+    arrowR:{ position:"absolute", right:16, top:"50%", zIndex:5, transform:"translateY(-50%)", width:40, height:40, borderRadius:"var(--radius-full)", background:"rgba(236,72,153,.25)", border:"1px solid rgba(236,72,153,.4)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", cursor:"pointer", border:"none" },
+    dots: { position:"absolute", bottom:16, left:"50%", zIndex:5, transform:"translateX(-50%)", display:"flex", gap:6 },
+    dot:  (a) => ({ width: a?20:6, height:6, borderRadius:3, background: a?"var(--pink-400)":"rgba(255,255,255,.3)", transition:"width .3s, background .3s" }),
+  };
+  return (
+    <div className="sec-wrap" style={s.wrap}>
+      <div className="hero-card" style={s.cardBg}>
+        {/* Full-bleed cover image — sits UNDER the gradient overlay */}
+        {data.heroCover && (
+          <img src={data.heroCover} alt="" style={{position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"center 25%", borderRadius:"var(--radius-lg)", zIndex:1}} />
+        )}
+        {/* Colored theme tint over the cover so the per-slide gradient still reads */}
+        {data.heroCover && (
+          <div style={{position:"absolute", inset:0, zIndex:2, borderRadius:"var(--radius-lg)", background:`linear-gradient(to right, ${baseBg} 0%, ${accent} 70%)`, opacity:0.55, mixBlendMode:"multiply", transition:"background 0.8s ease"}} />
+        )}
+        <div style={s.grad} />
+        {/* Portrait pop-out — portrait images on right, landscape images centered/large */}
+        {!isLandscape ? (
+          <div style={{position:"absolute", right:0, top:"-84px", bottom:0, width:"55%", zIndex:35, pointerEvents:"none", overflow:"hidden"}}>
+            <img key={"portrait"+idx} src={imgs[idx]} alt="" style={{position:"absolute", top:0, right:0, width:"100%", height:"auto", filter:`drop-shadow(0 0 50px ${glowColor})`, mixBlendMode: data.heroBlend?.[idx] || 'normal', animation:"hero-fade-in .6s ease-in-out", maskImage:"linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage:"linear-gradient(to bottom, black 65%, transparent 100%)"}}/>
+          </div>
+        ) : (
+          <div style={{position:"absolute", left:"50%", transform:"translateX(-50%)", top:"-84px", bottom:0, width:"80%", zIndex:35, pointerEvents:"none", overflow:"hidden"}}>
+            <img key={"portrait"+idx} src={imgs[idx]} alt="" style={{position:"absolute", top:0, left:"50%", transform:"translateX(-50%)", height:"100%", width:"auto", filter:`drop-shadow(0 0 60px ${glowColor})`, mixBlendMode: data.heroBlend?.[idx] || 'normal', animation:"hero-fade-in .6s ease-in-out", maskImage:"linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage:"linear-gradient(to bottom, black 65%, transparent 100%)"}}/>
+          </div>
+        )}
+        <div className="hero-left" style={s.left}>
+          <h1 className="hero-title" style={s.title}>{data.artistName}</h1>
+          <p style={s.desc}>{data.about}</p>
+          <button style={s.btn} onClick={()=>document.getElementById("project")?.scrollIntoView({behavior:"smooth"})}>
+            {lang==="vi"?"Xem dự án":"View Projects"} {icons.chevR}
+          </button>
+        </div>
+        <button style={s.arrowL} onClick={()=>advance(-1)}>{icons.chevL}</button>
+        <button style={s.arrowR} onClick={()=>advance(1)}>{icons.chevR}</button>
+        <div style={s.dots}>{imgs.map((_,i)=><div key={i} style={s.dot(i===idx)}/>)}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── INFO DASHBOARD (3-column): Schedule | Thông tin | Support+Thành tựu ── */
+function InfoSection({ data, onOpenPhoto, lang }) {
+  const vi = lang === "vi";
+  const L = { guestBanner: vi?"Ảnh mới nhất":"Guest Banner", info: vi?"Thông tin":"Info", support: vi?"Hỗ trợ":"Support", achievements: vi?"Thành tựu":"Achievements", viewMore: vi?"Xem thêm":"View More" };
+  const s = {
+    wrap: { maxWidth:1280, margin:"0 auto", padding:"80px 32px 0", position:"relative", zIndex:1, scrollMarginTop:80 },
+    grid: { display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:20 },
+    card: { background:"var(--surface-card)", border:"1px solid var(--border-default)", borderRadius:"var(--radius-lg)", padding:20, boxShadow:"var(--shadow-pink-soft)" },
+    secHead: { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 },
+    secTitle:{ margin:0, fontSize:"var(--text-base)", fontWeight:700, color:"var(--text-link)" },
+    socialRow: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 },
+    sRow: (col) => ({ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:"var(--radius-sm)", border:"1px solid var(--border-default)", color: col, cursor:"pointer", transition:"background .15s,border-color .15s" }),
+    sLabel: { fontSize:"var(--text-sm)", fontWeight:500 },
+
+    achList: { display:"flex", flexDirection:"column", gap:8 },
+    achRow: { display:"flex", gap:10, alignItems:"flex-start" },
+    achDot: { width:28, height:28, borderRadius:"var(--radius-full)", background:"var(--brand-soft)", border:"1px solid var(--border-brand)", display:"flex", alignItems:"center", justifyContent:"center", color:"var(--brand)", flexShrink:0, marginTop:2 },
+    achTitle:{ fontSize:"var(--text-sm)", fontWeight:600, color:"var(--text-strong)" },
+    achDesc: { fontSize:"var(--text-xs)", color:"var(--text-muted)", marginTop:2, lineHeight:1.4 },
+
+  };
+  return (
+    <div id="info" className="sec-wrap" style={s.wrap}>
+      <div className="info-grid" style={s.grid}>
+        {/* Col 1: Guest Banner */}
+        <div style={s.card}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {data.latestPhotos.map((src,i) => (
+              <div key={i} style={{aspectRatio:"1",borderRadius:"var(--radius-md)",overflow:"hidden",cursor:"pointer"}}
+                onMouseEnter={e=>{e.currentTarget.querySelector("img").style.transform="scale(1.05)"}}
+                onMouseLeave={e=>{e.currentTarget.querySelector("img").style.transform="scale(1)"}}
+                onClick={()=>onOpenPhoto(src)}>
+                <img src={src} alt="" style={{width:"100%",height:"100%",objectFit:"cover",transition:"transform .3s"}} />
+              </div>
+            ))}
+          </div>
+          <button
+            style={{marginTop:12,width:"100%",padding:"8px",borderRadius:"var(--radius-sm)",background:"transparent",border:"1px solid var(--border-default)",color:"var(--text-body)",fontWeight:500,fontSize:"var(--text-sm)",cursor:"pointer"}}
+            onMouseEnter={e=>{e.target.style.borderColor="var(--border-brand)";e.target.style.color="var(--text-link)"}}
+            onMouseLeave={e=>{e.target.style.borderColor="var(--border-default)";e.target.style.color="var(--text-body)"}}
+            onClick={()=>onOpenPhoto(data.latestPhotos[0])}>
+            {vi?"Xem thêm":"View More"}
+          </button>
+        </div>
+
+        {/* Col 2: Thông tin / Socials */}
+        <div style={s.card}>
+          <div style={s.secHead}>
+            <h3 style={s.secTitle}>{L.info}</h3>
+          </div>
+          <div style={s.socialRow}>
+            {data.socials.map(soc => {
+              const col = socialColors[soc.platform] || "var(--text-body)";
+              return (
+                <a key={soc.platform} href={soc.url} target="_blank" rel="noreferrer"
+                  style={s.sRow(col)}
+                  onMouseEnter={e=>{e.currentTarget.style.background=`${col}15`;e.currentTarget.style.borderColor=`${col}60`}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="var(--border-default)"}}>
+                  {socialIcons[soc.platform] || null}
+                  <span style={s.sLabel}>{soc.label}</span>
+                  <span style={{marginLeft:"auto"}}>{icons.ext}</span>
+                </a>
+              );
+            })}
+          </div>
+          <div style={{borderTop:"1px solid var(--border-default)",paddingTop:14,marginTop:14}}>
+            <h4 style={{margin:"0 0 10px",fontSize:"var(--text-sm)",fontWeight:700,color:"var(--text-link)"}}>{L.support}</h4>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {data.supports.map(sp => (
+              <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer"
+                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:"var(--radius-sm)",border:"1px solid var(--border-default)",color:sp.color,textDecoration:"none",transition:"background .15s,border-color .15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background=sp.color+"18";e.currentTarget.style.borderColor=sp.color+"70"}}
+                onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="var(--border-default)"}}>
+                {sp.icon
+                  ? <img src={sp.icon} alt={sp.label} style={{width:18,height:18,objectFit:"contain",flexShrink:0}}/>
+                  : socialIcons[sp.platform]
+                    ? <span style={{color:sp.color,display:"flex",flexShrink:0}}>{socialIcons[sp.platform]}</span>
+                    : <span style={{width:10,height:10,borderRadius:"50%",background:sp.color,flexShrink:0,display:"inline-block"}}/>
+                }
+                <span style={{fontSize:"var(--text-sm)",fontWeight:500}}>{sp.label}</span>
+                <span style={{marginLeft:"auto",color:"var(--text-muted)"}}>{icons.ext}</span>
+              </a>
+            ))}
+          </div>
+          </div>
+        </div>
+
+        {/* Col 3: Thành tựu */}
+        <div style={s.card}>
+          <div style={s.secHead}>
+            <h3 style={s.secTitle}>{L.achievements}</h3>
+          </div>
+          <div style={s.achList}>
+            {data.achievements.map((a,i) => (
+              <div key={i} style={s.achRow}>
+                <div style={s.achDot}>{icons.star}</div>
+                <div>
+                  <div style={s.achTitle}>{a.title}</div>
+                  <div style={s.achDesc}>{a.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── PROJECT + SCHEDULE ─────────────────────────────────────────────────── */
+function ProjectSection({ data, onOpenAlbum, lang }) {
+  const vi = lang === "vi";
+  const LP = { project: vi?"Dự án":"Project", schedule: vi?"Lịch":"Schedule" };
+  const s = {
+    wrap:      { maxWidth:1280, margin:"0 auto", padding:"28px 32px 0", scrollMarginTop:80 },
+    outerGrid: { display:"grid", gridTemplateColumns:"1fr 300px", gap:20 },
+    card:      { background:"var(--surface-card)", border:"1px solid var(--border-default)", borderRadius:"var(--radius-lg)", padding:20, boxShadow:"var(--shadow-pink-soft)" },
+    secTitle:  { margin:"0 0 16px", fontSize:"var(--text-base)", fontWeight:700, color:"var(--text-link)" },
+    albumGrid: { display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14 },
+    albumCard: { borderRadius:"var(--radius-md)", overflow:"hidden", border:"1px solid var(--border-default)", cursor:"pointer", background:"var(--bg-sunken)", position:"relative", transition:"transform .25s,box-shadow .25s" },
+    albumImg:  { width:"100%", aspectRatio:"4/5", objectFit:"cover", display:"block" },
+    albumFoot: { padding:"10px 14px", borderTop:"1px solid var(--border-default)" },
+    albumTitle:{ fontSize:"var(--text-sm)", fontWeight:600, color:"var(--text-strong)" },
+    albumCount:{ fontSize:"var(--text-xs)", color:"var(--text-muted)", marginTop:2 },
+    plusBtn:   { position:"absolute", top:8, right:8, width:26, height:26, borderRadius:"var(--radius-full)", background:"rgba(236,72,153,.25)", border:"1px solid rgba(236,72,153,.5)", color:"var(--pink-400)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, lineHeight:1 },
+    evList:    { display:"flex", flexDirection:"column", gap:10 },
+    evRow:     { display:"flex", gap:12, padding:"10px 12px", borderRadius:"var(--radius-sm)", border:"1px solid var(--border-default)", alignItems:"flex-start", cursor:"pointer", transition:"border-color .15s,background .15s" },
+    evDot:     { width:8, height:8, borderRadius:"var(--radius-full)", background:"var(--brand)", flexShrink:0, marginTop:5 },
+    evTitle:   { fontSize:"var(--text-sm)", fontWeight:600, color:"var(--text-strong)", lineHeight:1.3 },
+    evDate:    { fontSize:"var(--text-xs)", color:"var(--text-muted)", marginTop:3, display:"flex", alignItems:"center", gap:4 },
+  };
+  const [hov, setHov] = useState(null);
+  return (
+    <div id="project" className="sec-wrap" style={s.wrap}>
+      <div className="proj-grid" style={s.outerGrid}>
+        <div style={s.card}>
+          <h3 style={s.secTitle}>{LP.project}</h3>
+          <div className="album-grid" style={s.albumGrid}>
+            {data.albums.map((alb,i) => (
+              <div key={alb.id}
+                style={{...s.albumCard, transform: hov===i?"scale(1.02)":"none", boxShadow: hov===i?"var(--shadow-pink-hover)":"none"}}
+                onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)}
+                onClick={()=>onOpenAlbum(alb)}>
+                <img src={alb.cover} alt={alb.title} style={s.albumImg} />
+                <div style={s.plusBtn}>+</div>
+                <div style={s.albumFoot}>
+                  <div style={s.albumTitle}>{alb.title}</div>
+                  <div style={s.albumCount}>{alb.count} {vi?"ảnh":"photos"}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={s.card}>
+          <h3 style={s.secTitle}>{LP.schedule}</h3>
+          <div style={s.evList}>
+            {data.upcomingEvents.map((ev,i) => (
+              <a key={i} href={ev.url||"#"} target="_blank" rel="noreferrer"
+                style={s.evRow}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--border-brand)";e.currentTarget.style.background="var(--brand-soft)"}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border-default)";e.currentTarget.style.background="transparent"}}>
+                <div style={s.evDot}/>
+                <div>
+                  <div style={s.evTitle}>{ev.title}</div>
+                  <div style={s.evDate}>{icons.cal} {ev.date}</div>
+                </div>
+              </a>
+            ))}
+            {data.upcomingEvents.length === 0 && (
+              <p style={{color:"var(--text-muted)",fontSize:"var(--text-sm)",margin:0}}>No upcoming events.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── CONTACT & SP ────────────────────────────────────────────────────────── */
+function ContactSection({ data, lang }) {
+  const vi = lang === "vi";
+  const LC = { contact: vi?"Liên hệ":"Contact", support: vi?"Hỗ trợ":"Support" };
+  const BTN_W = 130;
+  const s = {
+    wrap:    { maxWidth:1280, margin:"0 auto", padding:"28px 32px 48px", scrollMarginTop:80, position:"relative", overflow:"visible" },
+    card:    { background:"var(--surface-card)", border:"1px solid var(--border-default)", borderBottom:"none", borderRadius:"var(--radius-lg)", padding:"28px 32px 28px", boxShadow:"var(--shadow-pink-soft)", display:"grid", gridTemplateColumns:"1fr 1fr", gap:32, position:"relative", overflow:"visible" },
+    title:   { margin:"0 0 14px", fontSize:"var(--text-base)", fontWeight:700, color:"var(--text-link)" },
+    label:   { fontSize:"var(--text-xs)", fontWeight:600, color:"var(--text-muted)", textTransform:"uppercase", letterSpacing:".06em" },
+    linkVal: { fontSize:"var(--text-sm)", fontWeight:500, color:"var(--text-link)", marginTop:4, textDecoration:"none", display:"block" },
+    btn:     (col) => ({ display:"inline-flex", alignItems:"center", justifyContent:"flex-start", gap:6, width:BTN_W, padding:"8px 12px", borderRadius:"var(--radius-sm)", border:`1px solid ${col}60`, color:col, fontSize:"var(--text-sm)", fontWeight:500, cursor:"pointer", background:`${col}10`, textDecoration:"none", boxSizing:"border-box" }),
+  };
+  return (
+    <div id="contact" className="sec-wrap" style={s.wrap}>
+      <div className="contact-card" style={s.card}>
+        {/* ── Contact ── */}
+        <div>
+          <h3 style={s.title}>{LC.contact}</h3>
+          <p style={{color:"var(--text-body)",fontSize:"var(--text-sm)",margin:"0 0 14px",lineHeight:1.6}}>
+            {vi?"Muốn đặt lịch hoặc hợp tác? Nhắn Zalo để bắt đầu nhé!":"Want to book or collaborate? Message Zalo or email to get started."}
+          </p>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+            <div>
+              <div style={s.label}>Phone / Zalo</div>
+              <a href="https://zalo.me/84901234567" target="_blank" rel="noreferrer" style={s.linkVal}>{data.contact.phone}</a>
+            </div>
+            <div>
+              <div style={s.label}>Email</div>
+              <a href={`mailto:${data.contact.email}`} style={s.linkVal}>{data.contact.email}</a>
+            </div>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {data.socials.map(soc => {
+              const col = socialColors[soc.platform] || "var(--brand)";
+              return (
+                <a key={soc.platform} href={soc.url} target="_blank" rel="noreferrer" style={s.btn(col)}
+                  onMouseEnter={e=>{e.currentTarget.style.background=col+"22";e.currentTarget.style.borderColor=col+"90"}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=col+"10";e.currentTarget.style.borderColor=col+"60"}}>
+                  {socialIcons[soc.platform] ? <span style={{display:"flex",flexShrink:0}}>{socialIcons[soc.platform]}</span> : null} {soc.label}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Support ── */}
+        <div>
+          <h3 style={s.title}>{LC.support}</h3>
+          <p style={{color:"var(--text-body)",fontSize:"var(--text-sm)",margin:"0 0 14px",lineHeight:1.6}}>
+            {vi?"Ủng hộ mình qua":"Support my work via"}
+          </p>
+          <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"flex-start"}}>
+            {data.supports.map(sp => (
+              <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer" style={s.btn(sp.color)}>
+                {sp.icon
+                  ? <img src={sp.icon} width={16} height={16} alt="" style={{objectFit:"contain",flexShrink:0}}/>
+                  : socialIcons[sp.platform] ? <span style={{display:"flex",flexShrink:0,color:sp.color}}>{socialIcons[sp.platform]}</span> : null
+                }
+                {sp.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* character now rendered at App level — remove from ContactSection card */}
+      </div>
+    </div>
+  );
+}
+
+/* ── EVENT POPUP (first-visit, sessionStorage-gated) ───────────────────── */
+function EventPopup({ event, onClose }) {
+  return (
+    <div onClick={onClose} role="dialog" aria-modal="true"
+      style={{position:"fixed",inset:0,zIndex:60,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.55)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}}>
+      <div onClick={e=>e.stopPropagation()}
+        style={{background:"var(--surface-card)",border:"1px solid var(--border-default)",borderRadius:"var(--radius-lg)",boxShadow:"var(--shadow-pink-glow)",maxWidth:420,width:"100%",padding:"20px 24px",overflow:"hidden"}}>
+        <h3 style={{margin:"0 0 4px",fontSize:"var(--text-lg)",fontWeight:700,color:"var(--text-strong)"}}>Announcement</h3>
+        {event.imageUrl && (
+          <img src={event.imageUrl} alt="" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",borderRadius:"var(--radius-md)",marginTop:8}} />
+        )}
+        <p style={{margin:"10px 0 2px",fontSize:"var(--text-base)",fontWeight:500,color:"var(--text-link)"}}>{event.title}</p>
+        {event.date && <p style={{margin:0,fontSize:"var(--text-sm)",color:"var(--text-muted)"}}>{event.date}</p>}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:16}}>
+          {event.url && event.url !== "#" && (
+            <a href={event.url} target="_blank" rel="noreferrer"
+              style={{padding:"8px 16px",borderRadius:"var(--radius-sm)",background:"var(--brand)",color:"#fff",fontWeight:500,fontSize:"var(--text-sm)",textDecoration:"none"}}>
+              View details
+            </a>
+          )}
+          <button onClick={onClose}
+            style={{padding:"8px 16px",borderRadius:"var(--radius-sm)",border:"1px solid var(--border-strong)",background:"transparent",color:"var(--text-body)",fontWeight:500,fontSize:"var(--text-sm)",cursor:"pointer"}}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── FOOTER ──────────────────────────────────────────────────────────────── */
+function Footer({ artistName, onAdmin }) {
+  return (
+    <footer style={{borderTop:"1px solid var(--border-default)", background:"var(--bg-sunken)", marginTop:8, position:"relative", zIndex:1}}>
+      <div style={{maxWidth:1280, margin:"0 auto", padding:"16px 32px", display:"flex", justifyContent:"space-between", color:"var(--text-muted)", fontSize:"var(--text-sm)"}}>
+        <span>© {new Date().getFullYear()} {artistName}. All rights reserved.</span>
+        <button onClick={onAdmin} style={{background:"none",border:"none",color:"var(--text-muted)",cursor:"pointer",fontSize:"var(--text-sm)"}}>Admin</button>
+      </div>
+    </footer>
+  );
+}
+
+/* ── LIGHTBOX ────────────────────────────────────────────────────────────── */
+function Lightbox({ photos, startIdx, onClose }) {
+  const [idx, setIdx] = useState(startIdx||0);
+  const total = photos.length;
+  const prev = () => setIdx(i => (i-1+total)%total);
+  const next = () => setIdx(i => (i+1)%total);
+  useEffect(() => {
+    const h = e => {
+      if(e.key==="Escape") onClose();
+      if(e.key==="ArrowLeft") prev();
+      if(e.key==="ArrowRight") next();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [total]);
+  const navBtn = (onClick, d, right) => (
+    <button onClick={e=>{e.stopPropagation();onClick();}} style={{position:"absolute",top:"50%",transform:"translateY(-50%)",[right?"right":"left"]:16,width:44,height:44,borderRadius:"var(--radius-full)",background:"rgba(0,0,0,.6)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:55,backdropFilter:"blur(4px)"}}>{d}</button>
+  );
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:50,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <img key={idx} src={photos[idx]} alt="" onClick={e=>e.stopPropagation()} style={{maxHeight:"88vh",maxWidth:"88vw",objectFit:"contain",borderRadius:"var(--radius-md)",boxShadow:"var(--shadow-pink-glow)",animation:"hero-fade-in .25s ease"}} />
+      {total>1 && navBtn(prev,<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>,false)}
+      {total>1 && navBtn(next,<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>,true)}
+      {total>1 && <div style={{position:"absolute",bottom:24,left:"50%",transform:"translateX(-50%)",display:"flex",gap:6}}>{photos.map((_,i)=><div key={i} onClick={e=>{e.stopPropagation();setIdx(i);}} style={{width:i===idx?20:6,height:6,borderRadius:3,background:i===idx?"var(--brand)":"rgba(255,255,255,.35)",cursor:"pointer",transition:"all .2s"}}></div>)}</div>}
+      <button onClick={onClose} style={{position:"absolute",top:16,right:16,width:36,height:36,borderRadius:"var(--radius-full)",background:"var(--brand)",border:"none",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:55}}>
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  );
+}
+
+/* ── ADMIN LOGIN ─────────────────────────────────────────────────────────── */
+function AdminLogin({ onExit, scheme, onSchemeChange }) {
+  const [u,setU]=useState("admin"); const [p,setP]=useState("admin"); const [err,setErr]=useState("");
+  const [ok,setOk]=useState(false);
+  const [heroSlots, setHeroSlots] = useState(
+    DATA.heroImages.map((src,i) => ({ src, color: DATA.heroThemes?.[i]?.c2 || null, mode:"auto", cutout: DATA.heroCutouts?.[i] ?? true }))
+  );
+  const [heroCover, setHeroCover] = useState(DATA.heroCover || "");
+  const coverInputRef = React.useRef(null);
+  const onPickCover = e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) setHeroCover(URL.createObjectURL(f));
+    e.target.value = "";
+  };
+  const [saved, setSaved] = useState(false);
+
+  // Auto-extract colors for "auto" slots on mount
+  useEffect(() => {
+    if (!ok) return;
+    heroSlots.forEach((slot, i) => {
+      if (slot.mode !== "auto") return;
+      extractDominantColor(slot.src, (rgb) => {
+        const th = colorToTheme(rgb);
+        setHeroSlots(prev => prev.map((s,j) => j===i && s.mode==="auto" ? {...s, color: th.accent} : s));
+      });
+    });
+  }, [ok]);
+
+  const setSlotMode = (i, mode) => {
+    setHeroSlots(prev => prev.map((s,j) => j!==i ? s : {...s, mode}));
+    if (mode === "auto") {
+      extractDominantColor(heroSlots[i].src, (rgb) => {
+        const th = colorToTheme(rgb);
+        setHeroSlots(prev => prev.map((s,j) => j===i ? {...s, color: th.accent, mode:"auto"} : s));
+      });
+    }
+  };
+
+  const submit = e => { e.preventDefault(); if(u&&p){setOk(true);setErr("");}else setErr("Please enter credentials."); };
+  const inp = { width:"100%", padding:"8px 12px", borderRadius:"var(--radius-sm)", border:"1px solid var(--border-strong)", background:"var(--bg-sunken)", color:"var(--text-strong)", fontSize:"var(--text-sm)", outline:"none", boxSizing:"border-box" };
+  const schemeEntries = Object.entries(SCHEMES);
+  if(ok) return (
+    <div style={{minHeight:"100vh",background:"var(--bg-page)"}}>
+      <header style={{background:"var(--surface-card)",borderBottom:"1px solid var(--border-default)",padding:"14px 32px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontWeight:700,color:"var(--text-strong)"}}>Admin — Cosplay Portfolio</span>
+        <button onClick={()=>{setOk(false);onExit();}} style={{background:"none",border:"none",color:"var(--text-muted)",cursor:"pointer",fontSize:"var(--text-sm)"}}>Log out</button>
+      </header>
+      <div style={{maxWidth:900,margin:"40px auto",padding:"0 32px",display:"flex",flexDirection:"column",gap:20}}>
+
+        {/* Hero image slots */}
+        <div style={{background:"var(--surface-card)",border:"1px solid var(--border-default)",borderRadius:"var(--radius-lg)",padding:"20px 24px"}}>
+          <h3 style={{margin:"0 0 4px",fontSize:"var(--text-base)",fontWeight:700,color:"var(--text-strong)"}}>Hero Slideshow</h3>
+          <p style={{margin:"0 0 16px",fontSize:"var(--text-sm)",color:"var(--text-muted)"}}>
+            Each image has an accent color used for the background gradient. Default is auto-extracted via canvas — override with the picker if needed. On save, the color is stored to DB; the client reads it directly with no processing.
+          </p>
+          {/* Cover image (optional) — full-bleed backdrop behind the gradient */}
+          <div style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",borderRadius:"var(--radius-sm)",border:"1px solid var(--border-default)",background:"var(--bg-sunken)",marginBottom:16}}>
+            <div style={{width:88,height:52,borderRadius:"var(--radius-sm)",overflow:"hidden",flexShrink:0,border:"1px dashed var(--border-strong)",display:"flex",alignItems:"center",justifyContent:"center",background:"var(--bg-page)"}}>
+              {heroCover
+                ? <img src={heroCover} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                : <span style={{fontSize:"var(--text-xs)",color:"var(--text-muted)"}}>Không có</span>}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:"var(--text-sm)",fontWeight:600,color:"var(--text-strong)"}}>Ảnh bìa (tùy chọn)</div>
+              <div style={{fontSize:"var(--text-xs)",color:"var(--text-muted)",marginTop:2}}>
+                Ảnh nền full-bleed nằm dưới dải gradient. Để trống nếu không muốn dùng.
+              </div>
+            </div>
+            <input ref={coverInputRef} type="file" accept="image/*" onChange={onPickCover} style={{display:"none"}}/>
+            <button onClick={()=>coverInputRef.current&&coverInputRef.current.click()}
+              style={{padding:"6px 14px",borderRadius:"var(--radius-sm)",border:"1px solid var(--border-strong)",background:"transparent",color:"var(--text-body)",fontSize:"var(--text-xs)",fontWeight:600,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>
+              {heroCover ? "Đổi ảnh" : "Chọn ảnh"}
+            </button>
+            {heroCover && (
+              <button onClick={()=>setHeroCover("")}
+                style={{padding:"6px 12px",borderRadius:"var(--radius-sm)",border:"none",background:"transparent",color:"var(--text-error)",fontSize:"var(--text-xs)",fontWeight:600,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>
+                Bỏ ảnh
+              </button>
+            )}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {heroSlots.map((slot, i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",borderRadius:"var(--radius-sm)",border:"1px solid var(--border-default)",background:"var(--bg-sunken)"}}>
+                {/* Thumbnail */}
+                <div style={{width:52,height:52,borderRadius:"var(--radius-sm)",overflow:"hidden",flexShrink:0,border:"1px solid var(--border-default)"}}>
+                  <img src={slot.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
+                </div>
+                {/* Info */}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:"var(--text-sm)",fontWeight:500,color:"var(--text-strong)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {slot.src.split('/').pop()}
+                  </div>
+                  <div style={{fontSize:"var(--text-xs)",color:"var(--text-muted)",marginTop:2}}>
+                    {slot.cutout ? "Transparent cutout — portrait mode" : "Full photo — background mode"}
+                  </div>
+                </div>
+                {/* Mode toggle */}
+                <div style={{display:"flex",borderRadius:"var(--radius-sm)",overflow:"hidden",border:"1px solid var(--border-default)",flexShrink:0}}>
+                  {["auto","manual"].map(m => (
+                    <button key={m} onClick={()=>setSlotMode(i,m)}
+                      style={{padding:"5px 12px",border:"none",cursor:"pointer",fontSize:"var(--text-xs)",fontWeight:600,fontFamily:"inherit",
+                        background: slot.mode===m ? "var(--brand)" : "transparent",
+                        color: slot.mode===m ? "#fff" : "var(--text-muted)"}}>
+                      {m==="auto" ? "Auto" : "Manual"}
+                    </button>
+                  ))}
+                </div>
+                {/* Color preview + picker (manual) or read-only (auto) */}
+                <label style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,cursor: slot.mode==="manual" ? "pointer" : "default"}}>
+                  <span style={{position:"relative",width:34,height:34,borderRadius:"var(--radius-sm)",overflow:"hidden",border:"2px solid var(--border-strong)",display:"block",flexShrink:0}}>
+                    <span style={{position:"absolute",inset:0,background: slot.color || "#444",pointerEvents:"none"}}/>
+                    {slot.mode==="manual" && (
+                      <input type="color" value={slot.color||"#3b1278"}
+                        onChange={e=>setHeroSlots(prev=>prev.map((s,j)=>j===i?{...s,color:e.target.value}:s))}
+                        style={{opacity:0,position:"absolute",inset:0,width:"100%",height:"100%",cursor:"pointer",border:"none",padding:0}}/>
+                    )}
+                  </span>
+                  <code style={{fontSize:11,color:"var(--text-muted)",letterSpacing:".04em",minWidth:58}}>
+                    {slot.color || "extracting…"}
+                  </code>
+                </label>
+                {/* Gradient preview */}
+                <div style={{width:40,height:34,borderRadius:"var(--radius-sm)",background:slot.color?`linear-gradient(135deg,#080810,${slot.color},#05050a)`:"var(--bg-sunken)",flexShrink:0,border:"1px solid var(--border-default)"}}/>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginTop:14}}>
+            <button onClick={()=>setSaved(true)}
+              style={{padding:"8px 20px",borderRadius:"var(--radius-sm)",background:"var(--brand)",color:"#fff",border:"none",fontWeight:600,fontSize:"var(--text-sm)",cursor:"pointer",fontFamily:"inherit"}}>
+              Save to database
+            </button>
+            {saved && <span style={{fontSize:"var(--text-sm)",color:"#4ade80"}}>✓ Saved — client will read accent colors from API on next load</span>}
+          </div>
+          <p style={{margin:"10px 0 0",fontSize:"var(--text-xs)",color:"var(--text-muted)"}}>
+            ℹ️ Production: <code>PATCH /api/settings</code> with <code>heroImages[i].accentColor</code>. Client reads and builds gradient — no Canvas needed on frontend.
+          </p>
+        </div>
+
+        {/* Upload drop zone */}
+        <div style={{border:"2px dashed var(--border-strong)",borderRadius:"var(--radius-lg)",padding:40,textAlign:"center",color:"var(--text-muted)"}}>
+          Drag &amp; drop images here to upload
+        </div>
+        <div style={{background:"var(--surface-card)",border:"1px solid var(--border-default)",borderRadius:"var(--radius-lg)",padding:"20px 24px"}}>
+          <h3 style={{margin:"0 0 6px",fontSize:"var(--text-base)",fontWeight:700,color:"var(--text-strong)"}}>Color Scheme</h3>
+          <p style={{margin:"0 0 16px",fontSize:"var(--text-sm)",color:"var(--text-muted)"}}>Pick a palette — visitors see this color on their next visit. Saved to site settings.</p>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            {schemeEntries.map(([key,sc]) => (
+              <button key={key} onClick={()=>onSchemeChange(key)}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",borderRadius:"var(--radius-sm)",
+                  border: scheme===key ? "2px solid "+sc.brand : "2px solid var(--border-default)",
+                  background: scheme===key ? sc.soft : "transparent",cursor:"pointer",transition:"all .2s",fontFamily:"inherit"}}>
+                <span style={{width:18,height:18,borderRadius:"50%",background:sc.brand,flexShrink:0,boxShadow:"0 0 8px "+sc.glow}}/>
+                <span style={{fontSize:"var(--text-sm)",fontWeight:600,color: scheme===key ? sc.brand : "var(--text-body)"}}>{sc.name}</span>
+                {scheme===key && <span style={{fontSize:10,color:sc.brand,marginLeft:2}}>✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{minHeight:"100vh",background:"var(--bg-page)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:360,background:"var(--surface-card)",border:"1px solid var(--border-default)",borderRadius:"var(--radius-lg)",padding:32,boxShadow:"var(--shadow-pink-soft)"}}>
+        <h2 style={{margin:"0 0 20px",fontSize:"var(--text-xl)",fontWeight:700,color:"var(--text-strong)"}}>Admin login</h2>
+        <form onSubmit={submit} style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div><label style={{fontSize:"var(--text-sm)",fontWeight:500,color:"var(--text-body)",display:"block",marginBottom:5}}>Username</label><input style={inp} value={u} onChange={e=>setU(e.target.value)} placeholder="admin"/></div>
+          <div><label style={{fontSize:"var(--text-sm)",fontWeight:500,color:"var(--text-body)",display:"block",marginBottom:5}}>Password</label><input style={inp} type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="••••••••"/></div>
+          {err && <p style={{margin:0,color:"var(--text-error)",fontSize:"var(--text-sm)"}}>{err}</p>}
+          <button type="submit" style={{padding:"10px",borderRadius:"var(--radius-sm)",background:"var(--brand)",color:"#fff",fontWeight:600,border:"none",cursor:"pointer",marginTop:4}}>Log in</button>
+          <button type="button" onClick={onExit} style={{padding:"8px",borderRadius:"var(--radius-sm)",background:"transparent",border:"1px solid var(--border-default)",color:"var(--text-body)",cursor:"pointer",fontSize:"var(--text-sm)"}}>Back to portfolio</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ── APP ─────────────────────────────────────────────────────────────────── */
+function App() {
+  const [scheme, setScheme] = useState("pink");
+  const [theme, setTheme] = useState("dark");
+  const [lang, setLang] = useState("en");
+  const [view, setView] = useState("portfolio");
+  const [lightbox, setLightbox] = useState(null);
+  const [showFooterChar, setShowFooterChar] = useState(true);
+  const openPhoto = (photos, idx=0) => setLightbox({ photos: Array.isArray(photos)?photos:[photos], idx });
+  const [eventPopup, setEventPopup] = useState(null);
+
+  // Apply color scheme from settings on load
+  useEffect(() => {
+    const saved = localStorage.getItem('colorScheme') || DATA.colorScheme || 'pink';
+    applyScheme(saved);
+    setScheme(saved);
+  }, []);
+
+  const handleSchemeChange = (name) => {
+    applyScheme(name);
+    setScheme(name);
+    localStorage.setItem('colorScheme', name);
+    // In production: PATCH /api/settings { config: { ...config, colorScheme: name } }
+  };
+
+  // First-visit popup — mirrors the current app's sessionStorage logic
+  useEffect(() => {
+    const events = DATA.upcomingEvents || [];
+    const idx = events.findIndex(ev => ev.showPopup);
+    if (idx === -1) return;
+    const key = `eventPopup_${idx}`;
+    if (sessionStorage.getItem(key)) return;
+    const id = setTimeout(() => setEventPopup({ event: events[idx], key }), 600);
+    return () => clearTimeout(id);
+  }, []);
+
+  const closeEventPopup = () => {
+    if (eventPopup) { sessionStorage.setItem(eventPopup.key, "1"); setEventPopup(null); }
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+
+  useEffect(() => {
+    document.title = DATA.artistName || "Cosplay Portfolio";
+  }, []);
+
+  if (view === "admin") return <AdminLogin onExit={() => setView("portfolio")} scheme={scheme} onSchemeChange={handleSchemeChange} />;
+
+  return (
+    <div>
+      <Navbar theme={theme} onToggleTheme={()=>setTheme(t=>t==="dark"?"light":"dark")}
+        lang={lang} onSetLang={setLang} onAdmin={()=>{ window.location.href = "../../templates/cosplay-admin/CosplayAdmin.dc.html"; }} />
+      <HeroBanner data={DATA} theme={theme} lang={lang} />
+      <InfoSection data={DATA} onOpenPhoto={(src)=>openPhoto(DATA.latestPhotos, DATA.latestPhotos.indexOf(src)<0?0:DATA.latestPhotos.indexOf(src))} lang={lang} />
+      <ProjectSection data={DATA} onOpenAlbum={(alb)=>openPhoto(alb.items||[alb.cover], 0)} lang={lang} />
+      <div style={{position:"relative", isolation:"isolate"}}>
+        <ContactSection data={DATA} lang={lang} />
+        <Footer artistName={DATA.artistName} onAdmin={()=>{ window.location.href = "../../templates/cosplay-admin/CosplayAdmin.dc.html"; }} />
+        {DATA.footerChar && showFooterChar && (
+          <div className="footer-char" style={{position:"absolute", bottom:0, right:32, height:"calc(100% + 260px)", width:"auto", zIndex:40, pointerEvents:"none"}}>
+            <img src={DATA.footerChar} alt="" style={{
+              height:"100%", width:"auto",
+              objectFit:"contain", objectPosition:"bottom right",
+              filter:"drop-shadow(0 8px 48px rgba(180,120,255,0.45))",
+              display:"block",
+              maskImage:"linear-gradient(to bottom, black 94%, transparent 100%)",
+              WebkitMaskImage:"linear-gradient(to bottom, black 94%, transparent 100%)",
+            }} />
+            <button onClick={()=>setShowFooterChar(false)} title="Ẩn nhân vật" aria-label="Ẩn nhân vật" style={{
+              position:"absolute", top:280, right:8, width:30, height:30, borderRadius:"var(--radius-full)",
+              background:"color-mix(in srgb, var(--bg-page) 70%, transparent)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)",
+              border:"1px solid var(--border-default)", color:"var(--text-body)", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", pointerEvents:"auto", zIndex:41,
+            }}
+              onMouseEnter={e=>{e.currentTarget.style.color="var(--text-link)";e.currentTarget.style.borderColor="var(--border-brand)"}}
+              onMouseLeave={e=>{e.currentTarget.style.color="var(--text-body)";e.currentTarget.style.borderColor="var(--border-default)"}}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        )}
+      </div>
+      {lightbox && <Lightbox photos={lightbox.photos} startIdx={lightbox.idx} onClose={()=>setLightbox(null)} />}
+      {eventPopup && <EventPopup event={eventPopup.event} onClose={closeEventPopup} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<style>
+  @keyframes hero-fade-in  { from{opacity:0} to{opacity:1} }
+  @keyframes hero-fade-out { from{opacity:1} to{opacity:0} }
+</style>
+</body>
+</html>

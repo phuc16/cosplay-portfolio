@@ -77,7 +77,8 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-cosplay-dark flex items-center justify-center p-3 sm:p-4">
       <div className="bg-white dark:bg-cosplay-card border border-gray-200 dark:border-cosplay-border rounded-lg sm:rounded-xl shadow-pink-soft p-5 sm:p-8 w-full max-w-sm">
-        <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-slate-100 mb-4 sm:mb-6">Đăng nhập Admin</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-slate-100 mb-1">Đăng nhập Admin</h2>
+        <p className="text-sm text-gray-500 dark:text-slate-500 mb-5 sm:mb-6">Cosplay Portfolio · trang quản trị</p>
         <form onSubmit={login}>
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Tên đăng nhập</label>
