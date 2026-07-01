@@ -10,6 +10,8 @@
 - **X/TikTok icon color = hex `#94a3b8` (not `var(--text-strong)`)** → Why: neutral grey visible on both themes AND the inline tint concats `${col}60`/`${col}10` only resolve for hex (a CSS var → `var(--x)60` invalid → border/box silently missing).
 - **`entrypoint.sh` retries `knex migrate:latest` until MySQL is up** → Why: fixed `sleep 5` was too short → migrations failed → tables never created ("table doesn't exist" 500s).
 
+- **Serve all uploads as WebP (quality 82 / 80 thumbs), not PNG/JPEG** → Why: hero cutouts were ~5MB PNG each (~15MB first load); WebP is ~10-15× smaller (alpha kept) and ~25-35% smaller than JPEG. Storage proxy cache set to `immutable` for repeat visits. Alternative rejected: **Redis-caching image bytes** — doesn't shrink the browser transfer (the real bottleneck), only speeds the already-fast MinIO fetch, and bloats RAM / evicts the settings+gallery cache. Existing images left as-is (user opted not to backfill; re-upload to convert).
+
 ## What Didn't Work
 - **`node-vibrant` + HSL normalization for hero accent** — produced saturated mid-tone colors (gold/blue/red) the user called ugly; replaced with the design's boost-×1.4 formula (pastels). Dependency removed.
 - **Hard right-weighted accent wash at 90% opacity** — looked garish with saturated colors; softened once colors became pastel.

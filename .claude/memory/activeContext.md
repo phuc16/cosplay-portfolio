@@ -1,8 +1,41 @@
 # Active Context
-Last updated: 2026-07-02 (task complete)
+Last updated: 2026-07-02 (contact section done; all deployed)
 
 ## Current Task
-Reproduce the design (`design_handoff_cosplay_portfolio/`) in the app — public site + admin — matching screenshots exactly, and polish hero/theme/i18n per user feedback.
+Contact section: hide raw phone; show quick-contact buttons Zalo / WhatsApp / Messenger + Gmail (with logos); email stays public.
+
+## Exactly Where I Am (contact task)
+- [x] Public: removed phone-number display; email text kept; added quick-contact button row from `data.contact.quick`
+- [x] `buildData.contact` = `{ email, quick }`; quick = contactLinks (zalo/whatsapp/messenger) + Gmail(email); legacy `phone` auto-migrates to a Zalo button (number not shown)
+- [x] Icons: Zalo + Gmail real/logo (`/refassets/zalo.png`, Gmail SVG), WhatsApp + Messenger SVGs; `CONTACT_META` + `contactHref()` helper
+- [x] Admin: removed phone input; contactLinks types → Zalo/WhatsApp/Messenger (dropped Gmail — comes from email field); email field labeled "hiện công khai + nút Gmail"
+- [x] Build + deploy (zalo.png bundled + served)
+- [x] Messenger available as a contactLinks type in admin (dropdown Zalo/WhatsApp/Messenger); user enters the link themselves — do NOT seed it (they said "link tự admin nhập")
+- [x] User to verify + add WhatsApp/Messenger links in admin if wanted
+
+## Prior task: Image perf — serve uploads as WebP to fix slow first-load of heavy hero PNGs (~5MB each).
+
+## Exactly Where I Am (WebP task)
+- [x] `processImage` (server.js) → always WebP (quality 82); replaces PNG/JPEG branch (keeps alpha)
+- [x] Worker thumbnails → WebP (quality 80)
+- [x] Storage proxy Cache-Control → `public, max-age=31536000, immutable`
+- [x] Deployed backend + worker; verified upload returns `.webp`
+- [ ] User to re-upload the 3 existing hero PNGs (kept as-is per request; not backfilled) to get WebP benefit
+
+## Prior task: Make the event/schedule URL optional (no HTML5 "Please enter a URL" required-validation); when empty the schedule item is simply not clickable.
+
+## Exactly Where I Am (current task)
+- [x] Admin event URL input: `type="url"` → `type="text"` (placeholder "Link sự kiện (tùy chọn)…")
+- [x] Seed defaults: event `url: "#"` → `url: ""` (config.js + server.js)
+- [x] Public schedule row: render `<a>` only when a real URL exists (`ev.url && ev.url !== "#"`), else non-clickable `<div>` (cursor default, no hover)
+- [x] Build + lint + deploy frontend + verify (event URL now optional)
+
+## Also done (this session)
+- [x] Latest photos: admin upload section (`config.latestPhotos`) + public reads it (config → gallery → hero); backend allowlist + sanitize
+- [x] Theme default dark: `index.html` now `<html lang="en" class="dark">` (no light flash; contexts already default dark)
+- [x] Language default en (already; confirmed in LanguageContext)
+
+## Prior task (done): Reproduce the design (public + admin) matching screenshots, polish hero/theme/i18n
 
 ## Exactly Where I Am
 - [x] Public site rebuilt as faithful reproduction (`Portfolio.jsx`): dark default, pink brand, hero cutout pop-out, Info/Project/Contact/Footer, lightbox, event popup
@@ -18,10 +51,11 @@ Reproduce the design (`design_handoff_cosplay_portfolio/`) in the app — public
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-[none — session wrapped; all changes deployed on :5173]
+[none — all changes deployed on :5173]
 
 ## Immediate Next Step
-Decide commit strategy (single squashed commit vs. split into ~5 logical commits) and commit the working tree. Then optionally re-verify remaining screens against `design_handoff_cosplay_portfolio/screenshots/`.
+User adds WhatsApp/Messenger links via admin themselves (Zalo/Gmail auto-show from existing phone+email). Also: re-upload hero/album images → WebP. Then commit the working tree.
+NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions
 - Existing hero accents can be overwritten if admin is Saved with stale (pre-backfill) values — reload admin before saving.

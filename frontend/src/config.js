@@ -33,6 +33,7 @@ export const SITE_CONFIG = {
   heroImages: ["/refassets/hero1.svg", "/refassets/hero2.svg", "/refassets/hero3.svg"],
   heroAccents: [],
   heroCover: "/refassets/cover.svg",
+  latestPhotos: [],
   logoUrl: "",
   footerChar: "/refassets/footer.svg",
   artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" },
@@ -47,9 +48,9 @@ export const SITE_CONFIG = {
     { title: { vi: "10K+ Người theo dõi", en: "10K+ Followers" }, description: { vi: "Trên Facebook, Instagram & TikTok", en: "Across Facebook, Instagram & TikTok" } },
   ],
   upcomingEvents: [
-    { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "#", showPopup: true, imageUrl: "" },
-    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "#", showPopup: false, imageUrl: "" },
-    { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "#", showPopup: false, imageUrl: "" },
+    { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "", showPopup: true, imageUrl: "" },
+    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "", showPopup: false, imageUrl: "" },
+    { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "", showPopup: false, imageUrl: "" },
   ],
   contact: {
     phone: "+84 90 123 4567",

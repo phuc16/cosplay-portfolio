@@ -35,6 +35,30 @@ const SUPPORT_META = {
   paypal: { label: "PayPal", color: "#003087" },
 }
 
+// Quick-contact channels (Zalo / WhatsApp / Messenger / Gmail) — icon + brand color.
+const CONTACT_ICONS = {
+  whatsapp: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.002-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.892 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.463 3.488A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413" /></svg>,
+  messenger: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8l3.13 3.26L19.752 8l-6.561 6.963z" /></svg>,
+  gmail: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" /></svg>,
+}
+const CONTACT_META = {
+  zalo: { label: "Zalo", color: "#0068FF", icon: "/refassets/zalo.png" },
+  whatsapp: { label: "WhatsApp", color: "#25D366" },
+  messenger: { label: "Messenger", color: "#0084FF" },
+  gmail: { label: "Gmail", color: "#EA4335" },
+}
+function contactHref(type, value) {
+  const v = (value || "").trim()
+  if (!v) return "#"
+  if (/^https?:\/\//i.test(v)) return v
+  const digits = v.replace(/[^0-9]/g, "")
+  if (type === "zalo") return `https://zalo.me/${digits}`
+  if (type === "whatsapp") return `https://wa.me/${digits}`
+  if (type === "messenger") return `https://m.me/${v.replace(/^@/, "")}`
+  if (type === "gmail") return `mailto:${v}`
+  return v
+}
+
 /* ── NAVBAR ─────────────────────────────────────────────────────────────── */
 function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, logoUrl }) {
   const navLinks = [
@@ -199,7 +223,7 @@ function InfoSection({ data, onOpenPhoto, lang }) {
         {/* Col 1: Latest photos */}
         <div style={s.card}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {data.latestPhotos.map((src, i) => (
+            {data.latestPhotos.slice(0, 4).map((src, i) => (
               <div key={i} style={{ aspectRatio: "1", borderRadius: "var(--radius-md)", overflow: "hidden", cursor: "pointer" }}
                 onMouseEnter={(e) => { e.currentTarget.querySelector("img").style.transform = "scale(1.05)" }}
                 onMouseLeave={(e) => { e.currentTarget.querySelector("img").style.transform = "scale(1)" }}
@@ -323,17 +347,23 @@ function ProjectSection({ data, onOpenAlbum, lang }) {
         <div style={s.card}>
           <h3 style={s.secTitle}>{LP.schedule}</h3>
           <div style={s.evList}>
-            {data.upcomingEvents.map((ev, i) => (
-              <a key={i} href={ev.url || "#"} target="_blank" rel="noreferrer" style={s.evRow}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-brand)"; e.currentTarget.style.background = "var(--brand-soft)" }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-default)"; e.currentTarget.style.background = "transparent" }}>
-                <div style={s.evDot} />
-                <div>
-                  <div style={s.evTitle}>{ev.title}</div>
-                  <div style={s.evDate}>{icons.cal} {ev.date}</div>
-                </div>
-              </a>
-            ))}
+            {data.upcomingEvents.map((ev, i) => {
+              const hasUrl = ev.url && ev.url !== "#"
+              const Row = hasUrl ? "a" : "div"
+              return (
+                <Row key={i}
+                  {...(hasUrl ? { href: ev.url, target: "_blank", rel: "noreferrer" } : {})}
+                  style={{ ...s.evRow, cursor: hasUrl ? "pointer" : "default" }}
+                  onMouseEnter={(e) => { if (!hasUrl) return; e.currentTarget.style.borderColor = "var(--border-brand)"; e.currentTarget.style.background = "var(--brand-soft)" }}
+                  onMouseLeave={(e) => { if (!hasUrl) return; e.currentTarget.style.borderColor = "var(--border-default)"; e.currentTarget.style.background = "transparent" }}>
+                  <div style={s.evDot} />
+                  <div>
+                    <div style={s.evTitle}>{ev.title}</div>
+                    <div style={s.evDate}>{icons.cal} {ev.date}</div>
+                  </div>
+                </Row>
+              )
+            })}
             {data.upcomingEvents.length === 0 && (
               <p style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)", margin: 0 }}>{vi ? "Chưa có sự kiện." : "No upcoming events."}</p>
             )}
@@ -365,20 +395,30 @@ function ContactSection({ data, lang }) {
           <p style={{ color: "var(--text-body)", fontSize: "var(--text-sm)", margin: "0 0 14px", lineHeight: 1.6 }}>
             {vi ? "Muốn đặt lịch hoặc hợp tác? Nhắn Zalo để bắt đầu nhé!" : "Want to book or collaborate? Message Zalo or email to get started."}
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-            {data.contact.phone && (
-              <div>
-                <div style={s.label}>Phone / Zalo</div>
-                <a href={`https://zalo.me/${data.contact.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer" style={s.linkVal}>{data.contact.phone}</a>
-              </div>
-            )}
-            {data.contact.email && (
-              <div>
-                <div style={s.label}>Email</div>
-                <a href={`mailto:${data.contact.email}`} style={s.linkVal}>{data.contact.email}</a>
-              </div>
-            )}
-          </div>
+          {data.contact.email && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={s.label}>Email</div>
+              <a href={`mailto:${data.contact.email}`} style={s.linkVal}>{data.contact.email}</a>
+            </div>
+          )}
+          {data.contact.quick.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+              {data.contact.quick.map((c) => {
+                const meta = CONTACT_META[c.type] || {}
+                const col = meta.color || "var(--brand)"
+                return (
+                  <a key={c.type} href={contactHref(c.type, c.value)} target="_blank" rel="noreferrer" style={s.btn(col)}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = col + "22"; e.currentTarget.style.borderColor = col + "90" }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = col + "10"; e.currentTarget.style.borderColor = col + "60" }}>
+                    {meta.icon
+                      ? <img src={meta.icon} alt="" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0, borderRadius: 3 }} />
+                      : CONTACT_ICONS[c.type] ? <span style={{ display: "flex", flexShrink: 0, color: col }}>{CONTACT_ICONS[c.type]}</span> : null}
+                    {meta.label || c.type}
+                  </a>
+                )
+              })}
+            </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {data.socials.map((soc) => {
               const col = socialColors[soc.platform] || "var(--brand)"
@@ -486,11 +526,17 @@ function buildData(cfg, gallery, lang) {
     items: (g.items || []).map((it) => it.fullSrc || it.src),
   }))
   const galleryPhotos = (gallery || []).flatMap((g) => g.items || []).map((it) => it.src)
-  const latestPhotos = (galleryPhotos.length ? galleryPhotos : heroImages).slice(0, 4)
+  // Latest photos: admin-uploaded (config.latestPhotos) → gallery items → hero images
+  const latestPhotos = cfg.latestPhotos?.length ? cfg.latestPhotos : galleryPhotos.length ? galleryPhotos : heroImages
   const supportsCfg = cfg.contact?.supports || {}
   const supports = Object.keys(SUPPORT_META)
     .filter((k) => supportsCfg[k])
     .map((k) => ({ platform: k, label: SUPPORT_META[k].label, color: SUPPORT_META[k].color, icon: SUPPORT_META[k].icon, url: supportsCfg[k] }))
+  // Quick contact buttons: Zalo/WhatsApp/Messenger (contactLinks) + Gmail (email). No raw phone shown.
+  const email = cfg.contact?.email || ""
+  let links = (cfg.contact?.contactLinks || []).filter((c) => c && c.value && ["zalo", "whatsapp", "messenger"].includes(c.type))
+  if (!links.length && cfg.contact?.phone) links = [{ type: "zalo", value: cfg.contact.phone }] // legacy phone → Zalo
+  const quick = [...links.map((c) => ({ type: c.type, value: c.value })), ...(email ? [{ type: "gmail", value: email }] : [])]
   return {
     artistName: getLocalized(cfg.artistName, lang),
     about: getLocalized(cfg.about, lang),
@@ -513,7 +559,7 @@ function buildData(cfg, gallery, lang) {
       title: getLocalized(ev.title, lang),
       date: getLocalized(ev.date, lang),
     })),
-    contact: { phone: cfg.contact?.phone || "", email: cfg.contact?.email || "" },
+    contact: { email, quick },
     footerChar: cfg.footerChar || "",
   }
 }
@@ -545,6 +591,15 @@ export default function Portfolio() {
   const data = buildData(cfg, gallery, lang)
 
   useEffect(() => { document.title = data.artistName || "Cosplay Portfolio" }, [data.artistName])
+
+  // Tab favicon = the logo (same image as the navbar mark); fall back to first hero image
+  useEffect(() => {
+    const href = cfg.logoUrl || data.heroImages[0]
+    if (!href) return
+    let link = document.querySelector('link[rel="icon"]')
+    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link) }
+    link.href = href
+  }, [cfg.logoUrl, data.heroImages])
 
   useEffect(() => {
     if (!settings) return

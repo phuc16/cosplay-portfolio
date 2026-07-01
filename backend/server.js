@@ -177,7 +177,7 @@ app.get(new RegExp(`^${API_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/storag
     const MIME = { png: "image/png", gif: "image/gif", webp: "image/webp", jpg: "image/jpeg", jpeg: "image/jpeg" }
     const ct = MIME[ext] || "application/octet-stream"
     res.setHeader("Content-Type", ct)
-    res.setHeader("Cache-Control", "public, max-age=86400")
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable")
     res.setHeader("Access-Control-Allow-Origin", "*")
     res.send(buffer)
   } catch (err) {
@@ -196,6 +196,7 @@ const DEFAULT_SETTINGS = {
   heroImages: ["/refassets/hero1.svg", "/refassets/hero2.svg", "/refassets/hero3.svg"],
   heroAccents: [],
   heroCover: "/refassets/cover.svg",
+  latestPhotos: [],
   logoUrl: "",
   footerChar: "/refassets/footer.svg",
   artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" },
@@ -217,9 +218,9 @@ const DEFAULT_SETTINGS = {
     { title: { vi: "10K+ Người theo dõi", en: "10K+ Followers" }, description: { vi: "Trên Facebook, Instagram & TikTok", en: "Across Facebook, Instagram & TikTok" } },
   ],
   upcomingEvents: [
-    { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "#", showPopup: true, imageUrl: "" },
-    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "#", showPopup: false, imageUrl: "" },
-    { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "#", showPopup: false, imageUrl: "" },
+    { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "", showPopup: true, imageUrl: "" },
+    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "", showPopup: false, imageUrl: "" },
+    { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "", showPopup: false, imageUrl: "" },
   ],
   contact: {
     email: "hello@kamidayhehe.com",
@@ -272,7 +273,7 @@ app.get(`${API_PREFIX}/settings`, publicLimiter, async (req, res) => {
 
 const ALLOWED_SETTINGS_KEYS = [
   "colorScheme", "artistName", "tagline", "about", "heroImageUrl", "thumbnailImageUrl",
-  "heroImages", "heroAccents", "heroCover", "logoUrl", "footerChar", "achievements", "hero",
+  "heroImages", "heroAccents", "heroCover", "latestPhotos", "logoUrl", "footerChar", "achievements", "hero",
   "upcomingEvents", "contact",
 ]
 
@@ -283,6 +284,7 @@ function sanitizeSettings(body) {
   }
   if (out.heroImages !== undefined && !Array.isArray(out.heroImages)) out.heroImages = []
   if (out.heroAccents !== undefined && !Array.isArray(out.heroAccents)) out.heroAccents = []
+  if (out.latestPhotos !== undefined && !Array.isArray(out.latestPhotos)) out.latestPhotos = []
   if (out.achievements !== undefined && !Array.isArray(out.achievements)) out.achievements = []
   if (out.upcomingEvents !== undefined && !Array.isArray(out.upcomingEvents)) out.upcomingEvents = []
   for (const key of ["colorScheme", "heroImageUrl", "thumbnailImageUrl", "heroCover", "logoUrl", "footerChar"]) {
@@ -444,10 +446,9 @@ async function processImage(buffer) {
   if (meta.width > MAX_FULL_WIDTH) {
     pipeline = pipeline.resize(MAX_FULL_WIDTH, null, { withoutEnlargement: true })
   }
-  if (meta.hasAlpha) {
-    return { buffer: await pipeline.png({ compressionLevel: 9 }).toBuffer(), ext: "png" }
-  }
-  return { buffer: await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer(), ext: "jpg" }
+  // WebP for everything: ~10-15x smaller than PNG for transparent cutouts,
+  // ~25-35% smaller than JPEG for photos, and it preserves alpha automatically.
+  return { buffer: await pipeline.webp({ quality: 82, effort: 4 }).toBuffer(), ext: "webp" }
 }
 
 // ── Hero accent color: computed ONCE here at upload (no client-side canvas). ──

@@ -94,6 +94,7 @@ const DEFAULT = {
   heroImages: [],
   heroAccents: [],
   heroCover: "",
+  latestPhotos: [],
   logoUrl: "",
   footerChar: "",
   artistName: { vi: "", en: "" },
@@ -124,6 +125,7 @@ function normalizeConfig(raw) {
       ? raw.heroAccents.map((a) => ({ mode: a?.mode === "manual" ? "manual" : "auto", color: typeof a?.color === "string" ? a.color : "" }))
       : [],
     heroCover: raw.heroCover ?? "",
+    latestPhotos: Array.isArray(raw.latestPhotos) ? raw.latestPhotos : [],
     logoUrl: raw.logoUrl ?? "",
     footerChar: raw.footerChar ?? "",
     artistName: toLocalizedObj(raw.artistName),
@@ -387,6 +389,33 @@ export default function AdminSettings() {
   }
   const heroImagesDropzone = useDropzone({ onDrop: onHeroImagesDrop, accept: { "image/*": [] }, disabled: heroImagesUploading })
 
+  /* ── Latest photos (Info dashboard 2×2 grid) multi-upload ── */
+  const [latestUploading, setLatestUploading] = useState(false)
+  const [latestUploadError, setLatestUploadError] = useState("")
+  const removeLatestPhoto = (idx) => {
+    setDirty(true)
+    setConfig((prev) => ({ ...prev, latestPhotos: (prev.latestPhotos || []).filter((_, i) => i !== idx) }))
+  }
+  const onLatestDrop = (files) => {
+    if (!files.length) return
+    setLatestUploadError("")
+    setLatestUploading(true)
+    const uploadOne = (file) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          axios.post("/api/upload/thumbnail", { base64: reader.result.split(",")[1] })
+            .then((r) => { setDirty(true); setConfig((prev) => ({ ...prev, latestPhotos: [...(prev.latestPhotos || []), r.data.url] })); resolve() })
+            .catch(reject)
+        }
+        reader.readAsDataURL(file)
+      })
+    Promise.all(files.map(uploadOne))
+      .catch((err) => setLatestUploadError(err.response?.data?.message || err.message || "Upload thất bại"))
+      .finally(() => setLatestUploading(false))
+  }
+  const latestDropzone = useDropzone({ onDrop: onLatestDrop, accept: { "image/*": [] }, disabled: latestUploading })
+
   /* ── Social fixed-platform URL update ── */
   const setSocialUrl = (platformKey, label, url) => {
     setDirty(true)
@@ -636,6 +665,29 @@ export default function AdminSettings() {
         </div>
       </div>
 
+      {/* ── Latest photos (Info dashboard grid) ── */}
+      <div className={cardCls}>
+        <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Ảnh mới nhất (Latest photos)</h3>
+        <p className="text-xs text-gray-500 dark:text-slate-500">Lưới 2×2 ở cột 1 Info Dashboard. Để trống sẽ tự lấy ảnh từ album/gallery.</p>
+        {(config.latestPhotos || []).length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {(config.latestPhotos || []).map((url, i) => (
+              <div key={i} className="relative group">
+                <img src={url} alt="" className="h-[84px] w-[84px] object-cover rounded-lg border border-gray-200 dark:border-cosplay-border" />
+                <button type="button" onClick={() => removeLatestPhoto(i)}
+                  className="absolute top-[5px] right-[5px] w-[22px] h-[22px] rounded-full bg-black/60 text-white text-[13px] flex items-center justify-center border-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div {...latestDropzone.getRootProps()}
+          className="border-2 border-dashed border-gray-300 dark:border-cosplay-border rounded-lg p-4 text-center cursor-pointer hover:border-pink-500/50 hover:bg-pink-500/5 min-h-[60px] flex items-center justify-center">
+          <input {...latestDropzone.getInputProps()} />
+          <p className="text-sm text-gray-500 dark:text-slate-400">{latestUploading ? "Đang tải..." : "+ Kéo thả / thêm ảnh"}</p>
+        </div>
+        {latestUploadError && <p className="mt-2 text-sm text-red-400">{latestUploadError}</p>}
+      </div>
+
       {/* ── Achievements ── */}
       <div className={cardCls}>
         <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Thành tựu (Achievements)</h3>
@@ -727,7 +779,7 @@ export default function AdminSettings() {
               <input type="text" value={ev.date?.en ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "date", { ...toLocalizedObj(ev.date), en: e.target.value })} className={inputCls} placeholder="Date (EN) — Aug 15, 2026" />
             </div>
             <div className="flex gap-2 items-center">
-              <input type="url" value={ev.url || ""} onChange={(e) => updateItem("upcomingEvents", i, "url", e.target.value)} className={`${inputCls} flex-1`} placeholder="https://..." />
+              <input type="text" value={ev.url || ""} onChange={(e) => updateItem("upcomingEvents", i, "url", e.target.value)} className={`${inputCls} flex-1`} placeholder="Link sự kiện (tùy chọn) — để trống nếu không có" />
               <button type="button" onClick={() => removeItem("upcomingEvents", i)} className="text-red-400 hover:text-red-300 shrink-0">×</button>
             </div>
             {ev.showPopup && (
@@ -777,26 +829,22 @@ export default function AdminSettings() {
       {/* ── Contact ── */}
       <div className={cardCls}>
         <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Liên hệ</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className={labelCls}>Số điện thoại</label>
-            <input type="tel" value={config.contact?.phone ?? ""} onChange={(e) => update("contact", { ...config.contact, phone: e.target.value })} className={inputCls} placeholder="0901234567" />
-          </div>
-          <div>
-            <label className={labelCls}>Email</label>
-            <input type="email" value={config.contact?.email ?? ""} onChange={(e) => update("contact", { ...config.contact, email: e.target.value })} className={inputCls} placeholder="email@example.com" />
-          </div>
+        <div>
+          <label className={labelCls}>Email (hiện công khai + nút Gmail)</label>
+          <input type="email" value={config.contact?.email ?? ""} onChange={(e) => update("contact", { ...config.contact, email: e.target.value })} className={inputCls} placeholder="email@gmail.com" />
         </div>
         <div>
-          <label className={labelCls}>Liên hệ nhanh (Zalo / WhatsApp / Gmail)</label>
+          <label className={labelCls}>Liên hệ nhanh (Zalo / WhatsApp / Messenger)</label>
+          <p className="text-xs text-gray-500 dark:text-slate-500 mb-2">Nhập số điện thoại hoặc dán link. Số điện thoại KHÔNG hiển thị công khai — chỉ dùng để tạo nút bấm.</p>
           {(config.contact?.contactLinks || []).map((item, i) => (
             <div key={i} className="flex gap-2 items-center mb-2 flex-wrap">
-              <select value={item?.type ?? "zalo"} onChange={(e) => updateItem("contact.contactLinks", i, "type", e.target.value)} className={`${inputCls} w-28`}>
+              <select value={item?.type ?? "zalo"} onChange={(e) => updateItem("contact.contactLinks", i, "type", e.target.value)} className={`${inputCls} w-32`}>
                 <option value="zalo">Zalo</option>
                 <option value="whatsapp">WhatsApp</option>
-                <option value="gmail">Gmail</option>
+                <option value="messenger">Messenger</option>
               </select>
-              <input type={item?.type === "gmail" ? "email" : "tel"} value={item?.value ?? ""} onChange={(e) => updateItem("contact.contactLinks", i, "value", e.target.value)} className={`${inputCls} flex-1 min-w-[120px]`} placeholder={item?.type === "gmail" ? "email@gmail.com" : "0901234567"} />
+              <input type="text" value={item?.value ?? ""} onChange={(e) => updateItem("contact.contactLinks", i, "value", e.target.value)} className={`${inputCls} flex-1 min-w-[120px]`}
+                placeholder={item?.type === "messenger" ? "username hoặc https://m.me/…" : "SĐT hoặc link (vd 0868835072)"} />
               <button type="button" onClick={() => removeItem("contact.contactLinks", i)} className="text-red-400 hover:text-red-300 shrink-0">×</button>
             </div>
           ))}
