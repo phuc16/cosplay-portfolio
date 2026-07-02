@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { SITE_CONFIG, applyColorScheme } from "../config"
@@ -118,10 +118,38 @@ function hexToRgba(hex, a) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
 }
 
+/* ── SCROLL REVEAL ───────────────────────────────────────────────────────── */
+/* Subtle fade + rise-in, once per element, honouring prefers-reduced-motion. */
+function Reveal({ children, delay = 0 }) {
+  const ref = useRef(null)
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (typeof IntersectionObserver === "undefined" ||
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setShown(true)
+      return
+    }
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setShown(true); io.unobserve(el) } },
+      { threshold: 0.08, rootMargin: "0px 0px -10% 0px" }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  return (
+    <div ref={ref} className={`reveal${shown ? " in" : ""}`} style={{ transitionDelay: `${delay}ms` }}>
+      {children}
+    </div>
+  )
+}
+
 /* ── HERO BANNER ─────────────────────────────────────────────────────────── */
 function HeroBanner({ data, theme, lang }) {
   const imgs = data.heroImages
   const [idx, setIdx] = useState(0)
+  const [dir, setDir] = useState(1)   // 1 = next (slide in from right), -1 = prev (from left)
   const [aspects, setAspects] = useState({})
 
   // Only measure aspect ratio (portrait vs landscape) — a plain image load, no canvas.
@@ -140,7 +168,7 @@ function HeroBanner({ data, theme, lang }) {
   const glowColor = hexToRgba(accentColor, 0.45)
   const baseBg = isDark ? "#080810" : "#ffffff"
 
-  const advance = useCallback((dir) => setIdx((i) => (i + dir + imgs.length) % imgs.length), [imgs.length])
+  const advance = useCallback((d) => { setDir(d); setIdx((i) => (i + d + imgs.length) % imgs.length) }, [imgs.length])
 
   useEffect(() => {
     if (imgs.length < 2) return
@@ -160,7 +188,9 @@ function HeroBanner({ data, theme, lang }) {
     dots: { position: "absolute", bottom: 16, left: "50%", zIndex: 5, transform: "translateX(-50%)", display: "flex", gap: 6 },
     dot: (a) => ({ width: a ? 20 : 6, height: 6, borderRadius: 3, background: a ? "var(--pink-400)" : "rgba(255,255,255,.3)", transition: "width .3s, background .3s" }),
   }
-  const cutout = { position: "absolute", top: 0, right: 0, height: "auto", width: "100%", filter: `drop-shadow(0 0 50px ${glowColor})`, animation: "hero-fade-in .6s ease-in-out", maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }
+  const slideAnim = `${dir === 1 ? "hero-slide-r" : "hero-slide-l"} .55s cubic-bezier(.22,.61,.36,1)`
+  const slideAnimC = `${dir === 1 ? "hero-slide-cr" : "hero-slide-cl"} .55s cubic-bezier(.22,.61,.36,1)`
+  const cutout = { position: "absolute", top: 0, right: 0, height: "auto", width: "100%", filter: `drop-shadow(0 0 50px ${glowColor})`, animation: slideAnim, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }
   return (
     <div className="sec-wrap" style={s.wrap}>
       <div className="hero-card" style={s.cardBg}>
@@ -180,7 +210,7 @@ function HeroBanner({ data, theme, lang }) {
           </div>
         ) : (
           <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: "-84px", bottom: 0, width: "80%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
-            <img key={"p" + idx} src={imgs[idx]} alt="" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", height: "100%", width: "auto", filter: `drop-shadow(0 0 60px ${glowColor})`, animation: "hero-fade-in .6s ease-in-out", maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
+            <img key={"p" + idx} src={imgs[idx]} alt="" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", height: "100%", width: "auto", filter: `drop-shadow(0 0 60px ${glowColor})`, animation: slideAnimC, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
           </div>
         ))}
         <div className="hero-left" style={s.left}>
@@ -631,11 +661,11 @@ export default function Portfolio() {
         artistName={data.artistName} tagline={getLocalized(cfg.tagline, lang)} logoUrl={logoUrl} />
 
       {!loading && <HeroBanner data={data} theme={theme} lang={lang} />}
-      {!loading && <InfoSection data={data} lang={lang} onOpenPhoto={(src) => openPhoto(data.latestPhotos, Math.max(0, data.latestPhotos.indexOf(src)))} />}
-      {!loading && <ProjectSection data={data} lang={lang} onOpenAlbum={(alb) => openPhoto(alb.items?.length ? alb.items : [alb.cover], 0)} />}
+      {!loading && <Reveal><InfoSection data={data} lang={lang} onOpenPhoto={(src) => openPhoto(data.latestPhotos, Math.max(0, data.latestPhotos.indexOf(src)))} /></Reveal>}
+      {!loading && <Reveal><ProjectSection data={data} lang={lang} onOpenAlbum={(alb) => openPhoto(alb.items?.length ? alb.items : [alb.cover], 0)} /></Reveal>}
 
       <div style={{ position: "relative", isolation: "isolate" }}>
-        {!loading && <ContactSection data={data} lang={lang} />}
+        {!loading && <Reveal><ContactSection data={data} lang={lang} /></Reveal>}
         <footer style={{ borderTop: "1px solid var(--border-default)", background: "var(--bg-sunken)", marginTop: 8, position: "relative", zIndex: 1 }}>
           <div style={{ maxWidth: 1280, margin: "0 auto", padding: "16px 32px", display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
             <span>© {new Date().getFullYear()} {data.artistName}. All rights reserved.</span>

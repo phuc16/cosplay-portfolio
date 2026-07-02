@@ -128,6 +128,17 @@
 @keyframes hero-slide-out { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 @keyframes hero-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hero-fade-out { from { opacity: 1; } to { opacity: 0; } }
+/* Direction-aware hero cutout slide-in (next = from right, prev = from left) */
+@keyframes hero-slide-r  { from { opacity: 0; transform: translateX(70px); }  to { opacity: 1; transform: translateX(0); } }
+@keyframes hero-slide-l  { from { opacity: 0; transform: translateX(-70px); } to { opacity: 1; transform: translateX(0); } }
+/* Centered variant (landscape image keeps its translateX(-50%) anchor) */
+@keyframes hero-slide-cr { from { opacity: 0; transform: translateX(-50%) translateX(70px); }  to { opacity: 1; transform: translateX(-50%); } }
+@keyframes hero-slide-cl { from { opacity: 0; transform: translateX(-50%) translateX(-70px); } to { opacity: 1; transform: translateX(-50%); } }
+
+/* Scroll-reveal: sections fade + rise in once when they enter the viewport */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s ease-out, transform .6s cubic-bezier(.22,.61,.36,1); will-change: opacity, transform; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
 /* ── Responsive (portfolio page) — mirrors the reference breakpoints ── */
 @media (max-width: 980px) {

@@ -1,8 +1,16 @@
 # Active Context
-Last updated: 2026-07-02 (contact section done; all deployed)
+Last updated: 2026-07-02 (animation task done)
 
 ## Current Task
-Contact section: hide raw phone; show quick-contact buttons Zalo / WhatsApp / Messenger + Gmail (with logos); email stays public.
+Add motion: (1) hero cutout slide-in (direction-aware), (2) subtle scroll-reveal (fade + rise) on Info/Project/Contact sections.
+
+## Exactly Where I Am (animation task)
+- [x] Hero: `dir` state; `advance(d)` sets direction; portrait cutout uses `hero-slide-r/l`, landscape uses centered `hero-slide-cr/cl` (keep translateX(-50%)); keyframes added to index.css
+- [x] `Reveal` component (IntersectionObserver, once, honours prefers-reduced-motion); wraps Info/Project/Contact; `.reveal`/`.reveal.in` CSS added (fade + translateY 22px)
+- [x] Build + deploy frontend (ships both) — done by user (they run builds themselves)
+- [x] User verifies
+
+## Prior task (done): Contact section — hide raw phone; show quick-contact buttons Zalo / WhatsApp / Messenger + Gmail (with logos); email stays public.
 
 ## Exactly Where I Am (contact task)
 - [x] Public: removed phone-number display; email text kept; added quick-contact button row from `data.contact.quick`
@@ -54,7 +62,7 @@ Contact section: hide raw phone; show quick-contact buttons Zalo / WhatsApp / Me
 [none — all changes deployed on :5173]
 
 ## Immediate Next Step
-User adds WhatsApp/Messenger links via admin themselves (Zalo/Gmail auto-show from existing phone+email). Also: re-upload hero/album images → WebP. Then commit the working tree.
+Build + deploy frontend (`docker compose up -d --build frontend`) to ship hero slide-in + scroll-reveal. Then user verifies.
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions
