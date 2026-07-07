@@ -32,7 +32,7 @@ const socialColors = { facebook: "#1877F2", instagram: "#E4405F", page: "#1877F2
 const SUPPORT_META = {
   gumroad: { label: "Gumroad", color: "#FF90E8" },
   gank: { label: "Gank", color: "#E84C3D", icon: "/refassets/gank.png" },
-  paypal: { label: "PayPal", color: "#003087" },
+  paypal: { label: "PayPal", color: "#a2cffe" },
 }
 
 // Quick-contact channels (Zalo / WhatsApp / Messenger / Gmail) — icon + brand color.
@@ -122,15 +122,14 @@ function hexToRgba(hex, a) {
 /* Subtle fade + rise-in, once per element, honouring prefers-reduced-motion. */
 function Reveal({ children, delay = 0 }) {
   const ref = useRef(null)
-  const [shown, setShown] = useState(false)
+  // Show immediately (no animation) when IO is unavailable or motion is reduced.
+  const [shown, setShown] = useState(() =>
+    typeof IntersectionObserver === "undefined" ||
+    (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
+  )
   useEffect(() => {
     const el = ref.current
-    if (!el) return
-    if (typeof IntersectionObserver === "undefined" ||
-        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setShown(true)
-      return
-    }
+    if (!el || shown) return
     const io = new IntersectionObserver(
       ([e]) => { if (e.isIntersecting) { setShown(true); io.unobserve(el) } },
       { threshold: 0.08, rootMargin: "0px 0px -10% 0px" }
@@ -205,11 +204,11 @@ function HeroBanner({ data, theme, lang }) {
         <div style={{ position: "absolute", inset: 0, zIndex: 4, borderRadius: "var(--radius-lg)", background: accent, opacity: 0.16, mixBlendMode: "soft-light", pointerEvents: "none", transition: "background 0.8s ease" }} />
         {/* Character cutout (transparent PNG) pops out over the top of the card */}
         {imgs[idx] && (!isLandscape ? (
-          <div style={{ position: "absolute", right: 0, top: "-84px", bottom: 0, width: "55%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
+          <div className="hero-cutout" style={{ position: "absolute", right: 0, top: "-84px", bottom: 0, width: "55%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
             <img key={"p" + idx} src={imgs[idx]} alt="" style={cutout} />
           </div>
         ) : (
-          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: "-84px", bottom: 0, width: "80%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
+          <div className="hero-cutout hero-cutout-c" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: "-84px", bottom: 0, width: "80%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
             <img key={"p" + idx} src={imgs[idx]} alt="" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", height: "100%", width: "auto", filter: `drop-shadow(0 0 60px ${glowColor})`, animation: slideAnimC, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
           </div>
         ))}
@@ -449,26 +448,14 @@ function ContactSection({ data, lang }) {
               })}
             </div>
           )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {data.socials.map((soc) => {
-              const col = socialColors[soc.platform] || "var(--brand)"
-              return (
-                <a key={soc.platform + soc.url} href={soc.url} target="_blank" rel="noreferrer" style={s.btn(col)}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = col + "22"; e.currentTarget.style.borderColor = col + "90" }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = col + "10"; e.currentTarget.style.borderColor = col + "60" }}>
-                  {socialIcons[soc.platform] ? <span style={{ display: "flex", flexShrink: 0 }}>{socialIcons[soc.platform]}</span> : null} {soc.label}
-                </a>
-              )
-            })}
-          </div>
         </div>
         <div>
           <h3 style={s.title}>{LC.support}</h3>
           <p style={{ color: "var(--text-body)", fontSize: "var(--text-sm)", margin: "0 0 14px", lineHeight: 1.6 }}>
             {vi ? "Ủng hộ mình qua" : "Support my work via"}
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-            {data.supports.map((sp) => (
+          <div className="support-row" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+            {data.supports.filter((sp) => sp.platform !== "gank").map((sp) => (
               <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer" style={s.btn(sp.color)}>
                 {sp.icon
                   ? <img src={sp.icon} alt="" width={16} height={16} style={{ objectFit: "contain", flexShrink: 0, borderRadius: 3 }} />
@@ -668,13 +655,20 @@ export default function Portfolio() {
         {!loading && <Reveal><ContactSection data={data} lang={lang} /></Reveal>}
         <footer style={{ borderTop: "1px solid var(--border-default)", background: "var(--bg-sunken)", marginTop: 8, position: "relative", zIndex: 1 }}>
           <div style={{ maxWidth: 1280, margin: "0 auto", padding: "16px 32px", display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
-            <span>© {new Date().getFullYear()} {data.artistName}. All rights reserved.</span>
-            <button onClick={() => navigate("/admin")} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "var(--text-sm)" }}>Admin</button>
+            <span>© {new Date().getFullYear()} {data.artistName}. {lang === "vi" ? "Bảo lưu mọi quyền." : "All rights reserved."}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span>Made with ♥</span>
+              <span aria-hidden="true">·</span>
+              <button onClick={() => navigate("/admin")} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "var(--text-sm)", padding: 0 }}>Admin</button>
+            </span>
           </div>
         </footer>
         {data.footerChar && showFooterChar && (
           <div className="footer-char" style={{ position: "absolute", bottom: 0, right: 32, height: "calc(100% + 260px)", width: "auto", zIndex: 40, pointerEvents: "none" }}>
-            <img src={data.footerChar} alt="" style={{ height: "100%", width: "auto", objectFit: "contain", objectPosition: "bottom right", filter: "drop-shadow(0 8px 48px rgba(180,120,255,0.45))", display: "block", maskImage: "linear-gradient(to bottom, black 94%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 94%, transparent 100%)" }} />
+            {/* Soft radial aura BEHIND the character — no straight edges, so a tightly-cropped
+                cutout never turns the glow into a rectangular frame (unlike a drop-shadow). */}
+            <div style={{ position: "absolute", inset: "-40px -30px 40px", background: "radial-gradient(ellipse at 50% 55%, rgba(180,120,255,0.40) 0%, rgba(180,120,255,0.16) 45%, transparent 72%)", filter: "blur(30px)", zIndex: 0, pointerEvents: "none" }} />
+            <img src={data.footerChar} alt="" style={{ position: "relative", zIndex: 1, height: "100%", width: "auto", objectFit: "contain", objectPosition: "bottom right", display: "block" }} />
             <button onClick={() => setShowFooterChar(false)} title={lang === "vi" ? "Ẩn nhân vật" : "Hide character"} aria-label="Hide character"
               style={{ position: "absolute", top: 280, right: 8, width: 30, height: 30, borderRadius: "var(--radius-full)", background: "color-mix(in srgb, var(--bg-page) 70%, transparent)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid var(--border-default)", color: "var(--text-body)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", zIndex: 41 }}
               onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-link)"; e.currentTarget.style.borderColor = "var(--border-brand)" }}

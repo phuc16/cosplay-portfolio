@@ -12,6 +12,8 @@
 
 - **Serve all uploads as WebP (quality 82 / 80 thumbs), not PNG/JPEG** → Why: hero cutouts were ~5MB PNG each (~15MB first load); WebP is ~10-15× smaller (alpha kept) and ~25-35% smaller than JPEG. Storage proxy cache set to `immutable` for repeat visits. Alternative rejected: **Redis-caching image bytes** — doesn't shrink the browser transfer (the real bottleneck), only speeds the already-fast MinIO fetch, and bloats RAM / evicts the settings+gallery cache. Existing images left as-is (user opted not to backfill; re-upload to convert).
 
+- **Footer character glow: radial-gradient behind, NOT `drop-shadow` on the image** → Why: the design/standalone used `filter: drop-shadow(0 8px 48px rgba(180,120,255,0.45))`, which traces the image's opaque alpha. It looks like a soft halo ONLY when the cutout has transparent padding around the subject (the design's PNG did). A tightly-cropped cutout (subject fills the frame, e.g. bbox ≈ full 1694×4094) makes the shadow a **rectangle = purple frame**. Replaced with a blurred radial-gradient ellipse behind the img (`inset:-40px -30px 40px`, no straight edges) so any crop looks clean. Deviates from standalone deliberately — standalone only looks right with a padded image; users upload tight crops. User picked this over "re-export padded images".
+
 ## What Didn't Work
 - **`node-vibrant` + HSL normalization for hero accent** — produced saturated mid-tone colors (gold/blue/red) the user called ugly; replaced with the design's boost-×1.4 formula (pastels). Dependency removed.
 - **Hard right-weighted accent wash at 90% opacity** — looked garish with saturated colors; softened once colors became pastel.

@@ -1,8 +1,18 @@
 # Active Context
-Last updated: 2026-07-02 (animation task done)
+Last updated: 2026-07-07 (UI polish batch done)
 
 ## Current Task
-Add motion: (1) hero cutout slide-in (direction-aware), (2) subtle scroll-reveal (fade + rise) on Info/Project/Contact sections.
+UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
+- [x] Footer-char purple frame fix: drop-shadow → radial-gradient aura behind img
+- [x] Footer-char bottom mask removed (caused horizontal band over footer text)
+- [x] Contact/footer: removed social-buttons grid + Gank; supports vertical on web/tablet, horizontal on mobile (.support-row @≤760px)
+- [x] PayPal color → #a2cffe (was #003087, invisible on dark)
+- [x] Mobile hero: card height 300px; cutout stays right + pops only 18px (never covers VI/EN)
+- [x] Footer line bilingual (VI "Bảo lưu mọi quyền.") + right side "Made with ♥ · Admin" (sits under footer char; shows when char hidden)
+- [x] Hero cover image sizing advice given: one 2560×1080 WebP, face in center-50%/upper half (object-fit cover crops sides on mobile)
+- PARKED (not accepted): change hero cutout fit to height-based bottom-right anchor (would let one 5:8 cutout image fit all breakpoints) — user was asking about cover, not cutout
+
+## Prior task: Add motion: (1) hero cutout slide-in (direction-aware), (2) subtle scroll-reveal (fade + rise) on Info/Project/Contact sections.
 
 ## Exactly Where I Am (animation task)
 - [x] Hero: `dir` state; `advance(d)` sets direction; portrait cutout uses `hero-slide-r/l`, landscape uses centered `hero-slide-cr/cl` (keep translateX(-50%)); keyframes added to index.css
@@ -62,7 +72,7 @@ Add motion: (1) hero cutout slide-in (direction-aware), (2) subtle scroll-reveal
 [none — all changes deployed on :5173]
 
 ## Immediate Next Step
-Build + deploy frontend (`docker compose up -d --build frontend`) to ship hero slide-in + scroll-reveal. Then user verifies.
+User deploys frontend to prod (kamidayhehe.com) with the whole UI-polish batch, then verifies. User is designing a new hero-cover image (2560×1080 spec given).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions

@@ -151,14 +151,18 @@
   .nav-inner { padding: 0 16px !important; }
   .sec-wrap { padding-left: 16px !important; padding-right: 16px !important; }
   .album-grid { grid-template-columns: 1fr 1fr !important; }
-  .hero-card { height: 440px !important; }
+  .hero-card { height: 300px !important; }
   .hero-left { max-width: 100% !important; padding: 0 24px 28px !important; }
   .hero-title { font-size: 36px !important; }
+  /* Cutout stays right + pops above the card, but rises less so it never
+     reaches the navbar's VI/EN switch (card sits 20px below the navbar). */
+  .hero-cutout { top: -18px !important; }
   .contact-card { padding: 24px 20px !important; gap: 24px !important; }
   .footer-char { display: none !important; }
+  .support-row { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; }
 }
 @media (max-width: 460px) {
-  .hero-card { height: 400px !important; }
+  .hero-card { height: 300px !important; }
   .hero-left { padding: 0 18px 22px !important; }
   .hero-title { font-size: 30px !important; }
   .album-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
