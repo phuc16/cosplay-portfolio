@@ -654,12 +654,12 @@ export default function Portfolio() {
       <div style={{ position: "relative", isolation: "isolate" }}>
         {!loading && <Reveal><ContactSection data={data} lang={lang} /></Reveal>}
         <footer style={{ borderTop: "1px solid var(--border-default)", background: "var(--bg-sunken)", marginTop: 8, position: "relative", zIndex: 1 }}>
-          <div style={{ maxWidth: 1280, margin: "0 auto", padding: "16px 32px", display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
+          <div className="footer-bar" style={{ maxWidth: 1280, margin: "0 auto", padding: "16px 32px", display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
             <span>© {new Date().getFullYear()} {data.artistName}. {lang === "vi" ? "Bảo lưu mọi quyền." : "All rights reserved."}</span>
             <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span>Made with ♥</span>
-              <span aria-hidden="true">·</span>
-              <button onClick={() => navigate("/admin")} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "var(--text-sm)", padding: 0 }}>Admin</button>
+              <span style={{ whiteSpace: "nowrap" }}>Made with ♥</span>
+              <span className="footer-admin" aria-hidden="true">·</span>
+              <button className="footer-admin" onClick={() => navigate("/admin")} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "var(--text-sm)", padding: 0 }}>Admin</button>
             </span>
           </div>
         </footer>

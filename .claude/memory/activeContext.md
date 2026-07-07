@@ -10,6 +10,7 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Mobile hero: card height 300px; cutout stays right + pops only 18px (never covers VI/EN)
 - [x] Footer line bilingual (VI "Bảo lưu mọi quyền.") + right side "Made with ♥ · Admin" (sits under footer char; shows when char hidden)
 - [x] Hero cover image sizing advice given: one 2560×1080 WebP, face in center-50%/upper half (object-fit cover crops sides on mobile)
+- [x] Mobile footer: stacked + centered lines, Admin button hidden (≤760px, .footer-bar/.footer-admin) — fixed ugly wrap
 - PARKED (not accepted): change hero cutout fit to height-based bottom-right anchor (would let one 5:8 cutout image fit all breakpoints) — user was asking about cover, not cutout
 
 ## Prior task: Add motion: (1) hero cutout slide-in (direction-aware), (2) subtle scroll-reveal (fade + rise) on Info/Project/Contact sections.
@@ -69,10 +70,10 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-[none — all changes deployed on :5173]
+frontend/src/pages/Portfolio.jsx + frontend/src/index.css (UI polish batch — built, NOT yet deployed to prod)
 
 ## Immediate Next Step
-User deploys frontend to prod (kamidayhehe.com) with the whole UI-polish batch, then verifies. User is designing a new hero-cover image (2560×1080 spec given).
+User deploys frontend to prod (kamidayhehe.com) with the whole UI-polish batch, then verifies. User is designing a new hero-cover image (2560×1080 spec given). Then commit the working tree (suggested message in progress notes).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions
