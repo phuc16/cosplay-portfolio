@@ -22,7 +22,16 @@
 - **Hero cover spec for the user's designer: one 2560×1080 WebP** (2x of 1216×500), face inside center-50% width / upper half — `object-fit: cover` shows only the middle ~half on phones. Cutout images can NOT fit all breakpoints exactly (zone ratios 0.62–1.15); height-based-fit CSS change offered but parked.
 - **Security posture (reviewed, no change): login lock 5 fails/15min per IP (Redis); rate limits global 600 / public 120 / storage 300 per min. NOT real DDoS protection — recommend Cloudflare free proxy; ensure backend port not public and Nginx overwrites X-Forwarded-For (keyGen trusts it).**
 
+- **Hero cutout glow = radial aura layer, NOT drop-shadow** (same as footer char) → Why: user's tight-crop cutouts turn drop-shadow into a visible rectangle that slides with the image on slide change. One `aura` div per cutout container, accent-colored, transitions with slide.
+- **Prod compose (`docker-compose.pull.yml`, newly created — repo never had it) publishes NO ports except frontend on `127.0.0.1:5173`** → Why: closes direct backend access (X-Forwarded-For spoof) and DB/Redis/MinIO exposure; host Nginx is the only entry. Secrets enforced with `:?` — refuses to boot with missing .env. Dev compose binds sensitive ports to 127.0.0.1.
+- **Login compare via sha256+`crypto.timingSafeEqual`** → Why: constant-time, and hashing first sidesteps timingSafeEqual's equal-length requirement.
+- **Backend request logs = one JSON line/request** (ts, level by status, method, path, status, ip, latency, bytes_in/out, user_agent, referer — underscore naming per user's global convention) + docker json-file rotation 10m×3 on all services.
+- **Security headers live in `frontend/nginx.conf`** (ships in image; pass through host Nginx/Cloudflare): HSTS, XFO SAMEORIGIN, nosniff, referrer-policy, permissions-policy, CSP (script-src 'self'; style unsafe-inline for React style props; img https: tolerated for admin-pasted URLs).
+- **Cloudflare free in front of kamidayhehe.com** → Namecheap NS → amanda/matias.ns.cloudflare.com; Full (strict) + Always Use HTTPS; CDN caches by file extension so `/api/storage/*.webp` HITs with zero config (immutable + unique timestamped filenames = never purge); `/api/*` stays DYNAMIC. Keep WebP over PNG — CDN doesn't change transfer size, which is the real bottleneck.
+- **Anti-download = deterrent only** (right-click blocked on IMG only, user-drag/select/touch-callout none, + Hotlink Protection) → Why: absolute prevention impossible (screenshots); watermark declined for now.
+
 ## What Didn't Work
+- **Verifying new compose locally** — host has another Docker process holding :6379, so local `up` fails on redis bind; irrelevant for prod (pull.yml doesn't publish redis). Don't chase local port conflicts for server-only changes.
 - **Full-width under-text cutout on mobile** — first fix for the cutout covering VI/EN moved it behind the text as a backdrop; user wanted the right-side pop-out kept, only lower (`top:-18px`).
 - **Footer char bottom mask fade** — drew a horizontal band where the semi-transparent strip crossed the dark footer; removed.
 - **`node-vibrant` + HSL normalization for hero accent** — produced saturated mid-tone colors (gold/blue/red) the user called ugly; replaced with the design's boost-×1.4 formula (pastels). Dependency removed.

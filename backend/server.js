@@ -6,6 +6,7 @@ if (!process.env.JWT_SECRET) {
 
 const express = require("express")
 const cors = require("cors")
+const crypto = require("crypto")
 const jwt = require("jsonwebtoken")
 const { rateLimit } = require("express-rate-limit")
 const { RedisStore } = require("rate-limit-redis")
@@ -89,15 +90,26 @@ const globalLimiter = rateLimit({
 })
 app.use(globalLimiter)
 
-// Request logging
+// Request logging — one structured JSON line per request
 app.use((req, res, next) => {
-  const start = Date.now()
-  const log = () => {
-    const duration = Date.now() - start
-    const size = req.headers["content-length"] ? ` ${req.headers["content-length"]}b` : ""
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}${size} → ${res.statusCode} (${duration}ms)`)
-  }
-  res.on("finish", log)
+  const start = process.hrtime.bigint()
+  res.on("finish", () => {
+    const latency = Number(process.hrtime.bigint() - start) / 1e6
+    console.log(JSON.stringify({
+      ts: new Date().toISOString(),
+      level: res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info",
+      msg: "request",
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      ip: getClientIp(req),
+      latency: Math.round(latency * 10) / 10,
+      bytes_in: Number(req.headers["content-length"]) || 0,
+      bytes_out: Number(res.getHeader("content-length")) || 0,
+      user_agent: req.headers["user-agent"] || "",
+      referer: req.headers["referer"] || "",
+    }))
+  })
   next()
 })
 
@@ -112,6 +124,13 @@ const LOGIN_LOCKOUT_MINUTES = 15
 
 function getClientIp(req) {
   return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+}
+
+// Constant-time string comparison — prevents character-by-character timing attacks
+function safeEqual(a, b) {
+  const ha = crypto.createHash("sha256").update(String(a)).digest()
+  const hb = crypto.createHash("sha256").update(String(b)).digest()
+  return crypto.timingSafeEqual(ha, hb)
 }
 
 app.post(`${API_PREFIX}/login`, async (req, res) => {
@@ -136,7 +155,7 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
       return res.status(400).json({ error: "invalid_input", message: "Cần nhập username và password" })
     }
 
-    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+    if (!safeEqual(username, ADMIN_USERNAME) || !safeEqual(password, ADMIN_PASSWORD)) {
       const attempts = await redis.incr(attemptKey)
       if (attempts === 1) await redis.expire(attemptKey, 60 * LOGIN_LOCKOUT_MINUTES)
       if (attempts >= LOGIN_MAX_ATTEMPTS) {

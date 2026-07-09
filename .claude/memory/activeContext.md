@@ -1,7 +1,24 @@
 # Active Context
-Last updated: 2026-07-07 (UI polish batch done)
+Last updated: 2026-07-09 (security/infra hardening batch)
 
 ## Current Task
+Security & infra hardening (user declined backups):
+- [x] Hero cutout white-frame fix: drop-shadow → radial aura behind img (same root cause as footer; tight-crop cutouts)
+- [x] docker-compose.yml (dev): sensitive ports bound to 127.0.0.1, restart unless-stopped, log rotation 10m×3
+- [x] Created docker-compose.pull.yml (prod, was missing from repo): NO public ports except frontend on 127.0.0.1:5173; secrets required via :?; log rotation; unless-stopped
+- [x] Login: crypto.timingSafeEqual (sha256 both sides) for username+password compare
+- [x] Backend request logs → structured JSON one-line (ts, level, method, path, status, ip, latency, bytes_in/out, user_agent, referer)
+- [x] npm audit fix backend+frontend → 0 vulnerabilities
+- [x] Lazy-load images (latest photos, album covers, footer char)
+- [x] Security headers in frontend/nginx.conf (HSTS, XFO, nosniff, referrer-policy, permissions-policy, CSP) — verified live on prod
+- [x] Cloudflare active on kamidayhehe.com (Namecheap NS → amanda/matias.ns.cloudflare.com); CDN cache verified (webp HIT, /api DYNAMIC); user set Full (strict) + Always Use HTTPS
+- [x] Anti-download deterrent: img right-click blocked (Portfolio root onContextMenu), CSS user-drag/select/touch-callout none
+- [x] Cloudflare active + verified live: A records → CF IPs, server: cloudflare, HTTP/2, security headers live, CDN cache webp MISS→HIT, /api DYNAMIC
+- [x] DEPLOY.md updated: Cloudflare flow (Bước 2), pull.yml security notes (Bước 7), structured-log viewing, troubleshooting (redirect loop / 526 / cf-cache-status / missing .env)
+- [ ] User to flip ON: Cloudflare Scrape Shield → Hotlink Protection
+- [ ] User: ufw on droplet (allow only 22/80/443) + deploy new pull.yml with --force-recreate + rebuild/push backend & frontend images (timing-safe login, JSON logs, anti-download, lazy-load)
+
+## Prior task (done): UI polish batch
 UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Footer-char purple frame fix: drop-shadow → radial-gradient aura behind img
 - [x] Footer-char bottom mask removed (caused horizontal band over footer text)
@@ -70,10 +87,10 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-frontend/src/pages/Portfolio.jsx + frontend/src/index.css (UI polish batch — built, NOT yet deployed to prod)
+[none in-flight — hardening batch code complete; backend/server.js, compose files, frontend/nginx.conf, deploy/DEPLOY.md all edited & verified]
 
 ## Immediate Next Step
-User deploys frontend to prod (kamidayhehe.com) with the whole UI-polish batch, then verifies. User is designing a new hero-cover image (2560×1080 spec given). Then commit the working tree (suggested message in progress notes).
+User: (1) rebuild+push backend & frontend images (`./scripts/build-push.sh`), deploy with new docker-compose.pull.yml `--force-recreate`; (2) ufw allow only 22/80/443; (3) Cloudflare Scrape Shield → Hotlink Protection ON. Then commit working tree. User still designing hero-cover image (2560×1080 spec).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions

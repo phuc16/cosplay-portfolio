@@ -189,7 +189,10 @@ function HeroBanner({ data, theme, lang }) {
   }
   const slideAnim = `${dir === 1 ? "hero-slide-r" : "hero-slide-l"} .55s cubic-bezier(.22,.61,.36,1)`
   const slideAnimC = `${dir === 1 ? "hero-slide-cr" : "hero-slide-cl"} .55s cubic-bezier(.22,.61,.36,1)`
-  const cutout = { position: "absolute", top: 0, right: 0, height: "auto", width: "100%", filter: `drop-shadow(0 0 50px ${glowColor})`, animation: slideAnim, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }
+  // No drop-shadow here: tightly-cropped cutouts (opaque pixels at the image edge)
+  // turn it into a visible rectangle. The soft aura comes from a radial layer behind.
+  const cutout = { position: "relative", zIndex: 1, height: "auto", width: "100%", animation: slideAnim, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }
+  const aura = { position: "absolute", inset: "-8% -12%", background: `radial-gradient(ellipse at 60% 42%, ${glowColor} 0%, transparent 68%)`, filter: "blur(28px)", zIndex: 0, pointerEvents: "none", transition: "background 0.8s ease" }
   return (
     <div className="sec-wrap" style={s.wrap}>
       <div className="hero-card" style={s.cardBg}>
@@ -205,11 +208,13 @@ function HeroBanner({ data, theme, lang }) {
         {/* Character cutout (transparent PNG) pops out over the top of the card */}
         {imgs[idx] && (!isLandscape ? (
           <div className="hero-cutout" style={{ position: "absolute", right: 0, top: "-84px", bottom: 0, width: "55%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
+            <div style={aura} />
             <img key={"p" + idx} src={imgs[idx]} alt="" style={cutout} />
           </div>
         ) : (
           <div className="hero-cutout hero-cutout-c" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: "-84px", bottom: 0, width: "80%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
-            <img key={"p" + idx} src={imgs[idx]} alt="" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", height: "100%", width: "auto", filter: `drop-shadow(0 0 60px ${glowColor})`, animation: slideAnimC, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
+            <div style={aura} />
+            <img key={"p" + idx} src={imgs[idx]} alt="" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", height: "100%", width: "auto", zIndex: 1, animation: slideAnimC, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
           </div>
         ))}
         <div className="hero-left" style={s.left}>
@@ -257,7 +262,7 @@ function InfoSection({ data, onOpenPhoto, lang }) {
                 onMouseEnter={(e) => { e.currentTarget.querySelector("img").style.transform = "scale(1.05)" }}
                 onMouseLeave={(e) => { e.currentTarget.querySelector("img").style.transform = "scale(1)" }}
                 onClick={() => onOpenPhoto(src)}>
-                <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s" }} />
+                <img src={src} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s" }} />
               </div>
             ))}
           </div>
@@ -360,7 +365,7 @@ function ProjectSection({ data, onOpenAlbum, lang }) {
             {data.albums.map((alb, i) => (
               <div key={alb.id} style={{ ...s.albumCard, transform: hov === i ? "scale(1.02)" : "none", boxShadow: hov === i ? "var(--shadow-pink-hover)" : "none" }}
                 onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)} onClick={() => onOpenAlbum(alb)}>
-                <img src={alb.cover} alt={alb.title} style={s.albumImg} />
+                <img src={alb.cover} alt={alb.title} loading="lazy" decoding="async" style={s.albumImg} />
                 <div style={s.plusBtn}>+</div>
                 <div style={s.albumFoot}>
                   <div style={s.albumTitle}>{alb.title}</div>
@@ -643,7 +648,9 @@ export default function Portfolio() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-page)", color: "var(--text-strong)" }}>
+    <div
+      style={{ minHeight: "100vh", background: "var(--bg-page)", color: "var(--text-strong)" }}
+      onContextMenu={(e) => { if (e.target.tagName === "IMG") e.preventDefault() }}>
       <Navbar theme={theme} onToggleTheme={toggleTheme} lang={lang} onSetLang={setLang}
         artistName={data.artistName} tagline={getLocalized(cfg.tagline, lang)} logoUrl={logoUrl} />
 
@@ -668,7 +675,7 @@ export default function Portfolio() {
             {/* Soft radial aura BEHIND the character — no straight edges, so a tightly-cropped
                 cutout never turns the glow into a rectangular frame (unlike a drop-shadow). */}
             <div style={{ position: "absolute", inset: "-40px -30px 40px", background: "radial-gradient(ellipse at 50% 55%, rgba(180,120,255,0.40) 0%, rgba(180,120,255,0.16) 45%, transparent 72%)", filter: "blur(30px)", zIndex: 0, pointerEvents: "none" }} />
-            <img src={data.footerChar} alt="" style={{ position: "relative", zIndex: 1, height: "100%", width: "auto", objectFit: "contain", objectPosition: "bottom right", display: "block" }} />
+            <img src={data.footerChar} alt="" loading="lazy" decoding="async" style={{ position: "relative", zIndex: 1, height: "100%", width: "auto", objectFit: "contain", objectPosition: "bottom right", display: "block" }} />
             <button onClick={() => setShowFooterChar(false)} title={lang === "vi" ? "Ẩn nhân vật" : "Hide character"} aria-label="Hide character"
               style={{ position: "absolute", top: 280, right: 8, width: 30, height: 30, borderRadius: "var(--radius-full)", background: "color-mix(in srgb, var(--bg-page) 70%, transparent)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid var(--border-default)", color: "var(--text-body)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", zIndex: 41 }}
               onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-link)"; e.currentTarget.style.borderColor = "var(--border-brand)" }}

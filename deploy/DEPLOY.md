@@ -36,17 +36,23 @@ Hướng dẫn từng bước để host project này trên VPS (DigitalOcean Dr
 
 ---
 
-## Bước 2: Trỏ domain về Droplet
+## Bước 2: Trỏ domain về Droplet (qua Cloudflare — khuyến nghị)
 
-1. Vào nhà cung cấp domain (Namecheap, Cloudflare, GoDaddy…)
-2. Thêm **A Record**:
+Dùng Cloudflare (gói Free) làm proxy trước domain: chống DDoS, CDN cache ảnh, ẩn IP droplet, HTTP/2.
 
-   | Type | Name | Value | TTL |
-   |------|------|-------|-----|
-   | A | @ | `IP_DROPLET` | 300 |
-   | A | www | `IP_DROPLET` | 300 |
+1. Đăng ký [cloudflare.com](https://cloudflare.com) → **Add site** → nhập domain → chọn plan **Free**.
+2. Cloudflare tự quét DNS. Kiểm tra 2 record A (`@` và `www`) trỏ đúng `IP_DROPLET`, bật **Proxied** (đám mây cam 🟠).
+3. Cloudflare cấp 2 nameserver (dạng `xxx.ns.cloudflare.com`).
+4. Vào nhà cung cấp domain (vd Namecheap: Domain List → Manage → **Nameservers → Custom DNS**) → dán 2 nameserver → Save.
+5. Chờ Cloudflare gửi email "**is now active**" (thường < 1h, tối đa 48h). Site vẫn chạy bình thường trong lúc chờ.
+6. Sau khi Active, trong Cloudflare dashboard:
+   - **SSL/TLS → Overview → Custom → Full (strict)** (bắt buộc — mặc định Flexible gây redirect loop với certbot).
+   - **SSL/TLS → Edge Certificates → Always Use HTTPS: On**.
+   - **Scrape Shield → Hotlink Protection: On** (chặn site khác nhúng thẳng ảnh).
 
-3. Đợi tối đa 48h (thường 5–15 phút)
+CDN cache tự hoạt động: ảnh `.webp/.png/.jpg` được cache tại edge (kiểm tra bằng `curl -sI https://domain/api/storage/... | grep cf-cache-status` — lần 2 phải là `HIT`); route API động là `DYNAMIC` (không cache).
+
+> Không dùng Cloudflare? Chỉ cần thêm 2 A record `@`/`www` trỏ `IP_DROPLET` tại nhà cung cấp domain.
 
 ---
 
@@ -150,6 +156,12 @@ docker compose -f docker-compose.pull.yml up -d
 
 Chỉ cần **pull** và **up** – không build trên server.
 
+**Bảo mật của compose prod:**
+- Không service nào publish port ra ngoài, trừ frontend bind `127.0.0.1:5173` (chỉ host Nginx vào được). MySQL/Redis/MinIO/backend chỉ nói chuyện trong mạng nội bộ Docker — không thể bị truy cập hoặc spoof `X-Forwarded-For` từ internet.
+- File `.env` **bắt buộc** phải có `DB_PASS`, `MINIO_ROOT_USER/PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME/PASSWORD` — thiếu là compose từ chối chạy (không còn default `admin/admin`).
+- Log tự xoay vòng (json-file, 10MB × 3 file/container) — không lo đầy đĩa.
+- Khi đổi cấu hình compose (ports/logging), phải chạy `up -d --force-recreate` mới có hiệu lực.
+
 Kiểm tra:
 
 ```bash
@@ -230,6 +242,8 @@ Làm theo hướng dẫn (email, điều khoản). Certbot sẽ tự cấu hình
 
 ## Bước 10: Mở firewall
 
+Chỉ mở đúng 3 port — mọi service khác đã không publish ra ngoài (xem Bước 7):
+
 ```bash
 ufw allow 22      # SSH
 ufw allow 80      # HTTP
@@ -254,6 +268,10 @@ docker compose -f docker-compose.pull.yml exec backend npm run migrate
 
 # Xem logs
 docker compose -f docker-compose.pull.yml logs -f
+
+# Log request backend là JSON structured (1 dòng/request):
+# {"ts","level","method","path","status","ip","latency","bytes_in","bytes_out","user_agent","referer"}
+docker compose -f docker-compose.pull.yml logs backend | grep '"msg":"request"' | tail -20
 ```
 
 ---
@@ -298,3 +316,7 @@ Images: `phuc16/cosplay-backend:latest`, `phuc16/cosplay-frontend:latest`
 | Migration lỗi | `docker compose exec backend npm run migrate` |
 | Ảnh không load | Kiểm tra MinIO bucket `cosplay` đã tạo chưa |
 | Upload ảnh lỗi | Kiểm tra `client_max_body_size` trong Nginx |
+| Redirect loop (quá nhiều lần chuyển hướng) | Cloudflare SSL mode đang Flexible → đổi sang **Full (strict)** |
+| Lỗi 526 Invalid SSL certificate | Chứng chỉ origin hết hạn/sai domain → `certbot renew --dry-run` trên droplet |
+| Ảnh chậm/không cache | `curl -sI .../api/storage/xxx.webp \| grep cf-cache-status` — `HIT` là qua CDN; `MISS` liên tục thì kiểm tra header `Cache-Control` từ backend |
+| Compose từ chối chạy (`required variable ... is missing`) | Thiếu biến trong `.env` — cố ý, điền đủ secrets |

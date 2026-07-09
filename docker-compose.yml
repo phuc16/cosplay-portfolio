@@ -1,14 +1,12 @@
-version: "3.9"
-
 services:
   mysql:
     image: mysql:8
-    restart: always
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASS:-root}
       MYSQL_DATABASE: ${DB_NAME:-cosplay}
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -16,32 +14,39 @@ services:
       interval: 3s
       timeout: 5s
       retries: 10
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
-    restart: always
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    logging: *logging
 
   minio:
     image: minio/minio:latest
-    restart: always
+    restart: unless-stopped
     command: server /data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    logging: *logging
 
   backend:
     image: phuc16/cosplay-backend:latest
     build: ./backend
-    restart: always
+    restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     depends_on:
       mysql:
         condition: service_healthy
@@ -64,11 +69,12 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       NODE_ENV: production
+    logging: *logging
 
   worker:
     image: phuc16/cosplay-backend:latest
     build: ./backend
-    restart: always
+    restart: unless-stopped
     command: node worker.js
     depends_on:
       mysql:
@@ -88,15 +94,17 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
+    logging: *logging
 
   frontend:
     image: phuc16/cosplay-frontend:latest
     build: ./frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:
       - backend
+    logging: *logging
 
 volumes:
   mysql_data:

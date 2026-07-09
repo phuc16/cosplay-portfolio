@@ -10,7 +10,8 @@
 ## Backend (`backend/`)
 - Node/Express 5, all routes in `server.js`. Background thumbnail worker in `worker.js`.
 - MySQL via `mysql2` (raw `db.query` with `?` placeholders — NOT knex query builder at runtime; knex only for migrations). Redis via `ioredis`. MinIO/S3 via `@aws-sdk/client-s3` (`storage.js`).
-- Image processing: `sharp` (resize ≤1920px; PNG when `meta.hasAlpha` else JPEG q85 — preserves transparency).
+- Image processing: `sharp` (resize ≤1920px; always WebP q82, thumbnails WebP q80 — preserves transparency, ~10-15× smaller than PNG).
+- Request logs: one structured JSON line per request (underscore fields: method, path, status, ip, latency, bytes_in/out, user_agent, referer). Login compare uses sha256 + `crypto.timingSafeEqual`.
 - Auth: JWT (`jsonwebtoken`), `auth.js` middleware. Rate limiting: `express-rate-limit` + `rate-limit-redis`.
 - Commands (run in `backend/`): `npm run migrate` (knex migrate:latest), `npm run seed`, `npm run rollback`, `node server.js` (:5000), `node worker.js`.
 
@@ -26,7 +27,10 @@
 
 ## Local dev / deploy (Docker)
 - `docker compose up -d --build` — full stack. Services: mysql:8, redis:7-alpine, minio, backend (`phuc16/cosplay-backend`), worker (same image), frontend (`phuc16/cosplay-frontend`).
-- Frontend published on host **:5173** (nginx serves SPA, proxies `/api` → backend). Redeploy one service: `docker compose up -d --build frontend`.
+- Frontend published on host **:5173** (nginx serves SPA, proxies `/api` → backend; nginx.conf ships security headers incl. CSP/HSTS). Redeploy one service: `docker compose up -d --build frontend`.
+- Dev compose binds MySQL/Redis/MinIO/backend to **127.0.0.1** only; all services have log rotation (json-file 10m×3) + `restart: unless-stopped`. NOTE: local `up` may fail binding :6379 (another Docker project holds it) — irrelevant for code changes.
+- **Prod = `docker-compose.pull.yml`**: no public ports except frontend `127.0.0.1:5173`; `.env` secrets required (`:?`); `up -d --force-recreate` after compose config changes.
+- **Cloudflare (free) fronts kamidayhehe.com**: proxied A records, Full (strict), Always Use HTTPS, CDN caches `/api/storage/*` by extension (verify: `cf-cache-status: HIT`).
 - `docker exec cosplay-portfolio-redis-1 redis-cli del settings gallery` — clear caches after direct DB edits.
 - Headless screenshot for verification: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new --screenshot=... --window-size=W,H http://localhost:5173/`.
 
