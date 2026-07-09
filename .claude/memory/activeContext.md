@@ -1,5 +1,5 @@
 # Active Context
-Last updated: 2026-07-09 (security/infra hardening batch)
+Last updated: 2026-07-09 (hardening batch + hero aura leak fix)
 
 ## Current Task
 Security & infra hardening (user declined backups):
@@ -14,6 +14,7 @@ Security & infra hardening (user declined backups):
 - [x] Cloudflare active on kamidayhehe.com (Namecheap NS → amanda/matias.ns.cloudflare.com); CDN cache verified (webp HIT, /api DYNAMIC); user set Full (strict) + Always Use HTTPS
 - [x] Anti-download deterrent: img right-click blocked (Portfolio root onContextMenu), CSS user-drag/select/touch-callout none
 - [x] Cloudflare active + verified live: A records → CF IPs, server: cloudflare, HTTP/2, security headers live, CDN cache webp MISS→HIT, /api DYNAMIC
+- [x] Hero aura leak fix: aura was inside the pop-out container (top:-84px) → accent bled above the card as a hard-edged band under the navbar. Moved aura INTO the card (inset 0, radius, zIndex 2, no blur). Build OK, needs deploy
 - [x] DEPLOY.md updated: Cloudflare flow (Bước 2), pull.yml security notes (Bước 7), structured-log viewing, troubleshooting (redirect loop / 526 / cf-cache-status / missing .env)
 - [ ] User to flip ON: Cloudflare Scrape Shield → Hotlink Protection
 - [ ] User: ufw on droplet (allow only 22/80/443) + deploy new pull.yml with --force-recreate + rebuild/push backend & frontend images (timing-safe login, JSON logs, anti-download, lazy-load)
@@ -87,10 +88,10 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-[none in-flight — hardening batch code complete; backend/server.js, compose files, frontend/nginx.conf, deploy/DEPLOY.md all edited & verified]
+frontend/src/pages/Portfolio.jsx (hero aura fix — built OK, uncommitted, not yet deployed)
 
 ## Immediate Next Step
-User: (1) rebuild+push backend & frontend images (`./scripts/build-push.sh`), deploy with new docker-compose.pull.yml `--force-recreate`; (2) ufw allow only 22/80/443; (3) Cloudflare Scrape Shield → Hotlink Protection ON. Then commit working tree. User still designing hero-cover image (2560×1080 spec).
+Commit the aura fix (message logged in session notes), then user: build+push frontend image, deploy to prod. Outstanding user-side infra steps: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done). User still designing hero-cover image (2560×1080 spec).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions

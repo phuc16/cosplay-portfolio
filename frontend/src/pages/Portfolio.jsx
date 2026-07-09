@@ -192,7 +192,9 @@ function HeroBanner({ data, theme, lang }) {
   // No drop-shadow here: tightly-cropped cutouts (opaque pixels at the image edge)
   // turn it into a visible rectangle. The soft aura comes from a radial layer behind.
   const cutout = { position: "relative", zIndex: 1, height: "auto", width: "100%", animation: slideAnim, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }
-  const aura = { position: "absolute", inset: "-8% -12%", background: `radial-gradient(ellipse at 60% 42%, ${glowColor} 0%, transparent 68%)`, filter: "blur(28px)", zIndex: 0, pointerEvents: "none", transition: "background 0.8s ease" }
+  // Lives inside the card (inset 0 + radius) — NOT inside the pop-out container,
+  // whose clipped overflow would show the glow as a hard-edged band above the card.
+  const aura = { position: "absolute", inset: 0, zIndex: 2, borderRadius: "var(--radius-lg)", background: `radial-gradient(ellipse 55% 65% at 70% 45%, ${glowColor} 0%, transparent 70%)`, pointerEvents: "none", transition: "background 0.8s ease" }
   return (
     <div className="sec-wrap" style={s.wrap}>
       <div className="hero-card" style={s.cardBg}>
@@ -202,18 +204,18 @@ function HeroBanner({ data, theme, lang }) {
         )}
         {/* Accent wash — cover/scrim shows on the left, soft pale accent fills the right (design look) */}
         <div style={{ position: "absolute", inset: 0, zIndex: 2, borderRadius: "var(--radius-lg)", background: `linear-gradient(to right, transparent 0%, transparent 28%, ${accent} 100%)`, transition: "background 0.8s ease" }} />
+        {/* Soft glow behind the character, clipped to the card */}
+        <div style={aura} />
         <div style={s.grad} />
         {/* Faint accent tint so the dark left band carries a hint of the slide color */}
         <div style={{ position: "absolute", inset: 0, zIndex: 4, borderRadius: "var(--radius-lg)", background: accent, opacity: 0.16, mixBlendMode: "soft-light", pointerEvents: "none", transition: "background 0.8s ease" }} />
         {/* Character cutout (transparent PNG) pops out over the top of the card */}
         {imgs[idx] && (!isLandscape ? (
           <div className="hero-cutout" style={{ position: "absolute", right: 0, top: "-84px", bottom: 0, width: "55%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
-            <div style={aura} />
             <img key={"p" + idx} src={imgs[idx]} alt="" style={cutout} />
           </div>
         ) : (
           <div className="hero-cutout hero-cutout-c" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: "-84px", bottom: 0, width: "80%", zIndex: 35, pointerEvents: "none", overflow: "hidden" }}>
-            <div style={aura} />
             <img key={"p" + idx} src={imgs[idx]} alt="" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", height: "100%", width: "auto", zIndex: 1, animation: slideAnimC, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
           </div>
         ))}

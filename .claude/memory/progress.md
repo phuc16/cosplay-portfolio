@@ -30,7 +30,10 @@
 - **Cloudflare free in front of kamidayhehe.com** → Namecheap NS → amanda/matias.ns.cloudflare.com; Full (strict) + Always Use HTTPS; CDN caches by file extension so `/api/storage/*.webp` HITs with zero config (immutable + unique timestamped filenames = never purge); `/api/*` stays DYNAMIC. Keep WebP over PNG — CDN doesn't change transfer size, which is the real bottleneck.
 - **Anti-download = deterrent only** (right-click blocked on IMG only, user-drag/select/touch-callout none, + Hotlink Protection) → Why: absolute prevention impossible (screenshots); watermark declined for now.
 
+- **Hero glow layer lives in the CARD, never in the pop-out container** → Why: any accent-colored layer inside the cutout container (which rises above the card, overflow:hidden) gets clipped into a hard-edged band visible under the navbar. Rule of thumb for this hero: pop-out container contains ONLY the character image; all washes/scrims/glows go on the card with `inset:0 + borderRadius`. Also avoid `filter:blur` on card-inset layers (bleeds past edges) — a radial gradient is already soft.
+
 ## What Didn't Work
+- **Aura inside the cutout container** — accent glow leaked above the card as a clipped rectangle below the navbar (reported by user); moved into the card.
 - **Verifying new compose locally** — host has another Docker process holding :6379, so local `up` fails on redis bind; irrelevant for prod (pull.yml doesn't publish redis). Don't chase local port conflicts for server-only changes.
 - **Full-width under-text cutout on mobile** — first fix for the cutout covering VI/EN moved it behind the text as a backdrop; user wanted the right-side pop-out kept, only lower (`top:-18px`).
 - **Footer char bottom mask fade** — drew a horizontal band where the semi-transparent strip crossed the dark footer; removed.
