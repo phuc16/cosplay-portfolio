@@ -38,6 +38,9 @@
 - **Favicon = backend-generated 64×64 PNG at `/api/favicon.png`** → Why: instant tab icon requires a `<link>` in index.html (not JS-after-settings), a tiny image (not the multi-MB logo webp — browsers show a placeholder block while decoding), and a `.png` suffix so Cloudflare edge-caches a path under /api. Redis-cached 1h; `invalidateSettings` also dels `favicon_png` (logo change propagates ≤5 min via max-age=300). Alternatives rejected: static file in frontend/public (fastest but frozen at build — breaks admin-driven logo), 302 redirect to the storage URL (still downloads/decodes the huge webp → pink block).
 - **Event popup shows every page load** → user request; sessionStorage gate removed, close = hide until next load.
 
+- **Decorative layers tied to an async image must hide until the image loads** → Why: the footer-char aura painted before its image arrived → floating purple block during page load. Pattern: gate the whole block (`visibility: hidden` until `onLoad`), not just the img — visibility keeps the lazy image loading. Hero aura exempt: it sits inside the gradient card so it reads as card background pre-load.
+- **Lightbox preloads only (idx±1) mod total via `new Image()`** → Why: instant prev/next without downloading the whole album; wraps circularly. Alternatives rejected: render all imgs hidden (downloads everything), no preload (visible stall on navigate).
+
 ## What Didn't Work
 - **Client-side favicon swap to the full-size logo URL** — Chrome cached the huge webp as the site icon and showed a pink placeholder block during decode on every load; removed in favor of the server-generated PNG.
 - **Aura inside the cutout container** — accent glow leaked above the card as a clipped rectangle below the navbar (reported by user); moved into the card.

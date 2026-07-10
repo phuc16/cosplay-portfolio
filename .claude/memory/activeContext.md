@@ -1,8 +1,14 @@
 # Active Context
-Last updated: 2026-07-11 (event popup every load + instant favicon)
+Last updated: 2026-07-11 (loading-blob fix + lightbox circular preload)
 
 ## Current Task
-Small UX batch:
+Loading polish:
+- [x] Footer-char purple blob during load: whole block (aura + img + × button) `visibility: hidden` until img onLoad (`footerCharLoaded` state) — aura alone looked like a floating purple block while the image was still downloading
+- [x] Lightbox circular preload: on idx change, warm cache for (idx±1) mod total via `new Image()` — instant prev/next, still lazy for the rest
+- [x] Assessed "remove all blocks": only footer-char had the issue; hero aura sits inside the gradient card (looks intentional pre-load), plain imgs have no decoration
+- [x] User deploys frontend + verifies
+
+## Prior task (done): Small UX batch:
 - [x] Event popup shows on EVERY page load (removed sessionStorage gate; close only hides until next load)
 - [x] Instant tab favicon: `<link rel="icon" href="/api/favicon.png">` in index.html; backend generates 64×64 PNG from logo (sharp, fit cover position top), Redis-cached 1h, Cache-Control max-age=300; `.png` suffix so Cloudflare edge-caches it; invalidateSettings also dels `favicon_png`; removed client JS that swapped favicon to the full-size logo (browser cached the huge webp as icon → pink placeholder block while decoding)
 - [x] User deploys backend + frontend; verify `curl -sI https://kamidayhehe.com/api/favicon.png` → 2nd hit cf-cache-status: HIT, image/png
@@ -105,10 +111,10 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-[none in-flight — favicon endpoint (server.js + index.html) and popup change (Portfolio.jsx) complete]
+[none in-flight — all session changes complete in Portfolio.jsx]
 
 ## Immediate Next Step
-User deploys backend + frontend, verifies favicon (`curl -sI https://kamidayhehe.com/api/favicon.png` — 2nd hit cf-cache-status: HIT, image/png; browser may need Cmd+Shift+R once for the old cached icon). Then commit working tree (message in session notes). Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
+Commit working tree (message in session notes). Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions

@@ -538,6 +538,16 @@ function Lightbox({ photos, startIdx, onClose }) {
   const total = photos.length
   const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total])
   const next = useCallback(() => setIdx((i) => (i + 1) % total), [total])
+
+  // Circular preload: warm the browser cache for the neighbours of the current
+  // photo (wrapping around), so prev/next swaps are instant.
+  useEffect(() => {
+    if (total < 2) return
+    for (const n of [(idx + 1) % total, (idx - 1 + total) % total]) {
+      const im = new Image()
+      im.src = photos[n]
+    }
+  }, [idx, photos, total])
   useEffect(() => {
     const h = (e) => {
       if (e.key === "Escape") onClose()
@@ -623,6 +633,7 @@ export default function Portfolio() {
   const [lightbox, setLightbox] = useState(null)
   const [eventPopup, setEventPopup] = useState(null)
   const [showFooterChar, setShowFooterChar] = useState(true)
+  const [footerCharLoaded, setFooterCharLoaded] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -691,11 +702,13 @@ export default function Portfolio() {
           </div>
         </footer>
         {data.footerChar && showFooterChar && (
-          <div className="footer-char" style={{ position: "absolute", bottom: 0, right: 32, height: "calc(100% + 260px)", width: "auto", zIndex: 40, pointerEvents: "none" }}>
+          <div className="footer-char" style={{ position: "absolute", bottom: 0, right: 32, height: "calc(100% + 260px)", width: "auto", zIndex: 40, pointerEvents: "none", visibility: footerCharLoaded ? "visible" : "hidden" }}>
             {/* Soft radial aura BEHIND the character — no straight edges, so a tightly-cropped
-                cutout never turns the glow into a rectangular frame (unlike a drop-shadow). */}
+                cutout never turns the glow into a rectangular frame (unlike a drop-shadow).
+                The whole block stays hidden until the image loads — otherwise the aura
+                shows up alone as a floating purple blob during page load. */}
             <div style={{ position: "absolute", inset: "-40px -30px 40px", background: "radial-gradient(ellipse at 50% 55%, rgba(180,120,255,0.40) 0%, rgba(180,120,255,0.16) 45%, transparent 72%)", filter: "blur(30px)", zIndex: 0, pointerEvents: "none" }} />
-            <img src={data.footerChar} alt="" loading="lazy" decoding="async" style={{ position: "relative", zIndex: 1, height: "100%", width: "auto", objectFit: "contain", objectPosition: "bottom right", display: "block" }} />
+            <img src={data.footerChar} alt="" loading="lazy" decoding="async" onLoad={() => setFooterCharLoaded(true)} style={{ position: "relative", zIndex: 1, height: "100%", width: "auto", objectFit: "contain", objectPosition: "bottom right", display: "block" }} />
             <button onClick={() => setShowFooterChar(false)} title={lang === "vi" ? "Ẩn nhân vật" : "Hide character"} aria-label="Hide character"
               style={{ position: "absolute", top: 280, right: 8, width: 30, height: 30, borderRadius: "var(--radius-full)", background: "color-mix(in srgb, var(--bg-page) 70%, transparent)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid var(--border-default)", color: "var(--text-body)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", zIndex: 41 }}
               onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-link)"; e.currentTarget.style.borderColor = "var(--border-brand)" }}
