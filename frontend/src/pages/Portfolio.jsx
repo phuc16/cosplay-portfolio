@@ -83,7 +83,7 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
     <header style={s.header}>
       <div className="nav-inner" style={s.inner}>
         <div style={s.logo}>
-          <div style={s.mark}>{logoUrl ? <img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "C"}</div>
+          {logoUrl && <div style={s.mark}><img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
           <div>
             <div style={s.name}>{artistName}</div>
             <div style={s.tag}>{tagline}</div>
@@ -535,9 +535,13 @@ function EventPopup({ event, lang, onClose }) {
 /* ── LIGHTBOX ────────────────────────────────────────────────────────────── */
 function Lightbox({ photos, startIdx, onClose }) {
   const [idx, setIdx] = useState(startIdx || 0)
+  const [imgLoaded, setImgLoaded] = useState(false)
   const total = photos.length
   const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total])
   const next = useCallback(() => setIdx((i) => (i + 1) % total), [total])
+
+  // Spinner while the current photo downloads
+  useEffect(() => { setImgLoaded(false) }, [idx])
 
   // Circular preload: warm the browser cache for the neighbours of the current
   // photo (wrapping around), so prev/next swaps are instant.
@@ -562,7 +566,9 @@ function Lightbox({ photos, startIdx, onClose }) {
   )
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <img key={idx} src={photos[idx]} alt="" onClick={(e) => e.stopPropagation()} style={{ maxHeight: "88vh", maxWidth: "88vw", objectFit: "contain", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pink-glow)", animation: "hero-fade-in .25s ease" }} />
+      {!imgLoaded && <div className="lightbox-spinner" onClick={(e) => e.stopPropagation()} />}
+      <img key={idx} src={photos[idx]} alt="" onClick={(e) => e.stopPropagation()} onLoad={() => setImgLoaded(true)}
+        style={{ maxHeight: "88vh", maxWidth: "88vw", objectFit: "contain", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pink-glow)", animation: "hero-fade-in .25s ease", visibility: imgLoaded ? "visible" : "hidden" }} />
       {total > 1 && navBtn(prev, icons.chevL, false)}
       {total > 1 && navBtn(next, icons.chevR, true)}
       {total > 1 && <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }}>{photos.map((_, i) => <div key={i} onClick={(e) => { e.stopPropagation(); setIdx(i) }} style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? "var(--brand)" : "rgba(255,255,255,.35)", cursor: "pointer", transition: "all .2s" }} />)}</div>}
@@ -685,6 +691,13 @@ export default function Portfolio() {
       <Navbar theme={theme} onToggleTheme={toggleTheme} lang={lang} onSetLang={setLang}
         artistName={data.artistName} tagline={getLocalized(cfg.tagline, lang)} logoUrl={logoUrl} />
 
+      {/* Full-page spinner while settings load from the backend */}
+      {loading && (
+        <div style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="lightbox-spinner" style={{ position: "static" }} />
+        </div>
+      )}
+
       {!loading && <HeroBanner data={data} theme={theme} lang={lang} />}
       {!loading && <Reveal><InfoSection data={data} lang={lang} onOpenPhoto={(src) => openPhoto(data.latestPhotos, Math.max(0, data.latestPhotos.indexOf(src)))} /></Reveal>}
       {!loading && <Reveal><ProjectSection data={data} lang={lang} onOpenAlbum={(alb) => openPhoto(alb.items?.length ? alb.items : [alb.cover], 0)} /></Reveal>}
@@ -701,7 +714,7 @@ export default function Portfolio() {
             </span>
           </div>
         </footer>
-        {data.footerChar && showFooterChar && (
+        {!loading && data.footerChar && showFooterChar && (
           <div className="footer-char" style={{ position: "absolute", bottom: 0, right: 32, height: "calc(100% + 260px)", width: "auto", zIndex: 40, pointerEvents: "none", visibility: footerCharLoaded ? "visible" : "hidden" }}>
             {/* Soft radial aura BEHIND the character — no straight edges, so a tightly-cropped
                 cutout never turns the glow into a rectangular frame (unlike a drop-shadow).

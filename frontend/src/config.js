@@ -26,49 +26,23 @@ export function applyColorScheme(name) {
   r.style.setProperty("--pink-500",          sc.brand)
 }
 
+// Empty skeleton only — ALL content comes from the backend (/api/settings).
+// Used solely as a shape-safe fallback while loading or if the API is down.
 export const SITE_CONFIG = {
   colorScheme: "pink",
   heroImageUrl: "",
   thumbnailImageUrl: "",
-  heroImages: ["/refassets/hero1.svg", "/refassets/hero2.svg", "/refassets/hero3.svg"],
+  heroImages: [],
   heroAccents: [],
   heroCovers: [],
-  heroCover: "/refassets/cover.svg",
+  heroCover: "",
   latestPhotos: [],
   logoUrl: "",
-  footerChar: "/refassets/footer.svg",
-  artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" },
-  tagline: { vi: "Cosplayer • Prop Maker", en: "Cosplayer • Prop Maker" },
-  about: {
-    vi: "Xin chào! Mình làm cosplay chủ yếu theo thể loại anime/game, tự làm đồ, props và có kinh nghiệm chụp hình sự kiện. Nhận đặt lịch cho convention, photoshoot và collab.",
-    en: "Hi! I do cosplay mostly in anime/game genres, make my own costumes and props, and have experience shooting at events. Booking open for conventions, photoshoots and collabs.",
-  },
-  achievements: [
-    { title: { vi: "100+ Cosplay", en: "100+ Cosplays" }, description: { vi: "Anime, game & thiết kế gốc từ 2018", en: "Anime, game & original designs since 2018" } },
-    { title: { vi: "20+ Convention", en: "20+ Conventions" }, description: { vi: "Khách mời & thí sinh tại các sự kiện lớn ở VN", en: "Guest & competitor at major VN events" } },
-    { title: { vi: "10K+ Người theo dõi", en: "10K+ Followers" }, description: { vi: "Trên Facebook, Instagram & TikTok", en: "Across Facebook, Instagram & TikTok" } },
-  ],
-  upcomingEvents: [
-    { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "", showPopup: true, imageUrl: "" },
-    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "", showPopup: false, imageUrl: "" },
-    { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "", showPopup: false, imageUrl: "" },
-  ],
-  contact: {
-    phone: "+84 90 123 4567",
-    email: "hello@kamidayhehe.com",
-    contactLinks: [],
-    social: [
-      { platform: "facebook", label: "Facebook", url: "https://facebook.com/kamimoe1911" },
-      { platform: "instagram", label: "Instagram", url: "https://instagram.com/kamidayhehe" },
-      { platform: "page", label: "Page", url: "https://facebook.com/kamimoe1911" },
-      { platform: "x", label: "X", url: "https://x.com/Kamidayhehe" },
-      { platform: "tiktok", label: "TikTok", url: "https://tiktok.com/@kamidayhehe" },
-      { platform: "discord", label: "Discord", url: "https://discord.gg/kamidayhehe" },
-    ],
-    supports: {
-      gumroad: "https://kamidayhehe.gumroad.com",
-      gank: "https://ganknow.com/kamidayhehe",
-      paypal: "https://paypal.com/kamidayhehe",
-    },
-  },
+  footerChar: "",
+  artistName: { vi: "", en: "" },
+  tagline: { vi: "", en: "" },
+  about: { vi: "", en: "" },
+  achievements: [],
+  upcomingEvents: [],
+  contact: { phone: "", email: "", contactLinks: [], social: [], supports: { gumroad: "", gank: "", paypal: "" } },
 }

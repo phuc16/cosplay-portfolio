@@ -41,7 +41,11 @@
 - **Decorative layers tied to an async image must hide until the image loads** → Why: the footer-char aura painted before its image arrived → floating purple block during page load. Pattern: gate the whole block (`visibility: hidden` until `onLoad`), not just the img — visibility keeps the lazy image loading. Hero aura exempt: it sits inside the gradient card so it reads as card background pre-load.
 - **Lightbox preloads only (idx±1) mod total via `new Image()`** → Why: instant prev/next without downloading the whole album; wraps circularly. Alternatives rejected: render all imgs hidden (downloads everything), no preload (visible stall on navigate).
 
+- **Frontend has NO demo/placeholder content — SITE_CONFIG is an empty shape-safe skeleton** → Why: fallback demo data (names/socials/events) and placeholder SVGs leaked into the real site during load (the "purple trapezoid" = /refassets/footer.svg from the fallback, loading instantly and bypassing the img-onLoad gate). All content is backend-driven; while /api/settings loads the page shows a centered spinner; navbar logo mark renders only when logoUrl exists (no "C" box). Backend DEFAULT_SETTINGS demo content kept (user choice) but its image fields are empty. Alternatives rejected: keeping demo fallback (leaks), per-image gates only (any instantly-loading placeholder bypasses them).
+- **Lightbox spinner until current photo loads** (imgLoaded reset on idx change; img hidden until onLoad) — complements the circular neighbour preload.
+
 ## What Didn't Work
+- **Gating only on img onLoad to hide loading artifacts** — an SVG placeholder loads instantly, so the gate passed and the purple block still showed; the real fix was removing placeholder content and gating on settings `!loading`.
 - **Client-side favicon swap to the full-size logo URL** — Chrome cached the huge webp as the site icon and showed a pink placeholder block during decode on every load; removed in favor of the server-generated PNG.
 - **Aura inside the cutout container** — accent glow leaked above the card as a clipped rectangle below the navbar (reported by user); moved into the card.
 - **Verifying new compose locally** — host has another Docker process holding :6379, so local `up` fails on redis bind; irrelevant for prod (pull.yml doesn't publish redis). Don't chase local port conflicts for server-only changes.

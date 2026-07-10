@@ -5,7 +5,7 @@
 - Tailwind CSS 3 (`darkMode: "class"`) + PostCSS + autoprefixer; ESLint 9 (flat config)
 - Design tokens live in `src/index.css` as CSS variables (light `:root` + `.dark` overrides). The public site (`src/pages/Portfolio.jsx`) is **inline-style + CSS-var driven** (faithful reproduction of the design standalone).
 - Commands (run in `frontend/`): `npm run dev` (Vite :5173), `npm run build` (→ `dist/`), `npm run preview`, `npm run lint`.
-- `public/refassets/` holds placeholder + brand assets (hero placeholders, `gank.png`) served at `/refassets/*`.
+- `public/refassets/` holds ONLY real brand assets (`gank.png`, `zalo.png`) served at `/refassets/*` — placeholder SVGs deleted; frontend `SITE_CONFIG` is an empty skeleton (all content backend-driven, spinner while loading).
 
 ## Backend (`backend/`)
 - Node/Express 5, all routes in `server.js`. Background thumbnail worker in `worker.js`.

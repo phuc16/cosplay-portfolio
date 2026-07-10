@@ -140,6 +140,17 @@
    Scoped to the public site so admin drag-to-reorder keeps working. */
 .portfolio-root img { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
+/* Lightbox loading spinner */
+.lightbox-spinner {
+  position: absolute;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .2);
+  border-top-color: var(--brand, #ec4899);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Scroll-reveal: sections fade + rise in once when they enter the viewport */
 .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s ease-out, transform .6s cubic-bezier(.22,.61,.36,1); will-change: opacity, transform; }
 .reveal.in { opacity: 1; transform: none; }

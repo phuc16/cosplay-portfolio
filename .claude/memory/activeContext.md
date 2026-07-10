@@ -1,8 +1,17 @@
 # Active Context
-Last updated: 2026-07-11 (loading-blob fix + lightbox circular preload)
+Last updated: 2026-07-11 (no-placeholder loading — pure backend content)
 
 ## Current Task
-Loading polish:
+No-placeholder loading (frontend thuần backend):
+- [x] Footer-char purple TRAPEZOID root cause: SITE_CONFIG fallback pointed footerChar at /refassets/footer.svg (purple placeholder, loads instantly → bypassed the onLoad gate). Fixed: footer-char gated on !loading too
+- [x] Removed ALL SVG placeholders: refs cleared in frontend SITE_CONFIG + backend DEFAULT_SETTINGS (heroImages [], heroCover "", footerChar ""); deleted 9 files from public/refassets (kept gank.png, zalo.png — real logos)
+- [x] SITE_CONFIG demo content deleted → empty shape-safe skeleton; content is 100% backend-driven (backend DEFAULT_SETTINGS demo content KEPT per user)
+- [x] Full-page pink spinner while /api/settings loads (reuses .lightbox-spinner, position static)
+- [x] Lightbox: spinner while current photo downloads (imgLoaded reset on idx change; img visibility hidden until onLoad) + kept circular preload of neighbours
+- [x] Navbar: removed "C" fallback — logo mark hidden entirely until logoUrl exists
+- [x] User deploys frontend + verifies clean load
+
+## Prior task (done): Loading polish:
 - [x] Footer-char purple blob during load: whole block (aura + img + × button) `visibility: hidden` until img onLoad (`footerCharLoaded` state) — aura alone looked like a floating purple block while the image was still downloading
 - [x] Lightbox circular preload: on idx change, warm cache for (idx±1) mod total via `new Image()` — instant prev/next, still lazy for the rest
 - [x] Assessed "remove all blocks": only footer-char had the issue; hero aura sits inside the gradient card (looks intentional pre-load), plain imgs have no decoration
@@ -111,7 +120,7 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-[none in-flight — all session changes complete in Portfolio.jsx]
+[none in-flight — session changes complete across config.js, Portfolio.jsx, index.css, server.js seeds]
 
 ## Immediate Next Step
 Commit working tree (message in session notes). Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
