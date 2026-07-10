@@ -1,7 +1,13 @@
 # Active Context
-Last updated: 2026-07-10 (hero cover auto + per-slide/per-breakpoint framing editor)
+Last updated: 2026-07-11 (event popup every load + instant favicon)
 
 ## Current Task
+Small UX batch:
+- [x] Event popup shows on EVERY page load (removed sessionStorage gate; close only hides until next load)
+- [x] Instant tab favicon: `<link rel="icon" href="/api/favicon.png">` in index.html; backend generates 64×64 PNG from logo (sharp, fit cover position top), Redis-cached 1h, Cache-Control max-age=300; `.png` suffix so Cloudflare edge-caches it; invalidateSettings also dels `favicon_png`; removed client JS that swapped favicon to the full-size logo (browser cached the huge webp as icon → pink placeholder block while decoding)
+- [x] User deploys backend + frontend; verify `curl -sI https://kamidayhehe.com/api/favicon.png` → 2nd hit cf-cache-status: HIT, image/png
+
+## Prior task (done): Hero cover rework
 Hero cover rework: cover derived from the CURRENT slide (no separate upload) + admin WYSIWYG framing editor per slide × per breakpoint.
 - [x] Cover = current slide image, rendered sharp (old format; muted look comes from scrim layers), objectPosition replaced by per-slide framing
 - [x] Removed "Ảnh bìa" upload from admin (note "tự lấy theo slide"); data.heroCover no longer used by public
@@ -99,10 +105,10 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-[none in-flight — heroCovers feature complete across Portfolio.jsx, AdminSettings.jsx, config.js, server.js]
+[none in-flight — favicon endpoint (server.js + index.html) and popup change (Portfolio.jsx) complete]
 
 ## Immediate Next Step
-User deploys backend + frontend (heroCovers touches both), tunes per-slide framing in admin → Save, then commit working tree (message in session notes). Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
+User deploys backend + frontend, verifies favicon (`curl -sI https://kamidayhehe.com/api/favicon.png` — 2nd hit cf-cache-status: HIT, image/png; browser may need Cmd+Shift+R once for the old cached icon). Then commit working tree (message in session notes). Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions

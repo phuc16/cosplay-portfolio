@@ -501,7 +501,7 @@ function ContactSection({ data, lang }) {
   )
 }
 
-/* ── EVENT POPUP (first-visit, sessionStorage-gated) ───────────────────── */
+/* ── EVENT POPUP (shows on every page load) ──────────────────────────────── */
 function EventPopup({ event, lang, onClose }) {
   const vi = lang === "vi"
   return (
@@ -640,29 +640,22 @@ export default function Portfolio() {
 
   useEffect(() => { document.title = data.artistName || "Cosplay Portfolio" }, [data.artistName])
 
-  // Tab favicon = the logo (same image as the navbar mark); fall back to first hero image
-  useEffect(() => {
-    const href = cfg.logoUrl || data.heroImages[0]
-    if (!href) return
-    let link = document.querySelector('link[rel="icon"]')
-    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link) }
-    link.href = href
-  }, [cfg.logoUrl, data.heroImages])
+  // Favicon comes from <link rel="icon" href="/api/favicon.png"> in index.html —
+  // a server-generated 64px PNG. Don't swap it to the full-size logo here:
+  // browsers cache that huge image as the site icon and show a placeholder
+  // block while decoding it on the next load.
 
+  // Popup shows on every page load (F5 included) — closing only hides it until the next load
   useEffect(() => {
     if (!settings) return
     const events = settings.upcomingEvents || []
     const idx = events.findIndex((ev) => ev.showPopup)
     if (idx === -1) return
-    const key = `eventPopup_${idx}`
-    if (sessionStorage.getItem(key)) return
-    const id = setTimeout(() => setEventPopup({ event: events[idx], key }), 600)
+    const id = setTimeout(() => setEventPopup({ event: events[idx] }), 600)
     return () => clearTimeout(id)
   }, [settings])
 
-  const closeEventPopup = () => {
-    if (eventPopup) { sessionStorage.setItem(eventPopup.key, "1"); setEventPopup(null) }
-  }
+  const closeEventPopup = () => setEventPopup(null)
 
   const openPhoto = (photos, idx = 0) => setLightbox({ photos: Array.isArray(photos) ? photos : [photos], idx })
   const logoUrl = cfg.logoUrl || ""

@@ -21,6 +21,7 @@
 
 ## API (prefix `/api`)
 - `GET /api/settings` → `{...config}` (Redis-cached key `settings`, 1h). `PUT /api/settings` (auth) → `sanitizeSettings` allowlist.
+- `GET /api/favicon.png` → 64×64 PNG from logo (sharp; Redis key `favicon_png` 1h; max-age=300; `.png` suffix → Cloudflare edge cache). Declared in index.html `<link rel="icon">`.
 - `GET /api/gallery` → `[{id, group, description, items:[{id, src, fullSrc, width, height}]}]` (Redis-cached key `gallery`).
 - `POST /api/login` → JWT. Album/image CRUD + reorder (auth).
 - Uploads (auth, base64 body, ≤50mb): `/api/upload/hero`, `/api/upload/thumbnail` (both return `{url, accentColor}`), `/api/upload/event-image`, `/api/image`. Storage proxy: `GET /api/storage/:path` (sets `Access-Control-Allow-Origin: *`).

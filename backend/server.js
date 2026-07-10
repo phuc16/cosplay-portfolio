@@ -205,7 +205,7 @@ app.get(new RegExp(`^${API_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/storag
     res.status(500).end()
   }
 })
-const invalidateSettings = () => redis.del("settings")
+const invalidateSettings = () => Promise.all([redis.del("settings"), redis.del("favicon_png")])
 
 // GET SETTINGS (public, cached)
 const DEFAULT_SETTINGS = {
@@ -257,6 +257,38 @@ const DEFAULT_SETTINGS = {
     supports: { gumroad: "https://kamidayhehe.gumroad.com", gank: "https://ganknow.com/kamidayhehe", paypal: "https://paypal.com/kamidayhehe" },
   },
 }
+
+// Favicon available straight from the HTML <link> (no waiting for the React
+// app to fetch settings). Serves a tiny 64×64 PNG generated from the logo —
+// redirecting to the full-size image made browsers show a placeholder while
+// downloading/decoding a huge webp.
+app.get(`${API_PREFIX}/favicon.png`, publicLimiter, async (req, res) => {
+  try {
+    const cached = await redis.getBuffer("favicon_png")
+    if (cached && cached.length) {
+      return res.type("png").set("Cache-Control", "public, max-age=300").end(cached)
+    }
+    let config = null
+    const cache = await redis.get("settings")
+    if (cache) {
+      config = JSON.parse(cache)
+    } else {
+      const [rows] = await db.query("SELECT config FROM site_settings ORDER BY id LIMIT 1")
+      config = rows[0]?.config
+        ? (typeof rows[0].config === "string" ? JSON.parse(rows[0].config) : rows[0].config)
+        : {}
+    }
+    const href = config.logoUrl || (config.heroImages || [])[0] || ""
+    if (!href.startsWith("/api/storage/")) return res.status(204).end()
+    const buf = await storage.getBuffer(href.replace(/^\/api\/storage\//, ""))
+    const png = await sharp(buf).resize(64, 64, { fit: "cover", position: "top" }).png().toBuffer()
+    await redis.set("favicon_png", png, "EX", 3600)
+    res.type("png").set("Cache-Control", "public, max-age=300").end(png)
+  } catch (err) {
+    console.error("[FAVICON] Lỗi:", err)
+    res.status(204).end()
+  }
+})
 
 app.get(`${API_PREFIX}/settings`, publicLimiter, async (req, res) => {
   try {
