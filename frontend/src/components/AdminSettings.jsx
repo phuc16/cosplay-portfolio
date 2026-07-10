@@ -78,6 +78,82 @@ function ClickUpload({ endpoint, onUrl, children }) {
   )
 }
 
+/* ── Hero cover preview: drag to pan, wheel/buttons to zoom ──────────────── */
+/* zoom = image height as a multiple of the card height; x/y = offsets in % of
+   the preview box (the public hero uses the same formula, so WYSIWYG).
+   One preview per breakpoint — box ratios mirror the real hero card:
+   desktop 1216×500, tablet ~756×500, mobile ~358×300. cutTop = how far the
+   cutout container rises above the card (-84px desktop/tablet, -18px mobile). */
+const DEFAULT_COVER = { zoom: 4.5, x: 0, y: -30 }
+const COVER_BREAKPOINTS = [
+  { key: "desktop", label: "Desktop", w: 219, h: 90, cutTop: -16.8 },
+  { key: "tablet",  label: "Tablet",  w: 136, h: 90, cutTop: -16.8 },
+  { key: "mobile",  label: "Mobile",  w: 107, h: 90, cutTop: -6 },
+]
+
+function CoverPreview({ url, cover, onChange, box }) {
+  const boxRef = useRef(null)
+  const dragRef = useRef(null)
+  const c = { ...DEFAULT_COVER, ...cover }
+  const clampZoom = (z) => Math.min(8, Math.max(1, Math.round(z * 20) / 20))
+
+  const onPointerDown = (e) => {
+    e.preventDefault()
+    const box = boxRef.current?.getBoundingClientRect()
+    if (!box) return
+    dragRef.current = { sx: e.clientX, sy: e.clientY, x: c.x, y: c.y, w: box.width, h: box.height }
+    const move = (ev) => {
+      const d = dragRef.current
+      if (!d) return
+      onChange({
+        x: Math.round((d.x + ((ev.clientX - d.sx) / d.w) * 100) * 10) / 10,
+        y: Math.round((d.y + ((ev.clientY - d.sy) / d.h) * 100) * 10) / 10,
+      })
+    }
+    const up = () => {
+      dragRef.current = null
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+  }
+
+  return (
+    <div className="shrink-0 flex flex-col gap-1">
+      <div
+        ref={boxRef}
+        onPointerDown={onPointerDown}
+        onWheel={(e) => { e.preventDefault(); onChange({ zoom: clampZoom(c.zoom + (e.deltaY < 0 ? 0.2 : -0.2)) }) }}
+        className="relative overflow-hidden rounded border border-gray-300 dark:border-cosplay-border cursor-grab active:cursor-grabbing select-none"
+        style={{ width: box.w, height: box.h, background: "#080810", touchAction: "none" }}
+        title="Kéo để dịch — lăn chuột hoặc dùng nút +/− để zoom"
+      >
+        <img
+          src={url} alt="" draggable={false}
+          className="absolute pointer-events-none max-w-none"
+          style={{ height: `${c.zoom * 100}%`, width: "auto", top: `${c.y}%`, left: `${50 + c.x}%`, transform: "translateX(-50%)" }}
+        />
+        {/* The slideshow cutout, rendered where it really sits — anything under it is hidden on the live site */}
+        <div className="absolute pointer-events-none overflow-hidden" style={{ right: 0, top: `${box.cutTop}%`, bottom: 0, width: "55%" }}>
+          <img src={url} alt="" draggable={false} className="max-w-none pointer-events-none"
+            style={{ width: "100%", height: "auto", maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
+        </div>
+        <span className="absolute bottom-0.5 left-1 text-[10px] text-white/70 bg-black/50 rounded px-1 pointer-events-none">{box.label}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <button type="button" onClick={() => onChange({ zoom: clampZoom(c.zoom - 0.25) })}
+          className="w-6 h-6 rounded border border-gray-300 dark:border-cosplay-border text-sm leading-none text-gray-600 dark:text-slate-300">−</button>
+        <button type="button" onClick={() => onChange({ zoom: clampZoom(c.zoom + 0.25) })}
+          className="w-6 h-6 rounded border border-gray-300 dark:border-cosplay-border text-sm leading-none text-gray-600 dark:text-slate-300">+</button>
+        <code className="text-[10px] text-gray-500 dark:text-slate-500 ml-auto">×{c.zoom.toFixed(2)}</code>
+        <button type="button" onClick={() => onChange({ ...DEFAULT_COVER })}
+          className="text-[10px] text-gray-500 dark:text-slate-500 underline">reset</button>
+      </div>
+    </div>
+  )
+}
+
 const FIXED_SOCIAL_PLATFORMS = [
   { key: "facebook",  label: "Facebook" },
   { key: "instagram", label: "Instagram" },
@@ -87,12 +163,34 @@ const FIXED_SOCIAL_PLATFORMS = [
   { key: "discord",  label: "Discord" },
 ]
 
+/* heroCovers slot = { desktop?, tablet?, mobile? } each {zoom,x,y}.
+   Legacy flat {zoom,x,y} (pre-breakpoint) is treated as desktop. */
+function normalizeCoverVariant(c) {
+  if (!c || typeof c !== "object") return null
+  return {
+    zoom: Number.isFinite(Number(c.zoom)) ? Number(c.zoom) : DEFAULT_COVER.zoom,
+    x: Number.isFinite(Number(c.x)) ? Number(c.x) : DEFAULT_COVER.x,
+    y: Number.isFinite(Number(c.y)) ? Number(c.y) : DEFAULT_COVER.y,
+  }
+}
+function normalizeCoverSlot(c) {
+  if (!c || typeof c !== "object") return {}
+  if ("zoom" in c || "x" in c || "y" in c) return { desktop: normalizeCoverVariant(c) }
+  const out = {}
+  for (const k of ["desktop", "tablet", "mobile"]) {
+    const v = normalizeCoverVariant(c[k])
+    if (v) out[k] = v
+  }
+  return out
+}
+
 const DEFAULT = {
   colorScheme: "pink",
   heroImageUrl: "",
   thumbnailImageUrl: "",
   heroImages: [],
   heroAccents: [],
+  heroCovers: [],
   heroCover: "",
   latestPhotos: [],
   logoUrl: "",
@@ -124,6 +222,7 @@ function normalizeConfig(raw) {
     heroAccents: Array.isArray(raw.heroAccents)
       ? raw.heroAccents.map((a) => ({ mode: a?.mode === "manual" ? "manual" : "auto", color: typeof a?.color === "string" ? a.color : "" }))
       : [],
+    heroCovers: Array.isArray(raw.heroCovers) ? raw.heroCovers.map(normalizeCoverSlot) : [],
     heroCover: raw.heroCover ?? "",
     latestPhotos: Array.isArray(raw.latestPhotos) ? raw.latestPhotos : [],
     logoUrl: raw.logoUrl ?? "",
@@ -333,6 +432,7 @@ export default function AdminSettings() {
       heroImages: [...(prev.heroImages || []), url],
       // accent color is computed once server-side at upload; stored here, no client canvas
       heroAccents: [...(prev.heroAccents || []), { mode: "auto", color: accentColor || "" }],
+      heroCovers: [...(prev.heroCovers || []), {}],
     }))
   }
   const removeHeroImage = (idx) => {
@@ -341,7 +441,27 @@ export default function AdminSettings() {
       ...prev,
       heroImages: (prev.heroImages || []).filter((_, i) => i !== idx),
       heroAccents: (prev.heroAccents || []).filter((_, i) => i !== idx),
+      heroCovers: (prev.heroCovers || []).filter((_, i) => i !== idx),
     }))
+  }
+
+  // Effective variant for editing: explicit value → desktop fallback → default
+  const getHeroCover = (idx, bp) => {
+    const slot = (config.heroCovers || [])[idx] || {}
+    return { ...DEFAULT_COVER, ...(slot.desktop || {}), ...(slot[bp] || {}) }
+  }
+  const setHeroCover = (idx, bp, patch) => {
+    setDirty(true)
+    setConfig((prev) => {
+      const len = (prev.heroImages || []).length
+      const covers = Array.from({ length: len }, (_, i) => {
+        const slot = (prev.heroCovers || [])[i] || {}
+        if (i !== idx) return slot
+        const cur = { ...DEFAULT_COVER, ...(slot.desktop || {}), ...(slot[bp] || {}) }
+        return { ...slot, [bp]: { ...cur, ...patch } }
+      })
+      return { ...prev, heroCovers: covers }
+    })
   }
 
   const setHeroAccentMode = (idx, mode) => {
@@ -415,6 +535,17 @@ export default function AdminSettings() {
       .finally(() => setLatestUploading(false))
   }
   const latestDropzone = useDropzone({ onDrop: onLatestDrop, accept: { "image/*": [] }, disabled: latestUploading })
+  const latestDragIdx = useRef(null)
+  const moveLatestPhoto = (from, to) => {
+    if (from === to || from == null) return
+    setDirty(true)
+    setConfig((prev) => {
+      const arr = [...(prev.latestPhotos || [])]
+      const [item] = arr.splice(from, 1)
+      arr.splice(to, 0, item)
+      return { ...prev, latestPhotos: arr }
+    })
+  }
 
   /* ── Social fixed-platform URL update ── */
   const setSocialUrl = (platformKey, label, url) => {
@@ -538,7 +669,7 @@ export default function AdminSettings() {
       <div className={cardCls}>
         <div>
           <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Hero Slideshow</h3>
-          <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5 mb-3.5">Mỗi ảnh có một màu accent dùng cho nền gradient. Mặc định tự lấy từ ảnh — đổi sang Manual để chọn tay.</p>
+          <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5 mb-3.5">Mỗi ảnh có một màu accent dùng cho nền gradient (Auto lấy từ ảnh — Manual chọn tay). Khung <b>cover</b> là ảnh nền mờ phía sau hero: kéo để dịch vị trí, lăn chuột / nút +− để zoom.</p>
         </div>
 
         {/* Per-slot rows */}
@@ -549,7 +680,7 @@ export default function AdminSettings() {
               const filename = url.split("/").pop().split("?")[0] || `Image ${i + 1}`
               const dispColor = slot.color || "#555555"
               return (
-                <div key={i} className="flex items-center gap-3 px-3.5 py-3 rounded border border-gray-200 dark:border-cosplay-border bg-gray-50 dark:bg-cosplay-darker">
+                <div key={i} className="flex items-center gap-3 px-3.5 py-3 rounded border border-gray-200 dark:border-cosplay-border bg-gray-50 dark:bg-cosplay-darker flex-wrap">
                   <div className="w-[52px] h-[52px] rounded overflow-hidden shrink-0 border border-gray-200 dark:border-cosplay-border">
                     <img src={url} alt="" className="w-full h-full object-cover object-top" />
                   </div>
@@ -598,6 +729,13 @@ export default function AdminSettings() {
                   <div className="w-10 h-[34px] rounded shrink-0 border border-gray-200 dark:border-cosplay-border"
                     style={{ background: `linear-gradient(to right, #080810, ${dispColor})` }}
                   />
+                  <div className="w-full flex flex-wrap gap-3 pt-1">
+                    {COVER_BREAKPOINTS.map((bp) => (
+                      <CoverPreview key={bp.key} url={url} box={bp}
+                        cover={getHeroCover(i, bp.key)}
+                        onChange={(patch) => setHeroCover(i, bp.key, patch)} />
+                    ))}
+                  </div>
                 </div>
               )
             })}
@@ -633,47 +771,26 @@ export default function AdminSettings() {
           {heroImagesUploadError && <p className="mt-2 text-sm text-red-400">{heroImagesUploadError}</p>}
         </div>
 
-        {/* Cover image sub-section */}
-        <div className="border-t border-dashed border-gray-200 dark:border-cosplay-border pt-3.5">
-          <h4 className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-0.5">Ảnh bìa (tùy chọn)</h4>
-          <p className="text-xs text-gray-500 dark:text-slate-500 mb-2.5">Ảnh nền full-bleed nằm dưới dải gradient. Để trống nếu không muốn dùng.</p>
-          <ClickUpload endpoint="/api/upload/hero" onUrl={(url) => update("heroCover", url)}>
-            {(trigger, uploading) => (
-              <div className="flex items-center gap-3.5">
-                <div
-                  onClick={trigger}
-                  className="border-2 border-dashed border-gray-300 dark:border-cosplay-border rounded-lg cursor-pointer overflow-hidden shrink-0 flex items-center justify-center bg-gray-50 dark:bg-cosplay-darker hover:border-pink-500/50 hover:bg-pink-500/5 transition-colors"
-                  style={{ width: 132, height: 74 }}
-                >
-                  {config.heroCover ? (
-                    <img src={config.heroCover} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs text-gray-500 dark:text-slate-500">+ Thêm ảnh</span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <button type="button" onClick={trigger} disabled={uploading} className={btnSecCls}>
-                    {uploading ? "Đang tải..." : "Chọn ảnh"}
-                  </button>
-                  {config.heroCover && (
-                    <button type="button" onClick={() => update("heroCover", "")} className={btnDangerCls}>Bỏ ảnh</button>
-                  )}
-                </div>
-              </div>
-            )}
-          </ClickUpload>
-        </div>
+        {/* Cover is derived automatically from the current hero slide — no upload needed */}
+        <p className="text-xs text-gray-500 dark:text-slate-500 border-t border-dashed border-gray-200 dark:border-cosplay-border pt-3">
+          Ảnh nền mờ phía sau tự lấy theo slide đang hiển thị — không cần upload riêng.
+        </p>
       </div>
 
       {/* ── Latest photos (Info dashboard grid) ── */}
       <div className={cardCls}>
         <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Ảnh mới nhất (Latest photos)</h3>
-        <p className="text-xs text-gray-500 dark:text-slate-500">Lưới 2×2 ở cột 1 Info Dashboard. Để trống sẽ tự lấy ảnh từ album/gallery.</p>
+        <p className="text-xs text-gray-500 dark:text-slate-500">Lưới 2×2 ở cột 1 Info Dashboard. Để trống sẽ tự lấy ảnh từ album/gallery. Kéo thả để sắp xếp — 4 ảnh đầu được hiển thị.</p>
         {(config.latestPhotos || []).length > 0 && (
           <div className="flex flex-wrap gap-2">
             {(config.latestPhotos || []).map((url, i) => (
-              <div key={i} className="relative group">
-                <img src={url} alt="" className="h-[84px] w-[84px] object-cover rounded-lg border border-gray-200 dark:border-cosplay-border" />
+              <div key={url} draggable className="relative group cursor-grab active:cursor-grabbing"
+                onDragStart={(e) => { latestDragIdx.current = i; e.dataTransfer.effectAllowed = "move" }}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
+                onDrop={(e) => { e.preventDefault(); moveLatestPhoto(latestDragIdx.current, i); latestDragIdx.current = null }}
+                onDragEnd={() => { latestDragIdx.current = null }}>
+                <img src={url} alt="" draggable={false} className="h-[84px] w-[84px] object-cover rounded-lg border border-gray-200 dark:border-cosplay-border pointer-events-none" />
+                <span className="absolute bottom-[5px] left-[5px] px-1.5 rounded bg-black/60 text-white text-[11px]">{i + 1}</span>
                 <button type="button" onClick={() => removeLatestPhoto(i)}
                   className="absolute top-[5px] right-[5px] w-[22px] h-[22px] rounded-full bg-black/60 text-white text-[13px] flex items-center justify-center border-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
               </div>

@@ -144,6 +144,18 @@ function Reveal({ children, delay = 0 }) {
   )
 }
 
+/* Breakpoints mirror index.css: ≤760 mobile, ≤980 tablet */
+function useBreakpoint() {
+  const get = () => (window.innerWidth <= 760 ? "mobile" : window.innerWidth <= 980 ? "tablet" : "desktop")
+  const [bp, setBp] = useState(get)
+  useEffect(() => {
+    const h = () => setBp(get())
+    window.addEventListener("resize", h)
+    return () => window.removeEventListener("resize", h)
+  }, [])
+  return bp
+}
+
 /* ── HERO BANNER ─────────────────────────────────────────────────────────── */
 function HeroBanner({ data, theme, lang }) {
   const imgs = data.heroImages
@@ -160,6 +172,7 @@ function HeroBanner({ data, theme, lang }) {
     })
   }, [imgs])
 
+  const bpKey = useBreakpoint()
   const isLandscape = (aspects[idx] || 1) > 1.2
   const isDark = theme !== "light"
   const accentColor = data.heroAccents?.[idx]      // hex computed server-side at upload
@@ -198,10 +211,21 @@ function HeroBanner({ data, theme, lang }) {
   return (
     <div className="sec-wrap" style={s.wrap}>
       <div className="hero-card" style={s.cardBg}>
-        {/* Optional full-bleed cover photo behind the gradient */}
-        {data.heroCover && (
-          <img src={data.heroCover} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 25%", borderRadius: "var(--radius-lg)", zIndex: 1 }} />
-        )}
+        {/* Backdrop derived from the CURRENT slide (no separate cover upload) —
+            rendered exactly like the old heroCover: sharp, the muted look comes
+            from the scrim/wash layers above it. */}
+        {imgs[idx] && (() => {
+          // Per-slide, per-breakpoint framing set in admin (drag/zoom preview) —
+          // same formula as the preview box. Legacy flat slots act as desktop.
+          const slot = data.heroCovers?.[idx] || {}
+          const flat = "zoom" in slot || "x" in slot || "y" in slot ? slot : null
+          const cov = { zoom: 4.5, x: 0, y: -30, ...(flat || slot.desktop || {}), ...(!flat && slot[bpKey]) || {} }
+          return (
+            <div style={{ position: "absolute", inset: 0, borderRadius: "var(--radius-lg)", overflow: "hidden", zIndex: 1 }}>
+              <img key={"c" + idx} src={imgs[idx]} alt="" style={{ position: "absolute", top: `${cov.y}%`, left: `${50 + cov.x}%`, transform: "translateX(-50%)", height: `${cov.zoom * 100}%`, width: "auto", maxWidth: "none", animation: "hero-fade-in .8s ease" }} />
+            </div>
+          )
+        })()}
         {/* Accent wash — cover/scrim shows on the left, soft pale accent fills the right (design look) */}
         <div style={{ position: "absolute", inset: 0, zIndex: 2, borderRadius: "var(--radius-lg)", background: `linear-gradient(to right, transparent 0%, transparent 28%, ${accent} 100%)`, transition: "background 0.8s ease" }} />
         {/* Soft glow behind the character, clipped to the card */}
@@ -569,7 +593,7 @@ function buildData(cfg, gallery, lang) {
     heroAccents: (cfg.heroAccents || []).map((a) =>
       typeof a === "string" ? a : a?.color || null
     ),
-    heroCover: cfg.heroCover || "",
+    heroCovers: Array.isArray(cfg.heroCovers) ? cfg.heroCovers : [],
     latestPhotos,
     albums,
     socials: cfg.contact?.social || [],
@@ -651,6 +675,7 @@ export default function Portfolio() {
 
   return (
     <div
+      className="portfolio-root"
       style={{ minHeight: "100vh", background: "var(--bg-page)", color: "var(--text-strong)" }}
       onContextMenu={(e) => { if (e.target.tagName === "IMG") e.preventDefault() }}>
       <Navbar theme={theme} onToggleTheme={toggleTheme} lang={lang} onSetLang={setLang}

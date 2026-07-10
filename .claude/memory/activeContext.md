@@ -1,7 +1,18 @@
 # Active Context
-Last updated: 2026-07-09 (hardening batch + hero aura leak fix)
+Last updated: 2026-07-10 (hero cover auto + per-slide/per-breakpoint framing editor)
 
 ## Current Task
+Hero cover rework: cover derived from the CURRENT slide (no separate upload) + admin WYSIWYG framing editor per slide × per breakpoint.
+- [x] Cover = current slide image, rendered sharp (old format; muted look comes from scrim layers), objectPosition replaced by per-slide framing
+- [x] Removed "Ảnh bìa" upload from admin (note "tự lấy theo slide"); data.heroCover no longer used by public
+- [x] Config `heroCovers[i] = { desktop?, tablet?, mobile? }`, each `{zoom, x, y}` (zoom = ×card-height; x/y = % of card). Legacy flat slot = desktop. Defaults {4.5, 0, -30}
+- [x] Admin: CoverPreview component — drag to pan (pointer events, % of box), wheel/+/− zoom (clamp 1–8), reset; 3 boxes per slide (Desktop 219×90, Tablet 136×90, Mobile 107×90 — real card ratios); slideshow cutout rendered on top at true position (right 55%, cutTop -16.8%/-6%) so admin sees what the cutout hides
+- [x] Public: useBreakpoint() (≤760 mobile, ≤980 tablet — mirror index.css); cov = defaults → slot.desktop → slot[bp]; same formula as preview (WYSIWYG)
+- [x] Backend: heroCovers in ALLOWED_SETTINGS_KEYS + sanitize (per-variant number coercion, legacy flat → desktop); seeds in DEFAULT_SETTINGS + SITE_CONFIG
+- [x] Also this session: admin latest-photos drag-to-reorder (order badge; anti-drag CSS scoped to .portfolio-root img); "Made with ♥"; PayPal #a2cffe; content checklist .docx/.xlsx on Desktop (no cover item — auto-derived)
+- [x] User deploys backend + frontend, then adjusts framing per slide in admin
+
+## Prior task (done):
 Security & infra hardening (user declined backups):
 - [x] Hero cutout white-frame fix: drop-shadow → radial aura behind img (same root cause as footer; tight-crop cutouts)
 - [x] docker-compose.yml (dev): sensitive ports bound to 127.0.0.1, restart unless-stopped, log rotation 10m×3
@@ -88,10 +99,10 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 - [x] Dead code removed earlier; design folder was deleted then re-copied by user (still present)
 
 ## Current File Being Worked On
-frontend/src/pages/Portfolio.jsx (hero aura fix — built OK, uncommitted, not yet deployed)
+[none in-flight — heroCovers feature complete across Portfolio.jsx, AdminSettings.jsx, config.js, server.js]
 
 ## Immediate Next Step
-Commit the aura fix (message logged in session notes), then user: build+push frontend image, deploy to prod. Outstanding user-side infra steps: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done). User still designing hero-cover image (2560×1080 spec).
+User deploys backend + frontend (heroCovers touches both), tunes per-slide framing in admin → Save, then commit working tree (message in session notes). Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions

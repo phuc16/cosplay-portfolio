@@ -32,6 +32,9 @@
 
 - **Hero glow layer lives in the CARD, never in the pop-out container** → Why: any accent-colored layer inside the cutout container (which rises above the card, overflow:hidden) gets clipped into a hard-edged band visible under the navbar. Rule of thumb for this hero: pop-out container contains ONLY the character image; all washes/scrims/glows go on the card with `inset:0 + borderRadius`. Also avoid `filter:blur` on card-inset layers (bleeds past edges) — a radial gradient is already soft.
 
+- **Hero cover = current slide image + per-slide/per-breakpoint framing in config (`heroCovers`)** → Why: one fixed objectPosition/zoom can't frame every portrait cutout (user iterated -55%→-30% by feel — endless back-and-forth); a WYSIWYG admin editor (drag/zoom per Desktop/Tablet/Mobile box, cutout overlaid at true position) makes it the cosplayer's call. Cover upload removed — slide change also swaps the backdrop. Formula shared verbatim by preview and public hero: `height = zoom×card-height`, `top = y%`, `left = 50+x%` + translateX(-50%). Fallback chain: bp → desktop → {4.5, 0, -30}; legacy flat slot = desktop. Alternatives rejected: hardcoded % tuning (subjective, per-image), separate cover upload (extra asset to request from the cosplayer).
+- **Anti-download CSS must be scoped (`.portfolio-root img`), not global `img`** → Why: global `-webkit-user-drag:none` breaks admin drag-to-reorder. Public root div carries the class + IMG-only contextmenu block.
+
 ## What Didn't Work
 - **Aura inside the cutout container** — accent glow leaked above the card as a clipped rectangle below the navbar (reported by user); moved into the card.
 - **Verifying new compose locally** — host has another Docker process holding :6379, so local `up` fails on redis bind; irrelevant for prod (pull.yml doesn't publish redis). Don't chase local port conflicts for server-only changes.

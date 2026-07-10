@@ -214,6 +214,7 @@ const DEFAULT_SETTINGS = {
   thumbnailImageUrl: "",
   heroImages: ["/refassets/hero1.svg", "/refassets/hero2.svg", "/refassets/hero3.svg"],
   heroAccents: [],
+  heroCovers: [],
   heroCover: "/refassets/cover.svg",
   latestPhotos: [],
   logoUrl: "",
@@ -292,7 +293,7 @@ app.get(`${API_PREFIX}/settings`, publicLimiter, async (req, res) => {
 
 const ALLOWED_SETTINGS_KEYS = [
   "colorScheme", "artistName", "tagline", "about", "heroImageUrl", "thumbnailImageUrl",
-  "heroImages", "heroAccents", "heroCover", "latestPhotos", "logoUrl", "footerChar", "achievements", "hero",
+  "heroImages", "heroAccents", "heroCovers", "heroCover", "latestPhotos", "logoUrl", "footerChar", "achievements", "hero",
   "upcomingEvents", "contact",
 ]
 
@@ -303,6 +304,26 @@ function sanitizeSettings(body) {
   }
   if (out.heroImages !== undefined && !Array.isArray(out.heroImages)) out.heroImages = []
   if (out.heroAccents !== undefined && !Array.isArray(out.heroAccents)) out.heroAccents = []
+  if (out.heroCovers !== undefined) {
+    // Per-slide cover framing from the admin preview.
+    // Slot = { desktop?, tablet?, mobile? }, each {zoom, x, y} numbers only;
+    // legacy flat {zoom,x,y} slots are stored as desktop.
+    const variant = (c) => c && typeof c === "object" ? {
+      zoom: Number.isFinite(Number(c.zoom)) ? Number(c.zoom) : 4.5,
+      x: Number.isFinite(Number(c.x)) ? Number(c.x) : 0,
+      y: Number.isFinite(Number(c.y)) ? Number(c.y) : -30,
+    } : null
+    out.heroCovers = (Array.isArray(out.heroCovers) ? out.heroCovers : []).map((c) => {
+      if (!c || typeof c !== "object") return {}
+      if ("zoom" in c || "x" in c || "y" in c) return { desktop: variant(c) }
+      const slot = {}
+      for (const k of ["desktop", "tablet", "mobile"]) {
+        const v = variant(c[k])
+        if (v) slot[k] = v
+      }
+      return slot
+    })
+  }
   if (out.latestPhotos !== undefined && !Array.isArray(out.latestPhotos)) out.latestPhotos = []
   if (out.achievements !== undefined && !Array.isArray(out.achievements)) out.achievements = []
   if (out.upcomingEvents !== undefined && !Array.isArray(out.upcomingEvents)) out.upcomingEvents = []

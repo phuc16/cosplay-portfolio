@@ -16,7 +16,7 @@
 - Commands (run in `backend/`): `npm run migrate` (knex migrate:latest), `npm run seed`, `npm run rollback`, `node server.js` (:5000), `node worker.js`.
 
 ## Data model
-- `site_settings.config` — single JSON blob holding ALL site content (colorScheme, artistName/tagline/about `{vi,en}`, heroImages[], heroAccents[]`{mode,color}`, heroCover, footerChar, achievements[]`{title,description}` (bilingual), upcomingEvents[]`{title,date,url,showPopup,imageUrl}` (bilingual), contact{phone,email,social[],supports{gumroad,gank,paypal}}). New fields = new JSON keys, no migration.
+- `site_settings.config` — single JSON blob holding ALL site content (colorScheme, artistName/tagline/about `{vi,en}`, heroImages[], heroAccents[]`{mode,color}`, heroCovers[]`{desktop?,tablet?,mobile?}` each `{zoom,x,y}` (backdrop framing; legacy flat = desktop; hero backdrop = current slide image, no separate cover upload), latestPhotos[], footerChar, achievements[] (bilingual), upcomingEvents[]`{title,date,url,showPopup,imageUrl}` (bilingual), contact{phone(hidden, feeds Zalo),email,contactLinks[],social[],supports{gumroad,gank,paypal}}). New fields = new JSON keys, no migration.
 - `albums`, `images` tables (id, url, thumb_url, width, height, sort_order). Migrations in `backend/migrations/`.
 
 ## API (prefix `/api`)

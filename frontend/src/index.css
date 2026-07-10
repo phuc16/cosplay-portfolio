@@ -136,8 +136,9 @@
 @keyframes hero-slide-cl { from { opacity: 0; transform: translateX(-50%) translateX(-70px); } to { opacity: 1; transform: translateX(-50%); } }
 
 /* Casual download deterrent: images can't be dragged out or long-press-saved
-   easily. Purely a speed bump — determined users can always use DevTools. */
-img { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+   easily. Purely a speed bump — determined users can always use DevTools.
+   Scoped to the public site so admin drag-to-reorder keeps working. */
+.portfolio-root img { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
 /* Scroll-reveal: sections fade + rise in once when they enter the viewport */
 .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s ease-out, transform .6s cubic-bezier(.22,.61,.36,1); will-change: opacity, transform; }

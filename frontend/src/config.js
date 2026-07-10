@@ -32,6 +32,7 @@ export const SITE_CONFIG = {
   thumbnailImageUrl: "",
   heroImages: ["/refassets/hero1.svg", "/refassets/hero2.svg", "/refassets/hero3.svg"],
   heroAccents: [],
+  heroCovers: [],
   heroCover: "/refassets/cover.svg",
   latestPhotos: [],
   logoUrl: "",
