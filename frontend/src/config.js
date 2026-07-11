@@ -4,6 +4,7 @@ export const COLOR_SCHEMES = {
   purple: { brand:"#8b5cf6", hover:"#a78bfa", strong:"#7c3aed", glow:"rgba(139,92,246,.30)", soft:"rgba(139,92,246,.15)", grad1:"#a78bfa", grad2:"#c084fc" },
   amber:  { brand:"#f59e0b", hover:"#fbbf24", strong:"#d97706", glow:"rgba(245,158,11,.30)",  soft:"rgba(245,158,11,.15)",  grad1:"#fbbf24", grad2:"#fb923c" },
   rose:   { brand:"#f43f5e", hover:"#fb7185", strong:"#e11d48", glow:"rgba(244,63,94,.30)",   soft:"rgba(244,63,94,.15)",   grad1:"#fb7185", grad2:"#fda4af" },
+  green:  { brand:"#6BBF59", hover:"#84cf74", strong:"#54a344", glow:"rgba(107,191,89,.30)",  soft:"rgba(107,191,89,.15)",  grad1:"#84cf74", grad2:"#4ade80" },
 }
 
 export function applyColorScheme(name) {

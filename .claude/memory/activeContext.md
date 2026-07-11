@@ -1,8 +1,14 @@
 # Active Context
-Last updated: 2026-07-11 (no-placeholder loading — pure backend content)
+Last updated: 2026-07-11 (small tweaks: section title, tab title, green scheme)
 
 ## Current Task
-No-placeholder loading (frontend thuần backend):
+Small tweaks batch:
+- [x] Achievements section title → "Sự kiện đã tham gia" / "Event Appearances" (Portfolio.jsx L constant)
+- [x] Tab title while loading → "Kamidayhehe" (index.html <title> + JS fallback)
+- [x] COLOR_SCHEMES += green #6BBF59 (hover #84cf74, strong #54a344, grads #84cf74→#4ade80) — admin picker auto-lists it
+- [x] User deploys frontend + verifies
+
+## Prior task (done): No-placeholder loading (frontend thuần backend):
 - [x] Footer-char purple TRAPEZOID root cause: SITE_CONFIG fallback pointed footerChar at /refassets/footer.svg (purple placeholder, loads instantly → bypassed the onLoad gate). Fixed: footer-char gated on !loading too
 - [x] Removed ALL SVG placeholders: refs cleared in frontend SITE_CONFIG + backend DEFAULT_SETTINGS (heroImages [], heroCover "", footerChar ""); deleted 9 files from public/refassets (kept gank.png, zalo.png — real logos)
 - [x] SITE_CONFIG demo content deleted → empty shape-safe skeleton; content is 100% backend-driven (backend DEFAULT_SETTINGS demo content KEPT per user)

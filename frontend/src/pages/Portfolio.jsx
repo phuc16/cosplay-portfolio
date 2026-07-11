@@ -261,7 +261,7 @@ function HeroBanner({ data, theme, lang }) {
 /* ── INFO DASHBOARD (3-column) ─────────────────────────────────────────── */
 function InfoSection({ data, onOpenPhoto, lang }) {
   const vi = lang === "vi"
-  const L = { info: vi ? "Thông tin" : "Info", support: vi ? "Hỗ trợ" : "Support", achievements: vi ? "Thành tựu" : "Achievements" }
+  const L = { info: vi ? "Thông tin" : "Info", support: vi ? "Hỗ trợ" : "Support", achievements: vi ? "Sự kiện đã tham gia" : "Event Appearances" }
   const s = {
     wrap: { maxWidth: 1280, margin: "0 auto", padding: "80px 32px 0", position: "relative", zIndex: 1, scrollMarginTop: 80 },
     grid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 },
@@ -453,7 +453,7 @@ function ContactSection({ data, lang }) {
         <div>
           <h3 style={s.title}>{LC.contact}</h3>
           <p style={{ color: "var(--text-body)", fontSize: "var(--text-sm)", margin: "0 0 14px", lineHeight: 1.6 }}>
-            {vi ? "Muốn đặt lịch hoặc hợp tác? Nhắn Zalo để bắt đầu nhé!" : "Want to book or collaborate? Message Zalo or email to get started."}
+            {vi ? "Muốn đặt lịch hoặc hợp tác? Liên hệ để bắt đầu nhé!" : "Want to book or collaborate? Contact to get started."}
           </p>
           {data.contact.email && (
             <div style={{ marginBottom: 12 }}>
@@ -655,7 +655,7 @@ export default function Portfolio() {
   const cfg = settings || SITE_CONFIG
   const data = buildData(cfg, gallery, lang)
 
-  useEffect(() => { document.title = data.artistName || "Cosplay Portfolio" }, [data.artistName])
+  useEffect(() => { document.title = data.artistName || "Kamidayhehe" }, [data.artistName])
 
   // Favicon comes from <link rel="icon" href="/api/favicon.png"> in index.html —
   // a server-generated 64px PNG. Don't swap it to the full-size logo here:

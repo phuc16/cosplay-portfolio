@@ -44,6 +44,8 @@
 - **Frontend has NO demo/placeholder content — SITE_CONFIG is an empty shape-safe skeleton** → Why: fallback demo data (names/socials/events) and placeholder SVGs leaked into the real site during load (the "purple trapezoid" = /refassets/footer.svg from the fallback, loading instantly and bypassing the img-onLoad gate). All content is backend-driven; while /api/settings loads the page shows a centered spinner; navbar logo mark renders only when logoUrl exists (no "C" box). Backend DEFAULT_SETTINGS demo content kept (user choice) but its image fields are empty. Alternatives rejected: keeping demo fallback (leaks), per-image gates only (any instantly-loading placeholder bypasses them).
 - **Lightbox spinner until current photo loads** (imgLoaded reset on idx change; img hidden until onLoad) — complements the circular neighbour preload.
 
+- **Color schemes are pure data** — adding one = one line in `COLOR_SCHEMES` (config.js); the admin picker renders from `Object.entries(COLOR_SCHEMES)` so no UI change needed (added `green` #6BBF59). Section labels live in the `L`/`LC` constants inside each section component (bilingual ternary), tab title in index.html `<title>` + `document.title` fallback.
+
 ## What Didn't Work
 - **Gating only on img onLoad to hide loading artifacts** — an SVG placeholder loads instantly, so the gate passed and the purple block still showed; the real fix was removing placeholder content and gating on settings `!loading`.
 - **Client-side favicon swap to the full-size logo URL** — Chrome cached the huge webp as the site icon and showed a pink placeholder block during decode on every load; removed in favor of the server-generated PNG.
