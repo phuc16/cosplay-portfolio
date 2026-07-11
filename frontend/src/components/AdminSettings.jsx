@@ -185,7 +185,7 @@ function normalizeCoverSlot(c) {
 }
 
 const DEFAULT = {
-  colorScheme: "pink",
+  colorScheme: "green",
   heroImageUrl: "",
   thumbnailImageUrl: "",
   heroImages: [],
@@ -215,7 +215,7 @@ function normalizeConfig(raw) {
   return {
     ...DEFAULT,
     ...raw,
-    colorScheme: raw.colorScheme || "pink",
+    colorScheme: raw.colorScheme || "green",
     heroImageUrl: raw.heroImageUrl ?? "",
     thumbnailImageUrl: raw.thumbnailImageUrl ?? "",
     heroImages: Array.isArray(raw.heroImages) ? raw.heroImages : [],

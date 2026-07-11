@@ -648,7 +648,7 @@ export default function Portfolio() {
     ]).then(([g, s]) => {
       setGallery(Array.isArray(g) ? g : [])
       setSettings(s)
-      applyColorScheme(s?.colorScheme || "pink")
+      applyColorScheme(s?.colorScheme || "green")
     }).finally(() => setLoading(false))
   }, [])
 

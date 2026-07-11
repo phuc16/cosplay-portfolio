@@ -37,11 +37,11 @@
   --red-400: #f87171;
   --red-500: #ef4444;
 
-  /* --- Semantic aliases — LIGHT MODE (default palette values; brand comes from scheme) --- */
-  --brand: var(--pink-500);
-  --brand-hover: var(--pink-400);
-  --brand-strong: var(--pink-600);
-  --brand-soft: rgba(236, 72, 153, 0.10);
+  /* --- Semantic aliases — LIGHT MODE (defaults = green scheme; settings may override via applyColorScheme) --- */
+  --brand: #6BBF59;
+  --brand-hover: #84cf74;
+  --brand-strong: #54a344;
+  --brand-soft: rgba(107, 191, 89, 0.10);
 
   --bg-page: var(--gray-50);
   --bg-elevated: #ffffff;
@@ -51,14 +51,14 @@
   --surface-card: #ffffff;
   --border-default: var(--gray-200);
   --border-strong: var(--gray-300);
-  --border-brand: rgba(236, 72, 153, 0.50);
+  --border-brand: rgba(107, 191, 89, 0.50);
 
   --text-strong: var(--gray-900);
   --text-body: var(--gray-600);
   --text-muted: var(--gray-500);
   --text-faint: var(--gray-500);
   --text-on-brand: #ffffff;
-  --text-link: var(--pink-500);
+  --text-link: #6BBF59;
   --text-error: var(--red-500);
 
   /* --- Typography --- */
@@ -79,17 +79,17 @@
   --radius-lg: 0.75rem;    /* large cards, dialogs */
   --radius-full: 9999px;
 
-  /* --- Shadows (signature pink glow) --- */
-  --shadow-pink-glow: 0 0 20px rgba(236, 72, 153, 0.30);
-  --shadow-pink-soft: 0 4px 14px rgba(236, 72, 153, 0.15);
-  --shadow-pink-hover: 0 20px 25px -5px rgba(236, 72, 153, 0.20), 0 8px 10px -6px rgba(236, 72, 153, 0.20);
-  --grad1: var(--pink-400);
-  --grad2: var(--rose-400);
+  /* --- Shadows (signature glow — defaults follow the green scheme) --- */
+  --shadow-pink-glow: 0 0 20px rgba(107, 191, 89, 0.30);
+  --shadow-pink-soft: 0 4px 14px rgba(107, 191, 89, 0.15);
+  --shadow-pink-hover: 0 20px 25px -5px rgba(107, 191, 89, 0.20), 0 8px 10px -6px rgba(107, 191, 89, 0.20);
+  --grad1: #84cf74;
+  --grad2: #4ade80;
 }
 
 /* --- Semantic aliases — DARK MODE (the signature aesthetic) --- */
 .dark {
-  --brand-soft: rgba(236, 72, 153, 0.15);
+  --brand-soft: rgba(107, 191, 89, 0.15);
 
   --bg-page: var(--cosplay-dark);
   --bg-elevated: var(--cosplay-card);
@@ -104,7 +104,7 @@
   --text-body: var(--slate-400);
   --text-muted: var(--slate-500);
   --text-faint: var(--slate-500);
-  --text-link: var(--pink-400);
+  --text-link: #84cf74;
   --text-error: var(--red-400);
 }
 
@@ -146,7 +146,7 @@
   width: 44px; height: 44px;
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, .2);
-  border-top-color: var(--brand, #ec4899);
+  border-top-color: var(--brand, #6BBF59);
   animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -1,8 +1,15 @@
 # Active Context
-Last updated: 2026-07-11 (small tweaks: section title, tab title, green scheme)
+Last updated: 2026-07-11 (default theme → green)
 
 ## Current Task
-Small tweaks batch:
+Default theme → green:
+- [x] index.css defaults (light + dark): --brand/hover/strong/soft, --border-brand, --text-link, shadow glow set, --grad1/2 → green (#6BBF59 family) — buttons/links green from first paint
+- [x] Spinner fallback (page + lightbox) → #6BBF59
+- [x] JS fallbacks: SITE_CONFIG.colorScheme, applyColorScheme fallback, Portfolio fallback, admin normalize → "green"
+- [x] NOTE: DB config's saved colorScheme still wins after load — user should pick green in admin + Save for the whole site
+- [x] User deploys frontend + verifies
+
+## Prior task (done): Small tweaks batch:
 - [x] Achievements section title → "Sự kiện đã tham gia" / "Event Appearances" (Portfolio.jsx L constant)
 - [x] Tab title while loading → "Kamidayhehe" (index.html <title> + JS fallback)
 - [x] COLOR_SCHEMES += green #6BBF59 (hover #84cf74, strong #54a344, grads #84cf74→#4ade80) — admin picker auto-lists it
@@ -129,7 +136,7 @@ UI polish batch (all built OK, awaiting user's prod deploy to kamidayhehe.com):
 [none in-flight — session changes complete across config.js, Portfolio.jsx, index.css, server.js seeds]
 
 ## Immediate Next Step
-Commit working tree (message in session notes). Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
+Commit working tree (message in session notes). Reminder for user: pick "green" in admin + Save so the DB colorScheme matches the new default. Outstanding user-side infra: ufw 22/80/443, Cloudflare Hotlink Protection ON (if not yet done).
 NOTE: user prefers to self-verify in the browser — do NOT auto-run headless screenshots. Do NOT seed contact data into config — user enters links in admin.
 
 ## Blockers / Open Questions

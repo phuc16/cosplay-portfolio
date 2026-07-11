@@ -8,7 +8,7 @@ export const COLOR_SCHEMES = {
 }
 
 export function applyColorScheme(name) {
-  const sc = COLOR_SCHEMES[name] || COLOR_SCHEMES.pink
+  const sc = COLOR_SCHEMES[name] || COLOR_SCHEMES.green
   const r = document.documentElement
   r.style.setProperty("--brand",             sc.brand)
   r.style.setProperty("--brand-hover",       sc.hover)
@@ -30,7 +30,7 @@ export function applyColorScheme(name) {
 // Empty skeleton only — ALL content comes from the backend (/api/settings).
 // Used solely as a shape-safe fallback while loading or if the API is down.
 export const SITE_CONFIG = {
-  colorScheme: "pink",
+  colorScheme: "green",
   heroImageUrl: "",
   thumbnailImageUrl: "",
   heroImages: [],
