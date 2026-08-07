@@ -13,7 +13,9 @@ const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }
 
 async function seedOrder(over = {}) {
-  const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+  const cid = await catalog.createCollection({
+    title: "Drop", status: "active", allow_ship: true, allow_pickup: true,
+  })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
   const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")

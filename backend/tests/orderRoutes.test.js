@@ -6,8 +6,8 @@ import catalog from "../shop/catalogRepo.js"
 import redis from "../redis.js"
 import { resetTables } from "./helpers/db.js"
 
-async function seed(stock = 5) {
-  const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+async function seed(stock = 5, collectionOver = {}) {
+  const cid = await catalog.createCollection({ title: "Drop", status: "active", ...collectionOver })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: stock }])
   const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
@@ -71,7 +71,7 @@ describe("POST /api/orders", () => {
   })
 
   it("requires an address for ship but not for pickup", async () => {
-    const v = await seed()
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
 
     const noAddr = { buyer_name: "A", phone: "0900000000", email: "a@example.com" }
     const ship = await request(app).post("/api/orders").send(body(v, { buyer: noAddr }))
@@ -81,6 +81,28 @@ describe("POST /api/orders", () => {
     const pickup = await request(app).post("/api/orders")
       .send(body(v, { buyer: noAddr, fulfillment_method: "pickup" }))
     expect(pickup.status).toBe(201)
+  })
+
+  it("rejects a pickup order for a ship-only collection", async () => {
+    const v = await seed(5, { allow_ship: true, allow_pickup: false })
+    const res = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup" }))
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("rejects a ship order for a pickup-only collection", async () => {
+    const v = await seed(5, { allow_ship: false, allow_pickup: true })
+    const res = await request(app).post("/api/orders").send(body(v))
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("still allows pickup for a collection that offers both ship and pickup", async () => {
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const res = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup" }))
+    expect(res.status).toBe(201)
   })
 
   it("rejects an empty cart", async () => {

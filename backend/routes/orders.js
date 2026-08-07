@@ -53,6 +53,7 @@ module.exports = function orderRoutes() {
       res.status(201).json({ order_token: order.order_token, total: order.total })
     } catch (err) {
       if (err instanceof repo.EmptyCartError) return bad(res, err.message)
+      if (err instanceof repo.FulfillmentNotOfferedError) return bad(res, err.message)
       if (err instanceof repo.OutOfStockError) {
         return res.status(409).json({
           error: "out_of_stock",

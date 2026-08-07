@@ -11,8 +11,8 @@ const buyer = {
   address_raw: "1 Đường ABC, Q1, TP.HCM",
 }
 
-async function seedVariant(stock) {
-  const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+async function seedVariant(stock, collectionOver = {}) {
+  const cid = await catalog.createCollection({ title: "Drop", status: "active", ...collectionOver })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Photocard", price: 35000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: stock }])
   const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
@@ -198,6 +198,36 @@ describe("createOrder", () => {
     }
   })
 
+  it("refuses a pickup order for a ship-only collection", async () => {
+    const { variantId } = await seedVariant(5, { allow_ship: true, allow_pickup: false })
+    await expect(
+      repo.createOrder(order(variantId, 1, { fulfillment_method: "pickup" }))
+    ).rejects.toThrow(repo.FulfillmentNotOfferedError)
+
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(5) // rejected before any stock was touched
+    const [orders] = await db.query("SELECT id FROM orders")
+    expect(orders).toHaveLength(0)
+  })
+
+  it("refuses a ship order for a pickup-only collection", async () => {
+    const { variantId } = await seedVariant(5, { allow_ship: false, allow_pickup: true })
+    await expect(
+      repo.createOrder(order(variantId, 1, { fulfillment_method: "ship" }))
+    ).rejects.toThrow(repo.FulfillmentNotOfferedError)
+
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(5)
+    const [orders] = await db.query("SELECT id FROM orders")
+    expect(orders).toHaveLength(0)
+  })
+
+  it("still allows pickup for a collection that offers both ship and pickup", async () => {
+    const { variantId } = await seedVariant(5, { allow_ship: true, allow_pickup: true })
+    const res = await repo.createOrder(order(variantId, 1, { fulfillment_method: "pickup" }))
+    expect(res.total).toBe(35000)
+  })
+
   it("treats a replay as the same buyer regardless of email case and padding", async () => {
     const { variantId } = await seedVariant(5)
     const first = await repo.createOrder(order(variantId, 1, { request_key: "abc123" }))
@@ -298,7 +328,7 @@ describe("transitionOrder", () => {
   })
 
   it("refuses to ship a pickup order", async () => {
-    const { variantId } = await seedVariant(5)
+    const { variantId } = await seedVariant(5, { allow_pickup: true })
     const res = await repo.createOrder(order(variantId, 1, { fulfillment_method: "pickup" }))
     await repo.transitionOrder(res.id, "confirmed")
     expect(await repo.transitionOrder(res.id, "shipped")).toBe(false)

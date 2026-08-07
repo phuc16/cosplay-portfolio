@@ -24,6 +24,23 @@ class RequestKeyConflictError extends Error {
 }
 
 /**
+ * The buyer asked for ship/pickup on a collection that never offered it —
+ * e.g. "pickup" against a ship-only collection. Distinct from OutOfStockError:
+ * this is a request-shape problem the client should not retry unchanged, not
+ * a stock race, so the route maps it to 400 rather than 409.
+ */
+class FulfillmentNotOfferedError extends Error {
+  constructor(method) {
+    super(
+      method === "pickup"
+        ? "Bộ sưu tập này không hỗ trợ nhận tại chỗ"
+        : "Bộ sưu tập này không hỗ trợ giao hàng"
+    )
+    this.name = "FulfillmentNotOfferedError"
+  }
+}
+
+/**
  * Look up a previous submit of this idempotency key.
  *
  * request_key is client-supplied and unique across ALL buyers, so a bare key
@@ -111,15 +128,28 @@ async function createOrder(input) {
     // block, while the same on product_variants does.
     const [rows] = await conn.query(
       `SELECT v.id, v.label, v.stock_qty, p.id AS product_id, p.name AS product_name,
-              p.price, p.collection_id
+              p.price, p.collection_id, c.allow_ship, c.allow_pickup
          FROM product_variants v
          JOIN products p ON p.id = v.product_id
+         JOIN collections c ON c.id = p.collection_id
         WHERE v.id IN (${ids.map(() => "?").join(",")})
         ORDER BY v.id ASC
         FOR UPDATE OF v`,
       ids
     )
     if (rows.length !== ids.length) throw new OutOfStockError("không tồn tại")
+
+    // Every line's collection must actually offer the requested fulfillment
+    // method. A cart could in principle span collections; check each row's
+    // own collection rather than assuming a single one for the whole order.
+    for (const row of rows) {
+      if (input.fulfillment_method === "ship" && !row.allow_ship) {
+        throw new FulfillmentNotOfferedError("ship")
+      }
+      if (input.fulfillment_method === "pickup" && !row.allow_pickup) {
+        throw new FulfillmentNotOfferedError("pickup")
+      }
+    }
 
     const byId = new Map(rows.map((r) => [r.id, r]))
     const lines = []
@@ -373,4 +403,5 @@ module.exports = {
   OutOfStockError,
   EmptyCartError,
   RequestKeyConflictError,
+  FulfillmentNotOfferedError,
 }
