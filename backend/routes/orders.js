@@ -1,6 +1,7 @@
 const express = require("express")
 const repo = require("../shop/orders/orderRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
+const { buildInstructions } = require("../shop/payments/instructions")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 const FULFILLMENT = ["ship", "pickup"]
@@ -91,6 +92,21 @@ module.exports = function orderRoutes() {
       res.json(toPublicOrder(order))
     } catch (err) {
       console.error("[ORDERS] Lỗi lấy đơn:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.get("/:token/payment", async (req, res) => {
+    try {
+      res.set("X-Robots-Tag", "noindex, nofollow")
+
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      const settings = await paymentSettings.getSettings()
+      res.json(buildInstructions(order, settings))
+    } catch (err) {
+      console.error("[ORDERS] Lỗi lấy hướng dẫn thanh toán:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
