@@ -55,11 +55,8 @@ async function listPublicCollections() {
   return rows.map((r) => ({ ...mapCollection(r), product_count: Number(r.product_count) }))
 }
 
-async function getPublicCollectionBySlug(slug) {
-  const [[collection]] = await db.query(
-    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) LIMIT 1",
-    [slug, ...PUBLIC_STATUSES]
-  )
+/** Nests a collection row with its products and each product's variants. */
+async function nestCollectionDetail(collection) {
   if (!collection) return null
 
   const [products] = await db.query(
@@ -93,6 +90,25 @@ async function getPublicCollectionBySlug(slug) {
       variants: byProduct.get(p.id) || [],
     })),
   }
+}
+
+async function getPublicCollectionBySlug(slug) {
+  const [[collection]] = await db.query(
+    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) LIMIT 1",
+    [slug, ...PUBLIC_STATUSES]
+  )
+  if (!collection) return null
+  return nestCollectionDetail(collection)
+}
+
+/** Admin-only: full nested detail by id, regardless of status (draft/archived included). */
+async function getCollectionDetailById(id) {
+  const [[collection]] = await db.query(
+    "SELECT * FROM collections WHERE id = ? LIMIT 1",
+    [id]
+  )
+  if (!collection) return null
+  return nestCollectionDetail(collection)
 }
 
 async function createCollection(data, attempt = 0) {
@@ -255,6 +271,7 @@ module.exports = {
   listAllCollections,
   listPublicCollections,
   getPublicCollectionBySlug,
+  getCollectionDetailById,
   createCollection,
   updateCollection,
   deleteCollection,

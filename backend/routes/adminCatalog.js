@@ -51,6 +51,15 @@ module.exports = function adminCatalogRoutes() {
     } catch (err) { oops(res, err, "Lỗi liệt kê collection") }
   })
 
+  router.get("/collections/:id", async (req, res) => {
+    try {
+      const detail = await repo.getCollectionDetailById(req.params.id)
+      if (!detail) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
+
+      res.json(detail)
+    } catch (err) { oops(res, err, "Lỗi lấy chi tiết collection") }
+  })
+
   router.post("/collections", async (req, res) => {
     try {
       const invalid = validateCollection(req.body)

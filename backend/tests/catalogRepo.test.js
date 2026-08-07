@@ -80,6 +80,32 @@ describe("getPublicCollectionBySlug", () => {
   })
 })
 
+describe("getCollectionDetailById", () => {
+  it("returns full product/variant detail for an archived collection, unlike getPublicCollectionBySlug", async () => {
+    const cid = await repo.createCollection({ title: "Vault", status: "archived" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Photocard", price: 35000 })
+    await repo.replaceVariants(pid, [
+      { label: "A1", stock_qty: 3 },
+      { label: "A2", stock_qty: null },
+    ])
+
+    expect(await repo.getPublicCollectionBySlug("vault")).toBeNull()
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.title).toBe("Vault")
+    expect(detail.status).toBe("archived")
+    expect(detail.products).toHaveLength(1)
+    expect(detail.products[0].name).toBe("Photocard")
+    expect(detail.products[0].variants.map((v) => v.label)).toEqual(["A1", "A2"])
+    expect(detail.products[0].variants[0].stock_qty).toBe(3)
+    expect(detail.products[0].variants[1].stock_qty).toBeNull()
+  })
+
+  it("returns null for a nonexistent id", async () => {
+    expect(await repo.getCollectionDetailById(999999)).toBeNull()
+  })
+})
+
 describe("replaceVariants", () => {
   it("inserts, updates and deletes to match the given list", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })

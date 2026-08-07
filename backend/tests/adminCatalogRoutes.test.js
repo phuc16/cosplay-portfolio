@@ -30,6 +30,34 @@ describe("auth", () => {
   })
 })
 
+describe("GET /api/admin/collections/:id", () => {
+  it("rejects unauthenticated access", async () => {
+    const cid = await repo.createCollection({ title: "Vault", status: "archived" })
+    const res = await request(app).get(`/api/admin/collections/${cid}`)
+    expect(res.status).toBe(401)
+    expect(res.body.error).toBe("unauthorized")
+  })
+
+  it("returns full nested detail for an archived collection", async () => {
+    const cid = await repo.createCollection({ title: "Vault", status: "archived" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Photocard", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 3 }, { label: "A2", stock_qty: null }])
+
+    const res = await authed(request(app).get(`/api/admin/collections/${cid}`))
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe("archived")
+    expect(res.body.products).toHaveLength(1)
+    expect(res.body.products[0].name).toBe("Photocard")
+    expect(res.body.products[0].variants.map((v) => v.label)).toEqual(["A1", "A2"])
+  })
+
+  it("returns 404 for a nonexistent collection", async () => {
+    const res = await authed(request(app).get("/api/admin/collections/999999"))
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe("not_found")
+  })
+})
+
 describe("POST /api/admin/collections", () => {
   it("creates a collection and returns its id", async () => {
     const res = await authed(request(app).post("/api/admin/collections"))
