@@ -22,7 +22,7 @@ const smallJson = express.json({ limit: "1mb" })
 
 app.use(cors())
 app.use((req, res, next) => {
-  if (req.method === "POST" && /^\/api\/(image$|upload\/)/.test(req.path)) {
+  if (req.method === "POST" && /^\/api\/(image$|upload\/|admin\/shop\/image$)/.test(req.path)) {
     return largeJson(req, res, next)
   }
   return smallJson(req, res, next)

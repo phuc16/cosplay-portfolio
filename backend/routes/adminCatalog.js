@@ -1,6 +1,7 @@
 const express = require("express")
 const repo = require("../shop/catalogRepo")
 const cache = require("../shop/catalogCache")
+const { uploadShopImage } = require("../shop/images")
 
 const STATUSES = ["draft", "active", "closed", "archived"]
 
@@ -128,6 +129,24 @@ module.exports = function adminCatalogRoutes() {
       await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi lưu phân loại") }
+  })
+
+  router.post("/shop/image", async (req, res) => {
+    try {
+      const { base64, folder } = req.body
+      if (!base64) return bad(res, "Cần ảnh (base64)")
+
+      const buffer = Buffer.from(base64, "base64")
+      console.log(`[ADMIN/CATALOG] upload ảnh shop size≈${Math.round(buffer.length / 1024)}KB`)
+
+      const url = await uploadShopImage(folder || "misc", buffer)
+      res.status(201).json({ url })
+    } catch (err) {
+      if (/unsupported image format|input buffer contains|invalid image/i.test(err.message || "")) {
+        return bad(res, "Ảnh không hợp lệ")
+      }
+      oops(res, err, "Lỗi upload ảnh")
+    }
   })
 
   return router
