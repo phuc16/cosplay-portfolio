@@ -140,6 +140,43 @@ describe("createOrder", () => {
     const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
     expect(v.stock_qty).toBe(4) // reserved once, not twice
   })
+
+  it("never hands a different buyer's order back when they reuse a request_key", async () => {
+    const { variantId } = await seedVariant(5)
+    const first = await repo.createOrder(order(variantId, 1, { request_key: "shared-key" }))
+
+    const stranger = {
+      buyer_name: "Trần Thị B",
+      phone: "0911111111",
+      email: "b@example.com",
+      address_raw: "9 Đường XYZ, Q3, TP.HCM",
+    }
+    await expect(
+      repo.createOrder(order(variantId, 1, { request_key: "shared-key", buyer: stranger }))
+    ).rejects.toThrow(repo.RequestKeyConflictError)
+
+    // No second order, and above all no leak of the first buyer's token.
+    const [orders] = await db.query("SELECT id, email, order_token FROM orders")
+    expect(orders).toHaveLength(1)
+    expect(orders[0].email).toBe("a@example.com")
+    expect(orders[0].order_token).toBe(first.order_token)
+
+    // The refused attempt rolled back the stock it had already reserved.
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(4)
+  })
+
+  it("treats a replay as the same buyer regardless of email case and padding", async () => {
+    const { variantId } = await seedVariant(5)
+    const first = await repo.createOrder(order(variantId, 1, { request_key: "abc123" }))
+    const second = await repo.createOrder(order(variantId, 1, {
+      request_key: "abc123",
+      buyer: { ...buyer, email: "  A@Example.COM " },
+    }))
+
+    expect(second.reused).toBe(true)
+    expect(second.order_token).toBe(first.order_token)
+  })
 })
 
 describe("createOrder locking", () => {

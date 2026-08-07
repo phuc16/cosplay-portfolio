@@ -16,13 +16,43 @@ class EmptyCartError extends Error {
   }
 }
 
+class RequestKeyConflictError extends Error {
+  constructor() {
+    super("Mã yêu cầu đã được dùng cho một đơn khác, vui lòng thử lại")
+    this.name = "RequestKeyConflictError"
+  }
+}
+
+/**
+ * Look up a previous submit of this idempotency key.
+ *
+ * request_key is client-supplied and unique across ALL buyers, so a bare key
+ * match is not proof the same person is retrying. The caller must confirm the
+ * stored row belongs to the buyer making the current request before treating
+ * it as a replay — handing back a stranger's order_token would give them the
+ * order page, and with it that buyer's name, phone, email and address.
+ */
 async function findByRequestKey(conn, requestKey) {
   const [[row]] = await conn.query(
-    "SELECT id, order_token, total FROM orders WHERE request_key = ? LIMIT 1",
+    "SELECT id, order_token, total, email FROM orders WHERE request_key = ? LIMIT 1",
     [requestKey]
   )
   return row || null
 }
+
+const normalizeEmail = (value) => String(value ?? "").trim().toLowerCase()
+
+/** Is the stored order the same buyer as the one submitting now? */
+function isSameBuyer(row, buyer) {
+  return normalizeEmail(row.email) === normalizeEmail(buyer.email)
+}
+
+const replayResult = (row) => ({
+  id: row.id,
+  order_token: row.order_token,
+  total: row.total,
+  reused: true,
+})
 
 /**
  * Create an order and reserve its stock in one transaction.
@@ -36,16 +66,24 @@ async function createOrder(input) {
   const items = Array.isArray(input.items) ? input.items : []
   if (!items.length) throw new EmptyCartError()
 
+  const buyer = input.buyer || {}
+
   const conn = await db.getConnection()
   try {
     await conn.beginTransaction()
 
     // Idempotency: a retried submit must not reserve stock a second time.
+    // Only this buyer's own earlier order counts as a retry. If the key is
+    // taken by someone else it is a coincidental collision between two
+    // unrelated buyers, and this buyer is still entitled to their order — so
+    // fall through and create it. The unique index then rejects the insert and
+    // the catch below turns that into a visible RequestKeyConflictError rather
+    // than silently returning the other buyer's order.
     if (input.request_key) {
       const existing = await findByRequestKey(conn, input.request_key)
-      if (existing) {
+      if (existing && isSameBuyer(existing, buyer)) {
         await conn.commit()
-        return { ...existing, reused: true }
+        return replayResult(existing)
       }
     }
 
@@ -116,7 +154,6 @@ async function createOrder(input) {
     const token = domain.generateOrderToken()
     const expiresAt = domain.computeExpiry(input.payment_method)
     const isPickup = input.fulfillment_method === "pickup"
-    const b = input.buyer || {}
 
     const [res] = await conn.query(
       `INSERT INTO orders
@@ -127,15 +164,15 @@ async function createOrder(input) {
       [
         token,
         input.request_key || null,
-        b.buyer_name,
-        b.phone,
-        b.email,
+        buyer.buyer_name,
+        buyer.phone,
+        buyer.email,
         input.fulfillment_method,
-        isPickup ? null : b.address_street || null,
-        isPickup ? null : b.address_ward || null,
-        isPickup ? null : b.address_district || null,
-        isPickup ? null : b.address_province || null,
-        isPickup ? null : b.address_raw || null,
+        isPickup ? null : buyer.address_street || null,
+        isPickup ? null : buyer.address_ward || null,
+        isPickup ? null : buyer.address_district || null,
+        isPickup ? null : buyer.address_province || null,
+        isPickup ? null : buyer.address_raw || null,
         input.note || null,
         input.payment_method,
         total,
@@ -160,10 +197,15 @@ async function createOrder(input) {
     return { id: res.insertId, order_token: token, total, reused: false }
   } catch (err) {
     await conn.rollback()
-    // A concurrent submit with the same key won the unique index; return theirs.
     if (err.code === "ER_DUP_ENTRY" && input.request_key) {
       const existing = await findByRequestKey(db, input.request_key)
-      if (existing) return { ...existing, reused: true }
+      // A concurrent submit by this same buyer won the unique index: their
+      // order is our order, so return it.
+      if (existing && isSameBuyer(existing, buyer)) return replayResult(existing)
+      // The key belongs to a different buyer. Refusing loudly is the only safe
+      // answer: reusing their order would leak their order_token, and we cannot
+      // store ours under a key the index already gave away.
+      if (existing) throw new RequestKeyConflictError()
     }
     throw err
   } finally {
@@ -328,4 +370,5 @@ module.exports = {
   releaseExpiredOrders,
   OutOfStockError,
   EmptyCartError,
+  RequestKeyConflictError,
 }
