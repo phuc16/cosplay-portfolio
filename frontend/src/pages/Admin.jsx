@@ -2,6 +2,7 @@ import { useState } from "react"
 import axios from "axios"
 import AdminAlbums from "../components/AdminAlbums"
 import AdminSettings from "../components/AdminSettings"
+import AdminCollections from "../components/AdminCollections"
 import { useTheme } from "../contexts/ThemeContext"
 
 export default function Admin() {
@@ -44,6 +45,12 @@ export default function Admin() {
               Cài đặt trang
             </button>
             <button
+              onClick={() => setTab("shop")}
+              className={`text-sm ${tab === "shop" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Shop
+            </button>
+            <button
               onClick={toggleTheme}
               className="p-2 rounded-md text-gray-600 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-cosplay-card"
               title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
@@ -69,7 +76,9 @@ export default function Admin() {
             </button>
           </div>
         </header>
-        {tab === "albums" ? <AdminAlbums /> : <AdminSettings />}
+        {tab === "albums" && <AdminAlbums />}
+        {tab === "settings" && <AdminSettings />}
+        {tab === "shop" && <AdminCollections />}
       </div>
     )
   }
