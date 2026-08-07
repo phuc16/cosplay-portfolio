@@ -75,6 +75,21 @@ const storageLimiter = rateLimit({
   },
 })
 
+// Order creation: 10/hour per IP. Reservation holds stock, so unchecked
+// submissions could exhaust a limited drop before anyone pays.
+const orderLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:order:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Order IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều đơn. Thử lại sau." })
+  },
+})
+
 // Global: 600 req/phút hard ceiling per IP
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -184,6 +199,13 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 
 // ── SHOP: public storefront ──
 app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
+
+// ── ORDERS: public order creation + lookup. Creation gets its own stricter
+// limiter (reservation holds real stock); reading an order status page uses
+// the general public limiter so a buyer refreshing it isn't locked out. ──
+app.use(`${API_PREFIX}/orders`, (req, res, next) =>
+  req.method === "POST" ? orderLimiter(req, res, next) : publicLimiter(req, res, next),
+  require("./routes/orders")())
 
 app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminCatalog")())
 
