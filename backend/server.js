@@ -185,6 +185,8 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 // ── SHOP: public storefront ──
 app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
 
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminCatalog")())
+
 const invalidateGallery = () => redis.del("gallery")
 
 // GET /api/storage/:path+ - proxy file từ MinIO (public)
