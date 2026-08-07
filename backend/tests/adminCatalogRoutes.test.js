@@ -30,6 +30,18 @@ describe("auth", () => {
   })
 })
 
+describe("GET /api/admin/collections", () => {
+  it("returns draft collections too, unlike the public route", async () => {
+    await repo.createCollection({ title: "Bí mật", status: "draft" })
+    await repo.createCollection({ title: "Live", status: "active" })
+
+    const res = await authed(request(app).get("/api/admin/collections"))
+    expect(res.status).toBe(200)
+    expect(res.body.map((c) => c.title).sort()).toEqual(["Bí mật", "Live"])
+    expect(res.body.find((c) => c.title === "Bí mật").status).toBe("draft")
+  })
+})
+
 describe("GET /api/admin/collections/:id", () => {
   it("rejects unauthenticated access", async () => {
     const cid = await repo.createCollection({ title: "Vault", status: "archived" })
@@ -92,6 +104,29 @@ describe("POST /api/admin/collections", () => {
   })
 })
 
+describe("PUT /api/admin/collections/:id", () => {
+  it("updates a collection and persists the change", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "draft" })
+
+    const res = await authed(request(app).put(`/api/admin/collections/${cid}`))
+      .send({ title: "Drop", status: "active", allow_pickup: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+
+    const [c] = await repo.listAllCollections()
+    expect(c.status).toBe("active")
+  })
+
+  it("returns 404 for a nonexistent collection", async () => {
+    const res = await authed(request(app).put("/api/admin/collections/999999"))
+      .send({ title: "X", status: "active" })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe("not_found")
+  })
+})
+
 describe("products and variants", () => {
   it("creates a product under a collection", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
@@ -140,6 +175,51 @@ describe("products and variants", () => {
     const res = await authed(request(app).delete(`/api/admin/collections/${cid}`))
     expect(res.status).toBe(200)
     expect(await repo.listAllCollections()).toHaveLength(0)
+  })
+})
+
+describe("PUT /api/admin/products/:id", () => {
+  it("updates a product and persists the change", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+
+    const res = await authed(request(app).put(`/api/admin/products/${pid}`))
+      .send({ name: "Card Deluxe", price: 50000 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].name).toBe("Card Deluxe")
+    expect(detail.products[0].price).toBe(50000)
+  })
+
+  it("returns 404 for a nonexistent product", async () => {
+    const res = await authed(request(app).put("/api/admin/products/999999"))
+      .send({ name: "X", price: 1000 })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe("not_found")
+  })
+})
+
+describe("DELETE /api/admin/products/:id", () => {
+  it("deletes a product", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+
+    const res = await authed(request(app).delete(`/api/admin/products/${pid}`))
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products).toHaveLength(0)
+  })
+
+  it("returns 404 for a nonexistent product", async () => {
+    const res = await authed(request(app).delete("/api/admin/products/999999"))
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe("not_found")
   })
 })
 
