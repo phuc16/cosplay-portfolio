@@ -6,7 +6,8 @@
 function slugify(input) {
   const slug = String(input || "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    // Strip the Unicode "Combining Diacritical Marks" block (U+0300–U+036F).
+    .replace(/[\u0300-\u036F]/g, "")
     .replace(/[đĐ]/g, "d")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
