@@ -46,5 +46,6 @@ describe("GET /api/shop/collections/:slug", () => {
     const res = await request(app).get("/api/shop/collections/secret")
     expect(res.status).toBe(404)
     expect(res.body.error).toBe("not_found")
+    expect(res.body.message).toBe("Không tìm thấy bộ sưu tập")
   })
 })
