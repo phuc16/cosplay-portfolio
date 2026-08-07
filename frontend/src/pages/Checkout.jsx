@@ -22,8 +22,10 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false)
 
   // Stable across retries so a double-tap or a retried submit cannot create
-  // two orders holding two reservations.
-  const requestKey = useMemo(() => crypto.randomUUID(), [])
+  // two orders holding two reservations. Held in state (not a pure useMemo) so
+  // it can be regenerated if the server ever reports a request_key_conflict —
+  // otherwise every retry would resend the same colliding key and get stuck.
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID())
 
   const submit = async () => {
     setError("")
@@ -40,6 +42,11 @@ export default function Checkout() {
       clearCart()
       navigate(`/order/${res.order_token}`)
     } catch (e) {
+      // An astronomically unlikely UUIDv4 collision, but if it ever happens the
+      // buyer must not be stuck resending the same colliding key forever.
+      if (e.response?.data?.error === "request_key_conflict") {
+        setRequestKey(crypto.randomUUID())
+      }
       setError(
         e.response?.status === 409
           ? e.response.data.message || t("errOutOfStock")
