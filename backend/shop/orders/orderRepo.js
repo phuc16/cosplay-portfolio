@@ -28,9 +28,9 @@ async function findByRequestKey(conn, requestKey) {
  * Create an order and reserve its stock in one transaction.
  *
  * Prices come from the catalog inside the transaction — never from the client,
- * which sends only {variant_id, qty}. Variant rows are locked FOR UPDATE in
- * ascending id order so two concurrent orders touching the same variants
- * cannot deadlock by grabbing them in opposite orders.
+ * which sends only {variant_id, qty}. Only product_variants rows are locked,
+ * and always in ascending id order, so two concurrent orders touching the same
+ * variants cannot deadlock by grabbing them in opposite orders.
  */
 async function createOrder(input) {
   const items = Array.isArray(input.items) ? input.items : []
@@ -49,15 +49,26 @@ async function createOrder(input) {
       }
     }
 
-    // Deterministic lock order prevents deadlock under concurrency.
     const wanted = new Map()
     for (const item of items) {
       const id = Number(item.variant_id)
       const qty = Number(item.qty)
       wanted.set(id, (wanted.get(id) || 0) + qty)
     }
+    // This sort is what makes the locking safe: it produces an ascending id
+    // list that drives both the IN (...) below — InnoDB walks the primary key
+    // in index order, so it takes the row locks ascending — and the check and
+    // decrement loops further down. The SQL ORDER BY only orders the result
+    // set; it does not govern lock acquisition.
     const ids = [...wanted.keys()].sort((a, b) => a - b)
 
+    // FOR UPDATE OF v locks only the product_variants rows. A bare FOR UPDATE
+    // would also lock the joined products rows, and it would take those locks
+    // in variant-id order — an order with no consistent relationship to product
+    // ids — so two orders buying from the same two products via differently
+    // ordered variants could deadlock on the parent rows. Verified on MySQL
+    // 8.4: with OF v, a concurrent SELECT ... FROM products FOR UPDATE does not
+    // block, while the same on product_variants does.
     const [rows] = await conn.query(
       `SELECT v.id, v.label, v.stock_qty, p.id AS product_id, p.name AS product_name,
               p.price, p.collection_id
@@ -65,7 +76,7 @@ async function createOrder(input) {
          JOIN products p ON p.id = v.product_id
         WHERE v.id IN (${ids.map(() => "?").join(",")})
         ORDER BY v.id ASC
-        FOR UPDATE`,
+        FOR UPDATE OF v`,
       ids
     )
     if (rows.length !== ids.length) throw new OutOfStockError("không tồn tại")

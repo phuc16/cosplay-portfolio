@@ -142,6 +142,55 @@ describe("createOrder", () => {
   })
 })
 
+describe("createOrder locking", () => {
+  it("locks the variant row it is reserving", async () => {
+    const { variantId } = await seedVariant(5)
+    const holder = await db.getConnection()
+    const pending = (async () => {
+      await holder.beginTransaction()
+      await holder.query("SELECT id FROM product_variants WHERE id = ? FOR UPDATE", [variantId])
+      return repo.createOrder(order(variantId, 1))
+    })()
+
+    let settled = false
+    const create = pending.then(
+      (r) => { settled = true; return r },
+      (e) => { settled = true; throw e }
+    )
+    create.catch(() => {})
+
+    await new Promise((r) => setTimeout(r, 500))
+    expect(settled).toBe(false) // still waiting on the variant row lock
+
+    await holder.rollback()
+    holder.release()
+    expect((await create).total).toBe(35000)
+  }, 20000)
+
+  it("does not lock the parent product row", async () => {
+    const { pid, variantId } = await seedVariant(5)
+    const holder = await db.getConnection()
+    await holder.beginTransaction()
+    await holder.query("SELECT id FROM products WHERE id = ? FOR UPDATE", [pid])
+
+    const create = repo.createOrder(order(variantId, 1))
+    create.catch(() => {})
+    try {
+      const res = await Promise.race([
+        create,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("createOrder blocked on the parent product row")), 4000)
+        ),
+      ])
+      expect(res.total).toBe(35000)
+    } finally {
+      await holder.rollback()
+      holder.release()
+      await create.catch(() => {})
+    }
+  }, 20000)
+})
+
 describe("transitionOrder", () => {
   it("releases stock when cancelled", async () => {
     const { variantId } = await seedVariant(5)
