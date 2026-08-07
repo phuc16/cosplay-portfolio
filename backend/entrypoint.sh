@@ -18,5 +18,5 @@ echo "Migrations applied."
 echo "Running seeds (optional)..."
 npx knex seed:run || echo "Seed step skipped (no seeds or seed error) — continuing."
 
-echo "Starting server..."
-node server.js
+echo "Starting..."
+exec "$@"

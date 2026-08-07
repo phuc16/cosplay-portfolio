@@ -13,3 +13,4 @@ RUN chmod +x entrypoint.sh
 EXPOSE 5000
 
 ENTRYPOINT ["sh", "./entrypoint.sh"]
+CMD ["node", "server.js"]
