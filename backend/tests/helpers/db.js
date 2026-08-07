@@ -8,8 +8,8 @@ async function resetTables(...names) {
     for (const name of names) {
       await conn.query(`TRUNCATE TABLE \`${name}\``)
     }
-    await conn.query("SET FOREIGN_KEY_CHECKS = 1")
   } finally {
+    await conn.query("SET FOREIGN_KEY_CHECKS = 1").catch(() => {})
     conn.release()
   }
 }
