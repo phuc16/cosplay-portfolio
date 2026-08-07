@@ -5,6 +5,22 @@ const { processShopImage, storeShopImage } = require("../shop/images")
 
 const STATUSES = ["draft", "active", "closed", "archived"]
 
+// Must match the varchar lengths declared in the migrations
+// (007_create_collections.js, 008_create_products.js, 009_create_product_variants.js)
+// so an oversized value is rejected with a clean 400 before it ever reaches MySQL
+// and comes back as an unhandled ER_DATA_TOO_LONG 500.
+//
+// collections.title itself is varchar(255), but every title is also turned into
+// collections.slug (varchar(191)) via slugify() — for a plain-ASCII title, slug
+// generation is length-preserving (spaces collapse to single hyphens, so the
+// slug is never longer than the title). A title between 192 and 255 chars can
+// therefore still crash the same INSERT/UPDATE on the slug column even though
+// it fits under the title column's own limit, so the effective, safe limit for
+// title is the tighter of the two: min(255, 191) = 191.
+const TITLE_MAX_LEN = 191
+const NAME_MAX_LEN = 255
+const LABEL_MAX_LEN = 191
+
 const bad = (res, message) => res.status(400).json({ error: "invalid_input", message })
 const oops = (res, err, where) => {
   console.error(`[ADMIN/CATALOG] ${where}:`, err)
@@ -13,6 +29,7 @@ const oops = (res, err, where) => {
 
 function validateCollection(body) {
   if (!body.title || !String(body.title).trim()) return "Cần tên bộ sưu tập"
+  if (String(body.title).length > TITLE_MAX_LEN) return `Tên bộ sưu tập không được quá ${TITLE_MAX_LEN} ký tự`
   if (body.status && !STATUSES.includes(body.status)) return "Trạng thái không hợp lệ"
   if (body.allow_ship === false && body.allow_pickup === false) {
     return "Phải chọn ít nhất một hình thức nhận hàng"
@@ -22,6 +39,7 @@ function validateCollection(body) {
 
 function validateProduct(body) {
   if (!body.name || !String(body.name).trim()) return "Cần tên sản phẩm"
+  if (String(body.name).length > NAME_MAX_LEN) return `Tên sản phẩm không được quá ${NAME_MAX_LEN} ký tự`
   const price = Number(body.price)
   if (!Number.isInteger(price) || price < 0) return "Giá phải là số nguyên không âm (VND)"
   return null
@@ -31,6 +49,7 @@ function validateVariants(variants) {
   if (!Array.isArray(variants)) return "Danh sách phân loại không hợp lệ"
   for (const v of variants) {
     if (!v.label || !String(v.label).trim()) return "Mỗi phân loại cần có mã/tên"
+    if (String(v.label).length > LABEL_MAX_LEN) return `Mã/tên phân loại không được quá ${LABEL_MAX_LEN} ký tự`
     if (v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty !== "") {
       const n = Number(v.stock_qty)
       if (!Number.isInteger(n) || n < 0) return "Số lượng phải là số nguyên không âm, hoặc để trống nếu không giới hạn"

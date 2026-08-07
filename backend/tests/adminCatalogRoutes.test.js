@@ -95,6 +95,24 @@ describe("POST /api/admin/collections", () => {
     expect(res.status).toBe(400)
   })
 
+  // The title column is varchar(255), but every title also generates
+  // collections.slug (varchar(191)) via a length-preserving slugify() for
+  // plain-ASCII input, so 191 (not 255) is the effective, crash-safe limit.
+  it("accepts a title at exactly the 191-char effective limit", async () => {
+    const title = "a".repeat(191)
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title, status: "active" })
+    expect(res.status).toBe(201)
+  })
+
+  it("rejects a title one character over the 191-char effective limit with 400, not 500", async () => {
+    const title = "a".repeat(192)
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title, status: "active" })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
   it("invalidates the public cache", async () => {
     await request(app).get("/api/shop/collections") // warm the cache
     await authed(request(app).post("/api/admin/collections")).send({ title: "New", status: "active" })
@@ -146,6 +164,23 @@ describe("products and variants", () => {
     expect(res.status).toBe(400)
   })
 
+  it("accepts a product name at exactly the 255-char column limit", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const name = "a".repeat(255)
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name, price: 1000 })
+    expect(res.status).toBe(201)
+  })
+
+  it("rejects a product name one character over the 255-char column limit with 400, not 500", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const name = "a".repeat(256)
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name, price: 1000 })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
   it("bulk replaces variants, preserving null stock as unlimited", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
     const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
@@ -166,6 +201,25 @@ describe("products and variants", () => {
     const res = await authed(request(app).put(`/api/admin/products/${pid}/variants`))
       .send({ variants: [{ stock_qty: 1 }] })
     expect(res.status).toBe(400)
+  })
+
+  it("accepts a variant label at exactly the 191-char column limit", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    const label = "a".repeat(191)
+    const res = await authed(request(app).put(`/api/admin/products/${pid}/variants`))
+      .send({ variants: [{ label }] })
+    expect(res.status).toBe(200)
+  })
+
+  it("rejects a variant label one character over the 191-char column limit with 400, not 500", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    const label = "a".repeat(192)
+    const res = await authed(request(app).put(`/api/admin/products/${pid}/variants`))
+      .send({ variants: [{ label }] })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
   })
 
   it("deletes a collection and its products", async () => {
