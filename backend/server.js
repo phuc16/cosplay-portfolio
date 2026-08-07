@@ -208,6 +208,7 @@ app.use(`${API_PREFIX}/orders`, (req, res, next) =>
   require("./routes/orders")())
 
 app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminCatalog")())
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminOrders")())
 
 const invalidateGallery = () => redis.del("gallery")
 
