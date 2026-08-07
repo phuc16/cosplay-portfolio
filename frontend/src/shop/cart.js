@@ -25,7 +25,11 @@ export function readCart() {
 }
 
 function writeCart(cart) {
-  localStorage.setItem(KEY, JSON.stringify(cart))
+  try {
+    localStorage.setItem(KEY, JSON.stringify(cart))
+  } catch (error) {
+    console.warn("Failed to persist cart to localStorage:", error)
+  }
   return cart
 }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { readCart, addToCart, updateQty, removeFromCart, clearCart, cartCount, cartTotal } from "./cart"
 
 const item = (over = {}) => ({
@@ -101,5 +101,16 @@ describe("cart", () => {
     const cart = readCart()
     expect(cart).toHaveLength(1)
     expect(cart[0].variant_id).toBe(1)
+  })
+
+  it("does not crash when localStorage.setItem throws (private browsing, quota exceeded)", () => {
+    const mock = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError")
+    })
+
+    const result = addToCart(item())
+    expect(result).toEqual([{ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop" }])
+
+    mock.mockRestore()
   })
 })
