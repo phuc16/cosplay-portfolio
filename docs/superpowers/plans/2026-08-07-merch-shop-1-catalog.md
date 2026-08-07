@@ -70,6 +70,19 @@ module.exports = mysql.createPool({
 })
 ```
 
+Replace the whole of `backend/redis.js` with:
+
+```js
+const Redis = require("ioredis")
+
+// REDIS_DB isolates the test suite (db 15) from dev/prod data (db 0), so a
+// test calling invalidate() can never flush real cache keys.
+module.exports = new Redis({
+  host: process.env.REDIS_HOST,
+  db: Number(process.env.REDIS_DB) || 0,
+})
+```
+
 In `backend/knexfile.js`, add the same `port` line to the `connection` object so it reads:
 
 ```js
@@ -194,8 +207,8 @@ In `backend/package.json`, replace the `"test"` script so the `scripts` block re
 
 ```json
 "scripts": {
-  "test": "DB_NAME=cosplay_test vitest run",
-  "test:watch": "DB_NAME=cosplay_test vitest",
+  "test": "DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_DB=15 vitest run",
+  "test:watch": "DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_DB=15 vitest",
   "migrate": "knex migrate:latest",
   "seed": "knex seed:run",
   "rollback": "knex migrate:rollback"
@@ -864,11 +877,25 @@ async function getPublicCollectionBySlug(slug) {
   }
 }
 
-async function createCollection(data) {
+async function createCollection(data, attempt = 0) {
   const [rows] = await db.query("SELECT slug FROM collections")
   const slug = uniqueSlug(slugify(data.title), rows.map((r) => r.slug))
   const sortOrder = await nextSortOrder("collections")
 
+  try {
+    return await insertCollection(data, slug, sortOrder)
+  } catch (err) {
+    // Read-then-insert is a TOCTOU race: two concurrent creates of the same
+    // title both compute the same slug and one loses on the unique index.
+    // Retrying re-reads, so the loser now sees the winner and picks -2.
+    if (err.code === "ER_DUP_ENTRY" && attempt < 5) {
+      return createCollection(data, attempt + 1)
+    }
+    throw err
+  }
+}
+
+async function insertCollection(data, slug, sortOrder) {
   const [res] = await db.query(
     `INSERT INTO collections
        (title, slug, description, cover_image, thumbnail_image, status,
@@ -957,32 +984,47 @@ async function replaceVariants(productId, variants) {
   const list = Array.isArray(variants) ? variants : []
   const keepIds = list.map((v) => v.id).filter(Boolean)
 
-  if (keepIds.length) {
-    await db.query(
-      `DELETE FROM product_variants
-        WHERE product_id = ? AND id NOT IN (${keepIds.map(() => "?").join(",")})`,
-      [productId, ...keepIds]
-    )
-  } else {
-    await db.query("DELETE FROM product_variants WHERE product_id = ?", [productId])
-  }
+  // Transactional: this deletes before it inserts, so a failure partway
+  // through an untransacted version would wipe a product's entire stock list.
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
 
-  for (const [index, v] of list.entries()) {
-    const stock = v.stock_qty === null || v.stock_qty === undefined || v.stock_qty === ""
-      ? null
-      : Number(v.stock_qty)
-
-    if (v.id) {
-      await db.query(
-        "UPDATE product_variants SET label = ?, image_url = ?, stock_qty = ?, sort_order = ? WHERE id = ? AND product_id = ?",
-        [v.label, v.image_url || null, stock, index, v.id, productId]
+    if (keepIds.length) {
+      await conn.query(
+        `DELETE FROM product_variants
+          WHERE product_id = ? AND id NOT IN (${keepIds.map(() => "?").join(",")})`,
+        [productId, ...keepIds]
       )
     } else {
-      await db.query(
-        "INSERT INTO product_variants (product_id, label, image_url, stock_qty, sort_order) VALUES (?, ?, ?, ?, ?)",
-        [productId, v.label, v.image_url || null, stock, index]
-      )
+      await conn.query("DELETE FROM product_variants WHERE product_id = ?", [productId])
     }
+
+    for (const [index, v] of list.entries()) {
+      const stock = v.stock_qty === null || v.stock_qty === undefined || v.stock_qty === ""
+        ? null
+        : Number(v.stock_qty)
+
+      if (v.id) {
+        // The product_id guard stops one product's request editing another's variant.
+        await conn.query(
+          "UPDATE product_variants SET label = ?, image_url = ?, stock_qty = ?, sort_order = ? WHERE id = ? AND product_id = ?",
+          [v.label, v.image_url || null, stock, index, v.id, productId]
+        )
+      } else {
+        await conn.query(
+          "INSERT INTO product_variants (product_id, label, image_url, stock_qty, sort_order) VALUES (?, ?, ?, ?, ?)",
+          [productId, v.label, v.image_url || null, stock, index]
+        )
+      }
+    }
+
+    await conn.commit()
+  } catch (err) {
+    await conn.rollback()
+    throw err
+  } finally {
+    conn.release()
   }
 }
 
