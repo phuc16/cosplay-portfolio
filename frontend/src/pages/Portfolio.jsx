@@ -60,10 +60,11 @@ function contactHref(type, value) {
 }
 
 /* ── NAVBAR ─────────────────────────────────────────────────────────────── */
-function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, logoUrl }) {
+function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, logoUrl, t }) {
   const navLinks = [
     { label: lang === "vi" ? "Thông tin" : "Info", href: "#info" },
     { label: lang === "vi" ? "Dự án" : "Project", href: "#project" },
+    { label: t("shop"), href: "/shop" },
     { label: lang === "vi" ? "Liên hệ" : "Contact", href: "#contact" },
   ]
   const s = {
@@ -632,7 +633,7 @@ function buildData(cfg, gallery, lang) {
 export default function Portfolio() {
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { lang, setLang } = useLanguage()
+  const { lang, setLang, t } = useLanguage()
   const [gallery, setGallery] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -689,7 +690,7 @@ export default function Portfolio() {
       style={{ minHeight: "100vh", background: "var(--bg-page)", color: "var(--text-strong)" }}
       onContextMenu={(e) => { if (e.target.tagName === "IMG") e.preventDefault() }}>
       <Navbar theme={theme} onToggleTheme={toggleTheme} lang={lang} onSetLang={setLang}
-        artistName={data.artistName} tagline={getLocalized(cfg.tagline, lang)} logoUrl={logoUrl} />
+        artistName={data.artistName} tagline={getLocalized(cfg.tagline, lang)} logoUrl={logoUrl} t={t} />
 
       {/* Full-page spinner while settings load from the backend */}
       {loading && (
