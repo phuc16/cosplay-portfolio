@@ -83,8 +83,27 @@ describe("POST /api/orders/:token/proof", () => {
 
   it("allows replacing proof while still pending", async () => {
     const o = await seedOrder()
-    await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+
+    // First upload
+    const first = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    expect(first.status).toBe(201)
+    const firstUrl = first.body.url
+    expect(firstUrl).toBeTruthy()
+
+    // Small delay to ensure Date.now() generates a distinct timestamp for the second key
+    await new Promise(r => setTimeout(r, 1))
+
+    // Second upload
     const second = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
     expect(second.status).toBe(201)
+    const secondUrl = second.body.url
+    expect(secondUrl).toBeTruthy()
+
+    // The two uploads must produce different URLs (mock uses the unique key from storeShopImage)
+    expect(secondUrl).not.toBe(firstUrl)
+
+    // Verify the database was updated with the second URL, not the first
+    const [[row]] = await db.query("SELECT payment_proof_url FROM orders WHERE id = ?", [o.id])
+    expect(row.payment_proof_url).toBe(secondUrl)
   })
 })
