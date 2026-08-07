@@ -44,6 +44,8 @@ function sanitizeInfo(text) {
 function buildVietQrPayload({ bankBin, accountNumber, amount, addInfo }) {
   if (!bankBin) throw new Error("Thiếu mã ngân hàng (BIN)")
   if (!accountNumber) throw new Error("Thiếu số tài khoản")
+  if (!/^\d{4,10}$/.test(String(bankBin))) throw new Error(`Mã ngân hàng (BIN) không hợp lệ: ${bankBin}`)
+  if (!/^[A-Za-z0-9]{1,19}$/.test(String(accountNumber))) throw new Error(`Số tài khoản không hợp lệ: ${accountNumber}`)
   if (amount !== null && amount !== undefined) {
     if (!Number.isInteger(amount) || amount <= 0) {
       throw new Error(`Số tiền không hợp lệ: ${amount}`)

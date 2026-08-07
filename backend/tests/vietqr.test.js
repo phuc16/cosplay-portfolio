@@ -67,6 +67,25 @@ describe("buildVietQrPayload", () => {
     expect(() => buildVietQrPayload({ ...base, accountNumber: "" })).toThrow()
   })
 
+  it("rejects a bank BIN containing a space or letters", () => {
+    expect(() => buildVietQrPayload({ ...base, bankBin: "9704 16" })).toThrow()
+    expect(() => buildVietQrPayload({ ...base, bankBin: "ABC416" })).toThrow()
+  })
+
+  it("rejects an account number containing a space", () => {
+    expect(() => buildVietQrPayload({ ...base, accountNumber: "123 456789" })).toThrow()
+  })
+
+  it("rejects an account number over 19 characters", () => {
+    expect(() => buildVietQrPayload({ ...base, accountNumber: "1".repeat(20) })).toThrow()
+  })
+
+  it("accepts realistic valid bank BINs and account numbers", () => {
+    expect(() => buildVietQrPayload({ ...base, bankBin: "970416", accountNumber: "0123456789012345" })).not.toThrow()
+    expect(() => buildVietQrPayload({ ...base, bankBin: "970436", accountNumber: "ABC123" })).not.toThrow()
+    expect(() => buildVietQrPayload({ ...base, accountNumber: "1".repeat(19) })).not.toThrow()
+  })
+
   it("rejects a non-integer amount, which would corrupt the transfer", () => {
     expect(() => buildVietQrPayload({ ...base, amount: 35000.5 })).toThrow()
     expect(() => buildVietQrPayload({ ...base, amount: -1 })).toThrow()
