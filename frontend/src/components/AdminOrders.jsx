@@ -4,20 +4,11 @@ import { formatVnd } from "../utils/money"
 
 const STATUSES = ["", "pending", "confirmed", "shipped", "completed", "cancelled"]
 
-const NEXT = {
-  pending: ["confirmed", "cancelled"],
-  confirmed: ["shipped", "completed", "cancelled"],
-  shipped: ["completed", "cancelled"],
-  completed: [],
-  cancelled: [],
-}
-
-// Pickup orders skip "shipped" entirely (confirmed -> completed directly),
-// mirroring backend/shop/orders/domain.js#canTransition. Without this filter
-// a pickup order in "confirmed" would show a "shipped" button that the
-// server would then reject with 409 invalid_transition.
-const nextStatuses = (order) =>
-  NEXT[order.status].filter((to) => !(order.fulfillment_method === "pickup" && to === "shipped"))
+// The legal next-statuses come straight from the API's allowed_transitions
+// field (computed server-side from the real canTransition state machine in
+// backend/shop/orders/domain.js) — the frontend keeps zero independent copy
+// of the transition rules.
+const nextStatuses = (order) => order.allowed_transitions || []
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState([])

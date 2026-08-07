@@ -1,7 +1,22 @@
 const express = require("express")
 const repo = require("../shop/orders/orderRepo")
+const domain = require("../shop/orders/domain")
 
 const STATUSES = ["pending", "confirmed", "shipped", "completed", "cancelled"]
+
+// The legal next-statuses for a given order, per the real canTransition state
+// machine — the single source of truth. Sent to the frontend so it never needs
+// its own copy of TRANSITIONS/the pickup-shipped exclusion rule.
+const TRANSITION_TARGETS = ["confirmed", "shipped", "completed", "cancelled"]
+function withAllowedTransitions(order) {
+  if (!order) return order
+  return {
+    ...order,
+    allowed_transitions: TRANSITION_TARGETS.filter((to) =>
+      domain.canTransition(order.status, to, order.fulfillment_method)
+    ),
+  }
+}
 
 module.exports = function adminOrderRoutes() {
   const router = express.Router()
@@ -13,10 +28,11 @@ module.exports = function adminOrderRoutes() {
 
   router.get("/orders", async (req, res) => {
     try {
-      res.json(await repo.listOrders({
+      const orders = await repo.listOrders({
         status: req.query.status,
         collection_id: req.query.collection_id,
-      }))
+      })
+      res.json(orders.map(withAllowedTransitions))
     } catch (err) { oops(res, err, "Lỗi liệt kê đơn") }
   })
 
@@ -24,7 +40,7 @@ module.exports = function adminOrderRoutes() {
     try {
       const order = await repo.getOrderById(req.params.id)
       if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
-      res.json(order)
+      res.json(withAllowedTransitions(order))
     } catch (err) { oops(res, err, "Lỗi lấy đơn") }
   })
 

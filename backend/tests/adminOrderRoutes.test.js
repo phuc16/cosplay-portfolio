@@ -57,6 +57,41 @@ describe("GET /api/admin/orders", () => {
   })
 })
 
+describe("allowed_transitions", () => {
+  it("lists confirmed/cancelled for a pending ship order", async () => {
+    await seedOrder({ fulfillment_method: "ship" })
+    const res = await authed(request(app).get("/api/admin/orders"))
+    expect(res.body[0].allowed_transitions.sort()).toEqual(["cancelled", "confirmed"])
+  })
+
+  it("lists confirmed/cancelled for a pending pickup order", async () => {
+    await seedOrder({ fulfillment_method: "pickup" })
+    const res = await authed(request(app).get("/api/admin/orders"))
+    expect(res.body[0].allowed_transitions.sort()).toEqual(["cancelled", "confirmed"])
+  })
+
+  it("includes shipped for a confirmed ship order", async () => {
+    const o = await seedOrder({ fulfillment_method: "ship" })
+    await orders.transitionOrder(o.id, "confirmed")
+    const res = await authed(request(app).get("/api/admin/orders"))
+    expect(res.body[0].allowed_transitions.sort()).toEqual(["cancelled", "completed", "shipped"])
+  })
+
+  it("excludes shipped but includes completed for a confirmed pickup order", async () => {
+    const o = await seedOrder({ fulfillment_method: "pickup" })
+    await orders.transitionOrder(o.id, "confirmed")
+    const res = await authed(request(app).get("/api/admin/orders"))
+    expect(res.body[0].allowed_transitions).not.toContain("shipped")
+    expect(res.body[0].allowed_transitions).toContain("completed")
+  })
+
+  it("is present on the single-order detail endpoint too", async () => {
+    const o = await seedOrder({ fulfillment_method: "ship" })
+    const res = await authed(request(app).get(`/api/admin/orders/${o.id}`))
+    expect(res.body.allowed_transitions.sort()).toEqual(["cancelled", "confirmed"])
+  })
+})
+
 describe("POST /api/admin/orders/:id/transition", () => {
   it("confirms a pending order", async () => {
     const o = await seedOrder()
