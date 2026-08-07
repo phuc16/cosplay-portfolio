@@ -24,13 +24,19 @@ export default function AdminProducts({ collection }) {
   useEffect(() => { reload() }, [reload])
 
   const pickImage = async (file) => {
-    const base64 = await new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(String(reader.result).split(",")[1])
-      reader.readAsDataURL(file)
-    })
-    const { url } = await adminUploadImage(base64, `products/${collection.id}`)
-    setDraft((d) => ({ ...d, images: [...(d.images || []), url] }))
+    setError("")
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(",")[1])
+        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
+        reader.readAsDataURL(file)
+      })
+      const { url } = await adminUploadImage(base64, `products/${collection.id}`)
+      setDraft((d) => ({ ...d, images: [...(d.images || []), url] }))
+    } catch (e) {
+      setError(e.response?.data?.message || "Tải ảnh lên thất bại")
+    }
   }
 
   const save = async () => {

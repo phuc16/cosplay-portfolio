@@ -31,13 +31,19 @@ export default function AdminCollections() {
   useEffect(() => { reload().catch(() => setCollections([])) }, [])
 
   const upload = async (file, field) => {
-    const base64 = await new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(String(reader.result).split(",")[1])
-      reader.readAsDataURL(file)
-    })
-    const { url } = await adminUploadImage(base64, "collections")
-    setDraft((d) => ({ ...d, [field]: url }))
+    setError("")
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(",")[1])
+        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
+        reader.readAsDataURL(file)
+      })
+      const { url } = await adminUploadImage(base64, "collections")
+      setDraft((d) => ({ ...d, [field]: url }))
+    } catch (e) {
+      setError(e.response?.data?.message || "Tải ảnh lên thất bại")
+    }
   }
 
   const save = async () => {
