@@ -8,6 +8,19 @@ import AddressFields from "../components/shop/AddressFields"
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 
+// generateRequestKey() only exists in secure contexts (HTTPS or localhost). Over
+// plain HTTP on a LAN IP — a realistic device-testing setup during development —
+// it's undefined, and calling it would throw during render since this feeds a
+// useState initializer, blanking the whole page. Production is HTTPS so this
+// isn't a live production risk, just a confusing dev-mode failure. The fallback
+// is NOT cryptographically secure, but request_key only needs uniqueness for
+// idempotency within a single checkout session, not unguessability like
+// order_token, so a weaker fallback is acceptable specifically for this value.
+function generateRequestKey() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return generateRequestKey()
+  return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("")
+}
+
 export default function Checkout() {
   const { t } = useLanguage()
   const navigate = useNavigate()
@@ -25,7 +38,7 @@ export default function Checkout() {
   // two orders holding two reservations. Held in state (not a pure useMemo) so
   // it can be regenerated if the server ever reports a request_key_conflict —
   // otherwise every retry would resend the same colliding key and get stuck.
-  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID())
+  const [requestKey, setRequestKey] = useState(() => generateRequestKey())
 
   const submit = async () => {
     setError("")
@@ -45,7 +58,7 @@ export default function Checkout() {
       // An astronomically unlikely UUIDv4 collision, but if it ever happens the
       // buyer must not be stuck resending the same colliding key forever.
       if (e.response?.data?.error === "request_key_conflict") {
-        setRequestKey(crypto.randomUUID())
+        setRequestKey(generateRequestKey())
       }
       setError(
         e.response?.status === 409
