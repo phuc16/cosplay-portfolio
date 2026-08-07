@@ -225,6 +225,11 @@ async function replaceVariants(productId, variants) {
 
       if (v.id) {
         // The product_id guard stops one product's request editing another's variant.
+        // If `id` does not belong to `productId`, this matches zero rows and the
+        // variant is silently dropped from the result — this is intentional
+        // isolation between products' variant lists, not a bug, but callers must
+        // not rely on this update succeeding without checking product ownership
+        // themselves.
         await conn.query(
           "UPDATE product_variants SET label = ?, image_url = ?, stock_qty = ?, sort_order = ? WHERE id = ? AND product_id = ?",
           [v.label, v.image_url || null, stock, index, v.id, productId]

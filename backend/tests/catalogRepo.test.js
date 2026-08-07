@@ -99,6 +99,60 @@ describe("replaceVariants", () => {
     const byLabel = Object.fromEntries(detail.products[0].variants.map((v) => [v.label, v.stock_qty]))
     expect(byLabel).toEqual({ A1: 9, A3: 5 })
   })
+
+  it("rolls back the entire write when a later item in the list fails", async () => {
+    const cid = await repo.createCollection({ title: "Rollback", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [
+      { label: "A1", stock_qty: 1 },
+      { label: "A2", stock_qty: 2 },
+    ])
+
+    const [before] = await db.query(
+      "SELECT id, label, stock_qty, sort_order FROM product_variants WHERE product_id = ? ORDER BY id ASC",
+      [pid]
+    )
+    expect(before).toHaveLength(2)
+
+    const tooLong = "x".repeat(192)
+    await expect(
+      repo.replaceVariants(pid, [
+        { label: "A1-renamed", stock_qty: 1 },
+        { label: tooLong, stock_qty: 99 },
+      ])
+    ).rejects.toThrow()
+
+    const [after] = await db.query(
+      "SELECT id, label, stock_qty, sort_order FROM product_variants WHERE product_id = ? ORDER BY id ASC",
+      [pid]
+    )
+    expect(after).toEqual(before)
+  })
+
+  it("no-ops silently when passed a variant id belonging to a different product", async () => {
+    const cidA = await repo.createCollection({ title: "Product A owner", status: "active" })
+    const pidA = await repo.createProduct({ collection_id: cidA, name: "A", price: 1000 })
+    await repo.replaceVariants(pidA, [{ label: "A1", stock_qty: 1 }])
+
+    const cidB = await repo.createCollection({ title: "Product B owner", status: "active" })
+    const pidB = await repo.createProduct({ collection_id: cidB, name: "B", price: 2000 })
+    await repo.replaceVariants(pidB, [{ label: "B1", stock_qty: 5 }])
+
+    const [[variantB]] = await db.query(
+      "SELECT * FROM product_variants WHERE product_id = ?",
+      [pidB]
+    )
+
+    await expect(
+      repo.replaceVariants(pidA, [{ id: variantB.id, label: "Hijacked", stock_qty: 999 }])
+    ).resolves.not.toThrow()
+
+    const [[variantBAfter]] = await db.query(
+      "SELECT * FROM product_variants WHERE id = ?",
+      [variantB.id]
+    )
+    expect(variantBAfter).toEqual(variantB)
+  })
 })
 
 describe("deleteCollection", () => {
