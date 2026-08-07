@@ -29,6 +29,23 @@ export const translations = {
     shopPickupNote: "Pickup note",
     shopNotFound: "Collection not found.",
 
+    // Cart & Checkout
+    cart: "Cart", cartEmpty: "Your cart is empty.", cartTotal: "Total",
+    cartCheckout: "Checkout", cartRemove: "Remove", cartQty: "Qty",
+    addToCart: "Add to cart", added: "Added",
+    checkout: "Checkout", checkoutName: "Full name", checkoutPhone: "Phone",
+    checkoutEmail: "Email", checkoutNote: "Note (optional)",
+    checkoutFulfillment: "Delivery method", checkoutShip: "Ship nationwide",
+    checkoutPickup: "Pickup at event", checkoutPayment: "Payment method",
+    checkoutAddress: "Address", checkoutPlaceOrder: "Place order",
+    checkoutShippingNote: "+ shipping fee, paid to the courier on delivery",
+    orderPlaced: "Order placed", orderStatus: "Status", orderItems: "Items",
+    orderTotalLabel: "Total", orderPending: "Awaiting payment confirmation",
+    orderConfirmed: "Confirmed", orderShipped: "Shipped", orderCompleted: "Completed",
+    orderCancelled: "Cancelled", orderNotFound: "Order not found.",
+    orderSaveLink: "Save this link to check your order later.",
+    errOutOfStock: "Sorry, that item just sold out. Please review your cart.",
+
     // Hero
     btnViewGallery: "View gallery",
     btnAboutMe: "About me",
@@ -109,6 +126,23 @@ export const translations = {
     shopPickupLocation: "Địa điểm nhận hàng",
     shopPickupNote: "Ghi chú nhận hàng",
     shopNotFound: "Không tìm thấy bộ sưu tập.",
+
+    // Cart & Checkout
+    cart: "Giỏ hàng", cartEmpty: "Giỏ hàng của bạn đang trống.", cartTotal: "Tổng cộng",
+    cartCheckout: "Thanh toán", cartRemove: "Xóa", cartQty: "SL",
+    addToCart: "Thêm vào giỏ", added: "Đã thêm",
+    checkout: "Thanh toán", checkoutName: "Họ và tên", checkoutPhone: "Số điện thoại",
+    checkoutEmail: "Email", checkoutNote: "Ghi chú (không bắt buộc)",
+    checkoutFulfillment: "Hình thức nhận hàng", checkoutShip: "Giao toàn quốc",
+    checkoutPickup: "Nhận tại sự kiện", checkoutPayment: "Hình thức thanh toán",
+    checkoutAddress: "Địa chỉ", checkoutPlaceOrder: "Đặt hàng",
+    checkoutShippingNote: "+ phí vận chuyển, thanh toán cho shipper khi nhận hàng",
+    orderPlaced: "Đã đặt hàng", orderStatus: "Trạng thái", orderItems: "Sản phẩm",
+    orderTotalLabel: "Tổng cộng", orderPending: "Đang chờ xác nhận thanh toán",
+    orderConfirmed: "Đã xác nhận", orderShipped: "Đã giao vận", orderCompleted: "Hoàn tất",
+    orderCancelled: "Đã hủy", orderNotFound: "Không tìm thấy đơn hàng.",
+    orderSaveLink: "Lưu lại đường dẫn này để kiểm tra đơn hàng sau.",
+    errOutOfStock: "Rất tiếc, sản phẩm này vừa hết hàng. Vui lòng kiểm tra lại giỏ hàng.",
 
     // Hero
     btnViewGallery: "Xem bộ sưu tập",

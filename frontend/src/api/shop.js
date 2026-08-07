@@ -37,3 +37,10 @@ export const adminSaveVariants = (productId, variants) =>
 
 export const adminUploadImage = (base64, folder) =>
   api.post("/api/admin/shop/image", { base64, folder }).then((r) => r.data)
+
+// ── Orders ──
+export const createOrder = (payload) =>
+  api.post("/api/orders", payload).then((r) => r.data)
+
+export const fetchOrder = (token) =>
+  api.get(`/api/orders/${token}`).then((r) => r.data)

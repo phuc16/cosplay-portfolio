@@ -1,6 +1,7 @@
 import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
+import { addToCart } from "../../shop/cart"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
 function stockLabel(variant, t) {
@@ -9,7 +10,7 @@ function stockLabel(variant, t) {
   return t("shopInStock", { n: variant.stock_qty })
 }
 
-export default function ProductCard({ product }) {
+export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
   const { t } = useLanguage()
   const cover = product.images?.[0] || product.variants?.find((v) => v.image_url)?.image_url
 
@@ -40,17 +41,30 @@ export default function ProductCard({ product }) {
             {product.variants.map((v) => {
               const soldOut = v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
               return (
-                <li
-                  key={v.id}
-                  title={stockLabel(v, t)}
-                  className={
-                    "px-2 py-1 rounded-lg text-xs border " +
-                    (soldOut
-                      ? "opacity-40 line-through border-current"
-                      : "border-[var(--border-brand)]")
-                  }
-                >
-                  {v.label}
+                <li key={v.id} title={stockLabel(v, t)}>
+                  <button
+                    type="button"
+                    disabled={soldOut || !orderable}
+                    onClick={() => {
+                      addToCart({
+                        variant_id: v.id,
+                        qty: 1,
+                        product_name: product.name,
+                        variant_label: v.label,
+                        price: product.price,
+                        image_url: v.image_url || product.images?.[0] || null,
+                        collection_slug: collectionSlug,
+                      })
+                      onAdded?.(v.label)
+                    }}
+                    className={
+                      "px-2 py-1 rounded-lg text-xs border transition " +
+                      (soldOut ? "opacity-40 line-through border-current cursor-not-allowed"
+                               : "border-[var(--border-brand)] hover:bg-[var(--brand-soft)]")
+                    }
+                  >
+                    {v.label}
+                  </button>
                 </li>
               )
             })}
