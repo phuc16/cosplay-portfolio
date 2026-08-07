@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest"
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest"
 import cache from "../shop/catalogCache.js"
 import repo from "../shop/catalogRepo.js"
 import redis from "../redis.js"
@@ -58,5 +58,34 @@ describe("getCollection", () => {
   it("returns null for an unknown slug without caching a bogus entry", async () => {
     expect(await cache.getCollection("nope")).toBeNull()
     expect(await redis.get("shop:collection:nope")).toBeNull()
+  })
+})
+
+describe("resilience to a Redis outage", () => {
+  it("getCollections still resolves by falling through to the repo when redis.get/set reject", async () => {
+    await repo.createCollection({ title: "Drop one", status: "active" })
+
+    const getSpy = vi.spyOn(redis, "get").mockRejectedValue(new Error("ECONNREFUSED"))
+    const setSpy = vi.spyOn(redis, "set").mockRejectedValue(new Error("ECONNREFUSED"))
+
+    const data = await cache.getCollections()
+    expect(data).toHaveLength(1)
+
+    getSpy.mockRestore()
+    setSpy.mockRestore()
+  })
+
+  it("getCollection still resolves by falling through to the repo when redis.get/set reject", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+
+    const getSpy = vi.spyOn(redis, "get").mockRejectedValue(new Error("ECONNREFUSED"))
+    const setSpy = vi.spyOn(redis, "set").mockRejectedValue(new Error("ECONNREFUSED"))
+
+    const data = await cache.getCollection("drop")
+    expect(data.products).toHaveLength(1)
+
+    getSpy.mockRestore()
+    setSpy.mockRestore()
   })
 })
