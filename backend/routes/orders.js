@@ -2,6 +2,8 @@ const express = require("express")
 const repo = require("../shop/orders/orderRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const { buildInstructions } = require("../shop/payments/instructions")
+const { processShopImage, storeShopImage } = require("../shop/images")
+const db = require("../db")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 const FULFILLMENT = ["ship", "pickup"]
@@ -107,6 +109,48 @@ module.exports = function orderRoutes() {
       res.json(buildInstructions(order, settings))
     } catch (err) {
       console.error("[ORDERS] Lỗi lấy hướng dẫn thanh toán:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.post("/:token/proof", async (req, res) => {
+    try {
+      const { base64 } = req.body
+      if (!base64) return bad(res, "Cần ảnh chuyển khoản")
+
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      // Once confirmed there is nothing left to prove, and accepting an upload
+      // would let anyone with the link overwrite the evidence after the fact.
+      if (order.status !== "pending") {
+        return res.status(409).json({
+          error: "invalid_state",
+          message: "Đơn hàng đã được xử lý, không cần tải ảnh nữa",
+        })
+      }
+
+      // Decoding/processing failures mean the input itself is bad (corrupt,
+      // truncated, or an unsupported format) — always a 400, regardless of
+      // sharp's exact error message. Storage failures below are real server
+      // errors and fall through to the outer catch.
+      let processed
+      try {
+        processed = await processShopImage(Buffer.from(base64, "base64"))
+      } catch {
+        return bad(res, "Ảnh không hợp lệ")
+      }
+
+      const url = await storeShopImage(`proofs/${order.id}`, processed)
+
+      await db.query(
+        "UPDATE orders SET payment_proof_url = ?, payment_proof_uploaded_at = NOW() WHERE id = ?",
+        [url, order.id]
+      )
+      console.log(`[ORDERS] Đã nhận ảnh chuyển khoản cho đơn ${order.id}`)
+      res.status(201).json({ url })
+    } catch (err) {
+      console.error("[ORDERS] Lỗi tải ảnh chuyển khoản:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
