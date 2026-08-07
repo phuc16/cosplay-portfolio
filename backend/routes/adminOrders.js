@@ -56,7 +56,10 @@ module.exports = function adminOrderRoutes() {
 
       const extra = {}
       if (tracking_code !== undefined) extra.tracking_code = tracking_code
-      if (shipping_fee !== undefined) extra.shipping_fee = Number(shipping_fee) || null
+      if (shipping_fee !== undefined) {
+        const n = Number(shipping_fee)
+        extra.shipping_fee = Number.isFinite(n) ? n : null
+      }
 
       const ok = await repo.transitionOrder(Number(req.params.id), to, extra)
       if (!ok) {

@@ -141,6 +141,17 @@ describe("POST /api/admin/orders/:id/transition", () => {
     expect(v.stock_qty).toBe(5)
   })
 
+  it("stores a shipping_fee of 0 as 0, not null (0 || null bug)", async () => {
+    const o = await seedOrder()
+    await orders.transitionOrder(o.id, "confirmed")
+
+    await authed(request(app).post(`/api/admin/orders/${o.id}/transition`))
+      .send({ to: "shipped", shipping_fee: 0 })
+
+    const [[row]] = await db.query("SELECT shipping_fee FROM orders WHERE id = ?", [o.id])
+    expect(row.shipping_fee).toBe(0)
+  })
+
   it("404s an unknown order", async () => {
     const res = await authed(request(app).post("/api/admin/orders/99999/transition")).send({ to: "confirmed" })
     expect(res.status).toBe(404)
