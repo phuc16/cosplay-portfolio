@@ -1,5 +1,6 @@
 const express = require("express")
 const repo = require("../shop/orders/orderRepo")
+const paymentSettings = require("../shop/payments/settingsRepo")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 const FULFILLMENT = ["ship", "pickup"]
@@ -48,6 +49,13 @@ module.exports = function orderRoutes() {
     try {
       const invalid = validate(req.body)
       if (invalid) return bad(res, invalid)
+
+      // A method the seller has switched off must not be orderable, even if a
+      // stale page or a crafted request still offers it.
+      const settings = await paymentSettings.getSettings()
+      if (!paymentSettings.enabledMethods(settings).includes(req.body.payment_method)) {
+        return bad(res, "Phương thức thanh toán chưa được bật")
+      }
 
       const order = await repo.createOrder(req.body)
       res.status(201).json({ order_token: order.order_token, total: order.total })

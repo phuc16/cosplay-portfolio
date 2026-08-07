@@ -4,6 +4,7 @@ import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import redis from "../redis.js"
+import settings from "../shop/payments/settingsRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 async function seed(stock = 5, collectionOver = {}) {
@@ -36,6 +37,12 @@ beforeEach(async () => {
   // test is well under the limit on its own.
   const keys = await redis.keys("rl:order:*")
   if (keys.length) await redis.del(...keys)
+  // These tests place orders using "bank" by default; the seller must have
+  // it enabled or checkout now (correctly) rejects it.
+  await settings.updateSettings({
+    bank_enabled: true, bank_name: "ACB", bank_bin: "970416",
+    bank_account_number: "123456789", bank_account_holder: "NGUYEN VAN A",
+  })
 })
 
 describe("POST /api/orders", () => {
