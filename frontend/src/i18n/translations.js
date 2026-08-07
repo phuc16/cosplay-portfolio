@@ -10,6 +10,23 @@ export const translations = {
     openMenu: "Open menu",
     closeMenu: "Close menu",
 
+    // Shop
+    shop: "Shop",
+    shopTitle: "Merch",
+    shopDesc: "Pick what you like, then place an order.",
+    shopEmpty: "No collections yet.",
+    shopLoading: "Loading...",
+    shopBack: "Back to shop",
+    shopClosed: "This drop has ended",
+    shopClosedNote: "You can still browse, but ordering is closed.",
+    shopSoldOut: "Sold out",
+    shopInStock: "{n} left",
+    shopUnlimited: "Available",
+    shopNoProducts: "No products in this collection yet.",
+    shopPickup: "Pickup at event",
+    shopShip: "Nationwide shipping",
+    shopNotFound: "Collection not found.",
+
     // Hero
     btnViewGallery: "View gallery",
     btnAboutMe: "About me",
@@ -71,6 +88,23 @@ export const translations = {
     contact: "Liên Hệ",
     openMenu: "Mở menu",
     closeMenu: "Đóng menu",
+
+    // Shop
+    shop: "Shop",
+    shopTitle: "Merch",
+    shopDesc: "Chọn món bạn thích rồi đặt hàng.",
+    shopEmpty: "Chưa có bộ sưu tập nào.",
+    shopLoading: "Đang tải...",
+    shopBack: "Về shop",
+    shopClosed: "Đợt mở bán đã kết thúc",
+    shopClosedNote: "Bạn vẫn xem được, nhưng không đặt hàng được nữa.",
+    shopSoldOut: "Hết hàng",
+    shopInStock: "Còn {n}",
+    shopUnlimited: "Còn hàng",
+    shopNoProducts: "Bộ sưu tập này chưa có sản phẩm.",
+    shopPickup: "Nhận tại sự kiện",
+    shopShip: "Giao toàn quốc",
+    shopNotFound: "Không tìm thấy bộ sưu tập.",
 
     // Hero
     btnViewGallery: "Xem bộ sưu tập",
