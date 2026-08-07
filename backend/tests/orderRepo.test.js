@@ -244,6 +244,34 @@ describe("transitionOrder", () => {
     const [[o]] = await db.query("SELECT confirmed_at FROM orders WHERE id = ?", [res.id])
     expect(o.confirmed_at).not.toBeNull()
   })
+
+  it("refuses the transition when expectedFromStatus no longer matches", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 2))
+    await repo.transitionOrder(res.id, "confirmed")
+
+    // confirmed -> cancelled is legal for an admin, but not for a caller that
+    // decided to cancel because it saw 'pending'.
+    expect(await repo.transitionOrder(res.id, "cancelled", { expectedFromStatus: "pending" }))
+      .toBe(false)
+
+    const [[o]] = await db.query("SELECT status, stock_released_at FROM orders WHERE id = ?", [res.id])
+    expect(o.status).toBe("confirmed")
+    expect(o.stock_released_at).toBeNull()
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(3)
+  })
+
+  it("refuses the transition when the order is no longer expired", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 2))
+
+    expect(await repo.transitionOrder(res.id, "cancelled", { expiredBefore: new Date() }))
+      .toBe(false)
+
+    const [[o]] = await db.query("SELECT status FROM orders WHERE id = ?", [res.id])
+    expect(o.status).toBe("pending")
+  })
 })
 
 describe("releaseExpiredOrders", () => {
@@ -280,6 +308,36 @@ describe("releaseExpiredOrders", () => {
 
     expect(await repo.releaseExpiredOrders(new Date())).toBe(0)
   })
+
+  it("does not cancel an order that is confirmed while the sweep waits for its lock", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 2))
+    await db.query("UPDATE orders SET expires_at = ? WHERE id = ?",
+      [new Date(Date.now() - 1000), res.id])
+
+    // An admin's confirm holds the row lock, uncommitted.
+    const admin = await db.getConnection()
+    await admin.beginTransaction()
+    await admin.query("SELECT id FROM orders WHERE id = ? FOR UPDATE", [res.id])
+    await admin.query("UPDATE orders SET status = 'confirmed', confirmed_at = NOW() WHERE id = ?",
+      [res.id])
+
+    // The sweep still sees 'pending' on its unlocked read, then blocks.
+    const sweep = repo.releaseExpiredOrders(new Date())
+    sweep.catch(() => {})
+    await new Promise((r) => setTimeout(r, 400))
+
+    await admin.commit()
+    admin.release()
+
+    expect(await sweep).toBe(0)
+
+    const [[o]] = await db.query("SELECT status, stock_released_at FROM orders WHERE id = ?", [res.id])
+    expect(o.status).toBe("confirmed")
+    expect(o.stock_released_at).toBeNull()
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(3) // the paid order's reservation survives
+  }, 20000)
 
   it("leaves orders that have not yet expired alone", async () => {
     const { variantId } = await seedVariant(5)

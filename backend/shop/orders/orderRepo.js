@@ -229,6 +229,11 @@ async function releaseStock(conn, orderId) {
  * Move an order to a new status. Cancelling returns reserved stock, guarded by
  * stock_released_at so a double cancel — or a cancel racing the expiry sweep —
  * cannot credit the same stock twice.
+ *
+ * `extra.expectedFromStatus` and `extra.expiredBefore` let a caller that
+ * decided to act on a row it read *outside* this transaction re-assert what it
+ * saw, now that the row is locked. Both are checked against the freshly locked
+ * row and refuse the transition (return false, change nothing) on a mismatch.
  */
 async function transitionOrder(id, toStatus, extra = {}) {
   const conn = await db.getConnection()
@@ -236,10 +241,31 @@ async function transitionOrder(id, toStatus, extra = {}) {
     await conn.beginTransaction()
 
     const [[order]] = await conn.query(
-      "SELECT id, status, fulfillment_method, stock_released_at FROM orders WHERE id = ? FOR UPDATE",
+      `SELECT id, status, fulfillment_method, stock_released_at, expires_at
+         FROM orders WHERE id = ? FOR UPDATE`,
       [id]
     )
     if (!order) { await conn.rollback(); return false }
+
+    // canTransition alone is not enough for the expiry sweep: confirmed ->
+    // cancelled is a legal admin action, so a sweep that queued behind an
+    // admin's confirm would wake up, see 'confirmed', and cancel an order the
+    // buyer had just paid for — releasing its stock back to the shop. The
+    // sweep therefore states the status it acted on and we verify it here.
+    if (extra.expectedFromStatus !== undefined && order.status !== extra.expectedFromStatus) {
+      await conn.rollback()
+      return false
+    }
+
+    // Same class of race on the deadline itself: an order whose expires_at was
+    // extended after the sweep's read must not be cancelled as overdue.
+    if (extra.expiredBefore !== undefined) {
+      const expiresAt = order.expires_at === null ? null : new Date(order.expires_at)
+      if (expiresAt === null || expiresAt > new Date(extra.expiredBefore)) {
+        await conn.rollback()
+        return false
+      }
+    }
 
     if (!domain.canTransition(order.status, toStatus, order.fulfillment_method)) {
       await conn.rollback()
@@ -279,9 +305,16 @@ async function releaseExpiredOrders(now = new Date()) {
     [now]
   )
 
+  // The rows above were read on the pool with no lock held, so each one may
+  // have moved on before we get to it. expectedFromStatus/expiredBefore make
+  // the cancel conditional on the row still being what the query selected.
   let released = 0
   for (const row of due) {
-    if (await transitionOrder(row.id, "cancelled")) released += 1
+    const cancelled = await transitionOrder(row.id, "cancelled", {
+      expectedFromStatus: "pending",
+      expiredBefore: now,
+    })
+    if (cancelled) released += 1
   }
   return released
 }
