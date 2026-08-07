@@ -7,6 +7,7 @@ import Shop from "./pages/Shop"
 import Collection from "./pages/Collection"
 import Cart from "./pages/Cart"
 import Checkout from "./pages/Checkout"
+import Order from "./pages/Order"
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/shop/:slug" element={<Collection />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/order/:token" element={<Order />} />
           </Routes>
         </BrowserRouter>
       </LanguageProvider>

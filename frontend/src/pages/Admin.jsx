@@ -3,6 +3,7 @@ import axios from "axios"
 import AdminAlbums from "../components/AdminAlbums"
 import AdminSettings from "../components/AdminSettings"
 import AdminCollections from "../components/AdminCollections"
+import AdminOrders from "../components/AdminOrders"
 import { useTheme } from "../contexts/ThemeContext"
 
 export default function Admin() {
@@ -51,6 +52,12 @@ export default function Admin() {
               Shop
             </button>
             <button
+              onClick={() => setTab("orders")}
+              className={`text-sm ${tab === "orders" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Đơn hàng
+            </button>
+            <button
               onClick={toggleTheme}
               className="p-2 rounded-md text-gray-600 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-cosplay-card"
               title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
@@ -79,6 +86,7 @@ export default function Admin() {
         {tab === "albums" && <AdminAlbums />}
         {tab === "settings" && <AdminSettings />}
         {tab === "shop" && <AdminCollections />}
+        {tab === "orders" && <AdminOrders />}
       </div>
     )
   }

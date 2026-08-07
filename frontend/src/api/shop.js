@@ -44,3 +44,13 @@ export const createOrder = (payload) =>
 
 export const fetchOrder = (token) =>
   api.get(`/api/orders/${token}`).then((r) => r.data)
+
+// ── Admin orders ──
+export const adminListOrders = (params = {}) =>
+  api.get("/api/admin/orders", { params }).then((r) => r.data)
+
+export const adminGetOrder = (id) =>
+  api.get(`/api/admin/orders/${id}`).then((r) => r.data)
+
+export const adminTransitionOrder = (id, payload) =>
+  api.post(`/api/admin/orders/${id}/transition`, payload).then((r) => r.data)
