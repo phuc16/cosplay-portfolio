@@ -66,8 +66,13 @@ export default function AdminCollections() {
 
   const remove = async (id) => {
     if (!confirm("Xóa bộ sưu tập này? Toàn bộ sản phẩm bên trong cũng bị xóa.")) return
-    await adminDeleteCollection(id)
-    await reload()
+    setError("")
+    try {
+      await adminDeleteCollection(id)
+      await reload()
+    } catch (e) {
+      setError(e.response?.data?.message || "Xóa bộ sưu tập thất bại")
+    }
   }
 
   return (

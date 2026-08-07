@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import {
-  fetchCollection, adminCreateProduct, adminUpdateProduct, adminDeleteProduct, adminUploadImage,
+  adminGetCollection, adminCreateProduct, adminUpdateProduct, adminDeleteProduct, adminUploadImage,
 } from "../api/shop"
 import AdminVariants from "./AdminVariants"
 import { formatVnd } from "../utils/money"
@@ -8,24 +8,18 @@ import { formatVnd } from "../utils/money"
 const blank = { name: "", description: "", price: "", images: [] }
 
 export default function AdminProducts({ collection }) {
-  // Raw fetch result only; the "draft" case is derived below rather than
-  // reset synchronously in the effect, which avoids a
-  // react-hooks/set-state-in-effect violation (setState called before any
-  // await, in the same tick the effect runs).
-  const [fetched, setFetched] = useState([])
+  const [products, setProducts] = useState([])
   const [draft, setDraft] = useState(blank)
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState("")
 
-  // Draft collections are not exposed publicly, so nothing to list until published.
-  const products = collection.status === "draft" ? [] : fetched
-
+  // Admin-scoped route: no status filter, so draft/archived collections'
+  // products are reachable here too (unlike the public storefront route).
   const reload = useCallback(() => {
-    if (collection.status === "draft") return Promise.resolve()
-    return fetchCollection(collection.slug)
-      .then((data) => setFetched(data.products))
-      .catch(() => setFetched([]))
-  }, [collection.slug, collection.status])
+    return adminGetCollection(collection.id)
+      .then((data) => setProducts(data.products))
+      .catch(() => setProducts([]))
+  }, [collection.id])
 
   useEffect(() => { reload() }, [reload])
 
@@ -61,18 +55,21 @@ export default function AdminProducts({ collection }) {
 
   const remove = async (id) => {
     if (!confirm("Xóa sản phẩm này?")) return
-    await adminDeleteProduct(id)
-    await reload()
+    setError("")
+    try {
+      await adminDeleteProduct(id)
+      await reload()
+    } catch (e) {
+      setError(e.response?.data?.message || "Xóa sản phẩm thất bại")
+    }
   }
 
   return (
     <div className="mt-4 pl-4 border-l border-[var(--border-brand)]">
       <h4 className="font-semibold mb-2">Sản phẩm</h4>
 
-      {collection.status === "draft" && (
-        <p className="text-sm opacity-70 mb-3">
-          Đổi trạng thái sang &quot;active&quot; để xem và thêm sản phẩm.
-        </p>
+      {products.length === 0 && (
+        <p className="text-sm opacity-70 mb-3">Chưa có sản phẩm nào.</p>
       )}
 
       {products.map((p) => (

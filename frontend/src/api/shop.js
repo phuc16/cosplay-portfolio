@@ -11,6 +11,9 @@ export const fetchCollection = (slug) =>
 export const adminListCollections = () =>
   api.get("/api/admin/collections").then((r) => r.data)
 
+export const adminGetCollection = (id) =>
+  api.get(`/api/admin/collections/${id}`).then((r) => r.data)
+
 export const adminCreateCollection = (data) =>
   api.post("/api/admin/collections", data).then((r) => r.data)
 

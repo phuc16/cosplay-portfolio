@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { adminSaveVariants } from "../api/shop"
 
 /**
@@ -12,6 +12,22 @@ export default function AdminVariants({ product, onSaved }) {
   const [bulk, setBulk] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
+
+  // This component is keyed by the parent on the stable product.id, so it is
+  // NOT remounted after a save -- `rows` would otherwise keep holding
+  // pre-save rows (missing the ids the server just assigned to new variants),
+  // and a second save would resend them id-less, making replaceVariants treat
+  // them as brand-new inserts and delete the just-created ones. `onSaved()`
+  // triggers the parent to re-fetch and pass a fresh `product` prop down, so
+  // resync `rows` from `product.variants` right after that -- but only then,
+  // not on every parent re-render, or in-progress unsaved edits would be
+  // clobbered whenever the parent happens to re-render for an unrelated reason.
+  const awaitingResync = useRef(false)
+  useEffect(() => {
+    if (!awaitingResync.current) return
+    awaitingResync.current = false
+    setRows(product.variants?.length ? product.variants : [{ label: "", stock_qty: "" }])
+  }, [product.variants])
 
   const update = (i, field, value) =>
     setRows(rows.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)))
@@ -41,6 +57,7 @@ export default function AdminVariants({ product, onSaved }) {
           stock_qty: r.stock_qty === "" || r.stock_qty === null ? null : Number(r.stock_qty),
         }))
       await adminSaveVariants(product.id, payload)
+      awaitingResync.current = true
       onSaved?.()
     } catch (e) {
       setError(e.response?.data?.message || "Lưu phân loại thất bại")
