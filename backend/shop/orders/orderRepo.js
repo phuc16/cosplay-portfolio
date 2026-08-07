@@ -1,0 +1,287 @@
+const db = require("./../../db")
+const domain = require("./domain")
+
+class OutOfStockError extends Error {
+  constructor(variantLabel) {
+    super(`Hết hàng: ${variantLabel}`)
+    this.name = "OutOfStockError"
+    this.variantLabel = variantLabel
+  }
+}
+
+class EmptyCartError extends Error {
+  constructor() {
+    super("Giỏ hàng trống")
+    this.name = "EmptyCartError"
+  }
+}
+
+async function findByRequestKey(conn, requestKey) {
+  const [[row]] = await conn.query(
+    "SELECT id, order_token, total FROM orders WHERE request_key = ? LIMIT 1",
+    [requestKey]
+  )
+  return row || null
+}
+
+/**
+ * Create an order and reserve its stock in one transaction.
+ *
+ * Prices come from the catalog inside the transaction — never from the client,
+ * which sends only {variant_id, qty}. Variant rows are locked FOR UPDATE in
+ * ascending id order so two concurrent orders touching the same variants
+ * cannot deadlock by grabbing them in opposite orders.
+ */
+async function createOrder(input) {
+  const items = Array.isArray(input.items) ? input.items : []
+  if (!items.length) throw new EmptyCartError()
+
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    // Idempotency: a retried submit must not reserve stock a second time.
+    if (input.request_key) {
+      const existing = await findByRequestKey(conn, input.request_key)
+      if (existing) {
+        await conn.commit()
+        return { ...existing, reused: true }
+      }
+    }
+
+    // Deterministic lock order prevents deadlock under concurrency.
+    const wanted = new Map()
+    for (const item of items) {
+      const id = Number(item.variant_id)
+      const qty = Number(item.qty)
+      wanted.set(id, (wanted.get(id) || 0) + qty)
+    }
+    const ids = [...wanted.keys()].sort((a, b) => a - b)
+
+    const [rows] = await conn.query(
+      `SELECT v.id, v.label, v.stock_qty, p.id AS product_id, p.name AS product_name,
+              p.price, p.collection_id
+         FROM product_variants v
+         JOIN products p ON p.id = v.product_id
+        WHERE v.id IN (${ids.map(() => "?").join(",")})
+        ORDER BY v.id ASC
+        FOR UPDATE`,
+      ids
+    )
+    if (rows.length !== ids.length) throw new OutOfStockError("không tồn tại")
+
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    const lines = []
+
+    for (const id of ids) {
+      const variant = byId.get(id)
+      const qty = wanted.get(id)
+      if (!domain.isReservable(variant.stock_qty, qty)) {
+        throw new OutOfStockError(variant.label)
+      }
+      lines.push({
+        variant_id: id,
+        qty,
+        product_name_snapshot: variant.product_name,
+        variant_label_snapshot: variant.label,
+        unit_price_snapshot: variant.price,
+        collection_id: variant.collection_id,
+      })
+    }
+
+    const total = domain.computeTotal(lines)
+
+    // Decrement only finite stock; NULL means unlimited and stays NULL.
+    for (const line of lines) {
+      const variant = byId.get(line.variant_id)
+      if (variant.stock_qty !== null) {
+        await conn.query(
+          "UPDATE product_variants SET stock_qty = stock_qty - ? WHERE id = ?",
+          [line.qty, line.variant_id]
+        )
+      }
+    }
+
+    const token = domain.generateOrderToken()
+    const expiresAt = domain.computeExpiry(input.payment_method)
+    const isPickup = input.fulfillment_method === "pickup"
+    const b = input.buyer || {}
+
+    const [res] = await conn.query(
+      `INSERT INTO orders
+         (order_token, request_key, buyer_name, phone, email, fulfillment_method,
+          address_street, address_ward, address_district, address_province, address_raw,
+          note, status, payment_method, total, cod_amount, collection_id, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+      [
+        token,
+        input.request_key || null,
+        b.buyer_name,
+        b.phone,
+        b.email,
+        input.fulfillment_method,
+        isPickup ? null : b.address_street || null,
+        isPickup ? null : b.address_ward || null,
+        isPickup ? null : b.address_district || null,
+        isPickup ? null : b.address_province || null,
+        isPickup ? null : b.address_raw || null,
+        input.note || null,
+        input.payment_method,
+        total,
+        input.payment_method === "cod" ? total : null,
+        lines[0].collection_id,
+        expiresAt,
+      ]
+    )
+
+    for (const line of lines) {
+      await conn.query(
+        `INSERT INTO order_items
+           (order_id, product_variant_id, product_name_snapshot,
+            variant_label_snapshot, unit_price_snapshot, qty)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [res.insertId, line.variant_id, line.product_name_snapshot,
+         line.variant_label_snapshot, line.unit_price_snapshot, line.qty]
+      )
+    }
+
+    await conn.commit()
+    return { id: res.insertId, order_token: token, total, reused: false }
+  } catch (err) {
+    await conn.rollback()
+    // A concurrent submit with the same key won the unique index; return theirs.
+    if (err.code === "ER_DUP_ENTRY" && input.request_key) {
+      const existing = await findByRequestKey(db, input.request_key)
+      if (existing) return { ...existing, reused: true }
+    }
+    throw err
+  } finally {
+    conn.release()
+  }
+}
+
+async function attachItems(order) {
+  if (!order) return null
+  const [items] = await db.query(
+    "SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC",
+    [order.id]
+  )
+  return { ...order, items }
+}
+
+async function getOrderByToken(token) {
+  const [[row]] = await db.query("SELECT * FROM orders WHERE order_token = ? LIMIT 1", [token])
+  return attachItems(row)
+}
+
+async function getOrderById(id) {
+  const [[row]] = await db.query("SELECT * FROM orders WHERE id = ? LIMIT 1", [id])
+  return attachItems(row)
+}
+
+async function listOrders(filter = {}) {
+  const where = []
+  const params = []
+  if (filter.status) { where.push("status = ?"); params.push(filter.status) }
+  if (filter.collection_id) { where.push("collection_id = ?"); params.push(filter.collection_id) }
+
+  const [rows] = await db.query(
+    `SELECT * FROM orders ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY created_at DESC, id DESC`,
+    params
+  )
+  return rows
+}
+
+/** Return reserved stock. Caller must hold the order row lock. */
+async function releaseStock(conn, orderId) {
+  const [items] = await conn.query(
+    "SELECT product_variant_id, qty FROM order_items WHERE order_id = ?",
+    [orderId]
+  )
+  // Ascending id order, same as reservation, to keep lock ordering consistent.
+  const sorted = items
+    .filter((i) => i.product_variant_id !== null)
+    .sort((a, b) => a.product_variant_id - b.product_variant_id)
+
+  for (const item of sorted) {
+    // The NULL guard keeps unlimited variants unlimited.
+    await conn.query(
+      "UPDATE product_variants SET stock_qty = stock_qty + ? WHERE id = ? AND stock_qty IS NOT NULL",
+      [item.qty, item.product_variant_id]
+    )
+  }
+  await conn.query("UPDATE orders SET stock_released_at = NOW() WHERE id = ?", [orderId])
+}
+
+/**
+ * Move an order to a new status. Cancelling returns reserved stock, guarded by
+ * stock_released_at so a double cancel — or a cancel racing the expiry sweep —
+ * cannot credit the same stock twice.
+ */
+async function transitionOrder(id, toStatus, extra = {}) {
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    const [[order]] = await conn.query(
+      "SELECT id, status, fulfillment_method, stock_released_at FROM orders WHERE id = ? FOR UPDATE",
+      [id]
+    )
+    if (!order) { await conn.rollback(); return false }
+
+    if (!domain.canTransition(order.status, toStatus, order.fulfillment_method)) {
+      await conn.rollback()
+      return false
+    }
+
+    if (toStatus === "cancelled" && order.stock_released_at === null) {
+      await releaseStock(conn, id)
+    }
+
+    const sets = ["status = ?"]
+    const params = [toStatus]
+    if (toStatus === "confirmed") sets.push("confirmed_at = NOW()")
+    if (extra.tracking_code !== undefined) { sets.push("tracking_code = ?"); params.push(extra.tracking_code) }
+    if (extra.shipping_fee !== undefined) { sets.push("shipping_fee = ?"); params.push(extra.shipping_fee) }
+    params.push(id)
+
+    await conn.query(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, params)
+    await conn.commit()
+    return true
+  } catch (err) {
+    await conn.rollback()
+    throw err
+  } finally {
+    conn.release()
+  }
+}
+
+/**
+ * Cancel pending prepaid orders past their deadline. COD orders have a NULL
+ * expires_at and are excluded by the query itself, not by a code path that
+ * could be forgotten.
+ */
+async function releaseExpiredOrders(now = new Date()) {
+  const [due] = await db.query(
+    "SELECT id FROM orders WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at <= ?",
+    [now]
+  )
+
+  let released = 0
+  for (const row of due) {
+    if (await transitionOrder(row.id, "cancelled")) released += 1
+  }
+  return released
+}
+
+module.exports = {
+  createOrder,
+  getOrderByToken,
+  getOrderById,
+  listOrders,
+  transitionOrder,
+  releaseExpiredOrders,
+  OutOfStockError,
+  EmptyCartError,
+}
