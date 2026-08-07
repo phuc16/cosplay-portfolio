@@ -121,8 +121,11 @@ describe("concurrent reservation", () => {
     expect(o.status).toBe("cancelled")
     expect(o.stock_released_at).not.toBeNull()
 
-    // The release stamp must not be rewritten by the losing cancels. Re-read
-    // after a further no-op cancel: an unguarded implementation would restamp.
+    // This proves a losing cancel call returns false and writes nothing — not
+    // that it defends against a restamp: canTransition already refuses
+    // cancelled -> cancelled one layer up, so transitionOrder returning false
+    // is why stock_released_at below is unchanged, not evidence of a guard
+    // against ever reaching a restamp in the first place.
     const stampedAt = new Date(o.stock_released_at).getTime()
     expect(await repo.transitionOrder(r.id, "cancelled")).toBe(false)
     const [[o2]] = await db.query("SELECT stock_released_at FROM orders WHERE id = ?", [r.id])
@@ -160,20 +163,36 @@ describe("concurrent reservation", () => {
     // An admin's confirm holds the order row lock, uncommitted, so the sweep's
     // unlocked SELECT still sees 'pending' and picks the row up.
     const admin = await db.getConnection()
-    await admin.beginTransaction()
-    await admin.query("SELECT id FROM orders WHERE id = ? FOR UPDATE", [r.id])
-    await admin.query(
-      "UPDATE orders SET status = 'confirmed', confirmed_at = NOW() WHERE id = ?", [r.id]
-    )
+    const holdMs = 400
+    let sweepElapsedMs
+    try {
+      await admin.beginTransaction()
+      await admin.query("SELECT id FROM orders WHERE id = ? FOR UPDATE", [r.id])
+      await admin.query(
+        "UPDATE orders SET status = 'confirmed', confirmed_at = NOW() WHERE id = ?", [r.id]
+      )
 
-    const sweep = repo.releaseExpiredOrders(new Date())
-    sweep.catch(() => {})
-    await new Promise((res) => setTimeout(res, 400))
+      const sweepStartedAt = Date.now()
+      const sweep = repo.releaseExpiredOrders(new Date())
+      sweep.catch(() => {})
+      await new Promise((res) => setTimeout(res, holdMs))
 
-    await admin.commit()
-    admin.release()
+      await admin.commit()
 
-    expect(await sweep).toBe(0)
+      expect(await sweep).toBe(0)
+      sweepElapsedMs = Date.now() - sweepStartedAt
+    } finally {
+      admin.release()
+    }
+
+    // Prove the sweep actually contended for the row lock rather than
+    // observing 'confirmed' already and skipping the row without ever
+    // blocking: on a slow/loaded machine that let the commit above finish
+    // before the sweep's initial SELECT ran, every assertion here would still
+    // pass with nothing exercised. Requiring the sweep call to have taken at
+    // least half the artificial hold time makes that silent, coverage-free
+    // pass fail instead.
+    expect(sweepElapsedMs).toBeGreaterThanOrEqual(holdMs / 2)
 
     const [[o]] = await db.query(
       "SELECT status, stock_released_at FROM orders WHERE id = ?", [r.id]
