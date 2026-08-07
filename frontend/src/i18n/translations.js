@@ -28,6 +28,7 @@ export const translations = {
     shopPickupLocation: "Pickup location",
     shopPickupNote: "Pickup note",
     shopNotFound: "Collection not found.",
+    shopAddedToCart: "Added {item} to cart",
 
     // Cart & Checkout
     cart: "Cart", cartEmpty: "Your cart is empty.", cartTotal: "Total",
@@ -126,6 +127,7 @@ export const translations = {
     shopPickupLocation: "Địa điểm nhận hàng",
     shopPickupNote: "Ghi chú nhận hàng",
     shopNotFound: "Không tìm thấy bộ sưu tập.",
+    shopAddedToCart: "Đã thêm {item} vào giỏ hàng",
 
     // Cart & Checkout
     cart: "Giỏ hàng", cartEmpty: "Giỏ hàng của bạn đang trống.", cartTotal: "Tổng cộng",

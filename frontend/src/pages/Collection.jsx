@@ -9,6 +9,14 @@ export default function Collection() {
   const { slug } = useParams()
   const { t } = useLanguage()
   const [result, setResult] = useState({ slug: null, collection: undefined })
+  const [addedMsg, setAddedMsg] = useState(null)
+
+  // Brief inline confirmation, matching this codebase's no-toast-library style —
+  // cleared automatically a couple seconds after each add.
+  const handleAdded = (label) => {
+    setAddedMsg(t("shopAddedToCart", { item: label }))
+    setTimeout(() => setAddedMsg(null), 2000)
+  }
 
   useEffect(() => {
     let ignore = false
@@ -101,8 +109,18 @@ export default function Collection() {
               product={p}
               collectionSlug={collection.slug}
               orderable={!closed}
+              onAdded={handleAdded}
             />
           ))}
+        </div>
+      )}
+
+      {addedMsg && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm shadow-lg"
+        >
+          {addedMsg}
         </div>
       )}
     </main>
