@@ -66,6 +66,17 @@ export default function Collection() {
         )}
       </div>
 
+      {collection.allow_pickup && (collection.pickup_location || collection.pickup_note) && (
+        <div className="mb-6 p-4 rounded-xl border border-[var(--border-brand)] opacity-80">
+          {collection.pickup_location && (
+            <p className="font-semibold">{t("shopPickupLocation")}: {collection.pickup_location}</p>
+          )}
+          {collection.pickup_note && (
+            <p className="text-sm">{t("shopPickupNote")}: {collection.pickup_note}</p>
+          )}
+        </div>
+      )}
+
       {closed && (
         <div className="mb-6 p-4 rounded-xl border border-[var(--border-brand)] opacity-80">
           <p className="font-semibold">{t("shopClosed")}</p>

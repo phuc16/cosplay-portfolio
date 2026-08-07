@@ -25,6 +25,8 @@ export const translations = {
     shopNoProducts: "No products in this collection yet.",
     shopPickup: "Pickup at event",
     shopShip: "Nationwide shipping",
+    shopPickupLocation: "Pickup location",
+    shopPickupNote: "Pickup note",
     shopNotFound: "Collection not found.",
 
     // Hero
@@ -104,6 +106,8 @@ export const translations = {
     shopNoProducts: "Bộ sưu tập này chưa có sản phẩm.",
     shopPickup: "Nhận tại sự kiện",
     shopShip: "Giao toàn quốc",
+    shopPickupLocation: "Địa điểm nhận hàng",
+    shopPickupNote: "Ghi chú nhận hàng",
     shopNotFound: "Không tìm thấy bộ sưu tập.",
 
     // Hero
