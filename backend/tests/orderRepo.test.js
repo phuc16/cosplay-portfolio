@@ -166,6 +166,38 @@ describe("createOrder", () => {
     expect(v.stock_qty).toBe(4)
   })
 
+  it("never hands a stranger's order back when both buyers submit a blank email with the same request_key", async () => {
+    const { variantId } = await seedVariant(5)
+    const first = await repo.createOrder(order(variantId, 1, {
+      request_key: "blank-email-key",
+      buyer: { ...buyer, email: "" },
+    }))
+
+    const stranger = {
+      buyer_name: "Trần Thị B",
+      phone: "0911111111",
+      email: "",
+      address_raw: "9 Đường XYZ, Q3, TP.HCM",
+    }
+
+    let second
+    try {
+      second = await repo.createOrder(order(variantId, 1, {
+        request_key: "blank-email-key",
+        buyer: stranger,
+      }))
+    } catch (err) {
+      expect(err).toBeInstanceOf(repo.RequestKeyConflictError)
+      second = null
+    }
+
+    if (second) {
+      // Only acceptable outcome besides the conflict error: the second buyer
+      // got their OWN order, never the first buyer's token.
+      expect(second.order_token).not.toBe(first.order_token)
+    }
+  })
+
   it("treats a replay as the same buyer regardless of email case and padding", async () => {
     const { variantId } = await seedVariant(5)
     const first = await repo.createOrder(order(variantId, 1, { request_key: "abc123" }))

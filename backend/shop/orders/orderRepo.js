@@ -44,7 +44,9 @@ const normalizeEmail = (value) => String(value ?? "").trim().toLowerCase()
 
 /** Is the stored order the same buyer as the one submitting now? */
 function isSameBuyer(row, buyer) {
-  return normalizeEmail(row.email) === normalizeEmail(buyer.email)
+  const a = normalizeEmail(row.email)
+  const b = normalizeEmail(buyer.email)
+  return a !== "" && a === b
 }
 
 const replayResult = (row) => ({
