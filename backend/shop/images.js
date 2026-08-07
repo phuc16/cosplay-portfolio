@@ -18,9 +18,13 @@ async function processShopImage(buffer) {
   return pipeline.webp({ quality: WEBP_QUALITY, effort: 4 }).toBuffer()
 }
 
-/** Process and store under shop/<folder>/, returning the proxy URL. */
-async function uploadShopImage(folder, buffer) {
-  const processed = await processShopImage(buffer)
+/**
+ * Store an already-processed (webp) buffer under shop/<folder>/, returning the proxy URL.
+ * Split out from `uploadShopImage` so callers can catch decode failures (processShopImage)
+ * separately from storage failures (this) — see adminCatalog.js, which maps the former
+ * to 400 (bad input) and the latter to 500 (real server error).
+ */
+async function storeShopImage(folder, processed) {
   const safeFolder = String(folder || "misc").replace(/[^a-z0-9/_-]/gi, "")
   const key = `shop/${safeFolder}/${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`
 
@@ -28,4 +32,10 @@ async function uploadShopImage(folder, buffer) {
   return storage.proxyUrl(key)
 }
 
-module.exports = { processShopImage, uploadShopImage }
+/** Process and store under shop/<folder>/, returning the proxy URL. */
+async function uploadShopImage(folder, buffer) {
+  const processed = await processShopImage(buffer)
+  return storeShopImage(folder, processed)
+}
+
+module.exports = { processShopImage, storeShopImage, uploadShopImage }

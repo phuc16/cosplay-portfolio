@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest"
 import request from "supertest"
 import jwt from "jsonwebtoken"
+import sharp from "sharp"
 import app from "../server.js"
 import repo from "../shop/catalogRepo.js"
 import cache from "../shop/catalogCache.js"
@@ -111,5 +112,35 @@ describe("products and variants", () => {
     const res = await authed(request(app).delete(`/api/admin/collections/${cid}`))
     expect(res.status).toBe(200)
     expect(await repo.listAllCollections()).toHaveLength(0)
+  })
+})
+
+describe("POST /api/admin/shop/image", () => {
+  it("returns 400 invalid_input for a buffer that isn't an image at all", async () => {
+    const garbage = Buffer.from("not a real image, just garbage bytes that are not valid webp/jpeg/png data")
+    const base64 = garbage.toString("base64")
+
+    const res = await authed(request(app).post("/api/admin/shop/image"))
+      .send({ base64, folder: "misc" })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("returns 400 invalid_input for a truncated/corrupted image buffer (not a 500)", async () => {
+    // A genuine JPEG with a valid-looking header, truncated mid-body — this is what a
+    // partial upload / network truncation actually produces, and sharp reports it as
+    // "Input buffer has corrupt header: ..." rather than "unsupported image format".
+    const realJpeg = await sharp({
+      create: { width: 50, height: 50, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    }).jpeg().toBuffer()
+    const truncated = realJpeg.subarray(0, 20)
+    const base64 = truncated.toString("base64")
+
+    const res = await authed(request(app).post("/api/admin/shop/image"))
+      .send({ base64, folder: "misc" })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
   })
 })
