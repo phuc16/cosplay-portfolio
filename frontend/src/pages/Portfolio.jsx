@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import axios from "axios"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { SITE_CONFIG, applyColorScheme } from "../config"
 import { useTheme } from "../contexts/ThemeContext"
 import { useLanguage } from "../contexts/LanguageContext"
@@ -92,7 +92,11 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
           </div>
         </div>
         <nav className="nav-links" style={s.nav}>
-          {navLinks.map((l) => (
+          {navLinks.map((l) => l.href.startsWith("/") ? (
+            <Link key={l.label} to={l.href} style={s.link}
+              onMouseEnter={(e) => (e.target.style.color = "var(--text-link)")}
+              onMouseLeave={(e) => (e.target.style.color = "var(--text-body)")}>{l.label}</Link>
+          ) : (
             <a key={l.label} href={l.href} style={s.link}
               onMouseEnter={(e) => (e.target.style.color = "var(--text-link)")}
               onMouseLeave={(e) => (e.target.style.color = "var(--text-body)")}>{l.label}</a>
@@ -102,7 +106,7 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
           <div style={{ display: "flex", gap: 2 }}>
             {["vi", "en"].map((l) => <button key={l} style={s.langBtn(lang === l)} onClick={() => onSetLang(l)}>{l.toUpperCase()}</button>)}
           </div>
-          <a href="/shop" className="nav-shop-mobile" style={s.iconBtn} aria-label={t("shop")} title={t("shop")}>{icons.bag}</a>
+          <Link to="/shop" className="nav-shop-mobile" style={s.iconBtn} aria-label={t("shop")} title={t("shop")}>{icons.bag}</Link>
           <button style={s.iconBtn} onClick={onToggleTheme}>{theme === "dark" ? icons.moon : icons.sun}</button>
         </div>
       </div>
