@@ -3,6 +3,7 @@ const sharp = require("sharp")
 const db = require("./db")
 const redis = require("./redis")
 const storage = require("./storage")
+const orderRepo = require("./shop/orders/orderRepo")
 
 const THUMB_WIDTH = 400
 const JPEG_QUALITY = 85
@@ -34,6 +35,23 @@ async function processImage(img) {
   console.log(`[WORKER] Thumbnail generated for image ${img.id}`)
 }
 
+/**
+ * Cancel prepaid orders whose payment window has passed and return their
+ * reserved stock. COD orders have a NULL expires_at and are never swept.
+ */
+async function sweepExpiredOrders() {
+  try {
+    const released = await orderRepo.releaseExpiredOrders(new Date())
+    if (released > 0) {
+      console.log(`[WORKER] Đã hủy ${released} đơn quá hạn, hoàn kho`)
+    }
+    return released
+  } catch (err) {
+    console.error("[WORKER] Lỗi quét đơn quá hạn:", err.message)
+    return 0
+  }
+}
+
 async function run() {
   try {
     const [rows] = await db.query(
@@ -54,7 +72,13 @@ async function run() {
   } catch (err) {
     console.error("[WORKER] Error:", err.message)
   }
+
+  await sweepExpiredOrders()
 }
 
-run()
-setInterval(run, 5000)
+if (require.main === module) {
+  run()
+  setInterval(run, 5000)
+}
+
+module.exports = { run, sweepExpiredOrders }
