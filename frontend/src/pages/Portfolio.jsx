@@ -15,6 +15,7 @@ const icons = {
   cal: <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" strokeWidth="2" /><path strokeLinecap="round" strokeWidth="2" d="M16 2v4M8 2v4M3 10h18" /></svg>,
   star: <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>,
   ext: <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>,
+  bag: <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4M3 6h18M16 10a4 4 0 01-8 0" /></svg>,
 }
 const socialIcons = {
   gumroad: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1C5.92 1 1 5.92 1 12s4.92 11 11 11 11-4.92 11-11S18.08 1 12 1zm.78 15.6c-2.86 0-4.62-2.06-4.62-4.86 0-2.92 1.94-4.92 4.74-4.92 2.5 0 3.94 1.46 4.16 3.34h-2.4c-.16-.86-.74-1.42-1.74-1.42-1.4 0-2.26 1.1-2.26 2.96 0 1.84.84 2.94 2.3 2.94 1.04 0 1.78-.56 2.02-1.62h-2.02v-1.7h4.32V16.4h-1.78l-.18-1.06c-.5.78-1.36 1.26-2.56 1.26z" /></svg>,
@@ -101,6 +102,7 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
           <div style={{ display: "flex", gap: 2 }}>
             {["vi", "en"].map((l) => <button key={l} style={s.langBtn(lang === l)} onClick={() => onSetLang(l)}>{l.toUpperCase()}</button>)}
           </div>
+          <a href="/shop" className="nav-shop-mobile" style={s.iconBtn} aria-label={t("shop")} title={t("shop")}>{icons.bag}</a>
           <button style={s.iconBtn} onClick={onToggleTheme}>{theme === "dark" ? icons.moon : icons.sun}</button>
         </div>
       </div>
