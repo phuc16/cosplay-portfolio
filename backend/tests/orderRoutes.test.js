@@ -113,6 +113,23 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(409)
     expect(res.body.error).toBe("out_of_stock")
   })
+
+  // This exact path guards a cross-buyer PII leak: a request_key shared by
+  // two different buyers must be refused, not silently treated as a retry
+  // that hands buyer B buyer A's order_token.
+  it("409s with request_key_conflict when the same request_key is reused by a different buyer", async () => {
+    const v = await seed(5)
+    const first = await request(app).post("/api/orders")
+      .send(body(v, { request_key: "some-key" }))
+    expect(first.status).toBe(201)
+
+    const second = await request(app).post("/api/orders")
+      .send(body(v, { request_key: "some-key", buyer: { ...body(v).buyer, email: "b@example.com" } }))
+
+    expect(second.status).toBe(409)
+    expect(second.body.error).toBe("request_key_conflict")
+    expect(JSON.stringify(second.body)).not.toContain(first.body.order_token)
+  })
 })
 
 describe("GET /api/orders/:token", () => {
