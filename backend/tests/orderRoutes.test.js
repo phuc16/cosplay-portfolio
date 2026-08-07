@@ -151,6 +151,23 @@ describe("GET /api/orders/:token", () => {
     expect(String(res.headers["x-robots-tag"])).toContain("noindex")
   })
 
+  it("does not echo internal fields (request_key, stock_released_at)", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders")
+      .send(body(v, { request_key: "internal-fields-test" }))
+
+    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    expect(res.body).not.toHaveProperty("request_key")
+    expect(res.body).not.toHaveProperty("stock_released_at")
+    // Sanity: the fields the order page actually uses are still there.
+    expect(res.body).toMatchObject({
+      status: "pending",
+      fulfillment_method: "ship",
+      total: 35000,
+    })
+    expect(res.body.items).toHaveLength(1)
+  })
+
   it("404s an unknown token", async () => {
     const res = await request(app).get(`/api/orders/${"a".repeat(32)}`)
     expect(res.status).toBe(404)

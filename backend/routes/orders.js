@@ -7,6 +7,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const bad = (res, message) => res.status(400).json({ error: "invalid_input", message })
 
+// The DB row (and repo.getOrderByToken) carries internal fields the buyer has
+// no use for and no business seeing — request_key (the idempotency key) and
+// stock_released_at (an internal reservation flag) — plus PII the order page
+// doesn't render. Project down to exactly what Order.jsx reads.
+function toPublicOrder(order) {
+  const { id, order_token, status, total, fulfillment_method, tracking_code, created_at, items } = order
+  return { id, order_token, status, total, fulfillment_method, tracking_code, created_at, items }
+}
+
 function validate(body) {
   const { items, buyer, fulfillment_method, payment_method } = body
 
@@ -70,7 +79,7 @@ module.exports = function orderRoutes() {
       const order = await repo.getOrderByToken(req.params.token)
       if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
 
-      res.json(order)
+      res.json(toPublicOrder(order))
     } catch (err) {
       console.error("[ORDERS] Lỗi lấy đơn:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
