@@ -35,7 +35,7 @@ export default function AdminProducts({ collection }) {
       const { url } = await adminUploadImage(base64, `products/${collection.id}`)
       setDraft((d) => ({ ...d, images: [...(d.images || []), url] }))
     } catch (e) {
-      setError(e.response?.data?.message || "Tải ảnh lên thất bại")
+      setError(e.response?.data?.message || e.message || "Tải ảnh lên thất bại")
     }
   }
 
