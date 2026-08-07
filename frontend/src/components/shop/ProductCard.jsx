@@ -14,7 +14,7 @@ export default function ProductCard({ product }) {
   const cover = product.images?.[0] || product.variants?.find((v) => v.image_url)?.image_url
 
   return (
-    <article className="rounded-2xl border border-[var(--border-brand)] bg-[var(--bg-card)] overflow-hidden flex flex-col">
+    <article className="rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] overflow-hidden flex flex-col">
       {cover && (
         <img
           src={cover}
