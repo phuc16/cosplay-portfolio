@@ -724,11 +724,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
 })
 
-app.listen(5000, () => {
-  storage.ensureBucket().then(() => {
-    console.log(`[SERVER] MinIO bucket ready: ${storage.BUCKET}`)
-  }).catch((e) => {
-    console.warn("[SERVER] MinIO init failed:", e.message, "- uploads may fail")
+if (require.main === module) {
+  app.listen(5000, () => {
+    storage.ensureBucket().then(() => {
+      console.log(`[SERVER] MinIO bucket ready: ${storage.BUCKET}`)
+    }).catch((e) => {
+      console.warn("[SERVER] MinIO init failed:", e.message, "- uploads may fail")
+    })
+    console.log(`[SERVER] Backend listening on :5000, body limit ${UPLOAD_LIMIT}`)
   })
-  console.log(`[SERVER] Backend listening on :5000, body limit ${UPLOAD_LIMIT}`)
-})
+}
+
+module.exports = app
