@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react"
+import { useEffect, lazy, Suspense, useState } from "react"
 import { adminListOrders, adminTransitionOrder, adminGetOrder, fetchPaymentInstructions } from "../api/shop"
 import { formatVnd } from "../utils/money"
-import AdminQrScanner from "./AdminQrScanner"
+
+// Statically importing this would ship the scanner/camera component code to
+// every buyer, even though only the admin route ever renders it (the jsqr
+// library itself was already dynamically imported inside the component —
+// this closes the remaining gap: the component's own code).
+const AdminQrScanner = lazy(() => import("./AdminQrScanner"))
 
 const STATUSES = ["", "pending", "confirmed", "shipped", "completed", "cancelled"]
 
@@ -93,7 +98,9 @@ export default function AdminOrders() {
       {orders.length === 0 && <p className="opacity-60">Chưa có đơn nào.</p>}
 
       {scannerOpen && (
-        <AdminQrScanner onToken={onScanToken} onClose={() => setScannerOpen(false)} />
+        <Suspense fallback={null}>
+          <AdminQrScanner onToken={onScanToken} onClose={() => setScannerOpen(false)} />
+        </Suspense>
       )}
 
       {orders.map((o) => (
