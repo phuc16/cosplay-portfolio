@@ -243,21 +243,43 @@ async function replaceVariants(productId, variants) {
   const list = Array.isArray(variants) ? variants : []
   const keepIds = list.map((v) => v.id).filter(Boolean)
 
-  // A variant holding a live reservation must not be deleted: order_items uses
-  // SET NULL so the history survives, but the reserved stock could then never
-  // be returned when that order is cancelled.
-  const [current] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [productId])
-  const keeping = new Set(keepIds)
-  const removing = current.map((r) => r.id).filter((id) => !keeping.has(id))
-
-  const blocked = await variantsWithLiveOrders(removing)
-  if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
-
   // Transactional: this deletes before it inserts, so a failure partway
   // through an untransacted version would wipe a product's entire stock list.
   const conn = await db.getConnection()
   try {
     await conn.beginTransaction()
+
+    // Lock the product's full current variant set before deciding what to
+    // remove. Row locks acquired in ascending id order, same convention as
+    // orderRepo.createOrder's `FOR UPDATE OF v` — so a concurrent checkout
+    // locking the same variant rows (also ascending) can never grab them in
+    // the opposite order and deadlock against this save.
+    const [current] = await conn.query(
+      "SELECT id FROM product_variants WHERE product_id = ? ORDER BY id ASC FOR UPDATE",
+      [productId]
+    )
+    const keeping = new Set(keepIds)
+    const removing = current.map((r) => r.id).filter((id) => !keeping.has(id))
+
+    // A variant holding a live reservation must not be deleted: order_items
+    // uses SET NULL so the history survives, but the reserved stock could
+    // then never be returned when that order is cancelled. Running this
+    // check on `conn`, inside the same transaction that now holds the row
+    // locks above, closes the TOCTOU race where a checkout could commit a
+    // new order against one of `removing` between an earlier unlocked check
+    // and this transaction's delete.
+    if (removing.length) {
+      const [blocked] = await conn.query(
+        `SELECT DISTINCT oi.product_variant_id AS id, v.label
+           FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           JOIN product_variants v ON v.id = oi.product_variant_id
+          WHERE o.status IN (?, ?, ?)
+            AND oi.product_variant_id IN (${removing.map(() => "?").join(",")})`,
+        [...LIVE_ORDER_STATUSES, ...removing]
+      )
+      if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
+    }
 
     if (keepIds.length) {
       await conn.query(
