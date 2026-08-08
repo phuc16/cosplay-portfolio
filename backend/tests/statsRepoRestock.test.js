@@ -84,7 +84,8 @@ describe("getRestockStats", () => {
     expect(v.unlimited).toBe(true)
     expect(v.remaining).toBeNull()
     expect(v.sold).toBe(3)
-    expect(v.velocity).toBeGreaterThan(0)
+    // With 1-day floor: 3 sales on same-day collection = 3 / 1 = 3 units/day. Pins floor behavior.
+    expect(v.velocity).toBe(3)
     expect(v.sell_through).toBeNull()
   })
 
@@ -112,13 +113,22 @@ describe("getRestockStats", () => {
   })
 
   it("sorts by velocity descending", async () => {
+    // Velocity is sold ÷ days-on-sale; stock is not part of it. So the two
+    // variants must differ in sales-per-day, not in stock level: slow takes
+    // 10 days to sell 1 unit (0.1/day), fast sells 5 on a same-day drop
+    // (5/day against the 1-day floor).
     const slow = await seedVariant({ stock: 100 })
     await placeAndConfirm(slow.variantId, 1)
-    const fast = await seedVariant({ stock: 1 })
-    await placeAndConfirm(fast.variantId, 1)
-    // fast sold out immediately; slow has 1 sale against 100 stock -> lower velocity.
+    await db.query("UPDATE collections SET created_at = ? WHERE id = ?", [
+      new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), slow.collectionId,
+    ])
+    const fast = await seedVariant({ stock: 10 })
+    await placeAndConfirm(fast.variantId, 5)
 
     const rows = await statsRepo.getRestockStats()
+    const fastRow = rows.find((r) => r.variant_id === fast.variantId)
+    const slowRow = rows.find((r) => r.variant_id === slow.variantId)
+    expect(fastRow.velocity).toBeGreaterThan(slowRow.velocity)
     const fastIndex = rows.findIndex((r) => r.variant_id === fast.variantId)
     const slowIndex = rows.findIndex((r) => r.variant_id === slow.variantId)
     expect(fastIndex).toBeLessThan(slowIndex)

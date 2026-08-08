@@ -177,7 +177,12 @@ async function getRestockStats() {
     const saleEnd = soldOut && sales ? new Date(sales.last_sale_at) : now
     const daysOnSale = Math.max(
       (saleEnd.getTime() - new Date(v.collection_created_at).getTime()) / MS_PER_DAY,
-      1 / 24 // floors at one hour, so a same-hour drop never divides by zero
+      // Floored at one day. Besides preventing a divide-by-zero on a drop
+      // created today, this stops a brand-new collection's first sale from
+      // reporting an absurd per-day rate — an hour-based floor made a single
+      // sale read as 24/day and vaulted fresh drops above real bestsellers,
+      // in the one view whose whole job is ranking what to restock.
+      1
     )
     const velocity = sold / daysOnSale
 
