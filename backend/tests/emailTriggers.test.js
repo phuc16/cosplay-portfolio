@@ -85,6 +85,61 @@ describe("lifecycle transitions", () => {
     void created
   })
 
+  it("copies payment_confirmed to the admin when ADMIN_EMAIL is set", async () => {
+    process.env.ADMIN_EMAIL = "seller@example.com"
+    try {
+      const v = await seedVariant()
+      await request(app).post("/api/orders").send(body(v))
+      const [[o]] = await db.query("SELECT id FROM orders LIMIT 1")
+      await db.query("DELETE FROM email_queue") // drop the order_placed copies
+
+      await orders.transitionOrder(o.id, "confirmed")
+
+      const rows = await queued()
+      expect(rows.some((r) => r.type === "payment_confirmed" && r.to_email === "buyer@example.com")).toBe(true)
+      expect(rows.some((r) => r.type === "payment_confirmed" && r.to_email === "seller@example.com")).toBe(true)
+    } finally {
+      delete process.env.ADMIN_EMAIL
+    }
+  })
+
+  it("does not copy shipped to the admin, even when ADMIN_EMAIL is set", async () => {
+    process.env.ADMIN_EMAIL = "seller@example.com"
+    try {
+      const v = await seedVariant()
+      await request(app).post("/api/orders").send(body(v))
+      const [[o]] = await db.query("SELECT id FROM orders LIMIT 1")
+
+      await orders.transitionOrder(o.id, "confirmed")
+      await db.query("DELETE FROM email_queue")
+      await orders.transitionOrder(o.id, "shipped", { tracking_code: "VTP1" })
+
+      const rows = await queued()
+      expect(rows.some((r) => r.type === "shipped" && r.to_email === "buyer@example.com")).toBe(true)
+      expect(rows.some((r) => r.to_email === "seller@example.com")).toBe(false)
+    } finally {
+      delete process.env.ADMIN_EMAIL
+    }
+  })
+
+  it("does not copy cancelled to the admin, even when ADMIN_EMAIL is set", async () => {
+    process.env.ADMIN_EMAIL = "seller@example.com"
+    try {
+      const v = await seedVariant()
+      await request(app).post("/api/orders").send(body(v))
+      const [[o]] = await db.query("SELECT id FROM orders LIMIT 1")
+      await db.query("DELETE FROM email_queue")
+
+      await orders.transitionOrder(o.id, "cancelled")
+
+      const rows = await queued()
+      expect(rows.some((r) => r.type === "cancelled" && r.to_email === "buyer@example.com")).toBe(true)
+      expect(rows.some((r) => r.to_email === "seller@example.com")).toBe(false)
+    } finally {
+      delete process.env.ADMIN_EMAIL
+    }
+  })
+
   it("queues shipped with the order", async () => {
     const v = await seedVariant()
     await request(app).post("/api/orders").send(body(v))
