@@ -11,9 +11,12 @@ function orderCode(orderId) {
 const SERVICE_INTRA_HCM = "PHS - Nội tỉnh tiết kiệm thỏa thuận"
 const SERVICE_INTER_PROVINCE = "VTK - CP tiết kiệm thỏa thuận"
 
-const HCM_KEYWORDS = [
-  "ho chi minh", "hcm", "tphcm", "tp hcm", "sai gon",
-]
+const HCM_ACCEPTED_FORMS = new Set(["ho chi minh", "hcm", "sai gon"])
+
+/** Matches a leading administrative prefix ("TP", "TP.", "T.P", "Thành phố")
+ * so it can be stripped before the equality check below. Deliberately does
+ * NOT match anywhere else in the string — a prefix only counts at position 0. */
+const HCM_PREFIX_RE = /^(thanh\s*pho|t\.?\s*p\.?)\s*\.?\s*/
 
 /** Strips diacritics and lowercases so "Hồ Chí Minh", "HCM", and "Sài Gòn"
  * all match the same keyword list the seller's existing script used —
@@ -28,10 +31,18 @@ function normalize(s) {
     .trim()
 }
 
+/** Requires the whole (prefix-stripped) province field to BE a Ho Chi Minh
+ * City designation, not merely contain one as a substring. Substring
+ * matching used to let "Đường Hồ Chí Minh" — a real highway running through
+ * Nghệ An, Kon Tum, Đắk Lắk, Hòa Bình, Thanh Hóa, Bình Phước, etc. — falsely
+ * select the intra-city service for a parcel nowhere near HCMC. Per spec
+ * that's the dangerous direction: wrongly-inter-province only costs more
+ * postage, wrongly-intra-province fails to deliver outright. */
 function isHoChiMinh(province) {
   const n = normalize(province)
   if (!n) return false
-  return HCM_KEYWORDS.some((kw) => n.includes(kw))
+  const stripped = n.replace(HCM_PREFIX_RE, "").trim()
+  return HCM_ACCEPTED_FORMS.has(stripped)
 }
 
 /** Unknown/empty province defaults to the inter-province service — the

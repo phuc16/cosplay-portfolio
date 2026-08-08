@@ -42,6 +42,43 @@ describe("isHoChiMinh", () => {
     expect(isHoChiMinh("")).toBe(false)
     expect(isHoChiMinh("   ")).toBe(false)
   })
+
+  // Finding 1: "Đường Hồ Chí Minh" is a real highway running through many
+  // non-HCM provinces (Nghệ An, Kon Tum, Đắk Lắk, Hòa Bình, Thanh Hóa,
+  // Bình Phước…). Substring matching would false-positive on it and route
+  // an undeliverable parcel to the intra-city service.
+  it("is false for a highway name containing the HCM substring", () => {
+    expect(isHoChiMinh("Đường Hồ Chí Minh")).toBe(false)
+    expect(isHoChiMinh("duong Ho Chi Minh")).toBe(false)
+  })
+
+  it("routes the highway name to the inter-province service, not intra-HCM", () => {
+    expect(selectService("Đường Hồ Chí Minh")).toBe(SERVICE_INTER_PROVINCE)
+  })
+
+  const hcmFullSpellings = [
+    "Thành phố Hồ Chí Minh", "TP.HCM", "TP HCM", "Hồ Chí Minh", "HCM",
+    "Sài Gòn", "Thành phố Hồ Chí Minh ",
+  ]
+  for (const variant of hcmFullSpellings) {
+    it(`still recognises "${variant}" as Ho Chi Minh City after the equality fix`, () => {
+      expect(isHoChiMinh(variant)).toBe(true)
+    })
+  }
+})
+
+describe("service string constants", () => {
+  // Finding 2: pin the constants against hardcoded literals, byte-exact,
+  // so a typo introduced into the definition itself (not just a call site)
+  // still fails a test. These strings must match ViettelPost's import
+  // template exactly or the upload is rejected.
+  it("SERVICE_INTRA_HCM matches the ViettelPost template byte-exact", () => {
+    expect(SERVICE_INTRA_HCM).toBe("PHS - Nội tỉnh tiết kiệm thỏa thuận")
+  })
+
+  it("SERVICE_INTER_PROVINCE matches the ViettelPost template byte-exact", () => {
+    expect(SERVICE_INTER_PROVINCE).toBe("VTK - CP tiết kiệm thỏa thuận")
+  })
 })
 
 describe("selectService", () => {
