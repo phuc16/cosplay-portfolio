@@ -54,3 +54,26 @@ export const adminGetOrder = (id) =>
 
 export const adminTransitionOrder = (id, payload) =>
   api.post(`/api/admin/orders/${id}/transition`, payload).then((r) => r.data)
+
+// ── Payments ──
+export const fetchPaymentMethods = () =>
+  api.get("/api/shop/payment-methods").then((r) => r.data)
+
+export const fetchPaymentInstructions = (token) =>
+  api.get(`/api/orders/${token}/payment`).then((r) => r.data)
+
+export const uploadPaymentProof = (token, base64) =>
+  api.post(`/api/orders/${token}/proof`, { base64 }).then((r) => r.data)
+
+export const adminGetPaymentSettings = () =>
+  api.get("/api/admin/payment-settings").then((r) => r.data)
+
+export const adminSavePaymentSettings = (data) =>
+  api.put("/api/admin/payment-settings", data).then((r) => r.data)
+
+// ── Email templates ──
+export const adminListEmailTemplates = () =>
+  api.get("/api/admin/email-templates").then((r) => r.data)
+
+export const adminSaveEmailTemplate = (type, data) =>
+  api.put(`/api/admin/email-templates/${type}`, data).then((r) => r.data)

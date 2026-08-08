@@ -4,6 +4,8 @@ import AdminAlbums from "../components/AdminAlbums"
 import AdminSettings from "../components/AdminSettings"
 import AdminCollections from "../components/AdminCollections"
 import AdminOrders from "../components/AdminOrders"
+import AdminPaymentSettings from "../components/AdminPaymentSettings"
+import AdminEmailTemplates from "../components/AdminEmailTemplates"
 import { useTheme } from "../contexts/ThemeContext"
 
 export default function Admin() {
@@ -58,6 +60,18 @@ export default function Admin() {
               Đơn hàng
             </button>
             <button
+              onClick={() => setTab("payments")}
+              className={`text-sm ${tab === "payments" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Thanh toán
+            </button>
+            <button
+              onClick={() => setTab("email")}
+              className={`text-sm ${tab === "email" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Email
+            </button>
+            <button
               onClick={toggleTheme}
               className="p-2 rounded-md text-gray-600 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-cosplay-card"
               title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
@@ -87,6 +101,8 @@ export default function Admin() {
         {tab === "settings" && <AdminSettings />}
         {tab === "shop" && <AdminCollections />}
         {tab === "orders" && <AdminOrders />}
+        {tab === "payments" && <AdminPaymentSettings />}
+        {tab === "email" && <AdminEmailTemplates />}
       </div>
     )
   }

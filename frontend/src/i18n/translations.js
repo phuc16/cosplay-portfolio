@@ -46,6 +46,22 @@ export const translations = {
     orderCancelled: "Cancelled", orderNotFound: "Order not found.",
     orderSaveLink: "Save this link to check your order later.",
     errOutOfStock: "Sorry, that item just sold out. Please review your cart.",
+    checkoutNoMethods: "No payment method is set up right now. Please contact the seller to place an order.",
+
+    // Payment instructions
+    paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
+    paymentAmount: "Amount", paymentBankName: "Bank", paymentAccountNumber: "Account number",
+    paymentAccountHolder: "Account holder", paymentTransferNote: "Transfer note",
+    paymentMomoPhone: "Momo phone", paymentCopy: "Copy", paymentCopied: "Copied",
+    paymentScanQr: "Scan to pay", paymentScanQrHint: "Scan with your banking app",
+    paymentQrUnavailable: "The QR code is unavailable right now — please use the details above to transfer manually.",
+    paymentPaypalPay: "Pay with PayPal", paymentCodNote: "Pay in cash when you receive the order.",
+
+    // Proof upload
+    proofTitle: "Payment proof", proofUpload: "Upload a screenshot of your transfer",
+    proofReplace: "Replace", proofUploading: "Uploading...", proofUploaded: "Uploaded",
+    proofError: "Could not upload the image. Please try again.",
+    orderQrCaption: "Show this QR code at pickup or to the seller.",
 
     // Hero
     btnViewGallery: "View gallery",
@@ -145,6 +161,22 @@ export const translations = {
     orderCancelled: "Đã hủy", orderNotFound: "Không tìm thấy đơn hàng.",
     orderSaveLink: "Lưu lại đường dẫn này để kiểm tra đơn hàng sau.",
     errOutOfStock: "Rất tiếc, sản phẩm này vừa hết hàng. Vui lòng kiểm tra lại giỏ hàng.",
+    checkoutNoMethods: "Hiện chưa có phương thức thanh toán nào được bật. Vui lòng liên hệ người bán để đặt hàng.",
+
+    // Payment instructions
+    paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",
+    paymentAmount: "Số tiền", paymentBankName: "Ngân hàng", paymentAccountNumber: "Số tài khoản",
+    paymentAccountHolder: "Chủ tài khoản", paymentTransferNote: "Nội dung chuyển khoản",
+    paymentMomoPhone: "Số điện thoại Momo", paymentCopy: "Sao chép", paymentCopied: "Đã sao chép",
+    paymentScanQr: "Quét để thanh toán", paymentScanQrHint: "Quét bằng ứng dụng ngân hàng",
+    paymentQrUnavailable: "Mã QR hiện chưa dùng được — vui lòng dùng thông tin phía trên để chuyển khoản thủ công.",
+    paymentPaypalPay: "Thanh toán qua PayPal", paymentCodNote: "Thanh toán tiền mặt khi nhận hàng.",
+
+    // Proof upload
+    proofTitle: "Ảnh chuyển khoản", proofUpload: "Tải lên ảnh chụp màn hình chuyển khoản",
+    proofReplace: "Thay ảnh khác", proofUploading: "Đang tải lên...", proofUploaded: "Đã tải lên",
+    proofError: "Không tải được ảnh lên. Vui lòng thử lại.",
+    orderQrCaption: "Đưa mã QR này khi nhận hàng hoặc cho người bán xem.",
 
     // Hero
     btnViewGallery: "Xem bộ sưu tập",

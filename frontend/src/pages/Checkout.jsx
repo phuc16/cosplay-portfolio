@@ -1,13 +1,11 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { readCart, cartTotal, clearCart } from "../shop/cart"
 import { generateRequestKey } from "../shop/requestKey"
-import { createOrder } from "../api/shop"
+import { createOrder, fetchPaymentMethods } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import AddressFields from "../components/shop/AddressFields"
-
-const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 
 export default function Checkout() {
   const { t } = useLanguage()
@@ -17,10 +15,19 @@ export default function Checkout() {
   const [buyer, setBuyer] = useState({ buyer_name: "", phone: "", email: "" })
   const [address, setAddress] = useState({ address_raw: "" })
   const [fulfillment, setFulfillment] = useState("ship")
-  const [payment, setPayment] = useState("bank")
+  const [methods, setMethods] = useState(null)
+  const [payment, setPayment] = useState("")
   const [note, setNote] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+
+  // Fetched rather than hardcoded: a shop with no method enabled must not
+  // silently offer one nobody can actually collect payment through.
+  useEffect(() => {
+    fetchPaymentMethods()
+      .then((d) => { setMethods(d.methods); setPayment(d.methods[0] || "") })
+      .catch(() => setMethods([]))
+  }, [])
 
   // Stable across retries so a double-tap or a retried submit cannot create
   // two orders holding two reservations. Held in state (not a pure useMemo) so
@@ -103,9 +110,13 @@ export default function Checkout() {
       <label className="block mb-4">
         <span className="block text-sm mb-1">{t("checkoutPayment")}</span>
         <select value={payment} onChange={(e) => setPayment(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent">
-          {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+          disabled={!methods || methods.length === 0}
+          className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent disabled:opacity-50">
+          {(methods || []).map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
         </select>
+        {methods && methods.length === 0 && (
+          <p className="text-sm text-[var(--text-error)] mt-1">{t("checkoutNoMethods")}</p>
+        )}
       </label>
 
       <label className="block mb-6">
@@ -121,7 +132,7 @@ export default function Checkout() {
 
       {error && <p className="text-red-500 mb-3">{error}</p>}
 
-      <button type="button" onClick={submit} disabled={submitting}
+      <button type="button" onClick={submit} disabled={submitting || !methods || methods.length === 0}
         className="w-full py-3 rounded-xl bg-[var(--brand)] text-white disabled:opacity-50">
         {submitting ? "..." : t("checkoutPlaceOrder")}
       </button>
