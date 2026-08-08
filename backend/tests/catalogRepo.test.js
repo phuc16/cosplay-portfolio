@@ -4,7 +4,11 @@ import db from "../db.js"
 import { resetTables, closeDb } from "./helpers/db.js"
 
 beforeEach(async () => {
-  await resetTables("product_variants", "products", "collections")
+  // order_items/orders must be reset too: TRUNCATE resets product_variants'
+  // autoincrement, so a leftover order from a previous run/file can reference
+  // a variant id that a new test's variant then reuses, false-tripping the
+  // live-order delete guard in replaceVariants.
+  await resetTables("order_items", "orders", "product_variants", "products", "collections")
 })
 
 afterAll(async () => {

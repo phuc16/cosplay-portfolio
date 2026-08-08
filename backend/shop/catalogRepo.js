@@ -3,6 +3,31 @@ const { slugify, uniqueSlug } = require("./slug")
 
 const PUBLIC_STATUSES = ["active", "closed"]
 
+class VariantInUseError extends Error {
+  constructor(labels) {
+    super(`Không thể xóa phân loại đang có đơn hàng: ${labels.join(", ")}`)
+    this.name = "VariantInUseError"
+    this.labels = labels
+  }
+}
+
+const LIVE_ORDER_STATUSES = ["pending", "confirmed", "shipped"]
+
+/** Variant ids referenced by an order that is not yet finished or cancelled. */
+async function variantsWithLiveOrders(variantIds) {
+  if (!variantIds.length) return []
+  const [rows] = await db.query(
+    `SELECT DISTINCT oi.product_variant_id AS id, v.label
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       JOIN product_variants v ON v.id = oi.product_variant_id
+      WHERE o.status IN (?, ?, ?)
+        AND oi.product_variant_id IN (${variantIds.map(() => "?").join(",")})`,
+    [...LIVE_ORDER_STATUSES, ...variantIds]
+  )
+  return rows
+}
+
 /** MySQL returns tinyint(1) as 0/1; the API contract is booleans. */
 function mapCollection(row) {
   if (!row) return null
@@ -218,6 +243,16 @@ async function replaceVariants(productId, variants) {
   const list = Array.isArray(variants) ? variants : []
   const keepIds = list.map((v) => v.id).filter(Boolean)
 
+  // A variant holding a live reservation must not be deleted: order_items uses
+  // SET NULL so the history survives, but the reserved stock could then never
+  // be returned when that order is cancelled.
+  const [current] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [productId])
+  const keeping = new Set(keepIds)
+  const removing = current.map((r) => r.id).filter((id) => !keeping.has(id))
+
+  const blocked = await variantsWithLiveOrders(removing)
+  if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
+
   // Transactional: this deletes before it inserts, so a failure partway
   // through an untransacted version would wipe a product's entire stock list.
   const conn = await db.getConnection()
@@ -279,4 +314,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   replaceVariants,
+  VariantInUseError,
+  variantsWithLiveOrders,
 }

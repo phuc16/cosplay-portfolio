@@ -153,7 +153,14 @@ module.exports = function adminCatalogRoutes() {
       const invalid = validateVariants(variants)
       if (invalid) return bad(res, invalid)
 
-      await repo.replaceVariants(Number(req.params.id), variants)
+      try {
+        await repo.replaceVariants(Number(req.params.id), variants)
+      } catch (err) {
+        if (err instanceof repo.VariantInUseError) {
+          return res.status(409).json({ error: "variant_in_use", message: err.message })
+        }
+        throw err
+      }
       await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi lưu phân loại") }
