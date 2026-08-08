@@ -33,7 +33,7 @@ async function markFailed(id, error) {
     `UPDATE email_queue
         SET attempts = attempts + 1,
             last_error = ?,
-            status = CASE WHEN attempts + 1 >= ? THEN 'failed' ELSE 'pending' END
+            status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END
       WHERE id = ?`,
     [String(error).slice(0, 1000), MAX_ATTEMPTS, id]
   )

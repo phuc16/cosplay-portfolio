@@ -123,27 +123,14 @@ describe("sendQueued: retry-cap respect", () => {
     expect(after.attempts).toBe(queue.MAX_ATTEMPTS)
   })
 
-  // KNOWN BUG (found while writing this test, reported rather than fixed —
-  // this file only adds coverage, it does not touch queue.js/sender.js):
-  // queue.markFailed's single UPDATE does
-  //   SET attempts = attempts + 1, status = CASE WHEN attempts + 1 >= ? ...
-  // MySQL evaluates a single-table UPDATE's SET list left-to-right, so by the
-  // time the CASE runs, `attempts` already holds the just-incremented value —
-  // the CASE's "attempts + 1" is really old_attempts + 2. That flips the row
-  // to 'failed' after only MAX_ATTEMPTS - 1 (4) failures instead of
-  // MAX_ATTEMPTS (5), verified directly against MySQL 127.0.0.1:3307 outside
-  // of any test framework. This test documents the CURRENT (buggy) behavior;
-  // it should be updated to assert 5 failures once queue.js is fixed to
-  // reference the pre-update attempts value (e.g. a bound parameter or a
-  // subquery) instead of re-reading the column mid-statement.
-  it("stops sending a row after it accumulates failures, and a later call does not retry it (see KNOWN BUG above: this trips at 4, not MAX_ATTEMPTS=5)", async () => {
+  it("stops sending a row after it accumulates failures, and a later call does not retry it", async () => {
     const o = await seedOrder()
     await queue.enqueue(o.id, "order_placed", "a@example.com")
     const [[row]] = await db.query("SELECT id FROM email_queue LIMIT 1")
 
     sendMailMock.mockRejectedValue(new Error("smtp down"))
 
-    const actualFailuresBeforeMarkedFailed = queue.MAX_ATTEMPTS - 1 // bug: should be queue.MAX_ATTEMPTS
+    const actualFailuresBeforeMarkedFailed = queue.MAX_ATTEMPTS
     for (let i = 0; i < actualFailuresBeforeMarkedFailed; i += 1) {
       const result = await sender.sendQueued()
       expect(result).toEqual({ sent: 0, failed: 1, skipped: false })
