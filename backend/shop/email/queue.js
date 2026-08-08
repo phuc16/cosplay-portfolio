@@ -30,6 +30,11 @@ async function markSent(id) {
  */
 async function markFailed(id, error) {
   await db.query(
+    // MySQL evaluates a single-table UPDATE's SET list left to right, so by
+    // the time this CASE runs, `attempts` already reflects the `attempts + 1`
+    // set above -- it is intentionally the POST-increment value, not the
+    // pre-update one ANSI SQL/Postgres would give you here. Do NOT add
+    // `+ 1` back below; that would silently shrink the retry budget by one.
     `UPDATE email_queue
         SET attempts = attempts + 1,
             last_error = ?,

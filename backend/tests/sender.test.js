@@ -100,6 +100,29 @@ describe("sendQueued: batch isolation", () => {
     expect(rows[1].status).toBe("pending")
     expect(rows[1].attempts).toBe(1)
   })
+
+  it("a genuinely failing send (rejected sendMail) does not stop the next row from sending", async () => {
+    const o1 = await seedOrder()
+    const o2 = await seedOrder()
+    await queue.enqueue(o1.id, "order_placed", "bad@example.com")
+    await queue.enqueue(o2.id, "order_placed", "a@example.com")
+
+    sendMailMock
+      .mockRejectedValueOnce(new Error("bad address"))
+      .mockResolvedValue({})
+
+    const result = await sender.sendQueued()
+
+    expect(result).toEqual({ sent: 1, failed: 1, skipped: false })
+    expect(sendMailMock).toHaveBeenCalledTimes(2)
+
+    const [rows] = await db.query("SELECT order_id, status, attempts FROM email_queue ORDER BY id ASC")
+    expect(rows[0].order_id).toBe(o1.id)
+    expect(rows[0].status).toBe("pending")
+    expect(rows[0].attempts).toBe(1)
+    expect(rows[1].order_id).toBe(o2.id)
+    expect(rows[1].status).toBe("sent")
+  })
 })
 
 describe("sendQueued: retry-cap respect", () => {
