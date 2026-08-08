@@ -108,6 +108,15 @@ describe("StatsRestock", () => {
     expect(velocityCell.textContent).toBe("0")
   })
 
+  it("shows an error message when the stats fetch rejects, instead of hanging or a blank view", async () => {
+    adminGetRestockStats.mockRejectedValue(new Error("network down"))
+    const container = await renderStatsRestock()
+    await flush()
+
+    expect(container.textContent).toContain("Không tải được thống kê restock")
+    expect(container.querySelector("table")).toBeNull()
+  })
+
   it("prints the demand-invisibility limitation note (spec: sold-out variants hide true demand)", async () => {
     adminGetRestockStats.mockResolvedValue([])
     const container = await renderStatsRestock()

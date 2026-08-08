@@ -181,6 +181,17 @@ describe("StatsDrop", () => {
     expect(container.textContent).not.toContain("35.000₫")
   })
 
+  it("shows an error message when the stats fetch rejects, instead of hanging or a blank view", async () => {
+    adminGetDropStats.mockRejectedValue(new Error("network down"))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    expect(container.textContent).toContain("Không tải được thống kê cho bộ sưu tập này")
+    expect(container.querySelector("table")).toBeNull()
+  })
+
   it("prints the sell-through honesty caveat (spec: mid-drop restock shifts the number)", async () => {
     adminGetDropStats.mockResolvedValue(dropStats())
     const container = await renderStatsDrop()
