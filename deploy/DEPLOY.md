@@ -130,6 +130,24 @@ JWT_SECRET=YOUR_64_CHAR_HEX_SECRET
 # Admin
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+
+# SMTP - bắt buộc phải set, nếu không email đơn hàng (và QR trong email) sẽ
+# im lặng không gửi (sender.js no-op khi thiếu SMTP_HOST/USER/PASS)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+SMTP_FROM=noreply@your-domain.com
+
+# Site URL - bắt buộc, nếu không QR nhận hàng sẽ trỏ về path tương đối và
+# không quét được bằng camera điện thoại
+SITE_URL=https://your-domain.com
+
+# Tên shop hiển thị trong email
+SHOP_NAME=Tên Shop
+
+# Email của bạn (seller) - nhận bản sao mỗi đơn hàng mới (tuỳ chọn)
+ADMIN_EMAIL=you@example.com
 ```
 
 Tạo secret mạnh:
@@ -302,7 +320,9 @@ Images: `phuc16/cosplay-backend:latest`, `phuc16/cosplay-frontend:latest`
 
 Orders are financial and dispute-resolution records — they must survive corruption, bad migrations, and accidental deletion. The `deploy/backup.sh` script dumps the `cosplay` database nightly via `mysqldump` with `--single-transaction`, so the site remains operational and consistent snapshots are guaranteed.
 
-**What is backed up:** The entire MySQL database (schema, data, stored procedures, triggers). MinIO images are durable by design (distributed storage); only the database requires nightly backups.
+**What is backed up:** The entire MySQL database (schema, data, stored procedures, triggers), via `deploy/backup.sh`. That script is MySQL-only.
+
+**Known gap — MinIO is NOT backed up:** This deployment runs a single MinIO container on one droplet, backed by a local Docker volume (`minio_data`) — there is no replication or distributed redundancy. If that volume or disk is lost, every original image and thumbnail is gone, including payment proof screenshots (`proofs/`), which are dispute-resolution evidence for orders. Until a MinIO backup mechanism is added, treat this as a real gap: at minimum, take manual/periodic snapshots of the droplet's disk (DigitalOcean Droplet snapshots cover the `minio_data` volume along with everything else) and/or `rsync`/`mc mirror` the MinIO data directory offsite before relying on this deployment for anything irreplaceable.
 
 **How often:** Every night at 03:00 UTC. Set this on the server via root's crontab:
 ```bash
@@ -336,9 +356,9 @@ docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" c
 ## Lưu ý
 
 1. **JWT_SECRET**: Đổi khác so với mặc định.
-3. **ADMIN_PASSWORD**: Đặt mật khẩu mạnh.
-4. **MinIO**: Đổi `MINIO_ROOT_USER` và `MINIO_ROOT_PASSWORD`.
-5. **DB_PASS**: Đặt mật khẩu mạnh cho MySQL.
+2. **ADMIN_PASSWORD**: Đặt mật khẩu mạnh.
+3. **MinIO**: Đổi `MINIO_ROOT_USER` và `MINIO_ROOT_PASSWORD`.
+4. **DB_PASS**: Đặt mật khẩu mạnh cho MySQL.
 
 ---
 

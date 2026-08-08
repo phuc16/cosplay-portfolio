@@ -69,6 +69,14 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       NODE_ENV: production
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     logging: *logging
 
   worker:
@@ -94,6 +102,14 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     logging: *logging
 
   frontend:

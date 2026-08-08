@@ -5,7 +5,7 @@ import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import queue from "../shop/email/queue.js"
 import settings from "../shop/payments/settingsRepo.js"
-import { run } from "../worker.js"
+import { run, dispatchEmails } from "../worker.js"
 import { resetTables } from "./helpers/db.js"
 
 // Same nodemailer-mocking gotcha documented in sender.test.js: mutate the
@@ -84,4 +84,44 @@ describe("worker run(): overlapping ticks", () => {
     expect(row.status).toBe("sent")
     expect(row.attempts).toBe(0)
   }, 20000)
+})
+
+describe("worker dispatchEmails(): SMTP unconfigured", () => {
+  // sendQueued() no-ops entirely when SMTP isn't set — it never touches the
+  // queue, so without this warning email_queue silently grows forever and
+  // the seller has zero signal that mail is stuck.
+  it("logs a warning when SMTP is unconfigured and mail is pending", async () => {
+    delete process.env.SMTP_HOST
+    delete process.env.SMTP_USER
+    delete process.env.SMTP_PASS
+
+    const o = await seedOrder()
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      await dispatchEmails()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("SMTP chưa cấu hình"))
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("1"))
+    } finally {
+      warnSpy.mockRestore()
+    }
+
+    const [[row]] = await db.query("SELECT status FROM email_queue LIMIT 1")
+    expect(row.status).toBe("pending")
+  })
+
+  it("stays silent when SMTP is unconfigured and the queue is empty", async () => {
+    delete process.env.SMTP_HOST
+    delete process.env.SMTP_USER
+    delete process.env.SMTP_PASS
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      await dispatchEmails()
+      expect(warnSpy).not.toHaveBeenCalled()
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
 })

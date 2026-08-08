@@ -53,10 +53,29 @@ async function sweepExpiredOrders() {
   }
 }
 
+/**
+ * When SMTP isn't configured, sendQueued() no-ops without touching the queue
+ * at all — so with no signal here, email_queue grows forever and nobody
+ * finds out until a buyer complains. This is the one cheap check
+ * (COUNT only, not claimPending's full row fetch) needed to surface that.
+ */
+async function warnIfMailStuckUnconfigured() {
+  const [[{ count }]] = await db.query(
+    "SELECT COUNT(*) AS count FROM email_queue WHERE status = 'pending'"
+  )
+  if (count > 0) {
+    console.warn(`[WORKER] SMTP chưa cấu hình — ${count} email đang chờ gửi bị bỏ qua`)
+  }
+}
+
 async function dispatchEmails() {
   try {
     const { sent, failed, skipped } = await emailSender.sendQueued(10)
-    if (!skipped && (sent || failed)) {
+    if (skipped) {
+      await warnIfMailStuckUnconfigured()
+      return 0
+    }
+    if (sent || failed) {
       console.log(`[WORKER] Email: gửi ${sent}, lỗi ${failed}`)
     }
     return sent
@@ -112,4 +131,4 @@ if (require.main === module) {
   setInterval(run, 5000)
 }
 
-module.exports = { run, sweepExpiredOrders, dispatchEmails }
+module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured }
