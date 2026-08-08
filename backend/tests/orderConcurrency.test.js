@@ -24,7 +24,7 @@ const attempt = (variantId, qty, extra = {}) =>
   }).then((r) => ({ ok: true, r })).catch((e) => ({ ok: false, e }))
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections")
 })
 
 describe("concurrent reservation", () => {
@@ -262,4 +262,38 @@ describe("concurrent reservation", () => {
     const [[lines]] = await db.query("SELECT COUNT(*) AS n FROM order_items")
     expect(Number(lines.n)).toBe(fulfilled * 2)
   })
+
+  // mysql2's pool defaults to connectionLimit 10 with queueLimit 0 (wait
+  // forever for a free connection). transitionOrder("confirmed") enqueues a
+  // payment_confirmed email, and emailQueue.enqueue() borrows its own
+  // connection from that SAME pool. If transitionOrder released its own
+  // connection only in the outer finally -- i.e. AFTER the enqueue call --
+  // then running more of these at once than the pool has slots for would
+  // have every in-flight call holding a connection while waiting for one to
+  // enqueue its email, and none of them would ever be released: permanent
+  // pool deadlock. Firing 15 (> the 10-connection default) concurrently and
+  // requiring them all to finish is the simplest reliable proof that the
+  // connection is genuinely freed before the email is enqueued.
+  it("confirms more orders at once than the pool has connections without hanging", async () => {
+    const variantId = await seedVariant(100)
+    const concurrency = 15
+
+    const orderIds = []
+    for (let i = 0; i < concurrency; i += 1) {
+      const { r } = await attempt(variantId, 1)
+      orderIds.push(r.id)
+    }
+
+    const outcomes = await Promise.all(
+      orderIds.map((id) => repo.transitionOrder(id, "confirmed"))
+    )
+
+    expect(outcomes).toHaveLength(concurrency)
+    expect(outcomes.every((ok) => ok === true)).toBe(true)
+
+    const [[queued]] = await db.query(
+      "SELECT COUNT(*) AS n FROM email_queue WHERE type = 'payment_confirmed'"
+    )
+    expect(Number(queued.n)).toBe(concurrency)
+  }, 20000)
 })

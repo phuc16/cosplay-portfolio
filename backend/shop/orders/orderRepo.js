@@ -319,6 +319,9 @@ async function releaseStock(conn, orderId) {
  */
 async function transitionOrder(id, toStatus, extra = {}) {
   const conn = await db.getConnection()
+  let ok = false
+  let notifyEmailType = null
+  let notifyAddress = null
   try {
     await conn.beginTransaction()
 
@@ -367,24 +370,33 @@ async function transitionOrder(id, toStatus, extra = {}) {
 
     await conn.query(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, params)
     await conn.commit()
+    ok = true
 
-    // After commit, and deliberately outside the transaction: a mail failure
-    // must never roll back a status change the seller already performed.
+    // Deliberately outside the transaction: a mail failure must never roll
+    // back a status change the seller already performed. The connection is
+    // released (see finally) before the email is enqueued below, so this
+    // does not hold a pool connection while enqueue() borrows another one.
     const emailType = TRANSITION_EMAILS[toStatus]
     if (emailType && extra.notify !== false && order.email) {
-      try {
-        await emailQueue.enqueue(id, emailType, order.email)
-      } catch (err) {
-        console.error("[ORDERS] Không xếp được email:", err.message)
-      }
+      notifyEmailType = emailType
+      notifyAddress = order.email
     }
-    return true
   } catch (err) {
     await conn.rollback()
     throw err
   } finally {
     conn.release()
   }
+
+  if (notifyEmailType) {
+    try {
+      await emailQueue.enqueue(id, notifyEmailType, notifyAddress)
+    } catch (err) {
+      console.error("[ORDERS] Không xếp được email:", err.message)
+    }
+  }
+
+  return ok
 }
 
 /**
