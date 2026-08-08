@@ -203,4 +203,27 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.error).toBe("not_found")
     expect(String(res.headers["x-robots-tag"])).toContain("noindex")
   })
+
+  it("surfaces the collection's pickup location/note on a pickup order", async () => {
+    const v = await seed(5, {
+      allow_ship: false, allow_pickup: true,
+      pickup_location: "Comic Fest, Booth 12", pickup_note: "9am-6pm, both days",
+    })
+    const created = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+
+    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.pickup_location).toBe("Comic Fest, Booth 12")
+    expect(res.body.pickup_note).toBe("9am-6pm, both days")
+  })
+
+  it("omits pickup location/note (null) for a ship order", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+
+    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    expect(res.body.pickup_location).toBeNull()
+    expect(res.body.pickup_note).toBeNull()
+  })
 })

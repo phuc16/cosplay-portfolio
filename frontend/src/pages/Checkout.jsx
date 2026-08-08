@@ -2,10 +2,41 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { readCart, cartTotal, clearCart } from "../shop/cart"
 import { generateRequestKey } from "../shop/requestKey"
-import { createOrder, fetchPaymentMethods } from "../api/shop"
+import { createOrder, fetchCollection, fetchPaymentMethods } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import AddressFields from "../components/shop/AddressFields"
+
+// Default to both open (rather than none) while the collection fetch is in
+// flight, so the picker doesn't flash empty before settling to what the
+// cart's collection(s) actually offer.
+const FLAGS_LOADING = { loaded: false, allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null }
+
+/**
+ * Derives which fulfillment methods the cart's collection(s) actually offer,
+ * reusing the existing public collection endpoint (no new one needed) — the
+ * same data already shown on the pre-purchase collection page. A cart can in
+ * principle span more than one collection, so a method only counts as
+ * offered if every collection in the cart offers it; pickup location/note
+ * are only surfaced when the cart is a single collection (otherwise which
+ * one to show is ambiguous, so neither is shown).
+ */
+async function loadFulfillmentFlags(cart) {
+  const slugs = [...new Set(cart.map((c) => c.collection_slug).filter(Boolean))]
+  if (slugs.length === 0) return { ...FLAGS_LOADING, loaded: true }
+
+  const collections = (await Promise.all(slugs.map((s) => fetchCollection(s).catch(() => null))))
+    .filter(Boolean)
+  if (collections.length === 0) return { ...FLAGS_LOADING, loaded: true }
+
+  return {
+    loaded: true,
+    allow_ship: collections.every((c) => c.allow_ship),
+    allow_pickup: collections.every((c) => c.allow_pickup),
+    pickup_location: collections.length === 1 ? collections[0].pickup_location || null : null,
+    pickup_note: collections.length === 1 ? collections[0].pickup_note || null : null,
+  }
+}
 
 export default function Checkout() {
   const { t } = useLanguage()
@@ -15,6 +46,7 @@ export default function Checkout() {
   const [buyer, setBuyer] = useState({ buyer_name: "", phone: "", email: "" })
   const [address, setAddress] = useState({ address_raw: "" })
   const [fulfillment, setFulfillment] = useState("ship")
+  const [flags, setFlags] = useState(FLAGS_LOADING)
   const [methods, setMethods] = useState(null)
   const [payment, setPayment] = useState("")
   const [note, setNote] = useState("")
@@ -28,6 +60,27 @@ export default function Checkout() {
       .then((d) => { setMethods(d.methods); setPayment(d.methods[0] || "") })
       .catch(() => setMethods([]))
   }, [])
+
+  useEffect(() => {
+    let ignore = false
+    loadFulfillmentFlags(cart).then((f) => { if (!ignore) setFlags(f) })
+    return () => { ignore = true }
+  }, [cart])
+
+  // Auto-select the sole offered method once the real flags are in, and
+  // never leave the picker pointed at a method the collection doesn't offer.
+  const offered = useMemo(() => {
+    const list = []
+    if (flags.allow_ship) list.push("ship")
+    if (flags.allow_pickup) list.push("pickup")
+    return list
+  }, [flags])
+
+  useEffect(() => {
+    if (!flags.loaded) return
+    if (!offered.includes(fulfillment)) setFulfillment(offered[0] || "")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flags.loaded, offered])
 
   // Stable across retries so a double-tap or a retried submit cannot create
   // two orders holding two reservations. Held in state (not a pure useMemo) so
@@ -91,19 +144,34 @@ export default function Checkout() {
 
       <fieldset className="mb-4">
         <legend className="text-sm mb-1">{t("checkoutFulfillment")}</legend>
-        {["ship", "pickup"].map((m) => (
+        {/* Only the methods the collection(s) in the cart actually offer are
+            rendered — offering ship/pickup regardless of the collection led
+            buyers straight into a 400 the backend correctly rejects. */}
+        {offered.map((m) => (
           <label key={m} className="mr-4 text-sm">
             <input type="radio" name="fulfillment" checked={fulfillment === m}
               onChange={() => setFulfillment(m)} className="mr-1" />
             {m === "ship" ? t("checkoutShip") : t("checkoutPickup")}
           </label>
         ))}
+        {flags.loaded && offered.length === 0 && (
+          <p className="text-sm text-[var(--text-error)]">{t("checkoutNoFulfillment")}</p>
+        )}
       </fieldset>
 
       {fulfillment === "ship" && (
         <div className="mb-4">
           <AddressFields value={address} onChange={setAddress} />
           <p className="text-xs opacity-70 mt-1">{t("checkoutShippingNote")}</p>
+        </div>
+      )}
+
+      {fulfillment === "pickup" && (flags.pickup_location || flags.pickup_note) && (
+        <div className="mb-4 p-3 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm">
+          {flags.pickup_location && (
+            <p className="font-semibold">{t("shopPickupLocation")}: {flags.pickup_location}</p>
+          )}
+          {flags.pickup_note && <p>{t("shopPickupNote")}: {flags.pickup_note}</p>}
         </div>
       )}
 

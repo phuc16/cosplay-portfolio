@@ -264,7 +264,18 @@ async function attachItems(order) {
 }
 
 async function getOrderByToken(token) {
-  const [[row]] = await db.query("SELECT * FROM orders WHERE order_token = ? LIMIT 1", [token])
+  // Joined so the public order page can show pickup_location/pickup_note for
+  // pickup orders (spec: "shown at checkout and on the order page") without a
+  // second round trip. SET NULL on collection deletion means a very old order
+  // may have no collection left; the LEFT JOIN degrades to nulls rather than
+  // dropping the order.
+  const [[row]] = await db.query(
+    `SELECT o.*, c.pickup_location, c.pickup_note
+       FROM orders o
+       LEFT JOIN collections c ON c.id = o.collection_id
+      WHERE o.order_token = ? LIMIT 1`,
+    [token]
+  )
   return attachItems(row)
 }
 

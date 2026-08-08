@@ -6,10 +6,12 @@ import { LanguageProvider } from "../contexts/LanguageContext"
 
 const fetchPaymentMethods = vi.fn()
 const createOrder = vi.fn()
+const fetchCollection = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchPaymentMethods: (...args) => fetchPaymentMethods(...args),
   createOrder: (...args) => createOrder(...args),
+  fetchCollection: (...args) => fetchCollection(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -42,6 +44,10 @@ beforeEach(() => {
   localStorage.clear()
   fetchPaymentMethods.mockReset()
   createOrder.mockReset()
+  fetchCollection.mockReset()
+  // Default: both methods offered, matching this file's existing tests which
+  // predate fulfillment filtering and expect the ship/pickup radio pair.
+  fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
 })
 
 describe("Checkout payment methods", () => {
@@ -83,5 +89,60 @@ describe("Checkout payment methods", () => {
 
     const placeOrderBtn = container.querySelector("button.w-full")
     expect(placeOrderBtn.disabled).toBe(true)
+  })
+})
+
+describe("Checkout fulfillment filtering", () => {
+  it("offers both methods when the collection allows both", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+
+    const container = await renderCheckout()
+
+    const radios = container.querySelectorAll('input[name="fulfillment"]')
+    expect(radios.length).toBe(2)
+  })
+
+  it("offers only pickup and auto-selects it when the collection is pickup-only", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchCollection.mockResolvedValue({
+      allow_ship: false, allow_pickup: true,
+      pickup_location: "Comic Fest, Booth 12", pickup_note: "9am-6pm",
+    })
+
+    const container = await renderCheckout()
+
+    const radios = container.querySelectorAll('input[name="fulfillment"]')
+    expect(radios.length).toBe(1)
+    expect(radios[0].checked).toBe(true)
+    // The address form (ship-only UI) must not render for a pickup-only collection.
+    expect(container.textContent).not.toContain("checkoutShippingNote")
+    expect(container.textContent).toContain("Comic Fest, Booth 12")
+    expect(container.textContent).toContain("9am-6pm")
+  })
+
+  it("offers only ship and auto-selects it when the collection is ship-only", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: false, pickup_location: null, pickup_note: null })
+
+    const container = await renderCheckout()
+
+    const radios = container.querySelectorAll('input[name="fulfillment"]')
+    expect(radios.length).toBe(1)
+    expect(radios[0].checked).toBe(true)
+  })
+
+  it("shows a contact-seller message when the collection offers neither method", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchCollection.mockResolvedValue({ allow_ship: false, allow_pickup: false, pickup_location: null, pickup_note: null })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]').length).toBe(0)
+    expect(container.textContent).toContain("This collection currently offers no delivery method")
   })
 })

@@ -144,6 +144,15 @@ export default function Order() {
         <p className="text-xs opacity-70 mt-1">{t("checkoutShippingNote")}</p>
       )}
 
+      {order.fulfillment_method === "pickup" && (order.pickup_location || order.pickup_note) && (
+        <div className="mt-4 p-4 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm">
+          {order.pickup_location && (
+            <p className="font-semibold">{t("shopPickupLocation")}: {order.pickup_location}</p>
+          )}
+          {order.pickup_note && <p>{t("shopPickupNote")}: {order.pickup_note}</p>}
+        </div>
+      )}
+
       <div className="mt-6 flex flex-col items-center">
         <img src={`/api/orders/${token}/qr.svg`} alt={t("orderQrCaption")}
           className="w-40 h-40 rounded-lg border border-[var(--border-brand)]" />

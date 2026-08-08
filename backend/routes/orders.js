@@ -19,8 +19,18 @@ const bad = (res, message) => res.status(400).json({ error: "invalid_input", mes
 // stock_released_at (an internal reservation flag) — plus PII the order page
 // doesn't render. Project down to exactly what Order.jsx reads.
 function toPublicOrder(order) {
-  const { id, order_token, status, total, fulfillment_method, tracking_code, created_at, items } = order
-  return { id, order_token, status, total, fulfillment_method, tracking_code, created_at, items }
+  const {
+    id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
+    // Spec (Fulfillment): pickup location/note must be shown on the order
+    // page, not just the pre-purchase collection browse page. Sourced from
+    // the order's own collection (joined in getOrderByToken), same content
+    // that is already public on the collection page — no new exposure.
+    pickup_location, pickup_note,
+  } = order
+  return {
+    id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
+    pickup_location, pickup_note,
+  }
 }
 
 function validate(body) {
