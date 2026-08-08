@@ -12,7 +12,7 @@ module.exports = function adminStatsRoutes() {
 
   router.get("/stats/drop/:collectionId", async (req, res) => {
     try {
-      const stats = await repo.getDropStats(Number(req.params.collectionId))
+      const stats = await repo.getDropStats(req.params.collectionId)
       if (!stats) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
       res.json(stats)
     } catch (err) { oops(res, err, "Lỗi thống kê theo đợt bán") }

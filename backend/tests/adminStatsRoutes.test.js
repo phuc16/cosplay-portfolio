@@ -54,6 +54,11 @@ describe("GET /api/admin/stats/drop/:collectionId", () => {
     const res = await authed(request(app).get("/api/admin/stats/drop/999999"))
     expect(res.status).toBe(404)
   })
+
+  it("404s a non-numeric collectionId", async () => {
+    const res = await authed(request(app).get("/api/admin/stats/drop/abc"))
+    expect(res.status).toBe(404)
+  })
 })
 
 describe("GET /api/admin/stats/restock", () => {
