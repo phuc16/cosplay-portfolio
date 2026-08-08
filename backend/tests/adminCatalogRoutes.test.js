@@ -6,6 +6,7 @@ import app from "../server.js"
 import repo from "../shop/catalogRepo.js"
 import cache from "../shop/catalogCache.js"
 import redis from "../redis.js"
+import { MAX_UPLOAD_BYTES } from "../shop/images.js"
 import { resetTables, closeDb } from "./helpers/db.js"
 
 const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET || "change-me-in-production")
@@ -304,5 +305,30 @@ describe("POST /api/admin/shop/image", () => {
 
     expect(res.status).toBe(400)
     expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("returns 400 invalid_input for an oversized image, rejected before sharp decode", async () => {
+    const oversized = Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0)
+    oversized[0] = 0xff
+    oversized[1] = 0xd8
+    oversized[2] = 0xff // valid jpeg magic bytes — this must fail on size, not type
+
+    const res = await authed(request(app).post("/api/admin/shop/image"))
+      .send({ base64: oversized.toString("base64"), folder: "misc" })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("still accepts a real, correctly-sized image", async () => {
+    const real = await sharp({
+      create: { width: 50, height: 50, channels: 3, background: { r: 0, g: 128, b: 255 } },
+    }).png().toBuffer()
+
+    const res = await authed(request(app).post("/api/admin/shop/image"))
+      .send({ base64: real.toString("base64"), folder: "misc" })
+
+    expect(res.status).toBe(201)
+    expect(res.body.url).toBeTruthy()
   })
 })

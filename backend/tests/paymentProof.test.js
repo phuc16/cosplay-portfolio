@@ -13,6 +13,7 @@ import app from "../server.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import settings from "../shop/payments/settingsRepo.js"
+import { MAX_UPLOAD_BYTES } from "../shop/images.js"
 import { resetTables } from "./helpers/db.js"
 
 async function seedOrder() {
@@ -68,6 +69,19 @@ describe("POST /api/orders/:token/proof", () => {
     const o = await seedOrder()
     const res = await request(app).post(`/api/orders/${o.order_token}/proof`)
       .send({ base64: Buffer.from("not an image at all").toString("base64") })
+    expect(res.status).toBe(400)
+  })
+
+  it("rejects an oversized proof image, before sharp decode is attempted", async () => {
+    const o = await seedOrder()
+    const oversized = Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0)
+    oversized[0] = 0xff
+    oversized[1] = 0xd8
+    oversized[2] = 0xff // valid jpeg magic bytes — must fail on size, not type
+
+    const res = await request(app).post(`/api/orders/${o.order_token}/proof`)
+      .send({ base64: oversized.toString("base64") })
+
     expect(res.status).toBe(400)
   })
 
