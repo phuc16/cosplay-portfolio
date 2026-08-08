@@ -57,6 +57,26 @@ describe("GET /api/admin/orders", () => {
     expect(res.body).toHaveLength(1)
     expect(res.body[0].id).toBe(o.id)
   })
+
+  it("filters by date_from/date_to", async () => {
+    const inRange = await seedOrder()
+    const outOfRange = await seedOrder()
+    await db.query("UPDATE orders SET created_at = '2020-01-01 00:00:00' WHERE id = ?", [outOfRange.id])
+
+    const res = await authed(
+      request(app).get("/api/admin/orders?date_from=2025-01-01&date_to=2030-01-01")
+    )
+    const ids = res.body.map((o) => o.id)
+    expect(ids).toContain(inRange.id)
+    expect(ids).not.toContain(outOfRange.id)
+  })
+
+  it("ignores a malformed date filter instead of erroring", async () => {
+    const o = await seedOrder()
+    const res = await authed(request(app).get("/api/admin/orders?date_from=garbage"))
+    expect(res.status).toBe(200)
+    expect(res.body.map((row) => row.id)).toContain(o.id)
+  })
 })
 
 describe("allowed_transitions", () => {

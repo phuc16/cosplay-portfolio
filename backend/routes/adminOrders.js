@@ -36,6 +36,8 @@ module.exports = function adminOrderRoutes() {
       const orders = await repo.listOrders({
         status: req.query.status,
         collection_id: req.query.collection_id,
+        date_from: req.query.date_from,
+        date_to: req.query.date_to,
       })
       res.json(orders.map(withAllowedTransitions))
     } catch (err) { oops(res, err, "Lỗi liệt kê đơn") }

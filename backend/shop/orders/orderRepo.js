@@ -273,11 +273,35 @@ async function getOrderById(id) {
   return attachItems(row)
 }
 
+/**
+ * Parse an admin-supplied date filter boundary. Malformed input is ignored
+ * (returns null) rather than surfaced as an error, per the route's
+ * tolerate-bad-input contract. `date_to` is treated as inclusive: a bare
+ * YYYY-MM-DD is widened to the end of that day so "to 2026-01-31" doesn't
+ * silently exclude orders created that afternoon.
+ */
+function parseDateBoundary(value, { endOfDay = false } = {}) {
+  if (typeof value !== "string" || value === "") return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    date.setUTCHours(23, 59, 59, 999)
+  }
+  return date
+}
+
 async function listOrders(filter = {}) {
   const where = []
   const params = []
   if (filter.status) { where.push("status = ?"); params.push(filter.status) }
   if (filter.collection_id) { where.push("collection_id = ?"); params.push(filter.collection_id) }
+
+  // Filters on created_at (not confirmed_at/etc.) so idx_orders_status_created
+  // stays usable when a status filter is also present.
+  const from = parseDateBoundary(filter.date_from)
+  if (from) { where.push("created_at >= ?"); params.push(from) }
+  const to = parseDateBoundary(filter.date_to, { endOfDay: true })
+  if (to) { where.push("created_at <= ?"); params.push(to) }
 
   const [rows] = await db.query(
     `SELECT * FROM orders ${where.length ? `WHERE ${where.join(" AND ")}` : ""}

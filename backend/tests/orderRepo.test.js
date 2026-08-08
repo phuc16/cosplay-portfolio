@@ -498,6 +498,40 @@ describe("releaseExpiredOrders", () => {
   })
 })
 
+describe("listOrders date filter", () => {
+  it("includes an order created within the range and excludes one outside it", async () => {
+    const { variantId } = await seedVariant(5)
+    const inRange = await repo.createOrder(order(variantId, 1))
+    const { variantId: v2 } = await seedVariant(5)
+    const outOfRange = await repo.createOrder(order(v2, 1))
+
+    // Push the second order's created_at outside the window we'll filter on.
+    await db.query("UPDATE orders SET created_at = '2020-01-01 00:00:00' WHERE id = ?", [outOfRange.id])
+
+    const rows = await repo.listOrders({ date_from: "2025-01-01", date_to: "2030-01-01" })
+    const ids = rows.map((r) => r.id)
+    expect(ids).toContain(inRange.id)
+    expect(ids).not.toContain(outOfRange.id)
+  })
+
+  it("treats date_to as inclusive of the whole day", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    const today = new Date().toISOString().slice(0, 10)
+
+    const rows = await repo.listOrders({ date_to: today })
+    expect(rows.map((r) => r.id)).toContain(res.id)
+  })
+
+  it("ignores a malformed date rather than throwing", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+
+    const rows = await repo.listOrders({ date_from: "not-a-date", date_to: "also-not-a-date" })
+    expect(rows.map((r) => r.id)).toContain(res.id)
+  })
+})
+
 describe("getOrderByToken", () => {
   it("returns the order with its items", async () => {
     const { variantId } = await seedVariant(5)
