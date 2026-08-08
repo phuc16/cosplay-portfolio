@@ -154,6 +154,46 @@ describe("resolvePreview", () => {
     expect(skipped.every((s) => s.reason === "duplicate_tracking_code")).toBe(true)
   })
 
+  it("rejects duplicate order codes with different tracking codes — neither row is applied", () => {
+    const { toApply, skipped } = resolvePreview(
+      [
+        { order_code: "DH12", tracking_code: "V1" },
+        { order_code: "DH12", tracking_code: "V2" },
+      ],
+      byId({ id: 12, status: "confirmed" })
+    )
+    expect(toApply).toEqual([])
+    expect(skipped).toHaveLength(2)
+    expect(skipped.every((s) => s.reason === "duplicate_order_code")).toBe(true)
+  })
+
+  it("rejects duplicate order codes even when the tracking code is also the same (still ambiguous)", () => {
+    const { toApply, skipped } = resolvePreview(
+      [
+        { order_code: "DH12", tracking_code: "V1" },
+        { order_code: "DH12", tracking_code: "V1" },
+      ],
+      byId({ id: 12, status: "confirmed" })
+    )
+    expect(toApply).toEqual([])
+    expect(skipped).toHaveLength(2)
+    expect(skipped.every((s) => ["duplicate_order_code", "duplicate_tracking_code"].includes(s.reason))).toBe(true)
+  })
+
+  it("isolates a duplicated order code from an unrelated clean row, which still applies", () => {
+    const { toApply, skipped } = resolvePreview(
+      [
+        { order_code: "DH12", tracking_code: "V1" },
+        { order_code: "DH12", tracking_code: "V2" },
+        { order_code: "DH1", tracking_code: "VTP001" },
+      ],
+      byId({ id: 12, status: "confirmed" }, confirmedOrder)
+    )
+    expect(toApply).toEqual([{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }])
+    expect(skipped).toHaveLength(2)
+    expect(skipped.every((s) => s.reason === "duplicate_order_code")).toBe(true)
+  })
+
   it("idempotency: re-running preview against orders already moved to shipped changes nothing", () => {
     // Simulates re-uploading the same file after a successful import: every
     // order is now 'shipped', so every row is skipped as already_shipped,

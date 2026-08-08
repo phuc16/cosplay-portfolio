@@ -64,12 +64,24 @@ function extractPairsFromSheetRows(rows2D) {
  *  - Duplicate tracking codes within one file are rejected outright — ALL
  *    rows sharing a duplicated tracking code are skipped, since which one
  *    is correct cannot be determined.
+ *  - Duplicate order codes within one file are rejected the same way — ALL
+ *    rows sharing a duplicated order code are skipped, since which tracking
+ *    code actually belongs to that order cannot be determined (a seller
+ *    pasting overlapping ranges, or duplicating a row while editing, must
+ *    never result in silent last-wins on a field the buyer gets emailed).
  */
 function resolvePreview(rows, ordersById) {
   const trackingCodeCounts = new Map()
   for (const r of rows) {
     if (!r.tracking_code) continue
     trackingCodeCounts.set(r.tracking_code, (trackingCodeCounts.get(r.tracking_code) || 0) + 1)
+  }
+
+  const orderIdCounts = new Map()
+  for (const r of rows) {
+    const oid = parseOrderCode(r.order_code)
+    if (oid === null) continue
+    orderIdCounts.set(oid, (orderIdCounts.get(oid) || 0) + 1)
   }
 
   const toApply = []
@@ -96,6 +108,14 @@ function resolvePreview(rows, ordersById) {
         order_code: r.order_code, tracking_code: r.tracking_code,
         reason: "duplicate_tracking_code",
         message: `Mã vận đơn "${r.tracking_code}" xuất hiện nhiều lần trong file, không rõ áp dụng cho đơn nào`,
+      })
+      continue
+    }
+    if (orderIdCounts.get(orderId) > 1) {
+      skipped.push({
+        order_code: r.order_code, tracking_code: r.tracking_code,
+        reason: "duplicate_order_code",
+        message: `Đơn ${ORDER_CODE_PREFIX}${orderId} xuất hiện nhiều lần trong file, không rõ mã vận đơn nào là đúng`,
       })
       continue
     }
