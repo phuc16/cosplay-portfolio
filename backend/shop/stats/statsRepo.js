@@ -17,11 +17,29 @@ class InvalidRangeError extends Error {}
  * 7am UTC, and could push orders across a month boundary.
  */
 function localDayStartUtc(dateStr) {
-  if (typeof dateStr !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    throw new InvalidRangeError(`Ngày không hợp lệ: ${dateStr}`)
-  }
+  const match = typeof dateStr === "string" && /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+  if (!match) throw new InvalidRangeError(`Ngày không hợp lệ: ${dateStr}`)
+
   const date = new Date(`${dateStr}T00:00:00+07:00`)
   if (Number.isNaN(date.getTime())) throw new InvalidRangeError(`Ngày không hợp lệ: ${dateStr}`)
+
+  // `new Date(...)` silently rolls calendar-invalid dates over into the next
+  // valid one (e.g. "2026-02-30" becomes March 2nd), so the shape check above
+  // is not enough — a typo would otherwise query a wrong-but-valid day with no
+  // error. Re-derive the year/month/day the constructed instant actually
+  // represents at UTC+7 (the same offset used to build it, not the server's
+  // local timezone, which would make this check itself TZ-dependent) and
+  // confirm it round-trips to the input.
+  const [, year, month, day] = match
+  const atOffset = new Date(date.getTime() + 7 * 60 * 60 * 1000)
+  if (
+    atOffset.getUTCFullYear() !== Number(year) ||
+    atOffset.getUTCMonth() + 1 !== Number(month) ||
+    atOffset.getUTCDate() !== Number(day)
+  ) {
+    throw new InvalidRangeError(`Ngày không hợp lệ: ${dateStr}`)
+  }
+
   return date
 }
 
