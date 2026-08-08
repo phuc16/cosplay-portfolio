@@ -49,17 +49,17 @@ describe("toCsv", () => {
 
 describe("bookkeepingToCsv", () => {
   const stats = {
-    received_total: 100000, awaiting_payment: 20000, to_collect: 30000, lost: 5000,
+    received_total: 100000, awaiting_payment: 20000, to_collect: 30000, lost: 5000, pending_cod: 15000,
     by_collection: [
-      { collection_id: 1, collection_title: "Drop, mùa hè", received_total: 100000, awaiting_payment: 20000, to_collect: 30000, lost: 5000 },
+      { collection_id: 1, collection_title: "Drop, mùa hè", received_total: 100000, awaiting_payment: 20000, to_collect: 30000, lost: 5000, pending_cod: 15000 },
     ],
   }
 
   it("includes a header row, one row per collection, and a total row", () => {
     const out = bookkeepingToCsv(stats)
     const lines = out.replace("﻿", "").split("\r\n")
-    expect(lines[0]).toBe("Bộ sưu tập,Đã nhận,Chờ thanh toán,Thu khi giao,Đã mất")
-    expect(lines[1]).toBe('"Drop, mùa hè",100000,20000,30000,5000')
-    expect(lines[2]).toBe("Tổng cộng,100000,20000,30000,5000")
+    expect(lines[0]).toBe("Bộ sưu tập,Đã nhận,Chờ thanh toán,Thu khi giao,Đã mất,Đơn COD chưa xác nhận")
+    expect(lines[1]).toBe('"Drop, mùa hè",100000,20000,30000,5000,15000')
+    expect(lines[2]).toBe("Tổng cộng,100000,20000,30000,5000,15000")
   })
 })

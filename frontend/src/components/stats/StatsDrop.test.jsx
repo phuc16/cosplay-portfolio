@@ -18,7 +18,7 @@ function dropStats(over = {}) {
   return {
     collection_id: 1, collection_title: "Drop",
     received: { bank: 35000, momo: 0, paypal: 0, cod: 0 }, received_total: 35000,
-    awaiting_payment: 0, to_collect: 0, lost: 0,
+    awaiting_payment: 0, to_collect: 0, lost: 0, pending_cod: 0,
     order_counts: { pending: 0, confirmed: 1, shipped: 0, completed: 0, cancelled: 0 },
     units_sold: 1, expiry_rate: null, prepaid_order_count: 0, expired_order_count: 0,
     fulfillment_counts: { ship: 1, pickup: 0 },
@@ -71,6 +71,18 @@ describe("StatsDrop", () => {
 
     expect(adminGetDropStats).toHaveBeenCalledWith("1")
     expect(container.textContent).toContain("35.000₫")
+  })
+
+  it("renders the pending-COD bucket as its own labelled figure, distinct from received_total", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({ received_total: 35000, pending_cod: 12000 }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    expect(container.textContent).toContain("Đơn COD chưa xác nhận")
+    expect(container.textContent).toContain("12.000₫")
+    expect(container.textContent).not.toContain("47.000₫") // never folded into received_total
   })
 
   it("shows 'không giới hạn' for an unlimited variant, never a stock number", async () => {

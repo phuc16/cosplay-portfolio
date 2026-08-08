@@ -126,6 +126,7 @@ async function getDropStats(collectionId) {
   let awaitingPayment = 0
   let toCollect = 0
   let lost = 0
+  let pendingCod = 0
   let prepaidCount = 0
   let expiredCount = 0
 
@@ -138,6 +139,7 @@ async function getDropStats(collectionId) {
     else if (bucket === "awaiting_payment") awaitingPayment += o.total
     else if (bucket === "to_collect") toCollect += o.total
     else if (bucket === "lost") lost += o.total
+    else if (bucket === "other") pendingCod += o.total
 
     if (isPrepaid(o.payment_method)) {
       prepaidCount += 1
@@ -177,6 +179,7 @@ async function getDropStats(collectionId) {
     awaiting_payment: awaitingPayment,
     to_collect: toCollect,
     lost,
+    pending_cod: pendingCod,
     order_counts: orderCounts,
     units_sold: Number(unitsSold),
     expiry_rate: prepaidCount === 0 ? null : expiredCount / prepaidCount,
@@ -295,6 +298,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
   let awaitingPayment = 0
   let toCollect = 0
   let lost = 0
+  let pendingCod = 0
   let shippingCost = 0
   const byCollection = new Map()
 
@@ -303,6 +307,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     else if (bucket === "awaiting_payment") entry.awaiting_payment += amount
     else if (bucket === "to_collect") entry.to_collect += amount
     else if (bucket === "lost") entry.lost += amount
+    else if (bucket === "other") entry.pending_cod += amount
   }
 
   for (const o of orderRows) {
@@ -311,6 +316,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     else if (bucket === "awaiting_payment") awaitingPayment += o.total
     else if (bucket === "to_collect") toCollect += o.total
     else if (bucket === "lost") lost += o.total
+    else if (bucket === "other") pendingCod += o.total
 
     if (o.shipping_fee) shippingCost += o.shipping_fee
 
@@ -319,7 +325,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
       byCollection.set(key, {
         collection_id: o.collection_id,
         collection_title: o.collection_id === null ? "Không thuộc bộ sưu tập" : o.collection_title,
-        received_total: 0, awaiting_payment: 0, to_collect: 0, lost: 0,
+        received_total: 0, awaiting_payment: 0, to_collect: 0, lost: 0, pending_cod: 0,
       })
     }
     addTo(byCollection.get(key), bucket, o.total)
@@ -333,6 +339,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     awaiting_payment: awaitingPayment,
     to_collect: toCollect,
     lost,
+    pending_cod: pendingCod,
     shipping_cost: shippingCost,
     by_collection: [...byCollection.values()],
   }

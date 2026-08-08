@@ -28,11 +28,13 @@ function toCsv(headers, rows) {
  * is guaranteed identical to what the screen displayed.
  */
 function bookkeepingToCsv(stats) {
-  const headers = ["Bộ sưu tập", "Đã nhận", "Chờ thanh toán", "Thu khi giao", "Đã mất"]
+  const headers = ["Bộ sưu tập", "Đã nhận", "Chờ thanh toán", "Thu khi giao", "Đã mất", "Đơn COD chưa xác nhận"]
   const rows = stats.by_collection.map((c) => [
-    c.collection_title, c.received_total, c.awaiting_payment, c.to_collect, c.lost,
+    c.collection_title, c.received_total, c.awaiting_payment, c.to_collect, c.lost, c.pending_cod,
   ])
-  rows.push(["Tổng cộng", stats.received_total, stats.awaiting_payment, stats.to_collect, stats.lost])
+  rows.push([
+    "Tổng cộng", stats.received_total, stats.awaiting_payment, stats.to_collect, stats.lost, stats.pending_cod,
+  ])
   return toCsv(headers, rows)
 }
 

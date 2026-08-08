@@ -77,6 +77,20 @@ describe("getDropStats", () => {
     expect(stats.received.cod).toBe(35000)
   })
 
+  it("buckets a pending COD order as pending_cod, excluded from received_total and every other bucket", async () => {
+    const { collectionId, variantId } = await seed()
+    await placeOrder(variantId, { payment_method: "cod" }) // stays pending
+
+    const stats = await statsRepo.getDropStats(collectionId)
+    expect(stats.pending_cod).toBe(35000)
+    expect(stats.received_total).toBe(0)
+    expect(stats.received.cod).toBe(0)
+    expect(stats.awaiting_payment).toBe(0)
+    expect(stats.to_collect).toBe(0)
+    expect(stats.lost).toBe(0)
+    expect(stats.order_counts.pending).toBe(1)
+  })
+
   it("buckets a cancelled order as lost, excluded from received/outstanding", async () => {
     const { collectionId, variantId } = await seed()
     const o = await placeOrder(variantId, { payment_method: "bank" })

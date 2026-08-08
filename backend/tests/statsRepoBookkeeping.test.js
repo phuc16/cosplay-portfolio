@@ -177,6 +177,24 @@ describe("getBookkeepingStats — money and buckets", () => {
     expect(stats.to_collect).toBe(0)
   })
 
+  it("buckets a pending COD order into pending_cod, excluded from received_total and every other bucket", async () => {
+    const { variantId } = await seedVariant()
+    const today = new Date()
+    await placeOrderAt(variantId, today, { payment_method: "cod" }) // stays pending
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    expect(stats.pending_cod).toBe(35000)
+    expect(stats.received_total).toBe(0)
+    expect(stats.received.cod).toBe(0)
+    expect(stats.awaiting_payment).toBe(0)
+    expect(stats.to_collect).toBe(0)
+    expect(stats.lost).toBe(0)
+
+    const bucket = stats.by_collection.find((c) => c.collection_id !== null)
+    expect(bucket.pending_cod).toBe(35000)
+  })
+
   it("keeps a confirmed/shipped COD order in to_collect, not received.cod, until it completes", async () => {
     const { variantId } = await seedVariant()
     const today = new Date()
@@ -207,6 +225,7 @@ describe("reconciliation — the highest-value test in this phase", () => {
     await orders.transitionOrder(oa2.id, "confirmed")
     const oa3 = await placeOrderAt(a.variantId, today, { payment_method: "bank" })
     await orders.transitionOrder(oa3.id, "cancelled")
+    await placeOrderAt(a.variantId, today, { payment_method: "cod" }) // stays pending -> pending_cod
 
     const b = await seedVariant()
     const ob1 = await placeOrderAt(b.variantId, today, { payment_method: "paypal" })
@@ -222,16 +241,20 @@ describe("reconciliation — the highest-value test in this phase", () => {
     expect(bucketA.to_collect).toBe(dropA.to_collect)
     expect(bucketA.lost).toBe(dropA.lost)
     expect(bucketA.lost).toBe(35000)
+    expect(bucketA.pending_cod).toBe(dropA.pending_cod)
+    expect(bucketA.pending_cod).toBe(35000)
     expect(bucketB.awaiting_payment).toBe(dropB.awaiting_payment)
 
     const sumReceived = stats.by_collection.reduce((s, c) => s + c.received_total, 0)
     const sumAwaiting = stats.by_collection.reduce((s, c) => s + c.awaiting_payment, 0)
     const sumToCollect = stats.by_collection.reduce((s, c) => s + c.to_collect, 0)
     const sumLost = stats.by_collection.reduce((s, c) => s + c.lost, 0)
+    const sumPendingCod = stats.by_collection.reduce((s, c) => s + c.pending_cod, 0)
 
     expect(sumReceived).toBe(stats.received_total)
     expect(sumAwaiting).toBe(stats.awaiting_payment)
     expect(sumToCollect).toBe(stats.to_collect)
     expect(sumLost).toBe(stats.lost)
+    expect(sumPendingCod).toBe(stats.pending_cod)
   })
 })

@@ -78,6 +78,10 @@ export default function StatsDrop() {
                 <p className="text-xs opacity-70">Đã mất</p>
                 <p className="text-lg font-semibold">{formatVnd(stats.lost)}</p>
               </div>
+              <div className="p-3 rounded-xl border border-[var(--border-brand)]">
+                <p className="text-xs opacity-70">Đơn COD chưa xác nhận</p>
+                <p className="text-lg font-semibold">{formatVnd(stats.pending_cod)}</p>
+              </div>
             </div>
 
             <p className="mb-2 text-sm">
