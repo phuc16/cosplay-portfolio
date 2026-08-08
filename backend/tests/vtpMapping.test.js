@@ -46,6 +46,14 @@ describe("resolveCod", () => {
   it("is an error for a COD order with cod_amount undefined", () => {
     expect(resolveCod({ payment_method: "cod", cod_amount: undefined }).ok).toBe(false)
   })
+
+  it("returns 0 (not an error) for a COD order collecting zero — a legitimate zero-collection instruction, distinct from null (export error)", () => {
+    // Zero is intentionally collected money (perhaps a return or reversal).
+    // Null/undefined is a missing field (export error). If this were a falsy check
+    // instead of strict null/undefined, zero would wrongly be treated as missing data.
+    const result = resolveCod({ payment_method: "cod", cod_amount: 0 })
+    expect(result).toEqual({ ok: true, value: 0 })
+  })
 })
 
 describe("selectPayer", () => {
