@@ -1,5 +1,6 @@
 const express = require("express")
 const templates = require("../shop/email/templates")
+const sender = require("../shop/email/sender")
 
 const TYPES = Object.keys(templates.DEFAULT_TEMPLATES)
 
@@ -45,6 +46,19 @@ module.exports = function adminEmailRoutes() {
       res.json({ ok: true })
     } catch (err) {
       console.error("[ADMIN/EMAIL] Lỗi lưu mẫu email:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Surfaces sender.js's listFailed() — a row that exhausted its retries
+  // otherwise sits in email_queue with nothing to tell the seller a buyer
+  // never got their confirmation.
+  router.get("/email-queue/failed", async (req, res) => {
+    try {
+      const rows = await sender.listFailed()
+      res.json(rows)
+    } catch (err) {
+      console.error("[ADMIN/EMAIL] Lỗi đọc email lỗi:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

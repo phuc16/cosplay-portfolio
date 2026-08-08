@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { adminListEmailTemplates, adminSaveEmailTemplate } from "../api/shop"
+import { adminListEmailTemplates, adminSaveEmailTemplate, adminListFailedEmails } from "../api/shop"
 
 const LABELS = {
   order_placed: "Đã nhận đơn hàng",
@@ -81,6 +81,35 @@ function Editor({ tpl, onSaved }) {
   )
 }
 
+// Minimal surfacing of sender.js's listFailed(): a badge + list so the
+// seller notices a buyer never got their confirmation, instead of the row
+// sitting invisibly in email_queue forever.
+function FailedEmails() {
+  const [failed, setFailed] = useState(null)
+
+  useEffect(() => {
+    adminListFailedEmails().then(setFailed).catch(() => setFailed([]))
+  }, [])
+
+  if (!failed || failed.length === 0) return null
+
+  return (
+    <div className="mb-6 p-3 rounded-xl border border-red-400">
+      <h4 className="font-semibold mb-2 text-red-600">
+        Email gửi thất bại ({failed.length})
+      </h4>
+      <ul className="text-sm space-y-1">
+        {failed.map((row) => (
+          <li key={row.id} className="opacity-80">
+            Đơn #{row.order_id} · {row.type} · {row.to_email}
+            {row.last_error && <span className="opacity-60"> — {row.last_error}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export default function AdminEmailTemplates() {
   const [templates, setTemplates] = useState(null)
 
@@ -93,6 +122,7 @@ export default function AdminEmailTemplates() {
   return (
     <div className="max-w-2xl">
       <h3 className="text-xl font-semibold mb-4">Mẫu email</h3>
+      <FailedEmails />
       {templates.map((tpl) => (
         <Editor
           key={tpl.type}

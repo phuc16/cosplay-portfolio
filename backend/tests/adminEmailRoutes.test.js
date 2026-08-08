@@ -4,6 +4,9 @@ import jwt from "jsonwebtoken"
 import app from "../server.js"
 import db from "../db.js"
 import templates from "../shop/email/templates.js"
+import catalog from "../shop/catalogRepo.js"
+import orders from "../shop/orders/orderRepo.js"
+import { resetTables } from "./helpers/db.js"
 
 const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
@@ -67,5 +70,44 @@ describe("PUT /api/admin/email-templates/:type", () => {
     const shipped = res.body.find((t) => t.type === "shipped")
     expect(shipped.subject).toBe("Đơn {{order_id}} đã gửi")
     expect(shipped.body_html).toBe("<p>{{buyer_name}}</p>")
+  })
+})
+
+describe("GET /api/admin/email-queue/failed", () => {
+  beforeEach(async () => {
+    await resetTables(
+      "email_queue", "order_items", "orders", "product_variants", "products", "collections"
+    )
+  })
+
+  it("requires auth", async () => {
+    expect((await request(app).get("/api/admin/email-queue/failed")).status).toBe(401)
+  })
+
+  it("returns failed rows in the shape sender.js writes them", async () => {
+    const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "09", email: "a@example.com", address_raw: "x" },
+      fulfillment_method: "ship", payment_method: "bank",
+    })
+    await db.query(
+      "INSERT INTO email_queue (order_id, type, to_email, status, attempts, last_error) VALUES (?, 'order_placed', 'a@example.com', 'failed', 5, 'boom')",
+      [o.id]
+    )
+
+    const res = await authed(request(app).get("/api/admin/email-queue/failed"))
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0]).toMatchObject({ order_id: o.id, status: "failed", last_error: "boom" })
+  })
+
+  it("returns an empty list when nothing has failed", async () => {
+    const res = await authed(request(app).get("/api/admin/email-queue/failed"))
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
   })
 })

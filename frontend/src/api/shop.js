@@ -77,3 +77,6 @@ export const adminListEmailTemplates = () =>
 
 export const adminSaveEmailTemplate = (type, data) =>
   api.put(`/api/admin/email-templates/${type}`, data).then((r) => r.data)
+
+export const adminListFailedEmails = () =>
+  api.get("/api/admin/email-queue/failed").then((r) => r.data)
