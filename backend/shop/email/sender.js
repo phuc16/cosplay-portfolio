@@ -4,6 +4,7 @@ const queue = require("./queue")
 const templates = require("./templates")
 const orderRepo = require("./../orders/orderRepo")
 const settingsRepo = require("./../payments/settingsRepo")
+const qr = require("./../orders/qr")
 
 let transport = null
 
@@ -49,11 +50,20 @@ async function sendQueued(limit = 10) {
         templates.buildVars({ ...order, payment_note: settings.payment_note })
       )
 
+      // cid: attachment rather than a data URI (Gmail strips those) or a remote
+      // URL (blocked by default in many clients).
+      const png = await qr.qrPngBuffer(qr.orderUrl(order.order_token))
+
       await getTransport().sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: row.to_email,
         subject: rendered.subject,
-        html: rendered.html,
+        html: `${rendered.html}
+          <div style="text-align:center;margin-top:16px">
+            <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
+            <p style="font-size:12px;color:#888">Đưa mã này khi nhận hàng tại sự kiện</p>
+          </div>`,
+        attachments: [{ filename: "order-qr.png", content: png, cid: "orderqr" }],
       })
 
       await queue.markSent(row.id)

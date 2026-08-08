@@ -4,6 +4,7 @@ const paymentSettings = require("../shop/payments/settingsRepo")
 const { buildInstructions } = require("../shop/payments/instructions")
 const { processShopImage, storeShopImage } = require("../shop/images")
 const emailQueue = require("../shop/email/queue")
+const qr = require("../shop/orders/qr")
 const db = require("../db")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
@@ -125,6 +126,20 @@ module.exports = function orderRoutes() {
       res.json(buildInstructions(order, settings))
     } catch (err) {
       console.error("[ORDERS] Lỗi lấy hướng dẫn thanh toán:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.get("/:token/qr.svg", async (req, res) => {
+    try {
+      res.set("X-Robots-Tag", "noindex, nofollow")
+
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      res.type("image/svg+xml").send(await qr.qrSvg(qr.orderUrl(order.order_token)))
+    } catch (err) {
+      console.error("[ORDERS] Lỗi tạo QR:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
