@@ -3,6 +3,42 @@ const { classify, isPrepaid, isExpired } = require("./money")
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
+/** Thrown for a missing, unparsable, or backwards date range — the bookkeeping
+ * view rejects these with a clear message rather than silently returning
+ * every order, unlike the admin orders list's tolerant date filter, because
+ * a money view that misinterprets its own range is a bookkeeping error. */
+class InvalidRangeError extends Error {}
+
+/**
+ * Turn a `YYYY-MM-DD` boundary, interpreted in Asia/Ho_Chi_Minh (fixed
+ * UTC+7, no DST), into the UTC instant `orders.created_at` can be compared
+ * against. `created_at` is stored UTC; comparing a bare local date string
+ * against it would misfile every order placed between local midnight and
+ * 7am UTC, and could push orders across a month boundary.
+ */
+function localDayStartUtc(dateStr) {
+  if (typeof dateStr !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    throw new InvalidRangeError(`Ngày không hợp lệ: ${dateStr}`)
+  }
+  const date = new Date(`${dateStr}T00:00:00+07:00`)
+  if (Number.isNaN(date.getTime())) throw new InvalidRangeError(`Ngày không hợp lệ: ${dateStr}`)
+  return date
+}
+
+/**
+ * Resolve a bookkeeping date range to UTC bounds. `date_to` is inclusive of
+ * its whole local day, so the upper bound is the start of the *following*
+ * local day, used with `<` rather than `<=`.
+ */
+function parseLocalDateRange(dateFrom, dateTo) {
+  if (!dateFrom || !dateTo) throw new InvalidRangeError("Cần chọn ngày bắt đầu và ngày kết thúc")
+  const from = localDayStartUtc(dateFrom)
+  const toStart = localDayStartUtc(dateTo)
+  const toExclusive = new Date(toStart.getTime() + MS_PER_DAY)
+  if (toExclusive <= from) throw new InvalidRangeError("Ngày kết thúc phải sau ngày bắt đầu")
+  return { from, toExclusive }
+}
+
 /**
  * Sell-through and time-to-sellout for one row of a drop's per-variant
  * table. Deleted variants (product_variant_id NULL after ON DELETE SET
@@ -219,4 +255,72 @@ async function getRestockStats() {
   return result.sort((a, b) => b.velocity - a.velocity)
 }
 
-module.exports = { getDropStats, buildVariantSummary, getRestockStats }
+/**
+ * Bookkeeping totals across every collection for a date range, plus an
+ * explicit "no collection" bucket (orders.collection_id is nullable) so
+ * per-collection sums always reconcile with the top-level totals — both are
+ * computed from the same fetched rows in the same pass, by construction.
+ */
+async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
+  const { from, toExclusive } = parseLocalDateRange(dateFrom, dateTo)
+
+  const [orderRows] = await db.query(
+    `SELECT o.id, o.status, o.payment_method, o.total, o.shipping_fee, o.collection_id,
+            c.title AS collection_title
+       FROM orders o
+       LEFT JOIN collections c ON c.id = o.collection_id
+      WHERE o.created_at >= ? AND o.created_at < ?`,
+    [from, toExclusive]
+  )
+
+  const received = { bank: 0, momo: 0, paypal: 0, cod: 0 }
+  let awaitingPayment = 0
+  let toCollect = 0
+  let lost = 0
+  let shippingCost = 0
+  const byCollection = new Map()
+
+  const addTo = (entry, bucket, amount) => {
+    if (bucket === "received") entry.received_total += amount
+    else if (bucket === "awaiting_payment") entry.awaiting_payment += amount
+    else if (bucket === "to_collect") entry.to_collect += amount
+    else if (bucket === "lost") entry.lost += amount
+  }
+
+  for (const o of orderRows) {
+    const bucket = classify(o)
+    if (bucket === "received") received[o.payment_method] += o.total
+    else if (bucket === "awaiting_payment") awaitingPayment += o.total
+    else if (bucket === "to_collect") toCollect += o.total
+    else if (bucket === "lost") lost += o.total
+
+    if (o.shipping_fee) shippingCost += o.shipping_fee
+
+    const key = o.collection_id === null ? "none" : o.collection_id
+    if (!byCollection.has(key)) {
+      byCollection.set(key, {
+        collection_id: o.collection_id,
+        collection_title: o.collection_id === null ? "Không thuộc bộ sưu tập" : o.collection_title,
+        received_total: 0, awaiting_payment: 0, to_collect: 0, lost: 0,
+      })
+    }
+    addTo(byCollection.get(key), bucket, o.total)
+  }
+
+  return {
+    date_from: dateFrom,
+    date_to: dateTo,
+    received,
+    received_total: received.bank + received.momo + received.paypal + received.cod,
+    awaiting_payment: awaitingPayment,
+    to_collect: toCollect,
+    lost,
+    shipping_cost: shippingCost,
+    by_collection: [...byCollection.values()],
+  }
+}
+
+module.exports = {
+  getDropStats, buildVariantSummary, getRestockStats,
+  getBookkeepingStats, parseLocalDateRange, InvalidRangeError,
+}
