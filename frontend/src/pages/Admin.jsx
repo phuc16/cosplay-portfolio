@@ -6,6 +6,7 @@ import AdminCollections from "../components/AdminCollections"
 import AdminOrders from "../components/AdminOrders"
 import AdminPaymentSettings from "../components/AdminPaymentSettings"
 import AdminEmailTemplates from "../components/AdminEmailTemplates"
+import AdminStats from "../components/AdminStats"
 import { useTheme } from "../contexts/ThemeContext"
 
 export default function Admin() {
@@ -72,6 +73,12 @@ export default function Admin() {
               Email
             </button>
             <button
+              onClick={() => setTab("stats")}
+              className={`text-sm ${tab === "stats" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Thống kê
+            </button>
+            <button
               onClick={toggleTheme}
               className="p-2 rounded-md text-gray-600 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-cosplay-card"
               title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
@@ -103,6 +110,7 @@ export default function Admin() {
         {tab === "orders" && <AdminOrders />}
         {tab === "payments" && <AdminPaymentSettings />}
         {tab === "email" && <AdminEmailTemplates />}
+        {tab === "stats" && <AdminStats />}
       </div>
     )
   }

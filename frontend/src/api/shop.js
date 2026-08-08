@@ -83,3 +83,16 @@ export const adminSaveEmailTemplate = (type, data) =>
 
 export const adminListFailedEmails = () =>
   api.get("/api/admin/email-queue/failed").then((r) => r.data)
+
+// ── Stats ──
+export const adminGetDropStats = (collectionId) =>
+  api.get(`/api/admin/stats/drop/${collectionId}`).then((r) => r.data)
+
+export const adminGetRestockStats = () =>
+  api.get("/api/admin/stats/restock").then((r) => r.data)
+
+export const adminGetBookkeepingStats = (params) =>
+  api.get("/api/admin/stats/bookkeeping", { params }).then((r) => r.data)
+
+export const adminDownloadBookkeepingCsv = (params) =>
+  api.get("/api/admin/stats/bookkeeping/export.csv", { params, responseType: "blob" }).then((r) => r.data)
