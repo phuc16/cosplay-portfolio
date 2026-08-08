@@ -1,5 +1,6 @@
 const express = require("express")
 const repo = require("../shop/orders/orderRepo")
+const catalogCache = require("../shop/catalogCache")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const { buildInstructions } = require("../shop/payments/instructions")
 const { processShopImage, storeShopImage } = require("../shop/images")
@@ -64,10 +65,18 @@ module.exports = function orderRoutes() {
 
       const order = await repo.createOrder(req.body)
 
-      // Best-effort, after the order is already committed: a mail failure
-      // must never fail an order the buyer has already placed. A replayed
-      // (reused) request already queued its email the first time around.
+      // Both best-effort, after the order (and its stock decrement) is
+      // already committed: neither a Redis nor a mail failure may fail an
+      // order the buyer has already placed. A replayed (reused) request
+      // reserved no new stock and already queued its email the first time
+      // around, so it does neither again.
       if (!order.reused) {
+        try {
+          await catalogCache.invalidate()
+        } catch (err) {
+          console.error("[ORDERS] Không xoá được cache catalog:", err.message)
+        }
+
         try {
           await emailQueue.enqueue(order.id, "order_placed", req.body.buyer.email)
           if (process.env.ADMIN_EMAIL) {
