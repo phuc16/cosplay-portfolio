@@ -298,10 +298,44 @@ Images: `phuc16/cosplay-backend:latest`, `phuc16/cosplay-frontend:latest`
 
 ---
 
+## Database Backups
+
+Orders are financial and dispute-resolution records — they must survive corruption, bad migrations, and accidental deletion. The `deploy/backup.sh` script dumps the `cosplay` database nightly via `mysqldump` with `--single-transaction`, so the site remains operational and consistent snapshots are guaranteed.
+
+**What is backed up:** The entire MySQL database (schema, data, stored procedures, triggers). MinIO images are durable by design (distributed storage); only the database requires nightly backups.
+
+**How often:** Every night at 03:00 UTC. Set this on the server via root's crontab:
+```bash
+crontab -e
+# Add this line:
+0 3 * * * cd /opt/cosplay && DB_PASS='YOUR_PASSWORD' ./deploy/backup.sh >> /var/log/cosplay-backup.log 2>&1
+```
+
+**Where dumps live:** `/var/backups/cosplay/` on the server. Each dump is named `cosplay-YYYYMMDD-HHMMSS.sql.gz`.
+
+**Retention window:** 14 days. Older dumps are automatically pruned by the backup script, keeping ~100 MB of historical snapshots on disk.
+
+**How to restore:** In the event of data loss, restore into a scratch database first to verify:
+```bash
+cd /opt/cosplay
+./deploy/restore.sh /var/backups/cosplay/cosplay-<date>.sql.gz
+# Prints row counts and the sum of order totals. Compare against production:
+docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" cosplay -e \
+  "SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders;"
+```
+
+If counts match, restore into production:
+```bash
+docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" cosplay < <(gunzip -c /var/backups/cosplay/cosplay-<date>.sql.gz)
+```
+
+**Quarterly drill:** A backup that has never been restored is not a backup. Run `./deploy/restore.sh <dump>` quarterly against a real backup to confirm the mechanism works.
+
+---
+
 ## Lưu ý
 
-1. **Backup**: Định kỳ backup MySQL và volume MinIO.
-2. **JWT_SECRET**: Đổi khác so với mặc định.
+1. **JWT_SECRET**: Đổi khác so với mặc định.
 3. **ADMIN_PASSWORD**: Đặt mật khẩu mạnh.
 4. **MinIO**: Đổi `MINIO_ROOT_USER` và `MINIO_ROOT_PASSWORD`.
 5. **DB_PASS**: Đặt mật khẩu mạnh cho MySQL.
