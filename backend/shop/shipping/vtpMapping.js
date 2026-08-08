@@ -68,8 +68,85 @@ function assembleAddress(order) {
   return raw.length > 0 ? raw : null
 }
 
+const PAYER_BUYER = "Người nhận trả"
+const PAYER_SELLER = "Người gửi trả"
+
+// Verified from the template's "Loai hang hoa" reference sheet — exactly two values.
+const LOAI_HANG_HOA_VALUES = ["Bưu kiện", "Tài liệu"]
+
+/** Column J (Tiền thu hộ COD). Blank (null) for any prepaid order — VTP
+ * should never be told to collect money that was already paid. A COD order
+ * with no recorded cod_amount is an export ERROR, not a blank cell: a COD
+ * shipment that collects nothing is money lost, and must be caught before
+ * the parcel leaves, not discovered afterward. */
+function resolveCod(order) {
+  if (order.payment_method !== "cod") return { ok: true, value: null }
+  if (order.cod_amount === null || order.cod_amount === undefined) {
+    return {
+      ok: false,
+      reason: "cod_missing_amount",
+      message: "Đơn COD nhưng chưa có số tiền thu hộ (cod_amount)",
+    }
+  }
+  return { ok: true, value: order.cod_amount }
+}
+
+/** Column S (Người trả cước). Defaults to buyer-pays, matching migration
+ * 017's column default — an order that predates the shipping_payer column
+ * being set explicitly is never silently treated as freeship. */
+function selectPayer(order) {
+  return order.shipping_payer === "seller" ? PAYER_SELLER : PAYER_BUYER
+}
+
+/**
+ * Map one order to its per-order VTP row values (columns B, C, D, E, I, J,
+ * M, S — the batch-level columns F, G, H, K, U are filled by the caller,
+ * see vtpWorkbook.js). Returns an explicit ok:false with a reason rather
+ * than throwing, so a caller can skip one bad order without aborting a
+ * whole export — the same per-row-isolation principle as the admin
+ * bulk-cancel endpoint.
+ *
+ * Deliberately reads only the specific fields it needs off `order` — never
+ * `order.order_token` — so a caller accidentally passing the full order row
+ * (including order_token) can never leak it into the mapped row. See this
+ * plan's Global Constraints.
+ */
+function mapOrderToRow(order) {
+  const address = assembleAddress(order)
+  if (!address) {
+    return {
+      ok: false,
+      order_id: order.id,
+      reason: "no_address",
+      message: `${orderCode(order.id)}: không có địa chỉ nhận hàng hợp lệ`,
+    }
+  }
+
+  const cod = resolveCod(order)
+  if (!cod.ok) {
+    return { ok: false, order_id: order.id, reason: cod.reason, message: `${orderCode(order.id)}: ${cod.message}` }
+  }
+
+  return {
+    ok: true,
+    order_id: order.id,
+    row: {
+      B: orderCode(order.id),
+      C: order.buyer_name,
+      D: String(order.phone || "").replace(/\s+/g, ""),
+      E: address,
+      I: order.total,
+      J: cod.value,
+      M: selectService(order.address_province),
+      S: selectPayer(order),
+    },
+  }
+}
+
 module.exports = {
   ORDER_CODE_PREFIX, orderCode,
   SERVICE_INTRA_HCM, SERVICE_INTER_PROVINCE, isHoChiMinh, selectService,
   assembleAddress,
+  PAYER_BUYER, PAYER_SELLER, LOAI_HANG_HOA_VALUES,
+  resolveCod, selectPayer, mapOrderToRow,
 }
