@@ -1,0 +1,68 @@
+import { describe, it, expect } from "vitest"
+import { buildRoster } from "../shop/shipping/roster.js"
+
+function order(over = {}) {
+  return {
+    id: 1, buyer_name: "Nguyễn An", phone: "0901111111",
+    payment_method: "bank", cod_amount: null,
+    items: [{ product_name_snapshot: "Photocard", variant_label_snapshot: "A1", qty: 2 }],
+    ...over,
+  }
+}
+
+describe("buildRoster — paid vs collect-at-handover", () => {
+  it("marks a prepaid order as paid with amount_due 0", () => {
+    const { rows } = buildRoster([order({ payment_method: "momo" })])
+    expect(rows[0].paid).toBe(true)
+    expect(rows[0].amount_due).toBe(0)
+  })
+
+  it("marks a COD order as not paid with amount_due equal to cod_amount", () => {
+    const { rows } = buildRoster([order({ payment_method: "cod", cod_amount: 75000 })])
+    expect(rows[0].paid).toBe(false)
+    expect(rows[0].amount_due).toBe(75000)
+  })
+
+  it("excludes a COD order with a null cod_amount, never showing 'collect ₫0'", () => {
+    const { rows, excluded } = buildRoster([order({ id: 7, payment_method: "cod", cod_amount: null })])
+    expect(rows).toEqual([])
+    expect(excluded).toEqual([{ order_id: 7, reason: "cod_missing_amount", message: expect.stringContaining("DH7") }])
+  })
+})
+
+describe("buildRoster — items", () => {
+  it("maps each order's item snapshots to product_name/variant_label/qty", () => {
+    const { rows } = buildRoster([order({
+      items: [
+        { product_name_snapshot: "Photocard", variant_label_snapshot: "A1", qty: 2 },
+        { product_name_snapshot: "Poster", variant_label_snapshot: "Std", qty: 1 },
+      ],
+    })])
+    expect(rows[0].items).toEqual([
+      { product_name: "Photocard", variant_label: "A1", qty: 2 },
+      { product_name: "Poster", variant_label: "Std", qty: 1 },
+    ])
+  })
+
+  it("gives every row an order_code derived the same way the shipping export does", () => {
+    const { rows } = buildRoster([order({ id: 42 })])
+    expect(rows[0].order_code).toBe("DH42")
+  })
+})
+
+describe("buildRoster — sorting", () => {
+  it("sorts rows by buyer_name ascending, Vietnamese-locale aware", () => {
+    const { rows } = buildRoster([
+      order({ id: 1, buyer_name: "Trần Văn B" }),
+      order({ id: 2, buyer_name: "Ánh Dương" }),
+      order({ id: 3, buyer_name: "Bùi Thị C" }),
+    ])
+    expect(rows.map((r) => r.buyer_name)).toEqual(["Ánh Dương", "Bùi Thị C", "Trần Văn B"])
+  })
+})
+
+describe("buildRoster — empty input", () => {
+  it("returns empty rows and excluded for no orders", () => {
+    expect(buildRoster([])).toEqual({ rows: [], excluded: [] })
+  })
+})
