@@ -11,7 +11,7 @@ function orderCode(orderId) {
 const SERVICE_INTRA_HCM = "PHS - Nội tỉnh tiết kiệm thỏa thuận"
 const SERVICE_INTER_PROVINCE = "VTK - CP tiết kiệm thỏa thuận"
 
-const HCM_ACCEPTED_FORMS = new Set(["ho chi minh", "hcm", "sai gon"])
+const HCM_ACCEPTED_FORMS = new Set(["ho chi minh", "hcm", "hcmc", "sai gon"])
 
 /** Matches a leading administrative prefix ("TP", "TP.", "T.P", "Thành phố")
  * so it can be stripped before the equality check below. Deliberately does
@@ -42,7 +42,8 @@ function isHoChiMinh(province) {
   const n = normalize(province)
   if (!n) return false
   const stripped = n.replace(HCM_PREFIX_RE, "").trim()
-  return HCM_ACCEPTED_FORMS.has(stripped)
+  const withoutTrailingPunct = stripped.replace(/[.,]\s*$/, "").trim()
+  return HCM_ACCEPTED_FORMS.has(withoutTrailingPunct)
 }
 
 /** Unknown/empty province defaults to the inter-province service — the

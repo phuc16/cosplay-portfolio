@@ -65,6 +65,25 @@ describe("isHoChiMinh", () => {
       expect(isHoChiMinh(variant)).toBe(true)
     })
   }
+
+  // Regression fix: accept HCMC as English abbreviation and handle trailing punctuation
+  const regressionFixedCases = [
+    "HCMC",
+    "hcmc",
+    "Hồ Chí Minh.",
+    "Hồ Chí Minh ,",
+    "TP.HCMC",
+  ]
+  for (const variant of regressionFixedCases) {
+    it(`recognises "${variant}" as Ho Chi Minh City (regression fix)`, () => {
+      expect(isHoChiMinh(variant)).toBe(true)
+    })
+  }
+
+  // Verify that trailing punctuation trimming does not rescue a non-match into a match
+  it("is false for highway name with trailing punctuation", () => {
+    expect(isHoChiMinh("Đường Hồ Chí Minh.")).toBe(false)
+  })
 })
 
 describe("service string constants", () => {
