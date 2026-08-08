@@ -28,7 +28,7 @@
 - **Commits:** Conventional Commits, descriptive body, **no `Co-Authored-By` trailer**.
 - **The bundled VTP template ships inside the repo** at `backend/shop/shipping/templates/VTP_mau_excel_don_hang_o.xlsx` so an export never depends on a path outside the repository (`/Users/phucth/vibes/vtp` is a local-machine-only workaround directory, not something a deployed container has access to).
 - **Verified template facts** (read directly from the file, not assumed): data sheet is `Danh sách`, header row **7**, data begins **row 8**. Column letters: A=STT, B=Mã đơn hàng, C=Tên người nhận(\*), D=Số ĐT(\*), E=Địa chỉ nhận(\*), F=Tên hàng hóa(\*), G=Số lượng, H=Trọng lượng gram(\*), I=Giá trị hàng VND(\*), J=Tiền thu hộ COD, K=Loại hàng hóa(\*), L=Tính chất đặc biệt, M=Dịch vụ(\*), N=Dịch vụ cộng thêm, O=Thu tiền xem hàng, P/Q/R=Dài/Rộng/Cao, S=Người trả cước, T=Yêu cầu khác, U=Thời gian hẹn lấy, V=Thời gian giao. Exact service strings: `PHS - Nội tỉnh tiết kiệm thỏa thuận` (intra-HCM), `VTK - CP tiết kiệm thỏa thuận` (inter-province). Exact payer strings: `Người gửi trả` (seller pays), `Người nhận trả` (buyer pays). `Loai hang hoa` reference sheet has exactly two values: `Bưu kiện`, `Tài liệu`.
-- **`Thời gian hẹn lấy` (column U) has 11 valid values on the template's own reference sheet, but their exact text was not transcribed into the spec.** Rather than inventing 11 strings for a `<select>` and risking an import rejection on a value that looks plausible but is wrong, this plan's frontend renders U as a free-text input the seller fills by copying the exact text from the template's own dropdown once (a one-time lookup, not a per-export burden — the seller already does this today in the existing Python script's interactive prompt). This is a deliberate, called-out limitation, not a placeholder — see the verification checklist's Outstanding Questions section.
+- **`Thời gian hẹn lấy` (column U) is a `<select>` over the exact 11 values transcribed verbatim from the template's own reference sheet:** `Hôm nay - Sáng (7h30 - 12h00)`, `Hôm nay - Chiều (13h30 - 18h00)`, `Hôm nay - Tối (18h30 - 21h00)`, `Ngày mai - Cả ngày`, `Ngày mai - Sáng (7h30 - 12h00)`, `Ngày mai - Chiều (13h30 - 18h00)`, `Ngày mai - Tối (18h30 - 21h00)`, `Ngày kia - Cả ngày`, `Ngày kia - Sáng (7h30 - 12h00)`, `Ngày kia - Chiều (13h30 - 18h00)`, `Ngày kia - Tối (18h30 - 21h00)`. VTP validates this field server-side on import, so free text would let a typo produce a file rejected only at upload time. Do not invent, reorder or "tidy" these strings — they must match byte-for-byte.
 - **`Số lượng` (column G) is not a batch-level input.** The spec's Batch-level fields section lists only F, H, K, U. G is filled as a fixed `1` (one parcel per order row) — `orders.total`/`cod_amount` already reflect the whole order's merch value, and per-order-item quantity has no defensible single number to put in a column that describes package count, not merchandise count. See Task 5.
 
 ---
@@ -2802,6 +2802,25 @@ import { formatVnd } from "../../utils/money"
 
 const LOAI_HANG_HOA_OPTIONS = ["Bưu kiện", "Tài liệu"]
 
+// The exact 11 values from the VTP template's own "Thời gian hẹn lấy"
+// reference sheet, transcribed verbatim. VTP validates this server-side on
+// import, so a free-text field would let a typo produce a file that is only
+// rejected at upload time, after the seller has already booked their day
+// around it.
+const THOI_GIAN_HEN_LAY_OPTIONS = [
+  "Hôm nay - Sáng (7h30 - 12h00)",
+  "Hôm nay - Chiều (13h30 - 18h00)",
+  "Hôm nay - Tối (18h30 - 21h00)",
+  "Ngày mai - Cả ngày",
+  "Ngày mai - Sáng (7h30 - 12h00)",
+  "Ngày mai - Chiều (13h30 - 18h00)",
+  "Ngày mai - Tối (18h30 - 21h00)",
+  "Ngày kia - Cả ngày",
+  "Ngày kia - Sáng (7h30 - 12h00)",
+  "Ngày kia - Chiều (13h30 - 18h00)",
+  "Ngày kia - Tối (18h30 - 21h00)",
+]
+
 function downloadBase64(base64, filename) {
   const bytes = atob(base64)
   const arr = new Uint8Array(bytes.length)
@@ -2933,9 +2952,10 @@ export default function ShippingExport() {
             </label>
             <label className="flex flex-col text-xs gap-1">
               Thời gian hẹn lấy
-              <input data-testid="thoi-gian-hen-lay" value={thoiGianHenLay} onChange={(e) => setThoiGianHenLay(e.target.value)}
-                placeholder="Sao chép đúng chữ từ dropdown mẫu VTP"
-                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+              <select data-testid="thoi-gian-hen-lay" value={thoiGianHenLay} onChange={(e) => setThoiGianHenLay(e.target.value)}
+                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent">
+                {THOI_GIAN_HEN_LAY_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
             </label>
           </div>
 
@@ -2986,11 +3006,10 @@ batch-fields form (tên hàng hóa, trọng lượng, loại hàng hóa, thời 
 lấy), and a generate action that decodes the base64 xlsx response into a
 Blob download and shows which orders were excluded and why.
 
-Thời gian hẹn lấy is a free-text field, not a <select> with invented
-options: the template's 11 valid values were never transcribed into the
-spec, and a plausible-looking wrong value would fail the VTP import
-silently on the seller's side. The seller copies the exact text from the
-template's own dropdown once — see the plan's Global Constraints.
+Thời gian hẹn lấy is a <select> over the 11 values transcribed verbatim
+from the template's own reference sheet, not free text: VTP validates the
+field server-side, so a typo would produce a file rejected only at upload
+time — after the seller has planned their day around that pickup slot.
 EOF
 ```
 

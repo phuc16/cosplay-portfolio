@@ -169,7 +169,14 @@ DBX="docker compose exec -T mysql mysql -uroot -p$DB_PASS cosplay -N -B -e"
 - [ ] **K3** Confirm no label-printing or rate-quoting code was added (scope check, mirroring Plan 4's K3/K4 sanity checks).
 - [ ] **K4** Confirm the roster is genuinely browser-printed HTML, not a server-generated PDF (`grep -rn "puppeteer\|pdfkit\|wkhtmltopdf" backend/package.json backend/shop/shipping` returns nothing) — per the spec's explicit rationale (no new heavy dependency on a 2GB droplet).
 - [ ] **K5** No stats/shipping route or component references `frontend/src/i18n/translations.js` — confirm via `grep -rn "translations\|useTranslation\|i18n" frontend/src/components/shipping frontend/src/components/AdminShipping.jsx` returning nothing.
-- [ ] **K6** Confirm the `Thời gian hẹn lấy` field is genuinely free-text in the shipped UI, not a `<select>` with invented option values (grep `ShippingExport.jsx` for a hardcoded array of slot strings — there should be none, per the plan's Global Constraints).
+- [ ] **K6** Confirm the `Thời gian hẹn lấy` `<select>` offers exactly the 11 values from the template's own reference sheet, byte-for-byte. Compare against the source of truth:
+  ```bash
+  cd /Users/phucth/vibes/vtp && venv/bin/python -c "
+  import openpyxl
+  ws = openpyxl.load_workbook('VTP_mau_excel_don_hang_o.xlsx')['Thời gian hẹn lấy']
+  print([str(c.value) for r in ws.iter_rows() for c in r if c.value is not None][1:])"
+  ```
+  Every string must match the array in `ShippingExport.jsx` exactly — no invented, reordered, or "tidied" values.
 
 **Section verdict: ___**
 
@@ -193,7 +200,7 @@ DBX="docker compose exec -T mysql mysql -uroot -p$DB_PASS cosplay -N -B -e"
 - [ ] `cd frontend && npm test && npm run build && npm run lint` pass, modulo the 3 pre-existing problems (A3–A5).
 - [ ] Section L (write-scope guarantee) fully PASS — this is the property that makes every other failure in this phase bounded to "one wrong export/import," never "unrelated data corrupted."
 - [ ] Every item marked **NOT VERIFIED — needs X** has either been verified in a follow-up session with the needed tool/access, or is recorded here as an accepted gap with a named owner and target date. This is expected to include at minimum G1/G2/G4/G5 (spreadsheet app, Excel, real VTP portal) and the browser-dependent H/J items — no browser, spreadsheet app, or VTP portal account is assumed available in an automated pass.
-- [ ] Non-blocking findings (T14's free-text `Thời gian hẹn lấy` field, any Minor from the automated pass) are recorded with an explicit accept/reject decision, not left ambiguous.
+- [ ] Non-blocking findings (any Minor from the automated pass) are recorded with an explicit accept/reject decision, not left ambiguous.
 
 ### Outstanding Questions from the spec — both must be tracked, neither blocks shipping this phase
 
@@ -203,5 +210,5 @@ DBX="docker compose exec -T mysql mysql -uroot -p$DB_PASS cosplay -N -B -e"
 ## Production readiness
 
 - [ ] The seller has performed at least one real export → real VTP import → real tracking-code round trip before this replaces their existing Python-script workflow entirely (do not retire `/Users/phucth/vibes/vtp/fill_vtp_orders.py` until this has happened at least once).
-- [ ] The seller understands the free-text `Thời gian hẹn lấy` field must be copied exactly from the template's own dropdown (T14) — a plausible-looking wrong value fails silently on VTP's side, not this app's.
+- [ ] The `Thời gian hẹn lấy` options were re-checked against the template's reference sheet (K6) — VTP validates this field server-side, so a drifted string fails at upload time, not in this app's tests.
 - [ ] A rollback plan exists: migration 017 is additive-only (`shipping_payer` with a safe default) and reversible via `exports.down`; confirm rollback is genuinely "revert the commits, roll back the migration, redeploy" by checking no other phase's code was touched beyond the mount lines and tab entry noted in A6.
