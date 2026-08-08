@@ -67,15 +67,23 @@ export default function StatsBookkeeping() {
     }
   }
 
+  /** Exports the range that produced the currently-displayed `stats`, not
+   * the live date-input values — the inputs can be edited after "Xem" is
+   * clicked without clearing `stats` (the button is gated only on `stats &&`),
+   * so using them here could silently download a different range than the
+   * one on screen. The backend echoes `date_from`/`date_to` back in its
+   * response precisely so the displayed range is always available here. */
   const downloadCsv = async () => {
+    if (!stats) return
+    const { date_from: statsDateFrom, date_to: statsDateTo } = stats
     setError("")
     setExporting(true)
     try {
-      const blob = await adminDownloadBookkeepingCsv({ date_from: dateFrom, date_to: dateTo })
+      const blob = await adminDownloadBookkeepingCsv({ date_from: statsDateFrom, date_to: statsDateTo })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `so-quy-${dateFrom}-${dateTo}.csv`
+      a.download = `so-quy-${statsDateFrom}-${statsDateTo}.csv`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
@@ -150,6 +158,10 @@ export default function StatsBookkeeping() {
                 <p className="text-xs opacity-70">Đã mất (đơn hủy)</p>
                 <p className="text-lg font-semibold">{formatVnd(stats.lost)}</p>
               </div>
+              <div className="p-3 rounded-xl border border-[var(--border-brand)]">
+                <p className="text-xs opacity-70">Đơn COD chưa xác nhận</p>
+                <p className="text-lg font-semibold">{formatVnd(stats.pending_cod)}</p>
+              </div>
             </div>
 
             <p className="mb-2 text-sm">
@@ -169,7 +181,8 @@ export default function StatsBookkeeping() {
                     <th className="pr-2">Đã nhận</th>
                     <th className="pr-2">Chờ thanh toán</th>
                     <th className="pr-2">Thu khi giao</th>
-                    <th>Đã mất</th>
+                    <th className="pr-2">Đã mất</th>
+                    <th>Đơn COD chưa xác nhận</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -179,7 +192,8 @@ export default function StatsBookkeeping() {
                       <td className="pr-2 py-1">{formatVnd(c.received_total)}</td>
                       <td className="pr-2 py-1">{formatVnd(c.awaiting_payment)}</td>
                       <td className="pr-2 py-1">{formatVnd(c.to_collect)}</td>
-                      <td className="py-1">{formatVnd(c.lost)}</td>
+                      <td className="pr-2 py-1">{formatVnd(c.lost)}</td>
+                      <td className="py-1">{formatVnd(c.pending_cod)}</td>
                     </tr>
                   ))}
                 </tbody>

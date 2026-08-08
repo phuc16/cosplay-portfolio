@@ -14,18 +14,39 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 globalThis.URL.createObjectURL = vi.fn(() => "blob:mock")
 globalThis.URL.revokeObjectURL = vi.fn()
 
+// The component builds a throwaway <a download="..."> and calls .click() on
+// it to trigger the browser download — capture the download attribute at
+// the moment of the click so tests can assert the exported filename.
+let lastAnchorDownload = null
+vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(function anchorClick() {
+  lastAnchorDownload = this.download
+})
+
 const { default: StatsBookkeeping } = await import("./StatsBookkeeping")
 
 function bookkeepingStats(over = {}) {
   return {
     date_from: "2026-08-01", date_to: "2026-08-08",
     received: { bank: 100000, momo: 20000, paypal: 0, cod: 30000 }, received_total: 150000,
-    awaiting_payment: 40000, to_collect: 10000, lost: 5000, shipping_cost: 25000,
+    awaiting_payment: 40000, to_collect: 10000, lost: 5000, pending_cod: 15000, shipping_cost: 25000,
     by_collection: [
-      { collection_id: 1, collection_title: "Drop hè", received_total: 150000, awaiting_payment: 40000, to_collect: 10000, lost: 5000 },
+      { collection_id: 1, collection_title: "Drop hè", received_total: 150000, awaiting_payment: 40000, to_collect: 10000, lost: 5000, pending_cod: 15000 },
     ],
     ...over,
   }
+}
+
+async function setDateInput(el, value) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+  await act(async () => {
+    setter.call(el, value)
+    el.dispatchEvent(new Event("change", { bubbles: true }))
+  })
+}
+
+function findDateInput(container, labelText) {
+  const label = [...container.querySelectorAll("label")].find((l) => l.textContent.startsWith(labelText))
+  return label.querySelector("input")
 }
 
 async function renderStatsBookkeeping() {
@@ -55,6 +76,7 @@ function jsonErrorBlob(message) {
 beforeEach(() => {
   adminGetBookkeepingStats.mockReset()
   adminDownloadBookkeepingCsv.mockReset()
+  lastAnchorDownload = null
 })
 
 describe("StatsBookkeeping", () => {
@@ -79,19 +101,26 @@ describe("StatsBookkeeping", () => {
     expect(container.textContent).toContain("Không có đơn hàng nào")
   })
 
-  it("downloads the CSV with the same date params shown on screen", async () => {
-    adminGetBookkeepingStats.mockResolvedValue(bookkeepingStats())
+  it("downloads the CSV with the same date params shown on screen, even after editing the inputs without clicking 'Xem'", async () => {
+    adminGetBookkeepingStats.mockResolvedValue(bookkeepingStats({ date_from: "2026-08-01", date_to: "2026-08-08" }))
     adminDownloadBookkeepingCsv.mockResolvedValue(new Blob(["csv"], { type: "text/csv" }))
     const container = await renderStatsBookkeeping()
     await flush()
 
     await click(findButton(container, "Xem"))
+
+    // Edit the date inputs after loading, without clicking "Xem" again — the
+    // screen still shows the August range, so the export must too.
+    await setDateInput(findDateInput(container, "Từ ngày"), "2026-09-01")
+    await setDateInput(findDateInput(container, "Đến ngày"), "2026-09-08")
+
     await click(findButton(container, "Xuất CSV"))
 
     expect(adminDownloadBookkeepingCsv).toHaveBeenCalledTimes(1)
     const params = adminDownloadBookkeepingCsv.mock.calls[0][0]
-    expect(params.date_from).toBeTruthy()
-    expect(params.date_to).toBeTruthy()
+    expect(params.date_from).toBe("2026-08-01")
+    expect(params.date_to).toBe("2026-08-08")
+    expect(lastAnchorDownload).toBe("so-quy-2026-08-01-2026-08-08.csv")
   })
 
   it("surfaces the server's real Vietnamese message from a blob-wrapped 400 on CSV export, not a generic fallback", async () => {
@@ -161,6 +190,17 @@ describe("StatsBookkeeping", () => {
     expect(container.textContent).toContain("COD 30.000₫")
     expect(container.textContent).toContain("40.000₫")
     expect(container.textContent).toContain("10.000₫")
+  })
+
+  it("renders the pending-COD bucket as its own labelled figure, distinct from received_total", async () => {
+    adminGetBookkeepingStats.mockResolvedValue(bookkeepingStats({ received_total: 150000, pending_cod: 15000 }))
+    const container = await renderStatsBookkeeping()
+    await flush()
+    await click(findButton(container, "Xem"))
+
+    expect(container.textContent).toContain("Đơn COD chưa xác nhận")
+    expect(container.textContent).toContain("15.000₫")
+    expect(container.textContent).not.toContain("165.000₫") // never folded into received_total
   })
 
   it("renders the no-collection bucket with its backend-provided label", async () => {
