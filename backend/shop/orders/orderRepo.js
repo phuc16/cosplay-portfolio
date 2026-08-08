@@ -1,5 +1,13 @@
 const db = require("./../../db")
 const domain = require("./domain")
+const emailQueue = require("./../email/queue")
+
+const TRANSITION_EMAILS = {
+  confirmed: "payment_confirmed",
+  shipped: "shipped",
+  cancelled: "cancelled",
+  // `completed` intentionally sends nothing: the buyer already has the item.
+}
 
 class OutOfStockError extends Error {
   constructor(variantLabel) {
@@ -315,7 +323,7 @@ async function transitionOrder(id, toStatus, extra = {}) {
     await conn.beginTransaction()
 
     const [[order]] = await conn.query(
-      `SELECT id, status, fulfillment_method, stock_released_at, expires_at
+      `SELECT id, status, fulfillment_method, stock_released_at, expires_at, email
          FROM orders WHERE id = ? FOR UPDATE`,
       [id]
     )
@@ -359,6 +367,17 @@ async function transitionOrder(id, toStatus, extra = {}) {
 
     await conn.query(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, params)
     await conn.commit()
+
+    // After commit, and deliberately outside the transaction: a mail failure
+    // must never roll back a status change the seller already performed.
+    const emailType = TRANSITION_EMAILS[toStatus]
+    if (emailType && extra.notify !== false && order.email) {
+      try {
+        await emailQueue.enqueue(id, emailType, order.email)
+      } catch (err) {
+        console.error("[ORDERS] Không xếp được email:", err.message)
+      }
+    }
     return true
   } catch (err) {
     await conn.rollback()

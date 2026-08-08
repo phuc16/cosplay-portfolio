@@ -4,6 +4,7 @@ const db = require("./db")
 const redis = require("./redis")
 const storage = require("./storage")
 const orderRepo = require("./shop/orders/orderRepo")
+const emailSender = require("./shop/email/sender")
 
 const THUMB_WIDTH = 400
 const JPEG_QUALITY = 85
@@ -52,6 +53,19 @@ async function sweepExpiredOrders() {
   }
 }
 
+async function dispatchEmails() {
+  try {
+    const { sent, failed, skipped } = await emailSender.sendQueued(10)
+    if (!skipped && (sent || failed)) {
+      console.log(`[WORKER] Email: gửi ${sent}, lỗi ${failed}`)
+    }
+    return sent
+  } catch (err) {
+    console.error("[WORKER] Lỗi gửi email:", err.message)
+    return 0
+  }
+}
+
 async function run() {
   try {
     const [rows] = await db.query(
@@ -74,6 +88,7 @@ async function run() {
   }
 
   await sweepExpiredOrders()
+  await dispatchEmails()
 }
 
 if (require.main === module) {
@@ -81,4 +96,4 @@ if (require.main === module) {
   setInterval(run, 5000)
 }
 
-module.exports = { run, sweepExpiredOrders }
+module.exports = { run, sweepExpiredOrders, dispatchEmails }

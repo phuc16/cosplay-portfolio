@@ -3,6 +3,7 @@ const repo = require("../shop/orders/orderRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const { buildInstructions } = require("../shop/payments/instructions")
 const { processShopImage, storeShopImage } = require("../shop/images")
+const emailQueue = require("../shop/email/queue")
 const db = require("../db")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
@@ -61,6 +62,21 @@ module.exports = function orderRoutes() {
       }
 
       const order = await repo.createOrder(req.body)
+
+      // Best-effort, after the order is already committed: a mail failure
+      // must never fail an order the buyer has already placed. A replayed
+      // (reused) request already queued its email the first time around.
+      if (!order.reused) {
+        try {
+          await emailQueue.enqueue(order.id, "order_placed", req.body.buyer.email)
+          if (process.env.ADMIN_EMAIL) {
+            await emailQueue.enqueue(order.id, "order_placed", process.env.ADMIN_EMAIL)
+          }
+        } catch (err) {
+          console.error("[ORDERS] Không xếp được email đơn mới:", err.message)
+        }
+      }
+
       res.status(201).json({ order_token: order.order_token, total: order.total })
     } catch (err) {
       if (err instanceof repo.EmptyCartError) return bad(res, err.message)
