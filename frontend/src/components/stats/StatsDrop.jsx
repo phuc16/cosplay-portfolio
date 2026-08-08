@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { adminListCollections, adminGetDropStats } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 
@@ -17,21 +17,25 @@ export default function StatsDrop() {
   const [collectionId, setCollectionId] = useState("")
   const [stats, setStats] = useState(null)
   const [error, setError] = useState("")
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     adminListCollections().then(setCollections).catch(() => setCollections([]))
   }, [])
 
-  /* eslint-disable react-hooks/set-state-in-effect -- clear stale stats immediately when the collection selection changes */
   useEffect(() => {
-    if (!collectionId) { setStats(null); return }
-    setError("")
-    adminGetDropStats(collectionId).then(setStats).catch(() => {
+    const requestId = ++requestIdRef.current
+    if (!collectionId) return
+    adminGetDropStats(collectionId).then((data) => {
+      if (requestIdRef.current !== requestId) return
+      setError("")
+      setStats(data)
+    }).catch(() => {
+      if (requestIdRef.current !== requestId) return
       setStats(null)
       setError("Không tải được thống kê cho bộ sưu tập này")
     })
   }, [collectionId])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   return (
     <div>
@@ -39,7 +43,7 @@ export default function StatsDrop() {
         Bộ sưu tập
         <select
           value={collectionId}
-          onChange={(e) => setCollectionId(e.target.value)}
+          onChange={(e) => { setStats(null); setCollectionId(e.target.value) }}
           className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
         >
           <option value="">— Chọn một bộ sưu tập —</option>
@@ -117,7 +121,7 @@ export default function StatsDrop() {
                         {v.deleted ? "—" : v.unlimited ? "không giới hạn" : v.remaining}
                       </td>
                       <td className="pr-2 py-1">
-                        {v.unlimited || v.deleted ? "—" : formatPercent(v.sell_through)}
+                        {v.deleted ? "—" : v.unlimited ? "không giới hạn" : formatPercent(v.sell_through)}
                       </td>
                       <td className="py-1">
                         {v.time_to_sellout_days === null ? "—" : `${Math.ceil(v.time_to_sellout_days)} ngày`}

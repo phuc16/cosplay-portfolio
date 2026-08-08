@@ -85,6 +85,52 @@ describe("StatsDrop", () => {
     expect(container.textContent).toContain("không giới hạn")
   })
 
+  it("shows 'không giới hạn' specifically in the sell-through cell for an unlimited variant, not '—'", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({
+      variants: [{ variant_id: 9, product_name: "Poster", variant_label: "Std", sold: 3, deleted: false, unlimited: true, remaining: null, sell_through: null, time_to_sellout_days: null }],
+    }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const row = Array.from(container.querySelectorAll("tbody tr")).find((tr) => tr.textContent.includes("Poster"))
+    const cells = row.querySelectorAll("td")
+    const remainingCell = cells[3]
+    const sellThroughCell = cells[4]
+    expect(remainingCell.textContent).toBe("không giới hạn")
+    expect(sellThroughCell.textContent).toBe("không giới hạn")
+  })
+
+  it("renders time_to_sellout_days rounded up with a 'ngày' suffix when non-null", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({
+      variants: [{ variant_id: 7, product_name: "Badge", variant_label: "Std", sold: 2, deleted: false, unlimited: false, remaining: 3, sell_through: 0.4, time_to_sellout_days: 4.2 }],
+    }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const row = Array.from(container.querySelectorAll("tbody tr")).find((tr) => tr.textContent.includes("Badge"))
+    const timeCell = row.querySelectorAll("td")[5]
+    expect(timeCell.textContent).toBe("5 ngày")
+  })
+
+  it("renders no time-to-sellout value when time_to_sellout_days is null", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({
+      variants: [{ variant_id: 8, product_name: "Sticker", variant_label: "Std", sold: 1, deleted: false, unlimited: false, remaining: 5, sell_through: 0.1, time_to_sellout_days: null }],
+    }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const row = Array.from(container.querySelectorAll("tbody tr")).find((tr) => tr.textContent.includes("Sticker"))
+    const timeCell = row.querySelectorAll("td")[5]
+    expect(timeCell.textContent).not.toMatch(/ngày/)
+    expect(timeCell.textContent).toBe("—")
+  })
+
   it("shows '—' for a deleted variant's remaining stock, never 0", async () => {
     adminGetDropStats.mockResolvedValue(dropStats({
       variants: [{ variant_id: null, product_name: "Old card", variant_label: "B2", sold: 2, deleted: true, unlimited: false, remaining: null, sell_through: null, time_to_sellout_days: null }],
@@ -97,6 +143,30 @@ describe("StatsDrop", () => {
     const table = container.querySelector("table")
     expect(table.textContent).toContain("—")
     expect(table.textContent).not.toMatch(/\b0\b.*Old card|Old card.*\b0\b/)
+  })
+
+  it("discards a stale response when a later selection resolves first (out-of-order race)", async () => {
+    let resolveFirst
+    let resolveSecond
+    adminGetDropStats.mockImplementation((id) => {
+      if (id === "1") return new Promise((resolve) => { resolveFirst = resolve })
+      return new Promise((resolve) => { resolveSecond = resolve })
+    })
+    adminListCollections.mockResolvedValue([{ id: 1, title: "Drop" }, { id: 2, title: "Second Drop" }])
+
+    const container = await renderStatsDrop()
+    await flush()
+
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+    setSelectValue(container.querySelector("select"), "2")
+    await flush()
+
+    await act(async () => { resolveSecond(dropStats({ collection_id: 2, collection_title: "Second Drop", received_total: 99000 })) })
+    await act(async () => { resolveFirst(dropStats({ collection_id: 1, collection_title: "Drop", received_total: 35000 })) })
+
+    expect(container.textContent).toContain("99.000₫")
+    expect(container.textContent).not.toContain("35.000₫")
   })
 
   it("prints the sell-through honesty caveat (spec: mid-drop restock shifts the number)", async () => {
