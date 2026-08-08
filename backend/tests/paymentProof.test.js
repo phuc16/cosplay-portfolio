@@ -37,6 +37,8 @@ beforeEach(async () => {
   // the same loopback address. Without clearing it, later tests would 429.
   const keys = await redis.keys("rl:order:*")
   if (keys.length) await redis.del(...keys)
+  const proofKeys = await redis.keys("rl:proof:*")
+  if (proofKeys.length) await redis.del(...proofKeys)
   await db.query("DELETE FROM payment_settings")
   await settings.updateSettings({
     bank_enabled: true, bank_name: "ACB", bank_bin: "970416",
@@ -105,5 +107,20 @@ describe("POST /api/orders/:token/proof", () => {
     // Verify the database was updated with the second URL, not the first
     const [[row]] = await db.query("SELECT payment_proof_url FROM orders WHERE id = ?", [o.id])
     expect(row.payment_proof_url).toBe(secondUrl)
+  })
+
+  // Proof upload used to share orderLimiter's "rl:order:" bucket with order
+  // creation — a buyer retrying a rejected photo could exhaust the 10/hour
+  // budget that order creation needs, and vice versa. It now has its own
+  // "rl:proof:" bucket, verified here by checking which Redis keys the
+  // limiter actually writes to.
+  it("rate-limits proof uploads under a separate bucket from order creation", async () => {
+    const o = await seedOrder()
+    await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+
+    const proofKeys = await redis.keys("rl:proof:*")
+    const orderKeys = await redis.keys("rl:order:*")
+    expect(proofKeys.length).toBeGreaterThan(0)
+    expect(orderKeys.length).toBe(0)
   })
 })

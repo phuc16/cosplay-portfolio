@@ -19,6 +19,11 @@ function readFileAsBase64(file) {
   })
 }
 
+// Well under the backend's 50MB body limit — rejects an obviously oversized
+// photo client-side before it's ever base64-encoded and sent, so a buyer
+// doesn't burn a retry against the proof rate limiter on a doomed upload.
+const MAX_PROOF_BYTES = 8 * 1024 * 1024
+
 function ProofUpload({ token }) {
   const { t } = useLanguage()
   const [uploading, setUploading] = useState(false)
@@ -33,6 +38,11 @@ function ProofUpload({ token }) {
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file) return
+
+    if (file.size > MAX_PROOF_BYTES) {
+      setError(t("proofTooLarge"))
+      return
+    }
 
     setError("")
     setUploading(true)

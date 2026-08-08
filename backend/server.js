@@ -90,6 +90,24 @@ const orderLimiter = rateLimit({
   },
 })
 
+// Payment proof upload: 20/hour per IP. Deliberately separate from
+// orderLimiter — a buyer retrying a rejected/blurry proof photo must not
+// burn the budget order creation needs, and vice versa. Base64-decodes up to
+// 50MB and hands it to sharp on an unauthenticated route, so this still
+// needs its own ceiling, just a more generous one sized for a few retries.
+const proofLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:proof:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Proof IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều lần tải ảnh. Thử lại sau." })
+  },
+})
+
 // Global: 600 req/phút hard ceiling per IP
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -201,10 +219,16 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
 
 // ── ORDERS: public order creation + lookup. Creation gets its own stricter
-// limiter (reservation holds real stock); reading an order status page uses
-// the general public limiter so a buyer refreshing it isn't locked out. ──
-app.use(`${API_PREFIX}/orders`, (req, res, next) =>
-  req.method === "POST" ? orderLimiter(req, res, next) : publicLimiter(req, res, next),
+// limiter (reservation holds real stock); proof upload gets its own more
+// generous limiter (retrying a photo must not burn the order-creation
+// budget, or vice versa); reading an order status page uses the general
+// public limiter so a buyer refreshing it isn't locked out. ──
+const PROOF_PATH = /^\/[^/]+\/proof$/
+app.use(`${API_PREFIX}/orders`, (req, res, next) => {
+  if (req.method === "POST" && PROOF_PATH.test(req.path)) return proofLimiter(req, res, next)
+  if (req.method === "POST") return orderLimiter(req, res, next)
+  return publicLimiter(req, res, next)
+},
   require("./routes/orders")())
 
 app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminCatalog")())

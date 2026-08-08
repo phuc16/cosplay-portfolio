@@ -61,6 +61,7 @@ export const translations = {
     proofTitle: "Payment proof", proofUpload: "Upload a screenshot of your transfer",
     proofReplace: "Replace", proofUploading: "Uploading...", proofUploaded: "Uploaded",
     proofError: "Could not upload the image. Please try again.",
+    proofTooLarge: "Image is too large. Please choose a file under 8MB.",
     orderQrCaption: "Show this QR code at pickup or to the seller.",
 
     // Hero
@@ -176,6 +177,7 @@ export const translations = {
     proofTitle: "Ảnh chuyển khoản", proofUpload: "Tải lên ảnh chụp màn hình chuyển khoản",
     proofReplace: "Thay ảnh khác", proofUploading: "Đang tải lên...", proofUploaded: "Đã tải lên",
     proofError: "Không tải được ảnh lên. Vui lòng thử lại.",
+    proofTooLarge: "Ảnh quá lớn. Vui lòng chọn ảnh dưới 8MB.",
     orderQrCaption: "Đưa mã QR này khi nhận hàng hoặc cho người bán xem.",
 
     // Hero
