@@ -160,3 +160,75 @@ describe("POST /api/admin/orders/:id/transition", () => {
     expect(res.body.error).toBe("not_found")
   })
 })
+
+describe("POST /api/admin/orders/bulk-cancel", () => {
+  it("requires a token", async () => {
+    const res = await request(app).post("/api/admin/orders/bulk-cancel").send({ ids: [1] })
+    expect(res.status).toBe(401)
+  })
+
+  it("cancels multiple pending orders and releases their stock", async () => {
+    const a = await seedOrder()
+    const b = await seedOrder()
+
+    const res = await authed(request(app).post("/api/admin/orders/bulk-cancel"))
+      .send({ ids: [a.id, b.id] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(2)
+    expect(res.body.results.every((r) => r.ok)).toBe(true)
+
+    const [[rowA]] = await db.query("SELECT status FROM orders WHERE id = ?", [a.id])
+    const [[rowB]] = await db.query("SELECT status FROM orders WHERE id = ?", [b.id])
+    expect(rowA.status).toBe("cancelled")
+    expect(rowB.status).toBe("cancelled")
+
+    const [variantRows] = await db.query("SELECT stock_qty FROM product_variants")
+    expect(variantRows.every((v) => v.stock_qty === 5)).toBe(true)
+  })
+
+  it("isolates a failing order from the others in the same batch", async () => {
+    const ok1 = await seedOrder()
+    const already = await seedOrder()
+    await orders.transitionOrder(already.id, "confirmed")
+    await orders.transitionOrder(already.id, "shipped")
+    await orders.transitionOrder(already.id, "completed")
+    const ok2 = await seedOrder()
+
+    const res = await authed(request(app).post("/api/admin/orders/bulk-cancel"))
+      .send({ ids: [ok1.id, already.id, ok2.id, 999999] })
+
+    expect(res.status).toBe(200)
+    const byId = Object.fromEntries(res.body.results.map((r) => [r.id, r]))
+    expect(byId[ok1.id].ok).toBe(true)
+    expect(byId[ok2.id].ok).toBe(true)
+    expect(byId[already.id].ok).toBe(false)
+    expect(byId[already.id].error).toBe("invalid_transition")
+    expect(byId[999999].ok).toBe(false)
+    expect(byId[999999].error).toBe("not_found")
+
+    const [[row1]] = await db.query("SELECT status FROM orders WHERE id = ?", [ok1.id])
+    const [[row2]] = await db.query("SELECT status FROM orders WHERE id = ?", [ok2.id])
+    expect(row1.status).toBe("cancelled")
+    expect(row2.status).toBe("cancelled")
+  })
+
+  it("rejects a non-array ids payload", async () => {
+    const res = await authed(request(app).post("/api/admin/orders/bulk-cancel")).send({ ids: "1,2" })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("rejects an empty ids array", async () => {
+    const res = await authed(request(app).post("/api/admin/orders/bulk-cancel")).send({ ids: [] })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("rejects a batch larger than the cap", async () => {
+    const ids = Array.from({ length: 101 }, (_, i) => i + 1)
+    const res = await authed(request(app).post("/api/admin/orders/bulk-cancel")).send({ ids })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+})

@@ -4,6 +4,11 @@ const domain = require("../shop/orders/domain")
 
 const STATUSES = ["pending", "confirmed", "shipped", "completed", "cancelled"]
 
+// A griefed drop is at most a few dozen orders; this is generous headroom
+// while still bounding how many DB transactions + email enqueues one request
+// can trigger.
+const BULK_CANCEL_MAX = 100
+
 // The legal next-statuses for a given order, per the real canTransition state
 // machine — the single source of truth. Sent to the frontend so it never needs
 // its own copy of TRANSITIONS/the pickup-shipped exclusion rule.
@@ -70,6 +75,56 @@ module.exports = function adminOrderRoutes() {
       }
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi đổi trạng thái đơn") }
+  })
+
+  // Bulk cancel — the abuse-resistance mitigation for a griefed drop: lets the
+  // admin clear a batch of orders in one request. Cancels each order through
+  // the same transitionOrder() used everywhere else (stock release, the
+  // double-release guard, and the cancellation email all live there), one
+  // order per call, so one order's failure never stops the others.
+  router.post("/orders/bulk-cancel", async (req, res) => {
+    try {
+      const { ids } = req.body
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "invalid_input", message: "ids phải là mảng khác rỗng" })
+      }
+      if (ids.length > BULK_CANCEL_MAX) {
+        return res.status(400).json({
+          error: "invalid_input",
+          message: `Chỉ có thể huỷ tối đa ${BULK_CANCEL_MAX} đơn mỗi lần`,
+        })
+      }
+
+      const results = []
+      for (const rawId of ids) {
+        const id = Number(rawId)
+        if (!Number.isInteger(id) || id <= 0) {
+          results.push({ id: rawId, ok: false, error: "invalid_input", message: "ID đơn hàng không hợp lệ" })
+          continue
+        }
+
+        try {
+          const order = await repo.getOrderById(id)
+          if (!order) {
+            results.push({ id, ok: false, error: "not_found", message: "Không tìm thấy đơn hàng" })
+            continue
+          }
+
+          const ok = await repo.transitionOrder(id, "cancelled")
+          results.push(ok
+            ? { id, ok: true }
+            : {
+                id, ok: false, error: "invalid_transition",
+                message: `Không thể chuyển từ "${order.status}" sang "cancelled"`,
+              })
+        } catch (err) {
+          console.error(`[ADMIN/ORDERS] Lỗi huỷ đơn ${id} trong huỷ hàng loạt:`, err)
+          results.push({ id, ok: false, error: "server_error", message: "Lỗi server. Thử lại sau." })
+        }
+      }
+
+      res.json({ results })
+    } catch (err) { oops(res, err, "Lỗi huỷ hàng loạt đơn") }
   })
 
   return router
