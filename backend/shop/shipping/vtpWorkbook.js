@@ -28,14 +28,22 @@ async function buildExportWorkbook(orders, batch) {
   if (!sheet) throw new Error(`Template thiếu sheet "${DATA_SHEET_NAME}"`)
 
   // The pristine template ships ViettelPost's own example order in row 8
-  // (buyer name, phone, address, etc.) — it must never survive into a real
-  // export, even when every order in this batch is excluded and no row
-  // gets written. Clear it unconditionally before filling anything in.
-  const exampleRow = sheet.getRow(DATA_START_ROW)
-  exampleRow.eachCell({ includeEmpty: true }, (cell) => {
-    cell.value = null
-  })
-  exampleRow.commit()
+  // (buyer name, phone, address, etc.) AND a pre-filled sequential STT
+  // (column A only) running all the way down to the sheet's last used row.
+  // A one-order export that clears only row 8 would ship ~1,037 rows
+  // carrying nothing but a stray number in column A — unlike the seller's
+  // proven-working script, which clears every column of every row from
+  // DATA_START_ROW down before filling. Match that behaviour here so we
+  // never diverge from what is known to import successfully.
+  const lastDataRow = sheet.lastRow ? sheet.lastRow.number : DATA_START_ROW
+  const lastDataColumn = sheet.columnCount || 1
+  for (let r = DATA_START_ROW; r <= lastDataRow; r += 1) {
+    const row = sheet.getRow(r)
+    for (let c = 1; c <= lastDataColumn; c += 1) {
+      row.getCell(c).value = null
+    }
+    row.commit()
+  }
 
   const exported = []
   const excluded = []
@@ -43,7 +51,7 @@ async function buildExportWorkbook(orders, batch) {
   let rowIdx = DATA_START_ROW
 
   for (const order of orders) {
-    const mapped = mapOrderToRow(order, batch)
+    const mapped = mapOrderToRow(order)
     if (!mapped.ok) {
       excluded.push({ order_id: mapped.order_id, reason: mapped.reason, message: mapped.message })
       continue

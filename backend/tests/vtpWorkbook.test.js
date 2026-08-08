@@ -111,6 +111,51 @@ describe("buildExportWorkbook", () => {
     expect(String(row.getCell("E").value)).toContain("Đường Điện Biên Phủ")
   })
 
+  it("clears the template's pre-filled STT rows below the last written row (row after last write, and row 1045)", async () => {
+    const { buffer, exported } = await buildExportWorkbook([order({ id: 1 })], batch)
+    expect(exported).toEqual([{ order_id: 1, row_index: DATA_START_ROW }])
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buffer)
+    const sheet = wb.getWorksheet(DATA_SHEET_NAME)
+
+    const nextRow = sheet.getRow(DATA_START_ROW + 1)
+    nextRow.eachCell({ includeEmpty: true }, (cell) => {
+      expect(cell.value, `row ${nextRow.number} col ${cell.col} should be empty`).toBeNull()
+    })
+
+    const farRow = sheet.getRow(1045)
+    farRow.eachCell({ includeEmpty: true }, (cell) => {
+      expect(cell.value, `row ${farRow.number} col ${cell.col} should be empty`).toBeNull()
+    })
+  })
+
+  it("leaves the header block (rows 1-7) and the reference sheets untouched", async () => {
+    const wbBefore = await (async () => {
+      const w = new ExcelJS.Workbook()
+      await w.xlsx.readFile(new URL("../shop/shipping/templates/VTP_mau_excel_don_hang_o.xlsx", import.meta.url).pathname)
+      return w
+    })()
+    const sheetBefore = wbBefore.getWorksheet(DATA_SHEET_NAME)
+
+    const { buffer } = await buildExportWorkbook([order()], batch)
+    const wbAfter = new ExcelJS.Workbook()
+    await wbAfter.xlsx.load(buffer)
+    const sheetAfter = wbAfter.getWorksheet(DATA_SHEET_NAME)
+
+    for (let r = 1; r <= 7; r += 1) {
+      const before = sheetBefore.getRow(r)
+      const after = sheetAfter.getRow(r)
+      before.eachCell({ includeEmpty: true }, (cell) => {
+        expect(after.getCell(cell.col).value).toEqual(cell.value)
+      })
+    }
+
+    for (const name of ["Dịch vụ", "Loai hang hoa", "Thời gian hẹn lấy", "Tinh chat hang hoa"]) {
+      expect(wbAfter.getWorksheet(name), `reference sheet ${name} missing`).toBeDefined()
+    }
+  })
+
   it("SECURITY: order_token never appears anywhere in the generated buffer", async () => {
     const secretToken = "extremely-unique-bearer-token-xyz987"
     const { buffer } = await buildExportWorkbook([order({ order_token: secretToken })], batch)
