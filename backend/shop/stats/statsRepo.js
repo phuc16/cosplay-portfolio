@@ -47,10 +47,11 @@ function buildVariantSummary(row, collectionCreatedAt) {
  * counts, units sold, expiry rate, fulfillment mix, and a per-variant table.
  *
  * Money classification happens in JavaScript over a scoped fetch
- * (`WHERE collection_id = ?`, using idx_orders_status_created's leading
- * column) rather than as a SQL CASE expression, so the exhaustively-tested
- * classify() from money.js is what actually computes every number here —
- * see this plan's Architecture note for why that trumps a "SQL only" rule.
+ * (`WHERE collection_id = ?`, served by the orders_collection_id_foreign
+ * index MySQL creates for the foreign key) rather than as a SQL CASE
+ * expression, so the exhaustively-tested classify() from money.js is what
+ * actually computes every number here — see this plan's Architecture note
+ * for why that trumps a "SQL only" rule.
  */
 async function getDropStats(collectionId) {
   const [[collection]] = await db.query(
