@@ -30,15 +30,17 @@ nodemailer.createTransport = () => ({
   sendMail: (...args) => sendMailMock(...args),
 })
 
-async function seedOrder() {
-  const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+async function seedOrder(fulfillment_method = "ship") {
+  const cid = await catalog.createCollection({
+    title: "Drop", status: "active", allow_ship: true, allow_pickup: true,
+  })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
   const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
   return orders.createOrder({
     items: [{ variant_id: v.id, qty: 1 }],
     buyer: { buyer_name: "A", phone: "09", email: "a@example.com", address_raw: "x" },
-    fulfillment_method: "ship", payment_method: "bank",
+    fulfillment_method, payment_method: "bank",
   })
 }
 
@@ -192,6 +194,35 @@ describe("sendQueued: send-time template rendering", () => {
 
     const [[row]] = await db.query("SELECT status FROM email_queue LIMIT 1")
     expect(row.status).toBe("sent")
+  })
+})
+
+describe("sendQueued: pickup QR gating", () => {
+  it("ship order: no QR image or attachment", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1)
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("cid:orderqr")
+    expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
+    expect(sentArg.attachments).toEqual([])
+  })
+
+  it("pickup order: has the QR image and attachment", async () => {
+    const o = await seedOrder("pickup")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1)
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("cid:orderqr")
+    expect(sentArg.html).toContain("nhận hàng tại sự kiện")
+    expect(sentArg.attachments).toHaveLength(1)
+    expect(sentArg.attachments[0]).toMatchObject({ filename: "order-qr.png", cid: "orderqr" })
   })
 })
 

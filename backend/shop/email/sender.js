@@ -50,20 +50,31 @@ async function sendQueued(limit = 10) {
         templates.buildVars({ ...order, payment_note: settings.payment_note })
       )
 
-      // cid: attachment rather than a data URI (Gmail strips those) or a remote
-      // URL (blocked by default in many clients).
-      const png = await qr.qrPngBuffer(qr.orderUrl(order.order_token))
+      // The QR block only makes sense for a pickup order — a ship order has no
+      // event pickup counter to scan it at, so skip generating and attaching
+      // it entirely rather than just hiding it visually.
+      const isPickup = order.fulfillment_method === "pickup"
+
+      let html = rendered.html
+      const attachments = []
+      if (isPickup) {
+        // cid: attachment rather than a data URI (Gmail strips those) or a
+        // remote URL (blocked by default in many clients).
+        const png = await qr.qrPngBuffer(qr.orderUrl(order.order_token))
+        html += `
+          <div style="text-align:center;margin-top:16px">
+            <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
+            <p style="font-size:12px;color:#888">Đưa mã này khi nhận hàng tại sự kiện</p>
+          </div>`
+        attachments.push({ filename: "order-qr.png", content: png, cid: "orderqr" })
+      }
 
       await getTransport().sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: row.to_email,
         subject: rendered.subject,
-        html: `${rendered.html}
-          <div style="text-align:center;margin-top:16px">
-            <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
-            <p style="font-size:12px;color:#888">Đưa mã này khi nhận hàng tại sự kiện</p>
-          </div>`,
-        attachments: [{ filename: "order-qr.png", content: png, cid: "orderqr" }],
+        html,
+        attachments,
       })
 
       await queue.markSent(row.id)
