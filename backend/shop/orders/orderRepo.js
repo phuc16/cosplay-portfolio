@@ -368,6 +368,9 @@ async function transitionOrder(id, toStatus, extra = {}) {
     const sets = ["status = ?"]
     const params = [toStatus]
     if (toStatus === "confirmed") sets.push("confirmed_at = NOW()")
+    if (toStatus === "shipped") sets.push("shipped_at = NOW()")
+    if (toStatus === "completed") sets.push("completed_at = NOW()")
+    if (toStatus === "cancelled") sets.push("cancelled_at = NOW()")
     if (extra.tracking_code !== undefined) { sets.push("tracking_code = ?"); params.push(extra.tracking_code) }
     if (extra.shipping_fee !== undefined) { sets.push("shipping_fee = ?"); params.push(extra.shipping_fee) }
     params.push(id)

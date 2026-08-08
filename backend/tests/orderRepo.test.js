@@ -344,6 +344,59 @@ describe("transitionOrder", () => {
     expect(o.confirmed_at).not.toBeNull()
   })
 
+  it("stamps shipped_at on shipping and leaves completed_at/cancelled_at null", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId))
+    await repo.transitionOrder(res.id, "confirmed")
+    await repo.transitionOrder(res.id, "shipped")
+
+    const [[o]] = await db.query(
+      "SELECT shipped_at, completed_at, cancelled_at FROM orders WHERE id = ?", [res.id]
+    )
+    expect(o.shipped_at).not.toBeNull()
+    expect(o.completed_at).toBeNull()
+    expect(o.cancelled_at).toBeNull()
+  })
+
+  it("stamps completed_at on completion and leaves shipped_at/cancelled_at null", async () => {
+    const { variantId } = await seedVariant(5, { allow_pickup: true })
+    const res = await repo.createOrder(order(variantId, 1, { fulfillment_method: "pickup" }))
+    await repo.transitionOrder(res.id, "confirmed")
+    await repo.transitionOrder(res.id, "completed")
+
+    const [[o]] = await db.query(
+      "SELECT shipped_at, completed_at, cancelled_at FROM orders WHERE id = ?", [res.id]
+    )
+    expect(o.completed_at).not.toBeNull()
+    expect(o.shipped_at).toBeNull()
+    expect(o.cancelled_at).toBeNull()
+  })
+
+  it("stamps cancelled_at on cancellation and leaves shipped_at/completed_at null", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId))
+    await repo.transitionOrder(res.id, "cancelled")
+
+    const [[o]] = await db.query(
+      "SELECT shipped_at, completed_at, cancelled_at FROM orders WHERE id = ?", [res.id]
+    )
+    expect(o.cancelled_at).not.toBeNull()
+    expect(o.shipped_at).toBeNull()
+    expect(o.completed_at).toBeNull()
+  })
+
+  it("leaves all three new timestamps null on a freshly created pending order", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId))
+
+    const [[o]] = await db.query(
+      "SELECT shipped_at, completed_at, cancelled_at FROM orders WHERE id = ?", [res.id]
+    )
+    expect(o.shipped_at).toBeNull()
+    expect(o.completed_at).toBeNull()
+    expect(o.cancelled_at).toBeNull()
+  })
+
   it("refuses the transition when expectedFromStatus no longer matches", async () => {
     const { variantId } = await seedVariant(5)
     const res = await repo.createOrder(order(variantId, 2))
