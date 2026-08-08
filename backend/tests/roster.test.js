@@ -10,6 +10,39 @@ function order(over = {}) {
   }
 }
 
+describe("buildRoster — completed orders never show money owing", () => {
+  // A completed pickup order was handed over at the booth, and for COD that
+  // means the buyer already paid then. Printing it as owing money would have
+  // the seller charge them a second time. The route also filters to
+  // confirmed, but this guard is what makes the printed page safe on its own.
+  it("treats a completed COD order as paid with nothing to collect", () => {
+    const { rows } = buildRoster([order({ payment_method: "cod", cod_amount: 50000, status: "completed" })])
+    expect(rows[0].paid).toBe(true)
+    expect(rows[0].amount_due).toBe(0)
+  })
+
+  it("still shows the amount to collect for a confirmed COD order", () => {
+    const { rows } = buildRoster([order({ payment_method: "cod", cod_amount: 50000, status: "confirmed" })])
+    expect(rows[0].paid).toBe(false)
+    expect(rows[0].amount_due).toBe(50000)
+  })
+
+  it("leaves prepaid orders paid at both confirmed and completed", () => {
+    for (const status of ["confirmed", "completed"]) {
+      const { rows } = buildRoster([order({ payment_method: "bank", status })])
+      expect(rows[0].paid).toBe(true)
+      expect(rows[0].amount_due).toBe(0)
+    }
+  })
+
+  it("stops excluding a completed COD order whose cod_amount is null, since nothing is left to collect", () => {
+    const { rows, excluded } = buildRoster([order({ id: 9, payment_method: "cod", cod_amount: null, status: "completed" })])
+    expect(excluded).toEqual([])
+    expect(rows[0].paid).toBe(true)
+    expect(rows[0].amount_due).toBe(0)
+  })
+})
+
 describe("buildRoster — paid vs collect-at-handover", () => {
   it("marks a prepaid order as paid with amount_due 0", () => {
     const { rows } = buildRoster([order({ payment_method: "momo" })])
