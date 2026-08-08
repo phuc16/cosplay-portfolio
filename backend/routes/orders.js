@@ -144,6 +144,32 @@ module.exports = function orderRoutes() {
     }
   })
 
+  // Renders the VietQR payload (not the order URL) as an SVG so the buyer's
+  // banking app can scan it. Built the same way as /qr.svg — locally, on
+  // demand, never stored — so the account details never transit a third
+  // party image service. 404 when the method isn't bank or the payload
+  // could not be built (misconfiguration); the caller falls back to the
+  // printed account details in that case.
+  router.get("/:token/payment/qr.svg", async (req, res) => {
+    try {
+      res.set("X-Robots-Tag", "noindex, nofollow")
+
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      const settings = await paymentSettings.getSettings()
+      const { vietqr_payload } = buildInstructions(order, settings)
+      if (!vietqr_payload) {
+        return res.status(404).json({ error: "not_found", message: "Không tạo được mã QR" })
+      }
+
+      res.type("image/svg+xml").send(await qr.qrSvg(vietqr_payload))
+    } catch (err) {
+      console.error("[ORDERS] Lỗi tạo QR thanh toán:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
   router.post("/:token/proof", async (req, res) => {
     try {
       const { base64 } = req.body
