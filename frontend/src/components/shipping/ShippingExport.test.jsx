@@ -170,6 +170,21 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("không có địa chỉ nhận hàng hợp lệ")
   })
 
+  it("shows an error message instead of crashing when generating the export fails", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGenerateShippingExport.mockRejectedValue(new Error("network down"))
+    const container = await renderShippingExport()
+    await flush()
+
+    await selectOrderAndFillBatch(container)
+
+    const exportButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Xuất file")
+    await click(exportButton)
+    await flush()
+
+    expect(container.textContent).toContain("Không xuất được file")
+  })
+
   it("renders a readable Vietnamese explanation for every known exclusion reason, never blank or snake_case", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminGenerateShippingExport.mockResolvedValue({

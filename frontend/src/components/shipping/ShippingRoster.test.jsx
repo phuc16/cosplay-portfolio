@@ -152,6 +152,16 @@ describe("ShippingRoster", () => {
     expect(printButton).toBeDefined()
   })
 
+  it("shows an error message instead of crashing or hanging when the roster fetch fails", async () => {
+    adminGetPickupRoster.mockRejectedValue(new Error("network down"))
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    expect(container.textContent).toContain("Không tải được danh sách nhận hàng")
+  })
+
   it("ignores a stale response when the collection selection changes before it resolves", async () => {
     let resolveFirst
     adminGetPickupRoster.mockImplementation((id) => {

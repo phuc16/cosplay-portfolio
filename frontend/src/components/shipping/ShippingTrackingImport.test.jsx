@@ -155,6 +155,30 @@ describe("ShippingTrackingImport", () => {
     expect(payload).toEqual({ rows_text: "DH1\tVTP001" })
   })
 
+  it("shows an error message instead of crashing when the preview call fails", async () => {
+    adminPreviewTrackingImport.mockRejectedValue(new Error("network down"))
+    const container = await renderComponent()
+
+    await pasteAndPreview(container, "DH1\tVTP001")
+
+    expect(container.textContent).toContain("Không xem trước được")
+  })
+
+  it("shows an error message instead of crashing when the confirm call fails", async () => {
+    const toApply = [{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }]
+    adminPreviewTrackingImport.mockResolvedValue({ toApply, skipped: [] })
+    adminConfirmTrackingImport.mockRejectedValue(new Error("network down"))
+
+    const container = await renderComponent()
+    await pasteAndPreview(container, "DH1\tVTP001")
+
+    const confirmButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Xác nhận")
+    await click(confirmButton)
+    await flush()
+
+    expect(container.textContent).toContain("Không xác nhận được")
+  })
+
   it("renders a readable Vietnamese explanation for every known skipped reason, never blank or snake_case", async () => {
     const reasons = [
       "invalid_code",
