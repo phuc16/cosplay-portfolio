@@ -215,21 +215,45 @@ module.exports = function adminShippingRoutes() {
       // added to `results` (that would re-violate "exactly once"); they are
       // logged server-side under the "duplicate_in_request" reason so it is
       // never confused with a genuine "not_confirmed".
+      //
+      // A row with an invalid order_id or a blank tracking_code is rejected
+      // here, before it ever reaches transitionOrder — the preview step
+      // (resolvePreview) already rejects exactly this shape of row as
+      // missing_tracking_code, and confirm must not silently accept what
+      // preview refused. Without this, an order with no tracking code would
+      // still transition to "shipped" and still queue the buyer's shipped
+      // email with a blank "Mã vận đơn:". Rejected rows are still deduped by
+      // order_id first, so each valid order_id gets exactly one entry in
+      // `results` (either this rejection, or the transitionOrder outcome).
       const seenOrderIds = new Set()
       const dedupedRows = []
+      const results = []
       for (const r of rows) {
         const orderId = Number(r.order_id)
-        if (Number.isInteger(orderId) && seenOrderIds.has(orderId)) {
+        if (!Number.isInteger(orderId) || orderId <= 0) {
+          console.warn(`[ADMIN/SHIPPING] invalid_order_id trong yêu cầu nhập mã vận đơn: ${JSON.stringify(r.order_id)}`)
+          results.push({ order_id: r.order_id, ok: false, reason: "invalid_order_id", message: "order_id không hợp lệ" })
+          continue
+        }
+        if (seenOrderIds.has(orderId)) {
           console.warn(
             `[ADMIN/SHIPPING] duplicate_in_request: ${orderCode(orderId)} xuất hiện nhiều lần trong yêu cầu nhập mã vận đơn, chỉ xử lý lần đầu`
           )
           continue
         }
-        if (Number.isInteger(orderId)) seenOrderIds.add(orderId)
-        dedupedRows.push(r)
+        seenOrderIds.add(orderId)
+
+        const trackingCode = typeof r.tracking_code === "string" ? r.tracking_code.trim() : ""
+        if (!trackingCode) {
+          results.push({
+            order_id: orderId, ok: false, reason: "missing_tracking_code",
+            message: `${orderCode(orderId)}: thiếu mã vận đơn`,
+          })
+          continue
+        }
+        dedupedRows.push({ order_id: orderId, tracking_code: trackingCode })
       }
 
-      const results = []
       for (const r of dedupedRows) {
         const orderId = Number(r.order_id)
         try {

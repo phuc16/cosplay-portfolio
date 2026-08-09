@@ -225,4 +225,44 @@ describe("POST /api/admin/shipping/tracking-import/confirm", () => {
     const tooMany = Array.from({ length: 201 }, (_, i) => ({ order_id: i, order_code: `DH${i}`, tracking_code: `V${i}` }))
     expect((await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({ rows: tooMany }))).status).toBe(400)
   })
+
+  it("rejects a row with a blank tracking_code per-order: order stays confirmed, no shipped email queued", async () => {
+    const id = await seedConfirmedOrder()
+    const [[{ count: beforeCount }]] = await db.query(
+      "SELECT COUNT(*) AS count FROM email_queue WHERE order_id = ?", [id]
+    )
+
+    const res = await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({
+      rows: [{ order_id: id, order_code: `DH${id}`, tracking_code: "   " }],
+    }))
+    expect(res.status).toBe(200)
+    expect(res.body.results).toEqual([
+      { order_id: id, ok: false, reason: "missing_tracking_code", message: expect.any(String) },
+    ])
+
+    const [[row]] = await db.query("SELECT status, tracking_code FROM orders WHERE id = ?", [id])
+    expect(row.status).toBe("confirmed")
+    expect(row.tracking_code).toBeFalsy()
+
+    const [[{ count: afterCount }]] = await db.query(
+      "SELECT COUNT(*) AS count FROM email_queue WHERE order_id = ?", [id]
+    )
+    expect(afterCount).toBe(beforeCount)
+  })
+
+  it("rejects a row with a non-integer order_id without aborting the rest of the batch", async () => {
+    const good = await seedConfirmedOrder()
+    const res = await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({
+      rows: [
+        { order_id: "not-a-number", order_code: "DHx", tracking_code: "VTP-BAD" },
+        { order_id: good, order_code: `DH${good}`, tracking_code: "VTP-GOOD" },
+      ],
+    }))
+    expect(res.status).toBe(200)
+    expect(res.body.results.find((r) => r.order_id === "not-a-number")).toMatchObject({ ok: false, reason: "invalid_order_id" })
+    expect(res.body.results.find((r) => r.order_id === good)).toMatchObject({ ok: true })
+
+    const [[row]] = await db.query("SELECT status FROM orders WHERE id = ?", [good])
+    expect(row.status).toBe("shipped")
+  })
 })
