@@ -268,6 +268,45 @@ describe("POST /api/admin/shipping/export", () => {
     expect(res.body.exported_count + res.body.excluded.length).toBe(orderIds.length)
   })
 
+  it("dedupes a repeated order_id, writing exactly one row in the xlsx for it", async () => {
+    const id = await seed()
+    const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id, id], batch }))
+    expect(res.status).toBe(200)
+    expect(res.body.exported_count).toBe(1)
+    expect(res.body.excluded).toEqual([
+      { order_id: id, reason: "duplicate_order_id", message: expect.stringContaining(orderCode(id)) },
+    ])
+    expect(res.body.exported_count + res.body.excluded.length).toBe(2)
+
+    const buffer = Buffer.from(res.body.file_base64, "base64")
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buffer)
+    const sheet = wb.getWorksheet("Danh sách")
+    expect(sheet.getRow(8).getCell("B").value).toBe(`DH${id}`)
+    expect(sheet.getRow(9).getCell("B").value).toBeNull()
+  })
+
+  it("routes a non-integer order_id into excluded instead of silently dropping it, invariant holds", async () => {
+    const goodId = await seed()
+    const orderIdsSent = [goodId, "abc"]
+    const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: orderIdsSent, batch }))
+    expect(res.status).toBe(200)
+    expect(res.body.exported_count).toBe(1)
+    expect(res.body.excluded).toEqual([
+      { order_id: "abc", reason: "invalid_order_id", message: expect.any(String) },
+    ])
+    expect(res.body.exported_count + res.body.excluded.length).toBe(orderIdsSent.length)
+  })
+
+  it("count invariant holds with a mix of duplicate and invalid ids", async () => {
+    const goodId = await seed()
+    const orderIdsSent = [goodId, goodId, "abc", 0, -5]
+    const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: orderIdsSent, batch }))
+    expect(res.status).toBe(200)
+    expect(res.body.exported_count).toBe(1)
+    expect(res.body.exported_count + res.body.excluded.length).toBe(orderIdsSent.length)
+  })
+
   it("does not mutate orders.status for exported orders", async () => {
     const id = await seed()
     await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id], batch }))

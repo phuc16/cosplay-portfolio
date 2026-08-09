@@ -108,9 +108,34 @@ module.exports = function adminShippingRoutes() {
       // exported_count + excluded.length back to 30, or a raced/unknown
       // order vanishes with only a smaller count as the only clue, and a
       // buyer never gets a parcel.
-      const ids = orderIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
-      const eligible = []
+      //
+      // Non-integer ids are routed into preExcluded here rather than being
+      // silently `.filter()`ed out, and a repeated id is deduped (first
+      // occurrence kept, later ones reported as duplicate_order_id) —
+      // otherwise the same order would be written into the xlsx twice,
+      // booking two parcels for one buyer when only one tracking code can
+      // ever come back to match against it. Both cases still count toward
+      // the exported_count + excluded.length === order_ids.length invariant.
+      const seenIds = new Set()
+      const ids = []
       const preExcluded = []
+      for (const raw of orderIds) {
+        const id = Number(raw)
+        if (!Number.isInteger(id) || id <= 0) {
+          preExcluded.push({ order_id: raw, reason: "invalid_order_id", message: `order_id không hợp lệ: ${JSON.stringify(raw)}` })
+          continue
+        }
+        if (seenIds.has(id)) {
+          preExcluded.push({
+            order_id: id, reason: "duplicate_order_id",
+            message: `${orderCode(id)}: trùng lặp trong yêu cầu, chỉ xuất một lần`,
+          })
+          continue
+        }
+        seenIds.add(id)
+        ids.push(id)
+      }
+      const eligible = []
       for (const id of ids) {
         const order = await orders.getOrderById(id)
         if (!order) {
