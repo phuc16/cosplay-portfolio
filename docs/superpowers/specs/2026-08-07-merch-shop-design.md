@@ -214,6 +214,26 @@ This is proportionate, not airtight: a determined attacker with many IPs could s
 - **Mobile-first.** Buyers arrive from Facebook/Instagram links, overwhelmingly on phones; the checkout and cart are designed for that first and scale up.
 - **Bilingual UI, single-language content.** Interface chrome — buttons, labels, checkout, order status — is translated Vietnamese/English via the existing `frontend/src/i18n/translations.js` pattern. Seller-authored content (collection and product names, descriptions) is entered once in whichever language the seller chooses and is not translated, so overseas buyers can navigate the flow even when merch descriptions stay Vietnamese. **Emails are Vietnamese only** — a single set of templates to write and maintain, and the overseas minority can translate a receipt.
 - The storefront reuses the existing Redis caching pattern, so catalog browsing stays fast without extra infrastructure.
+- **The shop is a separate area from the portfolio, reachable only by its own
+  URL** (decided 2026-08-09, after the buyer flow was walked end to end). The
+  portfolio header carries no shop or cart link; buyers arrive at `/shop` from
+  a link the seller shares. The shop therefore carries **its own header** on
+  every buyer page (`/shop`, `/shop/:slug`, `/cart`, `/checkout`,
+  `/order/:token`): the shop name linking back to the collection list, and a
+  cart icon with a live item count.
+
+  This replaced an arrangement in which the cart was linked from exactly one
+  place in the entire application — the portfolio header — leaving it
+  unreachable from inside the shop, so a buyer could add items and never reach
+  checkout. Two smaller defects were fixed with it: the portfolio's shop and
+  cart links rendered the same glyph, and the count was read once at mount
+  with no setter, so it never changed when the cart did.
+
+  **The count must stay live without a remount.** Items are added on the
+  collection page without navigating, so a mount-only read goes stale
+  immediately. `writeCart` — the single path every cart mutation already flows
+  through — notifies subscribers, and the header subscribes. Do not reintroduce
+  a mount-only read or a polling timer.
 
 ## Resource Fit (2GB RAM / 50GB disk)
 
