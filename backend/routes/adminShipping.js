@@ -1,9 +1,39 @@
 const express = require("express")
+const ExcelJS = require("exceljs")
 const db = require("../db")
 const orders = require("../shop/orders/orderRepo")
 const { LOAI_HANG_HOA_VALUES, orderCode } = require("../shop/shipping/vtpMapping")
 const { buildExportWorkbook } = require("../shop/shipping/vtpWorkbook")
 const trackingImport = require("../shop/shipping/trackingImport")
+
+// exceljs cell.value can be a rich-text object ({richText: [...]}), a
+// formula-result object ({result: ...}), a hyperlink object ({text/hyperlink}),
+// or a Date/number/plain string. extractPairsFromSheetRows expects plain
+// strings for header matching and cell text, so normalise here.
+function cellToText(value) {
+  if (value == null) return ""
+  if (typeof value === "object") {
+    if (Array.isArray(value.richText)) return value.richText.map((p) => p.text).join("")
+    if (value.text !== undefined) return String(value.text)
+    if (value.result !== undefined) return cellToText(value.result)
+    if (value instanceof Date) return value.toISOString()
+    return ""
+  }
+  return String(value)
+}
+
+async function sheetToRows2D(buffer) {
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(buffer)
+  const sheet = wb.worksheets[0]
+  if (!sheet) return []
+  const rows = []
+  sheet.eachRow({ includeEmpty: false }, (row) => {
+    const values = row.values.slice(1).map(cellToText)
+    rows.push(values)
+  })
+  return rows
+}
 
 module.exports = function adminShippingRoutes() {
   const router = express.Router()
@@ -109,8 +139,30 @@ module.exports = function adminShippingRoutes() {
 
   router.post("/shipping/tracking-import/preview", async (req, res) => {
     try {
-      const { rows_text: rowsText } = req.body
-      const rows = typeof rowsText === "string" ? trackingImport.parsePastedText(rowsText) : []
+      const { rows_text: rowsText, file_base64: fileBase64 } = req.body
+      const hasRowsText = typeof rowsText === "string"
+      const hasFileBase64 = typeof fileBase64 === "string"
+      if (hasRowsText === hasFileBase64) {
+        return res.status(400).json({
+          error: "invalid_input",
+          message: "Phải cung cấp đúng một trong hai: rows_text hoặc file_base64",
+        })
+      }
+
+      let rows
+      if (hasRowsText) {
+        rows = trackingImport.parsePastedText(rowsText)
+      } else {
+        let rows2D
+        try {
+          const buffer = Buffer.from(fileBase64, "base64")
+          rows2D = await sheetToRows2D(buffer)
+        } catch (err) {
+          return res.status(400).json({ error: "invalid_input", message: "Không đọc được file, vui lòng kiểm tra định dạng" })
+        }
+        rows = trackingImport.extractPairsFromSheetRows(rows2D)
+      }
+
       if (rows.length === 0) {
         return res.status(400).json({ error: "invalid_input", message: "Không có dòng dữ liệu nào để xử lý" })
       }
@@ -151,8 +203,33 @@ module.exports = function adminShippingRoutes() {
       // state machine's guards (confirmed -> shipped only), the shipped-
       // email dispatch, and the confirmed status check (expectedFromStatus)
       // all stay in force. One order's failure never stops the rest.
-      const results = []
+      //
+      // A repeated order_id within one request is deduped up front, keeping
+      // only the first occurrence, so each order appears EXACTLY ONCE in
+      // `results` — otherwise the second row's no-op (correctly rejected by
+      // expectedFromStatus) would show up as ok:false alongside the first
+      // row's ok:true for the SAME order_id, and a UI keyed by order_id
+      // could display the failure and hide the success, telling the seller
+      // an order failed when it actually shipped. Dropped duplicates are not
+      // added to `results` (that would re-violate "exactly once"); they are
+      // logged server-side under the "duplicate_in_request" reason so it is
+      // never confused with a genuine "not_confirmed".
+      const seenOrderIds = new Set()
+      const dedupedRows = []
       for (const r of rows) {
+        const orderId = Number(r.order_id)
+        if (Number.isInteger(orderId) && seenOrderIds.has(orderId)) {
+          console.warn(
+            `[ADMIN/SHIPPING] duplicate_in_request: ${orderCode(orderId)} xuất hiện nhiều lần trong yêu cầu nhập mã vận đơn, chỉ xử lý lần đầu`
+          )
+          continue
+        }
+        if (Number.isInteger(orderId)) seenOrderIds.add(orderId)
+        dedupedRows.push(r)
+      }
+
+      const results = []
+      for (const r of dedupedRows) {
         const orderId = Number(r.order_id)
         try {
           const ok = await orders.transitionOrder(orderId, "shipped", {

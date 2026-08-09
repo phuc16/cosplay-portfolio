@@ -1,11 +1,21 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import request from "supertest"
 import jwt from "jsonwebtoken"
+import ExcelJS from "exceljs"
 import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import { resetTables } from "./helpers/db.js"
+
+async function buildXlsxBase64(headerRow, dataRows) {
+  const wb = new ExcelJS.Workbook()
+  const sheet = wb.addWorksheet("Sheet1")
+  sheet.addRow(headerRow)
+  for (const row of dataRows) sheet.addRow(row)
+  const buffer = await wb.xlsx.writeBuffer()
+  return Buffer.from(buffer).toString("base64")
+}
 
 const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
@@ -24,7 +34,7 @@ async function seedConfirmedOrder() {
 }
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections")
 })
 
 describe("auth", () => {
@@ -58,10 +68,66 @@ describe("POST /api/admin/shipping/tracking-import/preview", () => {
     expect(res.status).toBe(400)
   })
 
+  it("400s when both rows_text and file_base64 are provided", async () => {
+    const b64 = await buildXlsxBase64(["Mã đơn hàng", "Mã vận đơn"], [["DH1", "VTP1"]])
+    const res = await authed(
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: "DH1\tVTP1", file_base64: b64 })
+    )
+    expect(res.status).toBe(400)
+  })
+
   it("400s when the row count exceeds MAX_IMPORT_ROWS", async () => {
     const text = Array.from({ length: 201 }, (_, i) => `DH${i}\tVTP${i}`).join("\n")
     const res = await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: text }))
     expect(res.status).toBe(400)
+  })
+
+  it("400s when the uploaded file_base64 row count exceeds MAX_IMPORT_ROWS", async () => {
+    const rows = Array.from({ length: 201 }, (_, i) => [`DH${i}`, `VTP${i}`])
+    const b64 = await buildXlsxBase64(["Mã đơn hàng", "Mã vận đơn"], rows)
+    const res = await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ file_base64: b64 }))
+    expect(res.status).toBe(400)
+  })
+
+  it("400s on a file_base64 payload that isn't a readable spreadsheet", async () => {
+    const notXlsx = Buffer.from("this is not an xlsx file, just plain bytes").toString("base64")
+    const res = await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ file_base64: notXlsx }))
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("resolves an uploaded VTP result file (file_base64) the same way as an equivalent paste", async () => {
+    const id = await seedConfirmedOrder()
+    const b64 = await buildXlsxBase64(
+      ["STT", "Mã đơn hàng", "Mã vận đơn"],
+      [[1, `DH${id}`, "VTP-XYZ"]]
+    )
+    const fileRes = await authed(
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ file_base64: b64 })
+    )
+    const pasteRes = await authed(
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `DH${id}\tVTP-XYZ` })
+    )
+    expect(fileRes.status).toBe(200)
+    expect(fileRes.body.toApply).toEqual([{ order_id: id, order_code: `DH${id}`, tracking_code: "VTP-XYZ" }])
+    expect(fileRes.body).toEqual(pasteRes.body)
+  })
+
+  it("normalises a rich-text cell value from the uploaded sheet to plain text", async () => {
+    const id = await seedConfirmedOrder()
+    const wb = new ExcelJS.Workbook()
+    const sheet = wb.addWorksheet("Sheet1")
+    sheet.addRow(["Mã đơn hàng", "Mã vận đơn"])
+    const dataRow = sheet.addRow([])
+    dataRow.getCell(1).value = { richText: [{ text: `DH${id}` }] }
+    dataRow.getCell(2).value = { richText: [{ text: "VTP-" }, { text: "RICH" }] }
+    dataRow.commit()
+    const buffer = await wb.xlsx.writeBuffer()
+    const b64 = Buffer.from(buffer).toString("base64")
+
+    const res = await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ file_base64: b64 }))
+    expect(res.status).toBe(200)
+    expect(res.body.toApply).toEqual([{ order_id: id, order_code: `DH${id}`, tracking_code: "VTP-RICH" }])
   })
 
   it("idempotency: previewing the same rows again after a successful import shows nothing to apply", async () => {
@@ -119,11 +185,39 @@ describe("POST /api/admin/shipping/tracking-import/confirm", () => {
     const row = { order_id: id, order_code: `DH${id}`, tracking_code: "VTP-ABC" }
     await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({ rows: [row] }))
 
+    const [[{ count: beforeCount }]] = await db.query(
+      "SELECT COUNT(*) AS count FROM email_queue WHERE order_id = ?", [id]
+    )
+    expect(beforeCount).toBeGreaterThan(0) // the first, legitimate confirm did queue a shipped email
+
     const secondRes = await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({ rows: [row] }))
     expect(secondRes.body.results[0].ok).toBe(false)
 
     const [[after]] = await db.query("SELECT tracking_code FROM orders WHERE id = ?", [id])
     expect(after.tracking_code).toBe("VTP-ABC") // unchanged, not overwritten a second time
+
+    const [[{ count: afterCount }]] = await db.query(
+      "SELECT COUNT(*) AS count FROM email_queue WHERE order_id = ?", [id]
+    )
+    expect(afterCount).toBe(beforeCount) // the no-op re-import must never queue a second buyer email
+  })
+
+  it("dedupes a repeated order_id within one confirm request, keeping exactly one entry per order", async () => {
+    const id = await seedConfirmedOrder()
+    const res = await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({
+      rows: [
+        { order_id: id, order_code: `DH${id}`, tracking_code: "VTP-FIRST" },
+        { order_id: id, order_code: `DH${id}`, tracking_code: "VTP-SECOND" },
+      ],
+    }))
+    expect(res.status).toBe(200)
+    const forOrder = res.body.results.filter((r) => r.order_id === id)
+    expect(forOrder).toHaveLength(1)
+    expect(forOrder[0].ok).toBe(true)
+
+    const [[row]] = await db.query("SELECT status, tracking_code FROM orders WHERE id = ?", [id])
+    expect(row.status).toBe("shipped")
+    expect(row.tracking_code).toBe("VTP-FIRST")
   })
 
   it("400s on an empty or oversized rows array", async () => {
