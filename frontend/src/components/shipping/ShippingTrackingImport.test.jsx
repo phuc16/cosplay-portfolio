@@ -117,6 +117,44 @@ describe("ShippingTrackingImport", () => {
     expect(container.textContent).not.toMatch(/^Thành công$/m)
   })
 
+  it("uploads a file and previews via file_base64, without sending rows_text", async () => {
+    adminPreviewTrackingImport.mockResolvedValue({
+      toApply: [{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }],
+      skipped: [],
+    })
+    const container = await renderComponent()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["DH1\tVTP001"], "vtp-result.xlsx", { type: "application/octet-stream" })
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+
+    const previewButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Xem trước")
+    await click(previewButton)
+    await flush()
+
+    expect(adminPreviewTrackingImport).toHaveBeenCalledTimes(1)
+    const payload = adminPreviewTrackingImport.mock.calls[0][0]
+    expect(payload).toHaveProperty("file_base64")
+    expect(payload).not.toHaveProperty("rows_text")
+    expect(container.textContent).toContain("DH1")
+  })
+
+  it("clears a chosen file when the user types into the textarea instead", async () => {
+    adminPreviewTrackingImport.mockResolvedValue({ toApply: [{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }], skipped: [] })
+    const container = await renderComponent()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["DH1\tVTP001"], "vtp-result.xlsx")
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+
+    await pasteAndPreview(container, "DH1\tVTP001")
+
+    const payload = adminPreviewTrackingImport.mock.calls[0][0]
+    expect(payload).toEqual({ rows_text: "DH1\tVTP001" })
+  })
+
   it("renders a readable Vietnamese explanation for every known skipped reason, never blank or snake_case", async () => {
     const reasons = [
       "invalid_code",
@@ -126,6 +164,7 @@ describe("ShippingTrackingImport", () => {
       "not_found",
       "already_shipped",
       "not_confirmed",
+      "not_shippable",
     ]
     adminPreviewTrackingImport.mockResolvedValue({
       toApply: [],

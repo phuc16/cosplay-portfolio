@@ -17,7 +17,14 @@ const storage = require("./storage")
 
 const app = express()
 const UPLOAD_LIMIT = "50mb"
+// A VTP result spreadsheet is at most MAX_IMPORT_ROWS (200) data rows of
+// plain text — a few hundred KB even with formatting. 10mb is a generous
+// ceiling for that, far below the 50mb image limit, so a malformed/huge
+// upload here can't be used to bypass the image path's specific tuning.
+const IMPORT_LIMIT = "10mb"
+const TRACKING_IMPORT_PREVIEW_PATH = "/api/admin/shipping/tracking-import/preview"
 const largeJson = express.json({ limit: UPLOAD_LIMIT })
+const importJson = express.json({ limit: IMPORT_LIMIT })
 const smallJson = express.json({ limit: "1mb" })
 
 app.use(cors())
@@ -25,17 +32,22 @@ app.use((req, res, next) => {
   if (req.method === "POST" && /^\/api\/(image$|upload\/|admin\/shop\/image$|orders\/[^/]+\/proof$)/.test(req.path)) {
     return largeJson(req, res, next)
   }
+  if (req.method === "POST" && req.path === TRACKING_IMPORT_PREVIEW_PATH) {
+    return importJson(req, res, next)
+  }
   return smallJson(req, res, next)
 })
 
 // Error handler for payload too large (413) — must be immediately after body-parser
 app.use((err, req, res, next) => {
   if (err.type === "entity.too.large") {
-    console.error(`[ERROR] Payload too large: ${req.url} - limit ${UPLOAD_LIMIT}`)
-    return res.status(413).json({
-      error: "payload_too_large",
-      message: `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
-    })
+    const isTrackingImport = req.path === TRACKING_IMPORT_PREVIEW_PATH
+    const limit = isTrackingImport ? IMPORT_LIMIT : UPLOAD_LIMIT
+    const message = isTrackingImport
+      ? `File quá lớn. Giới hạn: ${IMPORT_LIMIT}. Hãy dùng file kết quả ViettelPost nhỏ hơn.`
+      : `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
+    console.error(`[ERROR] Payload too large: ${req.url} - limit ${limit}`)
+    return res.status(413).json({ error: "payload_too_large", message })
   }
   next(err)
 })

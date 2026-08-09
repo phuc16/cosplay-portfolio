@@ -1,5 +1,17 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { adminPreviewTrackingImport, adminConfirmTrackingImport } from "../../api/shop"
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || "")
+      resolve(result.slice(result.indexOf(",") + 1))
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
 
 // Fallback labels for the reasons the server can send back in `skipped`.
 // The server always supplies a Vietnamese `message` per entry and that is
@@ -22,17 +34,36 @@ function skippedReasonText(s) {
 
 export default function ShippingTrackingImport() {
   const [rowsText, setRowsText] = useState("")
+  const [file, setFile] = useState(null)
+  const fileInputRef = useRef(null)
   const [preview, setPreview] = useState(null)
   const [results, setResults] = useState(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
+
+  // Exactly one of rows_text/file_base64 may be sent per preview (the
+  // backend 400s otherwise), so picking either input clears the other.
+  const onTextChange = (e) => {
+    setRowsText(e.target.value)
+    if (file) {
+      setFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const onFileChange = (e) => {
+    const picked = e.target.files?.[0] || null
+    setFile(picked)
+    if (picked) setRowsText("")
+  }
 
   const loadPreview = async () => {
     setError("")
     setResults(null)
     setBusy(true)
     try {
-      const data = await adminPreviewTrackingImport({ rows_text: rowsText })
+      const payload = file ? { file_base64: await readFileAsBase64(file) } : { rows_text: rowsText }
+      const data = await adminPreviewTrackingImport(payload)
       setPreview(data)
     } catch (e) {
       setPreview(null)
@@ -59,15 +90,24 @@ export default function ShippingTrackingImport() {
   return (
     <div>
       <p className="text-sm opacity-70 mb-2">
-        Dán các dòng "Mã đơn hàng &lt;tab hoặc phẩy&gt; Mã vận đơn" từ file kết quả ViettelPost.
+        Tải lên file kết quả ViettelPost, hoặc dán các dòng "Mã đơn hàng &lt;tab hoặc phẩy&gt; Mã vận đơn".
       </p>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={onFileChange}
+        className="block w-full text-sm mb-3"
+      />
       <textarea
         rows={6}
         value={rowsText}
-        onChange={(e) => setRowsText(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent mb-3"
+        onChange={onTextChange}
+        disabled={!!file}
+        placeholder={file ? `Đã chọn file: ${file.name}` : ""}
+        className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent mb-3 disabled:opacity-50"
       />
-      <button type="button" onClick={loadPreview} disabled={busy || !rowsText.trim()}
+      <button type="button" onClick={loadPreview} disabled={busy || (!file && !rowsText.trim())}
         className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-brand)] disabled:opacity-50 mr-2">
         {busy ? "Đang xử lý..." : "Xem trước"}
       </button>
