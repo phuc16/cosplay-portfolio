@@ -52,6 +52,14 @@ beforeEach(() => {
   uploadPaymentProof.mockReset()
 })
 
+function futureIso(hours) {
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+}
+
+function pastIso(hours) {
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+}
+
 describe("Order pickup info", () => {
   it("shows pickup location and note for a pickup order", async () => {
     fetchOrder.mockResolvedValue(baseOrder({
@@ -84,5 +92,67 @@ describe("Order pickup info", () => {
 
     expect(container.textContent).not.toContain("undefined")
     expect(container.querySelector('[class*="rounded-xl"][class*="opacity-80"]')).toBeNull()
+  })
+})
+
+describe("Order — payment deadline (Phase 6)", () => {
+  it("renders the deadline block for a pending, prepaid order with a future expires_at", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Payment deadline:")
+    expect(container.textContent).not.toContain("The payment deadline has passed")
+  })
+
+  it("renders nothing deadline-related for a COD order (null expires_at)", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: null, payment_method: "cod" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "cod", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Payment deadline:")
+    expect(container.textContent).not.toContain("The payment deadline has passed")
+    expect(container.textContent).not.toContain("Invalid Date")
+  })
+
+  it("renders the passed-deadline message, not a countdown, when expires_at is in the past but status is still pending (the sweep window)", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: pastIso(1) }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("The payment deadline has passed")
+    expect(container.textContent).not.toContain("còn")
+    expect(container.textContent).not.toContain("h left")
+  })
+
+  it("does not render the deadline block once the order is confirmed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed", expires_at: futureIso(3) }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Payment deadline:")
+    expect(container.textContent).not.toContain("The payment deadline has passed")
+  })
+
+  it("renders the manual-confirmation note and the transfer-note explanation while pending", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Payments are checked manually by the seller")
+    expect(container.textContent).toContain("Please include the exact transfer note above")
+  })
+
+  it("renders the extended save-the-link line mentioning the email", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("We also emailed it to you.")
   })
 })
