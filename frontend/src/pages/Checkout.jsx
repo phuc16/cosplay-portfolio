@@ -193,6 +193,12 @@ export default function Checkout() {
         {methods && methods.length === 0 && (
           <p className="text-sm text-[var(--text-error)] mt-1">{t("checkoutNoMethods")}</p>
         )}
+        {/* Stated before the buyer commits — cod never expires, so the
+            notice is only shown for the payment methods that actually
+            carry a deadline. */}
+        {payment && payment !== "cod" && (
+          <p className="text-xs opacity-70 mt-1">{t("checkoutPaymentWindow")}</p>
+        )}
       </label>
 
       <label className="block mb-6">

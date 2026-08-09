@@ -146,3 +146,23 @@ describe("Checkout fulfillment filtering", () => {
     expect(container.textContent).toContain("This collection currently offers no delivery method")
   })
 })
+
+describe("Checkout — payment window notice (Phase 6)", () => {
+  it("shows the payment-window notice when a non-COD payment method is selected", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
+
+    const container = await renderCheckout()
+
+    expect(container.textContent).toContain("must be paid within a limited window")
+  })
+
+  it("hides the payment-window notice when cod is the selected payment method", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["cod"] })
+
+    const container = await renderCheckout()
+
+    expect(container.textContent).not.toContain("must be paid within a limited window")
+  })
+})
