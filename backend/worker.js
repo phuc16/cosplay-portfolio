@@ -5,6 +5,7 @@ const redis = require("./redis")
 const storage = require("./storage")
 const orderRepo = require("./shop/orders/orderRepo")
 const emailSender = require("./shop/email/sender")
+const { createLease, TICK_INTERVAL_MS } = require("./workerLease")
 
 const THUMB_WIDTH = 400
 const JPEG_QUALITY = 85
@@ -126,9 +127,72 @@ async function run() {
   }
 }
 
-if (require.main === module) {
-  run()
-  setInterval(run, 5000)
+// Multi-process singleton guard, additive to (and independent of) the
+// in-process `running` overlap flag above. See workerLease.js for the full
+// rationale and TTL math.
+const lease = createLease()
+
+/**
+ * Redis-unavailability policy: FAIL CLOSED. `backend/redis.js` treats Redis
+ * as a cache elsewhere (the gallery/settings cache degrades gracefully to a
+ * DB read when Redis is down) because staleness there just costs a slower
+ * response. This lease is different in kind: its entire purpose is
+ * preventing the exact silent-double-processing incident in
+ * f14-reinvestigation-report.md, and a worker that "fails open" and polls
+ * anyway whenever Redis hiccups reintroduces precisely that risk at the one
+ * moment (a Redis blip, often correlated with a deploy) it is most likely to
+ * coincide with another instance also being up. So: if the lease cannot be
+ * acquired *or* renewed for any reason — another holder, or Redis itself
+ * being unreachable — this tick is skipped entirely (no sweep, no dispatch,
+ * no thumbnails) rather than proceeding unguarded.
+ *
+ * Skip vs. exit: retry-and-log, not exit. This runs under a process manager
+ * / entrypoint.sh with no supervisor that would restart a dead worker into
+ * a now-uncontested lease, so exiting on the very first failed attempt would
+ * turn an ordinary restart race (the old container still shutting down as
+ * the new one starts) into a worker that stays down until someone notices
+ * and manually restarts it. Retrying every tick lets that ordinary race
+ * self-resolve as soon as the old holder's lease clears, while the loud
+ * warning below still makes a *genuine* stale-process conflict impossible to
+ * miss in the logs — which is the whole point of this guard.
+ */
+async function tick() {
+  try {
+    if (!lease.isHeld()) {
+      const acquired = await lease.acquire()
+      if (!acquired) {
+        console.warn(
+          "[WORKER] SINGLETON LEASE HELD BY ANOTHER INSTANCE — refusing to poll this tick. " +
+          "If this persists, a stale/duplicate worker process is running and must be stopped " +
+          "(see .superpowers/sdd/f14-reinvestigation-report.md)."
+        )
+        return
+      }
+      console.log(`[WORKER] Đã giành lease singleton (holder=${lease.holderId})`)
+    } else {
+      const renewed = await lease.renew()
+      if (!renewed) {
+        console.warn(
+          "[WORKER] LOST SINGLETON LEASE (expired or taken by another instance) — " +
+          "skipping this tick and will attempt to re-acquire on the next one."
+        )
+        return
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[WORKER] Redis unavailable — cannot verify/renew the singleton lease, " +
+      "skipping this tick (failing closed) to avoid running unguarded:", err.message
+    )
+    return
+  }
+
+  await run()
 }
 
-module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured }
+if (require.main === module) {
+  tick()
+  setInterval(tick, TICK_INTERVAL_MS)
+}
+
+module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured, tick, lease }
