@@ -163,6 +163,8 @@ describe("Checkout — payment window notice (Phase 6)", () => {
 
     const container = await renderCheckout()
 
+    const select = container.querySelector("select")
+    expect(select.value).toBe("cod")
     expect(container.textContent).not.toContain("must be paid within a limited window")
   })
 })
