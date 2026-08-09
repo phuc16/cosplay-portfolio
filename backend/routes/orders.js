@@ -26,10 +26,15 @@ function toPublicOrder(order) {
     // the order's own collection (joined in getOrderByToken), same content
     // that is already public on the collection page — no new exposure.
     pickup_location, pickup_note,
+    // Spec (Buyer Onboarding, Phase 6): the payment deadline the reservation
+    // and the expiry sweep already enforce, but never told to the buyer
+    // before now. NULL for COD (domain.computeExpiry never sets a deadline
+    // for it). This is the only line this phase adds to this allowlist.
+    expires_at,
   } = order
   return {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
-    pickup_location, pickup_note,
+    pickup_location, pickup_note, expires_at,
   }
 }
 

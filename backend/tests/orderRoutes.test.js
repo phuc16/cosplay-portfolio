@@ -42,6 +42,10 @@ beforeEach(async () => {
   await settings.updateSettings({
     bank_enabled: true, bank_name: "ACB", bank_bin: "970416",
     bank_account_number: "123456789", bank_account_holder: "NGUYEN VAN A",
+    // The new COD expires_at test below places a "cod" order; COD must be
+    // enabled or checkout (correctly) rejects it before expires_at is ever
+    // reached.
+    cod_enabled: true,
   })
 })
 
@@ -195,6 +199,43 @@ describe("GET /api/orders/:token", () => {
       total: 35000,
     })
     expect(res.body.items).toHaveLength(1)
+  })
+
+  it("includes expires_at for a prepaid (non-COD) order", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+
+    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    expect(res.body).toHaveProperty("expires_at")
+    expect(res.body.expires_at).not.toBeNull()
+  })
+
+  it("returns a null expires_at for a COD order, which never expires", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v, { payment_method: "cod" }))
+
+    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    expect(res.body).toHaveProperty("expires_at")
+    expect(res.body.expires_at).toBeNull()
+  })
+
+  it("allowlist regression: expires_at is now present and order_token, request_key, stock_released_at are still absent or as before", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+
+    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    expect(res.body).toHaveProperty("expires_at")
+    // order_token IS present on this response by design (the buyer already
+    // holds it — it's in the URL they just requested), but nothing this
+    // phase adds may widen that: these fields must still never appear.
+    expect(res.body).not.toHaveProperty("request_key")
+    expect(res.body).not.toHaveProperty("stock_released_at")
+    expect(res.body).not.toHaveProperty("payment_proof_url")
+    expect(res.body).not.toHaveProperty("note")
+    expect(res.body).not.toHaveProperty("buyer_name")
+    expect(res.body).not.toHaveProperty("phone")
+    expect(res.body).not.toHaveProperty("email")
+    expect(res.body).not.toHaveProperty("address_raw")
   })
 
   it("404s an unknown token", async () => {
