@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
@@ -154,5 +154,49 @@ describe("Order — payment deadline (Phase 6)", () => {
     const container = await renderOrder()
 
     expect(container.textContent).toContain("We also emailed it to you.")
+  })
+
+  it("does not render the manual-confirm note for a pending COD order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: null, payment_method: "cod" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "cod", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Payments are checked manually by the seller")
+  })
+
+  it("does not render the manual-confirm note for a pending prepaid order whose deadline has passed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: pastIso(1) }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("The payment deadline has passed")
+    expect(container.textContent).not.toContain("Payments are checked manually by the seller")
+  })
+
+  it("still renders the manual-confirm note for a pending prepaid order with time remaining", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Payments are checked manually by the seller")
+  })
+})
+
+describe("Order — Vietnamese countdown copy", () => {
+  afterEach(() => {
+    localStorage.removeItem("lang")
+  })
+
+  it("renders the Vietnamese 'còn N giờ' countdown when lang is vi", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("còn 3 giờ")
   })
 })

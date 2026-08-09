@@ -143,6 +143,13 @@ export default function Order() {
 
   const isPending = order.status === "pending"
   const showPaymentInstructions = isPending && instructions && instructions.method !== "cod"
+  // Transfer-specific copy: only relevant when there's a transfer to make
+  // (showPaymentInstructions already excludes COD) and only while the
+  // deadline hasn't passed — once it has, DeadlineBlock's passed message is
+  // the one true statement about this order, and inviting a faster upload
+  // of an order that's being cancelled would contradict it.
+  const deadlineInfo = formatDeadline(order.expires_at)
+  const showManualConfirmNote = showPaymentInstructions && !deadlineInfo?.passed
 
   return (
     <>
@@ -160,7 +167,7 @@ export default function Order() {
             gate (not the helper) is what stops a stale countdown from
             reappearing on a confirmed/shipped/completed order. */}
         {isPending && <DeadlineBlock expiresAt={order.expires_at} />}
-        {isPending && <p className="text-sm opacity-70 mt-1">{t("orderManualConfirmNote")}</p>}
+        {showManualConfirmNote && <p className="text-sm opacity-70 mt-1">{t("orderManualConfirmNote")}</p>}
       </div>
 
       {showPaymentInstructions && <PaymentInstructions instructions={instructions} token={token} />}
