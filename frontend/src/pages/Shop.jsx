@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { fetchCollections } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
+import ShopHeader from "../components/shop/ShopHeader"
 
 export default function Shop() {
   const { t } = useLanguage()
@@ -14,7 +15,9 @@ export default function Shop() {
   }, [])
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-10">
+    <>
+      <ShopHeader />
+      <main className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-bold mb-1">{t("shopTitle")}</h1>
       <p className="opacity-70 mb-8">{t("shopDesc")}</p>
 
@@ -46,6 +49,7 @@ export default function Shop() {
           </Link>
         ))}
       </div>
-    </main>
+      </main>
+    </>
   )
 }

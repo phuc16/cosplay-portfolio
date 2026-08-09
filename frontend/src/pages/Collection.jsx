@@ -4,6 +4,7 @@ import { fetchCollection } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { renderMarkdown } from "../utils/markdown"
 import ProductCard from "../components/shop/ProductCard"
+import ShopHeader from "../components/shop/ShopHeader"
 
 export default function Collection() {
   const { slug } = useParams()
@@ -37,22 +38,32 @@ export default function Collection() {
   const collection = result.slug === slug ? result.collection : undefined
 
   if (collection === undefined) {
-    return <main className="max-w-5xl mx-auto px-4 py-10 opacity-60">{t("shopLoading")}</main>
+    return (
+      <>
+        <ShopHeader />
+        <main className="max-w-5xl mx-auto px-4 py-10 opacity-60">{t("shopLoading")}</main>
+      </>
+    )
   }
 
   if (collection === null) {
     return (
-      <main className="max-w-5xl mx-auto px-4 py-10">
-        <p className="opacity-70 mb-4">{t("shopNotFound")}</p>
-        <Link to="/shop" className="text-[var(--text-link)]">{t("shopBack")}</Link>
-      </main>
+      <>
+        <ShopHeader />
+        <main className="max-w-5xl mx-auto px-4 py-10">
+          <p className="opacity-70 mb-4">{t("shopNotFound")}</p>
+          <Link to="/shop" className="text-[var(--text-link)]">{t("shopBack")}</Link>
+        </main>
+      </>
     )
   }
 
   const closed = collection.status === "closed"
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-10">
+    <>
+      <ShopHeader />
+      <main className="max-w-5xl mx-auto px-4 py-10">
       <Link to="/shop" className="text-sm text-[var(--text-link)]">← {t("shopBack")}</Link>
 
       {collection.cover_image && (
@@ -123,6 +134,7 @@ export default function Collection() {
           {addedMsg}
         </div>
       )}
-    </main>
+      </main>
+    </>
   )
 }

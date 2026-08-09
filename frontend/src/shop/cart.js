@@ -1,5 +1,19 @@
 const KEY = "shop_cart"
 
+// Every write (add/update/remove/clear) goes through writeCart, so notifying
+// there is the one place that reaches every subscriber — no poller needed.
+const listeners = new Set()
+
+/** Subscribe to cart writes. Returns an unsubscribe function. */
+export function subscribeCart(listener) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+function notify() {
+  for (const listener of listeners) listener()
+}
+
 /** A stored entry is only trusted if it still has a usable id, qty and price. */
 function isValid(entry) {
   return (
@@ -30,6 +44,7 @@ function writeCart(cart) {
   } catch (error) {
     console.warn("Failed to persist cart to localStorage:", error)
   }
+  notify()
   return cart
 }
 

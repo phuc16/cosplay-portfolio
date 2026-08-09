@@ -5,7 +5,6 @@ import { SITE_CONFIG, applyColorScheme } from "../config"
 import { useTheme } from "../contexts/ThemeContext"
 import { useLanguage } from "../contexts/LanguageContext"
 import { getLocalized } from "../utils/localize"
-import { readCart, cartCount } from "../shop/cart"
 
 /* ── SVG ICONS ───────────────────────────────────────────────────────────── */
 const icons = {
@@ -62,17 +61,10 @@ function contactHref(type, value) {
 }
 
 /* ── NAVBAR ─────────────────────────────────────────────────────────────── */
-function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, logoUrl, t }) {
-  // localStorage-backed cart isn't reactive on its own — re-reading via lazy init
-  // means this recomputes every time Navbar mounts (i.e. every navigation back to
-  // "/"), which is enough: accurate on page load and after navigating to/from
-  // /cart. Nothing else in this codebase updates state without a mount either.
-  const [count] = useState(() => cartCount(readCart()))
+function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, logoUrl }) {
   const navLinks = [
     { label: lang === "vi" ? "Thông tin" : "Info", href: "#info" },
     { label: lang === "vi" ? "Dự án" : "Project", href: "#project" },
-    { label: t("shop"), href: "/shop" },
-    { label: count > 0 ? `${t("cart")} (${count})` : t("cart"), href: "/cart" },
     { label: lang === "vi" ? "Liên hệ" : "Contact", href: "#contact" },
   ]
   const s = {
@@ -87,7 +79,6 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
     right: { display: "flex", alignItems: "center", gap: 10 },
     langBtn: (active) => ({ padding: "3px 8px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 500, background: active ? "var(--brand)" : "transparent", color: active ? "#fff" : "var(--text-muted)" }),
     iconBtn: { width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", color: "var(--text-body)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" },
-    badge: { position: "absolute", top: -2, right: -2, minWidth: 16, height: 16, padding: "0 3px", borderRadius: 8, background: "var(--brand)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 },
   }
   return (
     <header style={s.header}>
@@ -114,11 +105,6 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
           <div style={{ display: "flex", gap: 2 }}>
             {["vi", "en"].map((l) => <button key={l} style={s.langBtn(lang === l)} onClick={() => onSetLang(l)}>{l.toUpperCase()}</button>)}
           </div>
-          <Link to="/shop" className="nav-shop-mobile" style={s.iconBtn} aria-label={t("shop")} title={t("shop")}>{icons.bag}</Link>
-          <Link to="/cart" className="nav-shop-mobile" style={s.iconBtn} aria-label={t("cart")} title={t("cart")}>
-            {icons.bag}
-            {count > 0 && <span style={s.badge}>{count}</span>}
-          </Link>
           <button style={s.iconBtn} onClick={onToggleTheme}>{theme === "dark" ? icons.moon : icons.sun}</button>
         </div>
       </div>
@@ -651,7 +637,7 @@ function buildData(cfg, gallery, lang) {
 export default function Portfolio() {
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { lang, setLang, t } = useLanguage()
+  const { lang, setLang } = useLanguage()
   const [gallery, setGallery] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -708,7 +694,7 @@ export default function Portfolio() {
       style={{ minHeight: "100vh", background: "var(--bg-page)", color: "var(--text-strong)" }}
       onContextMenu={(e) => { if (e.target.tagName === "IMG") e.preventDefault() }}>
       <Navbar theme={theme} onToggleTheme={toggleTheme} lang={lang} onSetLang={setLang}
-        artistName={data.artistName} tagline={getLocalized(cfg.tagline, lang)} logoUrl={logoUrl} t={t} />
+        artistName={data.artistName} tagline={getLocalized(cfg.tagline, lang)} logoUrl={logoUrl} />
 
       {/* Full-page spinner while settings load from the backend */}
       {loading && (

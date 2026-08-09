@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { readCart, updateQty, removeFromCart, cartTotal } from "../shop/cart"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
+import ShopHeader from "../components/shop/ShopHeader"
 
 export default function Cart() {
   const { t } = useLanguage()
@@ -14,16 +15,21 @@ export default function Cart() {
 
   if (!cart.length) {
     return (
-      <main className="max-w-3xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-bold mb-4">{t("cart")}</h1>
-        <p className="opacity-70 mb-4">{t("cartEmpty")}</p>
-        <Link to="/shop" className="text-[var(--text-link)]">{t("shopBack")}</Link>
-      </main>
+      <>
+        <ShopHeader />
+        <main className="max-w-3xl mx-auto px-4 py-10">
+          <h1 className="text-2xl font-bold mb-4">{t("cart")}</h1>
+          <p className="opacity-70 mb-4">{t("cartEmpty")}</p>
+          <Link to="/shop" className="text-[var(--text-link)]">{t("shopBack")}</Link>
+        </main>
+      </>
     )
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-10">
+    <>
+      <ShopHeader />
+      <main className="max-w-3xl mx-auto px-4 py-10">
       <h1 className="text-2xl font-bold mb-6">{t("cart")}</h1>
 
       {cart.map((c) => (
@@ -55,6 +61,7 @@ export default function Cart() {
           {t("cartCheckout")}
         </button>
       </div>
-    </main>
+      </main>
+    </>
   )
 }

@@ -6,6 +6,7 @@ import { createOrder, fetchCollection, fetchPaymentMethods } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import AddressFields from "../components/shop/AddressFields"
+import ShopHeader from "../components/shop/ShopHeader"
 
 // Default to both open (rather than none) while the collection fetch is in
 // flight, so the picker doesn't flash empty before settling to what the
@@ -119,7 +120,12 @@ export default function Checkout() {
   }
 
   if (!cart.length) {
-    return <main className="max-w-2xl mx-auto px-4 py-10 opacity-70">{t("cartEmpty")}</main>
+    return (
+      <>
+        <ShopHeader />
+        <main className="max-w-2xl mx-auto px-4 py-10 opacity-70">{t("cartEmpty")}</main>
+      </>
+    )
   }
 
   const field = (key, label, type = "text") => (
@@ -135,7 +141,9 @@ export default function Checkout() {
   )
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-10">
+    <>
+      <ShopHeader />
+      <main className="max-w-2xl mx-auto px-4 py-10">
       <h1 className="text-2xl font-bold mb-6">{t("checkout")}</h1>
 
       {field("buyer_name", t("checkoutName"))}
@@ -204,6 +212,7 @@ export default function Checkout() {
         className="w-full py-3 rounded-xl bg-[var(--brand)] text-white disabled:opacity-50">
         {submitting ? "..." : t("checkoutPlaceOrder")}
       </button>
-    </main>
+      </main>
+    </>
   )
 }
