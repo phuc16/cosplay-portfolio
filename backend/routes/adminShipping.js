@@ -3,6 +3,7 @@ const db = require("../db")
 const orders = require("../shop/orders/orderRepo")
 const { LOAI_HANG_HOA_VALUES, orderCode } = require("../shop/shipping/vtpMapping")
 const { buildExportWorkbook } = require("../shop/shipping/vtpWorkbook")
+const trackingImport = require("../shop/shipping/trackingImport")
 
 module.exports = function adminShippingRoutes() {
   const router = express.Router()
@@ -104,6 +105,73 @@ module.exports = function adminShippingRoutes() {
         excluded: [...preExcluded, ...excluded],
       })
     } catch (err) { oops(res, err, "Lỗi xuất file ViettelPost") }
+  })
+
+  router.post("/shipping/tracking-import/preview", async (req, res) => {
+    try {
+      const { rows_text: rowsText } = req.body
+      const rows = typeof rowsText === "string" ? trackingImport.parsePastedText(rowsText) : []
+      if (rows.length === 0) {
+        return res.status(400).json({ error: "invalid_input", message: "Không có dòng dữ liệu nào để xử lý" })
+      }
+      if (rows.length > trackingImport.MAX_IMPORT_ROWS) {
+        return res.status(400).json({
+          error: "invalid_input",
+          message: `Chỉ có thể nhập tối đa ${trackingImport.MAX_IMPORT_ROWS} dòng mỗi lần`,
+        })
+      }
+
+      const orderIds = [...new Set(
+        rows.map((r) => trackingImport.parseOrderCode(r.order_code)).filter((id) => id !== null)
+      )]
+      const ordersById = new Map()
+      for (const id of orderIds) {
+        const order = await orders.getOrderById(id)
+        if (order) ordersById.set(id, order)
+      }
+
+      res.json(trackingImport.resolvePreview(rows, ordersById))
+    } catch (err) { oops(res, err, "Lỗi xem trước nhập mã vận đơn") }
+  })
+
+  router.post("/shipping/tracking-import/confirm", async (req, res) => {
+    try {
+      const { rows } = req.body
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ error: "invalid_input", message: "rows phải là mảng khác rỗng" })
+      }
+      if (rows.length > trackingImport.MAX_IMPORT_ROWS) {
+        return res.status(400).json({
+          error: "invalid_input",
+          message: `Chỉ có thể nhập tối đa ${trackingImport.MAX_IMPORT_ROWS} dòng mỗi lần`,
+        })
+      }
+
+      // Each row goes through transitionOrder() individually — the order
+      // state machine's guards (confirmed -> shipped only), the shipped-
+      // email dispatch, and the confirmed status check (expectedFromStatus)
+      // all stay in force. One order's failure never stops the rest.
+      const results = []
+      for (const r of rows) {
+        const orderId = Number(r.order_id)
+        try {
+          const ok = await orders.transitionOrder(orderId, "shipped", {
+            tracking_code: r.tracking_code,
+            expectedFromStatus: "confirmed",
+          })
+          results.push(ok
+            ? { order_id: orderId, ok: true, message: `Đã cập nhật mã vận đơn cho DH${orderId}` }
+            : {
+                order_id: orderId, ok: false, reason: "not_confirmed",
+                message: `DH${orderId} không còn ở trạng thái "confirmed" (đã xử lý trước đó hoặc bị thay đổi)`,
+              })
+        } catch (err) {
+          console.error(`[ADMIN/SHIPPING] Lỗi cập nhật mã vận đơn cho đơn ${orderId}:`, err)
+          results.push({ order_id: orderId, ok: false, reason: "server_error", message: "Lỗi server. Thử lại sau." })
+        }
+      }
+      res.json({ results })
+    } catch (err) { oops(res, err, "Lỗi xác nhận nhập mã vận đơn") }
   })
 
   return router
