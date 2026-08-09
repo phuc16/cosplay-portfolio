@@ -96,3 +96,22 @@ export const adminGetBookkeepingStats = (params) =>
 
 export const adminDownloadBookkeepingCsv = (params) =>
   api.get("/api/admin/stats/bookkeeping/export.csv", { params, responseType: "blob" }).then((r) => r.data)
+
+// ── Shipping ──
+export const adminListShippingExportOrders = () =>
+  api.get("/api/admin/shipping/export/orders").then((r) => r.data)
+
+export const adminSetShippingPayer = (id, shippingPayer) =>
+  api.patch(`/api/admin/shipping/export/orders/${id}/payer`, { shipping_payer: shippingPayer }).then((r) => r.data)
+
+export const adminGenerateShippingExport = (orderIds, batch) =>
+  api.post("/api/admin/shipping/export", { order_ids: orderIds, batch }).then((r) => r.data)
+
+export const adminPreviewTrackingImport = (payload) =>
+  api.post("/api/admin/shipping/tracking-import/preview", payload).then((r) => r.data)
+
+export const adminConfirmTrackingImport = (rows) =>
+  api.post("/api/admin/shipping/tracking-import/confirm", { rows }).then((r) => r.data)
+
+export const adminGetPickupRoster = (collectionId) =>
+  api.get(`/api/admin/shipping/roster/${collectionId}`).then((r) => r.data)

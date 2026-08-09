@@ -7,6 +7,7 @@ import AdminOrders from "../components/AdminOrders"
 import AdminPaymentSettings from "../components/AdminPaymentSettings"
 import AdminEmailTemplates from "../components/AdminEmailTemplates"
 import AdminStats from "../components/AdminStats"
+import AdminShipping from "../components/AdminShipping"
 import { useTheme } from "../contexts/ThemeContext"
 
 export default function Admin() {
@@ -79,6 +80,12 @@ export default function Admin() {
               Thống kê
             </button>
             <button
+              onClick={() => setTab("shipping")}
+              className={`text-sm ${tab === "shipping" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Vận chuyển
+            </button>
+            <button
               onClick={toggleTheme}
               className="p-2 rounded-md text-gray-600 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-cosplay-card"
               title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
@@ -111,6 +118,7 @@ export default function Admin() {
         {tab === "payments" && <AdminPaymentSettings />}
         {tab === "email" && <AdminEmailTemplates />}
         {tab === "stats" && <AdminStats />}
+        {tab === "shipping" && <AdminShipping />}
       </div>
     )
   }
