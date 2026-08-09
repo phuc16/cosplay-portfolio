@@ -135,6 +135,18 @@ const globalLimiter = rateLimit({
 })
 app.use(globalLimiter)
 
+// The buyer's order_token (crypto.randomBytes(16).toString("hex") — see
+// shop/orders/domain.js) is the sole credential protecting their order page,
+// and it rides in the URL path on every /order/:token and
+// /api/orders/:token/... request. Redact only that exact 32-hex-char segment
+// before logging — never anything shorter/longer or non-hex, like a numeric
+// order id elsewhere in the path — so this can't be widened into hiding
+// unrelated path segments.
+const ORDER_TOKEN_RE = /\b[0-9a-f]{32}\b/g
+function redactOrderToken(path) {
+  return path.replace(ORDER_TOKEN_RE, "[token]")
+}
+
 // Request logging — one structured JSON line per request
 app.use((req, res, next) => {
   const start = process.hrtime.bigint()
@@ -145,7 +157,7 @@ app.use((req, res, next) => {
       level: res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info",
       msg: "request",
       method: req.method,
-      path: req.originalUrl,
+      path: redactOrderToken(req.originalUrl),
       status: res.statusCode,
       ip: getClientIp(req),
       latency: Math.round(latency * 10) / 10,
