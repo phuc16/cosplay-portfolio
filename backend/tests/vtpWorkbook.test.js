@@ -17,6 +17,37 @@ const batch = {
   ten_hang_hoa: "Photocard", trong_luong: 50, loai_hang_hoa: "Bưu kiện", thoi_gian_hen_lay: "Cả ngày",
 }
 
+// An .xlsx is a deflated zip of XML parts — cell text never appears as
+// plaintext in the raw buffer, whether it landed in a cell, a shared
+// string, or anywhere else. A raw buffer/string scan for a canary can
+// never fail, even if the canary was actually written into a cell, so it
+// proves nothing. Decoding through exceljs and walking every cell of every
+// worksheet is the only scan that actually inspects what a courier's
+// spreadsheet software would show.
+function cellText(value) {
+  if (value == null) return ""
+  if (typeof value === "object") {
+    if (Array.isArray(value.richText)) return value.richText.map((p) => p.text).join("")
+    if (value.text !== undefined) return String(value.text)
+    if (value.result !== undefined) return cellText(value.result)
+    if (value instanceof Date) return value.toISOString()
+    return JSON.stringify(value)
+  }
+  return String(value)
+}
+
+function workbookText(wb) {
+  let all = ""
+  wb.eachSheet((sheet) => {
+    sheet.eachRow({ includeEmpty: false }, (row) => {
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        all += `${cellText(cell.value)}\n`
+      })
+    })
+  })
+  return all
+}
+
 describe("buildExportWorkbook", () => {
   it("produces a buffer that reopens as a valid workbook with the Danh sách sheet", async () => {
     const { buffer } = await buildExportWorkbook([order()], batch)
@@ -156,12 +187,14 @@ describe("buildExportWorkbook", () => {
     }
   })
 
-  it("SECURITY: order_token never appears anywhere in the generated buffer", async () => {
+  it("SECURITY: order_token never appears in any cell of any worksheet", async () => {
     const secretToken = "extremely-unique-bearer-token-xyz987"
     const { buffer } = await buildExportWorkbook([order({ order_token: secretToken })], batch)
-    // The xlsx is a zip of XML parts; a raw substring scan of the buffer
-    // catches the token whether it landed in a cell, shared string, or
-    // anywhere else exceljs might have serialized it.
-    expect(buffer.toString("latin1")).not.toContain(secretToken)
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buffer)
+    // Decode and walk every cell of every worksheet (data sheet + reference
+    // sheets) rather than scanning the raw compressed bytes — see the
+    // comment above workbookText().
+    expect(workbookText(wb)).not.toContain(secretToken)
   })
 })

@@ -18,6 +18,36 @@ const buyer = {
   address_province: "Hồ Chí Minh", address_raw: null,
 }
 
+// An .xlsx is a deflated zip of XML parts — cell text never appears as
+// plaintext in the raw buffer. A raw buffer scan for a canary can never
+// fail, even if the canary was actually written into a cell, so it proves
+// nothing. Decoding through exceljs and walking every cell of every
+// worksheet is the only scan that actually inspects what a courier's
+// spreadsheet software would show.
+function cellText(value) {
+  if (value == null) return ""
+  if (typeof value === "object") {
+    if (Array.isArray(value.richText)) return value.richText.map((p) => p.text).join("")
+    if (value.text !== undefined) return String(value.text)
+    if (value.result !== undefined) return cellText(value.result)
+    if (value instanceof Date) return value.toISOString()
+    return JSON.stringify(value)
+  }
+  return String(value)
+}
+
+function workbookText(wb) {
+  let all = ""
+  wb.eachSheet((sheet) => {
+    sheet.eachRow({ includeEmpty: false }, (row) => {
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        all += `${cellText(cell.value)}\n`
+      })
+    })
+  })
+  return all
+}
+
 async function seed() {
   const cid = await catalog.createCollection({ title: "Drop", status: "active" })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 120000 })
@@ -154,9 +184,12 @@ describe("POST /api/admin/shipping/export", () => {
     const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id], batch }))
     expect(res.status).toBe(200)
     const buffer = Buffer.from(res.body.file_base64, "base64")
-    // A distinctive canary: the raw xlsx bytes (zip of XML parts) must not
-    // contain the order_token string anywhere.
-    expect(buffer.includes(row.order_token)).toBe(false)
+    // Decode the xlsx and walk every cell of every worksheet — a raw byte
+    // scan of the compressed zip can never find text that is actually
+    // present in a cell, so it would never catch a real leak.
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buffer)
+    expect(workbookText(wb)).not.toContain(row.order_token)
   })
 
   it("400s on missing order_ids", async () => {
