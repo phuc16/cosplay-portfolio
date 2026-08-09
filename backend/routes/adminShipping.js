@@ -5,6 +5,7 @@ const orders = require("../shop/orders/orderRepo")
 const { LOAI_HANG_HOA_VALUES, orderCode } = require("../shop/shipping/vtpMapping")
 const { buildExportWorkbook } = require("../shop/shipping/vtpWorkbook")
 const trackingImport = require("../shop/shipping/trackingImport")
+const { buildRoster } = require("../shop/shipping/roster")
 
 // exceljs cell.value can be a rich-text object ({richText: [...]}), a
 // formula-result object ({result: ...}), a hyperlink object ({text/hyperlink}),
@@ -249,6 +250,48 @@ module.exports = function adminShippingRoutes() {
       }
       res.json({ results })
     } catch (err) { oops(res, err, "Lỗi xác nhận nhập mã vận đơn") }
+  })
+
+  // Pickup roster: confirmed pickup orders for one collection, shaped by
+  // buildRoster() into the paid-vs-collect-at-handover printable list. The
+  // WHERE clause below is the primary filter, but `status` is still selected
+  // and passed through to buildRoster() — its internal completed-order guard
+  // is defense in depth and silently no-ops without a real status value, so
+  // this query must never drop that column (see roster.js for why).
+  // order_token is deliberately never selected: this document gets printed
+  // and carried around a public event.
+  router.get("/shipping/roster/:collectionId", async (req, res) => {
+    try {
+      const collectionId = Number(req.params.collectionId)
+      if (!Number.isInteger(collectionId) || collectionId <= 0) {
+        return res.status(400).json({ error: "invalid_input", message: "collectionId không hợp lệ" })
+      }
+
+      const [orderRows] = await db.query(
+        `SELECT id, buyer_name, phone, status, payment_method, cod_amount
+           FROM orders
+          WHERE collection_id = ? AND status = 'confirmed' AND fulfillment_method = 'pickup'`,
+        [collectionId]
+      )
+
+      let itemRows = []
+      if (orderRows.length > 0) {
+        [itemRows] = await db.query(
+          `SELECT order_id, product_name_snapshot, variant_label_snapshot, qty
+             FROM order_items WHERE order_id IN (?)`,
+          [orderRows.map((o) => o.id)]
+        )
+      }
+
+      const itemsByOrder = new Map()
+      for (const item of itemRows) {
+        if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, [])
+        itemsByOrder.get(item.order_id).push(item)
+      }
+      const withItems = orderRows.map((o) => ({ ...o, items: itemsByOrder.get(o.id) || [] }))
+
+      res.json(buildRoster(withItems))
+    } catch (err) { oops(res, err, "Lỗi tạo danh sách nhận hàng") }
   })
 
   return router
