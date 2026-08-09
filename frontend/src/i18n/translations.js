@@ -45,9 +45,14 @@ export const translations = {
     orderTotalLabel: "Total", orderPending: "Awaiting payment confirmation",
     orderConfirmed: "Confirmed", orderShipped: "Shipped", orderCompleted: "Completed",
     orderCancelled: "Cancelled", orderNotFound: "Order not found.",
-    orderSaveLink: "Save this link to check your order later.",
+    orderSaveLink: "Save this link to check your order later. We also emailed it to you.",
+    orderDeadline: "Payment deadline: {time} ({remaining})",
+    orderDeadlinePassed: "The payment deadline has passed — this order is being cancelled automatically.",
+    orderManualConfirmNote: "Payments are checked manually by the seller, which can take a little time. Uploading a screenshot of your transfer helps confirm it faster.",
+    orderTransferNoteExplain: "Please include the exact transfer note above — without it, we can't match your payment to this order.",
     errOutOfStock: "Sorry, that item just sold out. Please review your cart.",
     checkoutNoMethods: "No payment method is set up right now. Please contact the seller to place an order.",
+    checkoutPaymentWindow: "Bank transfer / Momo / PayPal orders must be paid within a limited window after you order, or they're cancelled automatically. The exact deadline will appear on your order page after checkout.",
 
     // Payment instructions
     paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
@@ -162,9 +167,14 @@ export const translations = {
     orderTotalLabel: "Tổng cộng", orderPending: "Đang chờ xác nhận thanh toán",
     orderConfirmed: "Đã xác nhận", orderShipped: "Đã giao vận", orderCompleted: "Hoàn tất",
     orderCancelled: "Đã hủy", orderNotFound: "Không tìm thấy đơn hàng.",
-    orderSaveLink: "Lưu lại đường dẫn này để kiểm tra đơn hàng sau.",
+    orderSaveLink: "Lưu lại đường dẫn này để kiểm tra đơn hàng sau. Chúng tôi cũng đã gửi đường dẫn này qua email cho bạn.",
+    orderDeadline: "Hạn thanh toán: {time} ({remaining})",
+    orderDeadlinePassed: "Đã quá hạn thanh toán — đơn hàng đang được tự động hủy.",
+    orderManualConfirmNote: "Người bán kiểm tra chuyển khoản thủ công nên có thể mất chút thời gian. Tải lên ảnh chụp màn hình chuyển khoản sẽ giúp xác nhận nhanh hơn.",
+    orderTransferNoteExplain: "Vui lòng ghi đúng nội dung chuyển khoản ở trên — nếu không, chúng tôi sẽ không thể đối chiếu thanh toán với đơn hàng này.",
     errOutOfStock: "Rất tiếc, sản phẩm này vừa hết hàng. Vui lòng kiểm tra lại giỏ hàng.",
     checkoutNoMethods: "Hiện chưa có phương thức thanh toán nào được bật. Vui lòng liên hệ người bán để đặt hàng.",
+    checkoutPaymentWindow: "Đơn hàng thanh toán qua chuyển khoản/Momo/PayPal cần được thanh toán trong một khoảng thời gian giới hạn sau khi đặt hàng, nếu không sẽ tự động bị hủy. Hạn cụ thể sẽ hiển thị trên trang đơn hàng của bạn sau khi đặt.",
 
     // Payment instructions
     paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",
