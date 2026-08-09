@@ -1,7 +1,7 @@
 const express = require("express")
 const db = require("../db")
 const orders = require("../shop/orders/orderRepo")
-const { LOAI_HANG_HOA_VALUES } = require("../shop/shipping/vtpMapping")
+const { LOAI_HANG_HOA_VALUES, orderCode } = require("../shop/shipping/vtpMapping")
 const { buildExportWorkbook } = require("../shop/shipping/vtpWorkbook")
 
 module.exports = function adminShippingRoutes() {
@@ -19,7 +19,7 @@ module.exports = function adminShippingRoutes() {
       const eligible = rows.filter((o) => o.fulfillment_method === "ship" && !o.tracking_code)
       res.json(eligible.map((o) => ({
         id: o.id,
-        order_code: `DH${o.id}`,
+        order_code: orderCode(o.id),
         buyer_name: o.buyer_name,
         phone: o.phone,
         address_province: o.address_province,

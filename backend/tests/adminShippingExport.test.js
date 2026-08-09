@@ -6,6 +6,7 @@ import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
+import { orderCode } from "../shop/shipping/vtpMapping.js"
 import { resetTables } from "./helpers/db.js"
 
 const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
@@ -49,6 +50,15 @@ describe("GET /api/admin/shipping/export/orders", () => {
     expect(res.status).toBe(200)
     expect(res.body.find((o) => o.id === id)).toBeDefined()
     expect(res.body.find((o) => o.id === id).order_code).toBe(`DH${id}`)
+  })
+
+  it("listing's order_code matches the orderCode() helper", async () => {
+    const id = await seed()
+    const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    expect(res.status).toBe(200)
+    const order = res.body.find((o) => o.id === id)
+    expect(order).toBeDefined()
+    expect(order.order_code).toBe(orderCode(id))
   })
 
   it("excludes an order that already has a tracking code", async () => {
