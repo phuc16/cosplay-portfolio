@@ -119,7 +119,13 @@ module.exports = function orderRoutes() {
       if (err instanceof repo.RequestKeyConflictError) {
         return res.status(409).json({ error: "request_key_conflict", message: err.message })
       }
-      console.error("[ORDERS] Lỗi tạo đơn:", err)
+      // Never log the raw err object here: mysql2 embeds the fully
+      // interpolated failing SQL (every bound parameter, including the
+      // buyer's full name/phone/address/email and the generated
+      // order_token) in err.sql, and console.error(err) prints that. Log
+      // only the message (plus the code, useful for triage) — never err,
+      // err.sql, or anything from req.body.
+      console.error("[ORDERS] Lỗi tạo đơn:", err.message, err.code || "")
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
