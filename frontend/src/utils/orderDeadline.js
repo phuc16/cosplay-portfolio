@@ -16,17 +16,20 @@ export function formatDeadline(expiresAt, now = new Date()) {
 
   const passed = deadline.getTime() <= now.getTime()
 
-  const raw = deadline.toLocaleString("en-GB", {
+  // Read the individual fields out of formatToParts rather than the
+  // formatted string: which order ICU prints date vs. time in, and which
+  // separator (ASCII space, comma, U+202F narrow no-break space, ...) it
+  // uses between them, is runtime/browser-dependent. Indexing parts by
+  // `type` sidesteps that entirely — the values are correct regardless of
+  // how this environment's ICU data would have rendered the string.
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Ho_Chi_Minh",
     hour: "2-digit", minute: "2-digit",
     day: "2-digit", month: "2-digit",
     hour12: false,
-  })
-  // ICU emits "dd/MM, HH:mm" (or "dd/MM HH:mm" depending on the runtime's
-  // ICU data) — normalize to the spec's "HH:mm dd/MM" regardless of which
-  // order this environment's en-GB formatter produces.
-  const [datePart, timePart] = raw.replace(",", "").split(" ")
-  const absolute = `${timePart} ${datePart}`
+  }).formatToParts(deadline)
+  const part = (type) => parts.find((p) => p.type === type)?.value
+  const absolute = `${part("hour")}:${part("minute")} ${part("day")}/${part("month")}`
 
   // Never a countdown once the deadline has passed — the sweep window (the
   // worker cancels a pending order every ~5s) means expires_at can be in

@@ -62,6 +62,17 @@ describe("formatDeadline", () => {
     expect(result.passed).toBe(true)
   })
 
+  it("builds the absolute string from formatToParts field values, not from string layout — proven across several known instants", () => {
+    // Each case's expectation is derived from the known Asia/Ho_Chi_Minh
+    // wall-clock time, not from re-running toLocaleString — this would have
+    // caught a flipped date/time order or a non-ASCII separator, since
+    // neither can produce the right "HH:mm dd/MM" value by accident.
+    const now = new Date("2020-01-01T00:00:00Z")
+    expect(formatDeadline("2026-01-01T17:00:00Z", now).absolute).toBe("00:00 02/01") // +7h rolls to next day
+    expect(formatDeadline("2026-06-15T05:05:00Z", now).absolute).toBe("12:05 15/06")
+    expect(formatDeadline("2026-12-31T17:30:00Z", now).absolute).toBe("00:30 01/01")
+  })
+
   it("defaults now to the current time when not passed explicitly", () => {
     // A far-future deadline is always "not passed" under a real current now.
     const result = formatDeadline("2099-01-01T00:00:00Z")
