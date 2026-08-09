@@ -118,6 +118,11 @@ describe("PATCH /api/admin/shipping/export/orders/:id/payer", () => {
     expect(res.status).toBe(404)
   })
 
+  it("404s (not 500) for a non-numeric id", async () => {
+    const res = await authed(request(app).patch("/api/admin/shipping/export/orders/not-a-number/payer").send({ shipping_payer: "seller" }))
+    expect(res.status).toBe(404)
+  })
+
   it("does not mutate orders.status", async () => {
     const id = await seed()
     await authed(request(app).patch(`/api/admin/shipping/export/orders/${id}/payer`).send({ shipping_payer: "seller" }))
@@ -173,12 +178,61 @@ describe("POST /api/admin/shipping/export", () => {
     expect(res.status).toBe(400)
   })
 
-  it("silently omits an order_id that is no longer eligible (raced by another admin action)", async () => {
+  it("reports an order_id that is no longer eligible (raced by another admin action) in excluded, not silently", async () => {
     const id = await seed()
     await orders.transitionOrder(id, "cancelled")
     const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id], batch }))
     expect(res.status).toBe(200)
     expect(res.body.exported_count).toBe(0)
+    expect(res.body.excluded).toEqual([
+      { order_id: id, reason: "not_eligible", message: expect.stringContaining(orderCode(id)) },
+    ])
+  })
+
+  it("reports an order that already has a tracking_code as excluded with the eligibility reason", async () => {
+    const id = await seed()
+    await orders.transitionOrder(id, "shipped", { tracking_code: "VTP-ALREADY" })
+    const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id], batch }))
+    expect(res.status).toBe(200)
+    expect(res.body.exported_count).toBe(0)
+    expect(res.body.excluded).toHaveLength(1)
+    expect(res.body.excluded[0]).toMatchObject({ order_id: id, reason: "not_eligible" })
+  })
+
+  it("mixes a good order, a cancelled order, and an unknown id: good exports, others excluded distinctly, count reconciles", async () => {
+    const goodId = await seed()
+    const cancelledId = await seed()
+    await orders.transitionOrder(cancelledId, "cancelled")
+    const unknownId = 999999
+
+    const orderIds = [goodId, cancelledId, unknownId]
+    const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: orderIds, batch }))
+
+    expect(res.status).toBe(200)
+    expect(res.body.exported_count).toBe(1)
+    expect(res.body.excluded).toHaveLength(2)
+
+    const byId = Object.fromEntries(res.body.excluded.map((e) => [e.order_id, e]))
+    expect(byId[cancelledId]).toMatchObject({ order_id: cancelledId, reason: "not_eligible" })
+    expect(byId[unknownId]).toMatchObject({ order_id: unknownId, reason: "not_found" })
+    expect(byId[cancelledId].reason).not.toBe(byId[unknownId].reason)
+
+    expect(res.body.exported_count + res.body.excluded.length).toBe(orderIds.length)
+  })
+
+  it("count invariant: exported_count + excluded.length always equals the number of submitted order_ids", async () => {
+    const goodId = await seed()
+    const cancelledId = await seed()
+    await orders.transitionOrder(cancelledId, "cancelled")
+    const codMissingId = await seed()
+    await db.query("UPDATE orders SET payment_method = 'cod', cod_amount = NULL WHERE id = ?", [codMissingId])
+    const unknownId = 888888
+
+    const orderIds = [goodId, cancelledId, codMissingId, unknownId]
+    const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: orderIds, batch }))
+
+    expect(res.status).toBe(200)
+    expect(res.body.exported_count + res.body.excluded.length).toBe(orderIds.length)
   })
 
   it("does not mutate orders.status for exported orders", async () => {
