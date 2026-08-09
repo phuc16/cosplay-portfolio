@@ -160,10 +160,10 @@ module.exports = function adminShippingRoutes() {
             expectedFromStatus: "confirmed",
           })
           results.push(ok
-            ? { order_id: orderId, ok: true, message: `Đã cập nhật mã vận đơn cho DH${orderId}` }
+            ? { order_id: orderId, ok: true, message: `Đã cập nhật mã vận đơn cho ${orderCode(orderId)}` }
             : {
                 order_id: orderId, ok: false, reason: "not_confirmed",
-                message: `DH${orderId} không còn ở trạng thái "confirmed" (đã xử lý trước đó hoặc bị thay đổi)`,
+                message: `${orderCode(orderId)} không còn ở trạng thái "confirmed" (đã xử lý trước đó hoặc bị thay đổi)`,
               })
         } catch (err) {
           console.error(`[ADMIN/SHIPPING] Lỗi cập nhật mã vận đơn cho đơn ${orderId}:`, err)
