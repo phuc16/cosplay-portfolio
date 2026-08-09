@@ -69,6 +69,13 @@ function extractPairsFromSheetRows(rows2D) {
  *    code actually belongs to that order cannot be determined (a seller
  *    pasting overlapping ranges, or duplicating a row while editing, must
  *    never result in silent last-wins on a field the buyer gets emailed).
+ *  - A pickup order is skipped as not_shippable, never toApply: confirm
+ *    would then reject it via canTransition(confirmed, shipped, "pickup")
+ *    and report "không còn ở trạng thái confirmed" about an order that IS
+ *    confirmed — factually wrong, since the real reason is that it is a
+ *    pickup order that was never meant to get a tracking code. `order`
+ *    comes from orderRepo.getOrderById()'s `SELECT *`, so fulfillment_method
+ *    is already present without any extra plumbing.
  */
 function resolvePreview(rows, ordersById) {
   const trackingCodeCounts = new Map()
@@ -125,6 +132,14 @@ function resolvePreview(rows, ordersById) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
         reason: "not_found", message: `Không tìm thấy đơn ${ORDER_CODE_PREFIX}${orderId}`,
+      })
+      continue
+    }
+    if (order.fulfillment_method !== "ship") {
+      skipped.push({
+        order_code: r.order_code, tracking_code: r.tracking_code,
+        reason: "not_shippable",
+        message: `Đơn ${ORDER_CODE_PREFIX}${orderId} là đơn nhận tại chỗ (pickup), không áp dụng mã vận đơn`,
       })
       continue
     }

@@ -266,3 +266,29 @@ describe("POST /api/admin/shipping/tracking-import/confirm", () => {
     expect(row.status).toBe("shipped")
   })
 })
+
+describe("pickup orders in tracking import", () => {
+  async function seedConfirmedPickupOrder() {
+    const cid = await catalog.createCollection({ title: "Drop", status: "active", allow_pickup: true })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 1 }], buyer, fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await orders.transitionOrder(o.id, "confirmed")
+    return o.id
+  }
+
+  it("skips a confirmed pickup order in preview with an honest not_shippable reason, not not_confirmed", async () => {
+    const id = await seedConfirmedPickupOrder()
+    const res = await authed(
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `DH${id}\tVTP-XYZ` })
+    )
+    expect(res.status).toBe(200)
+    expect(res.body.toApply).toEqual([])
+    expect(res.body.skipped).toEqual([
+      { order_code: `DH${id}`, tracking_code: "VTP-XYZ", reason: "not_shippable", message: expect.any(String) },
+    ])
+  })
+})

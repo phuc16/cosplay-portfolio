@@ -78,11 +78,11 @@ describe("extractPairsFromSheetRows", () => {
 })
 
 describe("resolvePreview", () => {
-  const confirmedOrder = { id: 1, status: "confirmed" }
-  const shippedOrder = { id: 2, status: "shipped" }
-  const completedOrder = { id: 3, status: "completed" }
-  const pendingOrder = { id: 4, status: "pending" }
-  const cancelledOrder = { id: 5, status: "cancelled" }
+  const confirmedOrder = { id: 1, status: "confirmed", fulfillment_method: "ship" }
+  const shippedOrder = { id: 2, status: "shipped", fulfillment_method: "ship" }
+  const completedOrder = { id: 3, status: "completed", fulfillment_method: "ship" }
+  const pendingOrder = { id: 4, status: "pending", fulfillment_method: "ship" }
+  const cancelledOrder = { id: 5, status: "cancelled", fulfillment_method: "ship" }
 
   function byId(...orders) {
     return new Map(orders.map((o) => [o.id, o]))
@@ -147,7 +147,7 @@ describe("resolvePreview", () => {
         { order_code: "DH1", tracking_code: "SAME" },
         { order_code: "DH2", tracking_code: "SAME" },
       ],
-      byId(confirmedOrder, { id: 2, status: "confirmed" })
+      byId(confirmedOrder, { id: 2, status: "confirmed", fulfillment_method: "ship" })
     )
     expect(toApply).toEqual([])
     expect(skipped).toHaveLength(2)
@@ -160,7 +160,7 @@ describe("resolvePreview", () => {
         { order_code: "DH12", tracking_code: "V1" },
         { order_code: "DH12", tracking_code: "V2" },
       ],
-      byId({ id: 12, status: "confirmed" })
+      byId({ id: 12, status: "confirmed", fulfillment_method: "ship" })
     )
     expect(toApply).toEqual([])
     expect(skipped).toHaveLength(2)
@@ -173,7 +173,7 @@ describe("resolvePreview", () => {
         { order_code: "DH12", tracking_code: "V1" },
         { order_code: "DH12", tracking_code: "V1" },
       ],
-      byId({ id: 12, status: "confirmed" })
+      byId({ id: 12, status: "confirmed", fulfillment_method: "ship" })
     )
     expect(toApply).toEqual([])
     expect(skipped).toHaveLength(2)
@@ -187,7 +187,7 @@ describe("resolvePreview", () => {
         { order_code: "DH12", tracking_code: "V2" },
         { order_code: "DH1", tracking_code: "VTP001" },
       ],
-      byId({ id: 12, status: "confirmed" }, confirmedOrder)
+      byId({ id: 12, status: "confirmed", fulfillment_method: "ship" }, confirmedOrder)
     )
     expect(toApply).toEqual([{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }])
     expect(skipped).toHaveLength(2)
@@ -202,6 +202,15 @@ describe("resolvePreview", () => {
     const { toApply, skipped } = resolvePreview(rows, byId(shippedOrder))
     expect(toApply).toEqual([])
     expect(skipped[0].reason).toBe("already_shipped")
+  })
+
+  it("skips a confirmed pickup order as not_shippable, not not_confirmed", () => {
+    const pickupOrder = { id: 6, status: "confirmed", fulfillment_method: "pickup" }
+    const { toApply, skipped } = resolvePreview(
+      [{ order_code: "DH6", tracking_code: "VTP001" }], byId(pickupOrder)
+    )
+    expect(toApply).toEqual([])
+    expect(skipped).toEqual([{ order_code: "DH6", tracking_code: "VTP001", reason: "not_shippable", message: expect.any(String) }])
   })
 
   it("processes multiple valid rows independently — one bad row does not affect a good one", () => {

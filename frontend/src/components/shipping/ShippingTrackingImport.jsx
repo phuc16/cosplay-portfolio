@@ -13,6 +13,7 @@ const SKIPPED_REASON_LABELS = {
   not_found: "Không tìm thấy đơn hàng",
   already_shipped: "Đơn hàng đã được giao trước đó",
   not_confirmed: "Đơn hàng chưa được xác nhận",
+  not_shippable: "Đơn nhận tại chỗ (pickup), không áp dụng mã vận đơn",
 }
 
 function skippedReasonText(s) {
