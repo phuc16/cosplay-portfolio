@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { formatVnd } from "../../utils/money"
+import vietQrLogo from "../../assets/vietqr-logo.svg"
 
 /** Copy-to-clipboard button; silently no-ops where the Clipboard API is unavailable. */
 function CopyButton({ value }) {
@@ -75,6 +76,7 @@ export default function PaymentInstructions({ instructions, token }) {
                 alt={t("paymentScanQr")}
                 className="w-48 h-48 rounded-lg border border-[var(--border-default)]"
               />
+              <img src={vietQrLogo} alt="VietQR" className="h-4 mt-2 opacity-80" />
               <p className="text-xs opacity-60 mt-2">{t("paymentScanQrHint")}</p>
             </div>
           ) : (

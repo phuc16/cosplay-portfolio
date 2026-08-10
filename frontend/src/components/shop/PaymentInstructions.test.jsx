@@ -50,6 +50,37 @@ describe("PaymentInstructions", () => {
     expect(container.textContent).not.toContain("unavailable")
   })
 
+  it("shows a VietQR badge next to the bank QR so buyers recognize it as the transfer code", async () => {
+    const container = await renderWith({
+      method: "bank", amount: 100000, payment_note: null,
+      bank_name: "ACB", account_number: "123456789", account_holder: "NGUYEN VAN A",
+      transfer_note: "DH12345678", vietqr_payload: "0002010102...",
+    })
+
+    const badge = container.querySelector('img[alt="VietQR"]')
+    expect(badge).toBeTruthy()
+  })
+
+  it("does not show the VietQR badge when the QR itself is unavailable", async () => {
+    const container = await renderWith({
+      method: "bank", amount: 100000, payment_note: null,
+      bank_name: "ACB", account_number: "123456789", account_holder: "NGUYEN VAN A",
+      transfer_note: "DH12345678", vietqr_payload: null,
+    })
+
+    expect(container.querySelector('img[alt="VietQR"]')).toBeNull()
+  })
+
+  it("does not show the VietQR badge for momo, which uses an admin-uploaded QR, not the VietQR standard", async () => {
+    const container = await renderWith({
+      method: "momo", amount: 50000, payment_note: null,
+      momo_phone: "0900000000", momo_account_holder: "A", momo_qr_image: "https://x/img.png",
+      transfer_note: "DH12345678",
+    })
+
+    expect(container.querySelector('img[alt="VietQR"]')).toBeNull()
+  })
+
   it("renders momo details with the uploaded QR image", async () => {
     const container = await renderWith({
       method: "momo", amount: 50000, payment_note: null,
