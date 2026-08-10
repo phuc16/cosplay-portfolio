@@ -1,5 +1,17 @@
 # Payment Deep Links — Design
 
+> **STATUS (2026-08-10): DEFERRED — NOT IMPLEMENTED.** This spec (and the
+> plan built from it) describe a single deep-link button tied to the
+> seller's own bank. Further verification found VietQR's registry actually
+> supports something closer to what the user wanted — a picker of the
+> *buyer's* bank apps (like Messenger's payment sheet), opening whichever
+> app the buyer taps, targeted at the seller's fixed account via
+> `app=<buyer's bank>&ba=<seller account>@<seller bank code>`. That's real
+> and documented, but choosing how many bank buttons to show (a website
+> cannot detect which apps are actually installed) had no clearly-right
+> answer, and the user chose to skip the feature rather than force one.
+> Kept as a record of the investigation, not as ready-to-execute.
+
 ## Context
 
 The buyer's order page (`frontend/src/components/shop/PaymentInstructions.jsx`)
