@@ -127,12 +127,14 @@ export default function Collection() {
       )}
 
       {addedMsg && (
-        <div
+        <Link
+          to="/cart"
           role="status"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm shadow-lg"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm shadow-lg hover:opacity-90"
         >
           {addedMsg}
-        </div>
+          <span className="underline">{t("cart")}</span>
+        </Link>
       )}
       </main>
     </>
