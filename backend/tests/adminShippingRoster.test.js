@@ -182,6 +182,13 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(poster.qty).toBe(2)
   })
 
+  it("includes pickup_code in the roster row", async () => {
+    const { collectionId, orderId } = await seedPickupOrder()
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
+    const row = res.body.rows.find((r) => r.order_id === orderId)
+    expect(row.pickup_code).toMatch(/^\d{6}$/)
+  })
+
   // --- order_token must never leak into this printed/carried document ---
   it("never includes order_token in the response, even as a canary value", async () => {
     const { collectionId, orderId } = await seedPickupOrder()

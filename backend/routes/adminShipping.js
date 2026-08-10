@@ -317,7 +317,7 @@ module.exports = function adminShippingRoutes() {
       }
 
       const [orderRows] = await db.query(
-        `SELECT id, buyer_name, phone, status, payment_method, cod_amount
+        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code
            FROM orders
           WHERE collection_id = ? AND status = 'confirmed' AND fulfillment_method = 'pickup'`,
         [collectionId]

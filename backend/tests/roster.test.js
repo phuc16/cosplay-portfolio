@@ -94,6 +94,13 @@ describe("buildRoster — sorting", () => {
   })
 })
 
+describe("buildRoster — pickup_code", () => {
+  it("includes pickup_code on every row", () => {
+    const { rows } = buildRoster([order({ pickup_code: "482913" })])
+    expect(rows[0].pickup_code).toBe("482913")
+  })
+})
+
 describe("buildRoster — empty input", () => {
   it("returns empty rows and excluded for no orders", () => {
     expect(buildRoster([])).toEqual({ rows: [], excluded: [] })

@@ -40,6 +40,7 @@ function buildRoster(orders) {
       order_code: orderCode(order.id),
       buyer_name: order.buyer_name,
       phone: order.phone,
+      pickup_code: order.pickup_code,
       items: (order.items || []).map((i) => ({
         product_name: i.product_name_snapshot,
         variant_label: i.variant_label_snapshot,
