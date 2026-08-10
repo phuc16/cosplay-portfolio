@@ -235,6 +235,19 @@ describe("sendQueued: pickup QR gating", () => {
     const [[row]] = await db.query("SELECT pickup_code FROM orders WHERE id = ?", [o.id])
     expect(sentArg.html).toContain(row.pickup_code)
   })
+
+  it("pickup order with a null pickup_code (legacy order predating the migration): QR still renders, no 'Mã xác nhận' / literal 'null'", async () => {
+    const o = await seedOrder("pickup")
+    await db.query("UPDATE orders SET pickup_code = NULL WHERE id = ?", [o.id])
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("cid:orderqr")
+    expect(sentArg.html).not.toContain("Mã xác nhận")
+    expect(sentArg.html).not.toContain("null")
+  })
 })
 
 describe("sendQueued: no real network connection", () => {

@@ -81,6 +81,7 @@ export default function ShippingRoster() {
                     <tr className="text-left opacity-70">
                       <th className="pr-2">✓</th>
                       <th className="pr-2">Mã đơn</th>
+                      <th className="pr-2">Mã nhận hàng</th>
                       <th className="pr-2">Người nhận</th>
                       <th className="pr-2">SĐT</th>
                       <th className="pr-2">Sản phẩm</th>
@@ -93,6 +94,7 @@ export default function ShippingRoster() {
                       <tr key={r.order_id} className="border-t border-[var(--border-brand)]">
                         <td className="pr-2 py-1">☐</td>
                         <td className="pr-2 py-1">{r.order_code}</td>
+                        <td className="pr-2 py-1">{r.pickup_code}</td>
                         <td className="pr-2 py-1">{r.buyer_name}</td>
                         <td className="pr-2 py-1">{r.phone}</td>
                         <td className="pr-2 py-1">

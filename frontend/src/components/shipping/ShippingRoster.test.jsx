@@ -141,6 +141,27 @@ describe("ShippingRoster", () => {
     expect(container.textContent).toContain("đơn COD nhưng chưa có số tiền thu hộ")
   })
 
+  it("renders the pickup code for a row that has one", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+          pickup_code: "PICKUP-7X2K",
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    expect(container.textContent).toContain("Mã nhận hàng")
+    const row = container.querySelector("tbody tr")
+    expect(row.textContent).toContain("PICKUP-7X2K")
+  })
+
   it("has a print button", async () => {
     adminGetPickupRoster.mockResolvedValue({ rows: [], excluded: [] })
     const container = await renderComponent()
