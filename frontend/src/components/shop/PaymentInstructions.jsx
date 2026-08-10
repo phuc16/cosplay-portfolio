@@ -70,13 +70,18 @@ export default function PaymentInstructions({ instructions, token }) {
           <Row label={t("paymentTransferNote")} value={instructions.transfer_note} copyable />
 
           {instructions.vietqr_payload ? (
-            <div className="mt-4 flex flex-col items-center">
+            <div className="mt-4 flex flex-col items-center p-4 rounded-lg border border-[var(--border-default)]">
+              <img src={vietQrLogo} alt="VietQR" className="h-7 mb-3" />
               <img
                 src={`/api/orders/${token}/payment/qr.svg`}
                 alt={t("paymentScanQr")}
-                className="w-48 h-48 rounded-lg border border-[var(--border-default)]"
+                className="w-48 h-48"
               />
-              <img src={vietQrLogo} alt="VietQR" className="h-4 mt-2 opacity-80" />
+              <p className="text-xs font-semibold tracking-wide opacity-70 mt-3">NAPAS 247</p>
+              {instructions.account_holder && (
+                <p className="text-sm font-bold uppercase mt-1 text-center">{instructions.account_holder}</p>
+              )}
+              <p className="text-sm">{instructions.account_number}</p>
               <p className="text-xs opacity-60 mt-2">{t("paymentScanQrHint")}</p>
             </div>
           ) : (

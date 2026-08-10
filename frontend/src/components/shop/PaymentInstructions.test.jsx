@@ -44,21 +44,34 @@ describe("PaymentInstructions", () => {
       transfer_note: "DH12345678", vietqr_payload: "0002010102...",
     })
 
-    const img = container.querySelector("img")
+    const img = [...container.querySelectorAll("img")].find((i) => i.src.includes("/api/orders/tok123/payment/qr.svg"))
     expect(img).toBeTruthy()
-    expect(img.src).toContain("/api/orders/tok123/payment/qr.svg")
     expect(container.textContent).not.toContain("unavailable")
   })
 
-  it("shows a VietQR badge next to the bank QR so buyers recognize it as the transfer code", async () => {
+  it("shows the VietQR logo above the QR, like VietQR's own official card layout", async () => {
     const container = await renderWith({
       method: "bank", amount: 100000, payment_note: null,
       bank_name: "ACB", account_number: "123456789", account_holder: "NGUYEN VAN A",
       transfer_note: "DH12345678", vietqr_payload: "0002010102...",
     })
 
-    const badge = container.querySelector('img[alt="VietQR"]')
+    const imgs = [...container.querySelectorAll("img")]
+    const badge = imgs.find((i) => i.alt === "VietQR")
+    const qr = imgs.find((i) => i.src.includes("/api/orders/tok123/payment/qr.svg"))
     expect(badge).toBeTruthy()
+    expect(imgs.indexOf(badge)).toBeLessThan(imgs.indexOf(qr))
+  })
+
+  it("shows the NAPAS 247 caption and the account holder/number beneath the QR, like the official VietQR card", async () => {
+    const container = await renderWith({
+      method: "bank", amount: 100000, payment_note: null,
+      bank_name: "ACB", account_number: "123456789", account_holder: "NGUYEN VAN A",
+      transfer_note: "DH12345678", vietqr_payload: "0002010102...",
+    })
+
+    expect(container.textContent).toContain("NAPAS 247")
+    expect(container.textContent).toContain("NGUYEN VAN A")
   })
 
   it("does not show the VietQR badge when the QR itself is unavailable", async () => {
