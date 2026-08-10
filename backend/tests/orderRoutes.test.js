@@ -163,6 +163,23 @@ describe("POST /api/orders", () => {
     expect(second.body.error).toBe("request_key_conflict")
     expect(JSON.stringify(second.body)).not.toContain(first.body.order_token)
   })
+
+  it("rejects COD for a pickup order", async () => {
+    await settings.updateSettings({ cod_enabled: true, bank_enabled: true, bank_name: "ACB", bank_bin: "970416", bank_account_number: "1", bank_account_holder: "A" })
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const res = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", payment_method: "cod", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("still allows COD for a ship order", async () => {
+    await settings.updateSettings({ cod_enabled: true, bank_enabled: true, bank_name: "ACB", bank_bin: "970416", bank_account_number: "1", bank_account_holder: "A" })
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const res = await request(app).post("/api/orders")
+      .send(body(v, { payment_method: "cod" }))
+    expect(res.status).toBe(201)
+  })
 })
 
 describe("GET /api/orders/:token", () => {
@@ -266,5 +283,18 @@ describe("GET /api/orders/:token", () => {
     const res = await request(app).get(`/api/orders/${created.body.order_token}`)
     expect(res.body.pickup_location).toBeNull()
     expect(res.body.pickup_note).toBeNull()
+  })
+
+  it("includes pickup_code for a pickup order, null for a ship order", async () => {
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const pickup = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+    const pickupGet = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    expect(pickupGet.body.pickup_code).toMatch(/^\d{6}$/)
+
+    const v2 = await seed(5)
+    const ship = await request(app).post("/api/orders").send(body(v2))
+    const shipGet = await request(app).get(`/api/orders/${ship.body.order_token}`)
+    expect(shipGet.body.pickup_code).toBeNull()
   })
 })

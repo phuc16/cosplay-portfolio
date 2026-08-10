@@ -31,10 +31,14 @@ function toPublicOrder(order) {
     // before now. NULL for COD (domain.computeExpiry never sets a deadline
     // for it). This is the only line this phase adds to this allowlist.
     expires_at,
+    // Spec (Event Pickup Verification): a pickup-only code the buyer can
+    // read aloud/show staff, verifiable against the printed roster without
+    // network. Always null for a ship order.
+    pickup_code,
   } = order
   return {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
-    pickup_location, pickup_note, expires_at,
+    pickup_location, pickup_note, expires_at, pickup_code,
   }
 }
 
@@ -50,6 +54,12 @@ function validate(body) {
 
   if (!FULFILLMENT.includes(fulfillment_method)) return "Hình thức nhận hàng không hợp lệ"
   if (!PAYMENT_METHODS.includes(payment_method)) return "Phương thức thanh toán không hợp lệ"
+  // Pickup orders require prepayment — COD only applies when there is a
+  // delivery to collect cash at. A crafted request could otherwise bypass
+  // the checkout UI's own filter (added alongside this).
+  if (payment_method === "cod" && fulfillment_method === "pickup") {
+    return "COD không áp dụng cho đơn nhận tại sự kiện"
+  }
 
   if (!buyer) return "Thiếu thông tin người mua"
   if (!buyer.buyer_name?.trim()) return "Cần họ tên"
