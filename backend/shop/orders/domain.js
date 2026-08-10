@@ -8,6 +8,17 @@ function generateOrderToken() {
 }
 
 /**
+ * 6-digit numeric pickup verification code. Short enough for a staff member
+ * to read aloud or match by eye against the printed pickup roster when
+ * event-venue connectivity is too weak for the QR-scan flow (which needs a
+ * live full order-list fetch). Unlike order_token, this is never accepted
+ * as a credential anywhere — it only ever gets compared visually.
+ */
+function generatePickupCode() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, "0")
+}
+
+/**
  * Sum the order. Throws rather than coercing, because a non-integer price or a
  * negative quantity reaching this point means something upstream is broken and
  * silently rounding it would produce a wrong charge.
@@ -63,6 +74,7 @@ function canTransition(from, to, fulfillment) {
 module.exports = {
   RESERVATION_HOURS,
   generateOrderToken,
+  generatePickupCode,
   computeTotal,
   isReservable,
   computeExpiry,

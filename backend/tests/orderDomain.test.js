@@ -12,6 +12,17 @@ describe("generateOrderToken", () => {
   })
 })
 
+describe("generatePickupCode", () => {
+  it("is a 6-digit numeric string", () => {
+    expect(d.generatePickupCode()).toMatch(/^\d{6}$/)
+  })
+
+  it("varies across many generations (not a constant)", () => {
+    const codes = new Set(Array.from({ length: 200 }, () => d.generatePickupCode()))
+    expect(codes.size).toBeGreaterThan(1)
+  })
+})
+
 describe("computeTotal", () => {
   it("sums price times quantity", () => {
     expect(d.computeTotal([

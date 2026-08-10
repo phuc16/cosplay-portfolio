@@ -195,13 +195,14 @@ async function createOrder(input) {
     const token = domain.generateOrderToken()
     const expiresAt = domain.computeExpiry(input.payment_method)
     const isPickup = input.fulfillment_method === "pickup"
+    const pickupCode = isPickup ? domain.generatePickupCode() : null
 
     const [res] = await conn.query(
       `INSERT INTO orders
          (order_token, request_key, buyer_name, phone, email, fulfillment_method,
           address_street, address_ward, address_district, address_province, address_raw,
-          note, status, payment_method, total, cod_amount, collection_id, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+          note, status, payment_method, total, cod_amount, collection_id, expires_at, pickup_code)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
       [
         token,
         input.request_key || null,
@@ -220,6 +221,7 @@ async function createOrder(input) {
         input.payment_method === "cod" ? total : null,
         lines[0].collection_id,
         expiresAt,
+        pickupCode,
       ]
     )
 

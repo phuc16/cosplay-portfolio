@@ -241,6 +241,24 @@ describe("createOrder", () => {
   })
 })
 
+describe("createOrder: pickup_code", () => {
+  it("sets a 6-digit pickup_code for a pickup order", async () => {
+    const { variantId } = await seedVariant(5, { allow_pickup: true })
+    const created = await repo.createOrder(order(variantId, 1, { fulfillment_method: "pickup" }))
+
+    const [[row]] = await db.query("SELECT pickup_code FROM orders WHERE id = ?", [created.id])
+    expect(row.pickup_code).toMatch(/^\d{6}$/)
+  })
+
+  it("leaves pickup_code null for a ship order", async () => {
+    const { variantId } = await seedVariant(5)
+    const created = await repo.createOrder(order(variantId, 1))
+
+    const [[row]] = await db.query("SELECT pickup_code FROM orders WHERE id = ?", [created.id])
+    expect(row.pickup_code).toBeNull()
+  })
+})
+
 describe("createOrder locking", () => {
   it("locks the variant row it is reserving", async () => {
     const { variantId } = await seedVariant(5)
