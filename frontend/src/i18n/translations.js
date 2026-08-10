@@ -53,6 +53,8 @@ export const translations = {
     errOutOfStock: "Sorry, that item just sold out. Please review your cart.",
     checkoutNoMethods: "No payment method is set up right now. Please contact the seller to place an order.",
     checkoutPaymentWindow: "Bank transfer / Momo / PayPal orders must be paid within a limited window after you order, or they're cancelled automatically. The exact deadline will appear on your order page after checkout.",
+    orderPickupCode: "Pickup code",
+    orderPickupCodeHint: "Show or read this to event staff if the QR code can't be scanned.",
 
     // Payment instructions
     paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
@@ -175,6 +177,8 @@ export const translations = {
     errOutOfStock: "Rất tiếc, sản phẩm này vừa hết hàng. Vui lòng kiểm tra lại giỏ hàng.",
     checkoutNoMethods: "Hiện chưa có phương thức thanh toán nào được bật. Vui lòng liên hệ người bán để đặt hàng.",
     checkoutPaymentWindow: "Đơn hàng thanh toán qua chuyển khoản/Momo/PayPal cần được thanh toán trong một khoảng thời gian giới hạn sau khi đặt hàng, nếu không sẽ tự động bị hủy. Hạn cụ thể sẽ hiển thị trên trang đơn hàng của bạn sau khi đặt.",
+    orderPickupCode: "Mã nhận hàng",
+    orderPickupCodeHint: "Đọc hoặc cho nhân viên xem mã này nếu không quét được mã QR.",
 
     // Payment instructions
     paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",

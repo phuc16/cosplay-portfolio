@@ -215,6 +215,14 @@ export default function Order() {
         </div>
       )}
 
+      {order.fulfillment_method === "pickup" && order.pickup_code && (
+        <div className="mt-4 p-4 rounded-xl border border-[var(--border-warning)] bg-[var(--surface-warning)] text-center">
+          <p className="text-xs opacity-70">{t("orderPickupCode")}</p>
+          <p className="text-2xl font-bold tracking-widest">{order.pickup_code}</p>
+          <p className="text-xs opacity-60 mt-1">{t("orderPickupCodeHint")}</p>
+        </div>
+      )}
+
       <div className="mt-6 flex flex-col items-center">
         <img src={`/api/orders/${token}/qr.svg`} alt={t("orderQrCaption")}
           className="w-40 h-40 rounded-lg border border-[var(--border-brand)]" />

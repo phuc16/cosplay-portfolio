@@ -95,6 +95,20 @@ describe("Order pickup info", () => {
   })
 })
 
+describe("Order — pickup code (Event Pickup Verification plan)", () => {
+  it("shows the pickup code for a pickup order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", pickup_code: "482913" }))
+    const container = await renderOrder()
+    expect(container.textContent).toContain("482913")
+  })
+
+  it("does not render a pickup code section for a ship order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "ship", pickup_code: null }))
+    const container = await renderOrder()
+    expect(container.textContent).not.toContain("Pickup code")
+  })
+})
+
 describe("Order — payment deadline (Phase 6)", () => {
   it("renders the deadline block for a pending, prepaid order with a future expires_at", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))
