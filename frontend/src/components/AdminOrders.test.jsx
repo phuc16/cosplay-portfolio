@@ -152,6 +152,26 @@ describe("AdminOrders bulk cancel", () => {
     expect(container.textContent).toContain("completed")
     expect(container.textContent).toContain("#2")
   })
+
+  it("shows the cancel-specific banner text after a full-success bulk cancel", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 }), order({ id: 2 })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const selectAll = container.querySelector('input[type="checkbox"]')
+    await act(async () => { selectAll.click() })
+
+    vi.spyOn(globalThis, "confirm").mockReturnValue(true)
+    adminBulkCancelOrders.mockResolvedValue({ results: [{ id: 1, ok: true }, { id: 2, ok: true }] })
+    adminListOrders.mockResolvedValue([order({ id: 1, status: "cancelled" }), order({ id: 2, status: "cancelled" })])
+
+    const bulkBtn = [...container.querySelectorAll("button")].find((b) => b.textContent.startsWith("Huỷ đã chọn"))
+    await act(async () => { bulkBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("Đã huỷ 2 đơn.")
+    expect(container.textContent).not.toContain("Đã hoàn tất")
+  })
 })
 
 describe("AdminOrders — bulk complete (Event Pickup Verification plan)", () => {
@@ -192,6 +212,47 @@ describe("AdminOrders — bulk complete (Event Pickup Verification plan)", () =>
     await act(async () => { completeBtn.click() })
 
     expect(adminBulkCompleteOrders).toHaveBeenCalledWith([1, 2])
+  })
+
+  it("shows the complete-specific banner text, not the cancel wording, after a bulk complete", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 }), order({ id: 2 })])
+    adminBulkCompleteOrders.mockResolvedValue({ results: [{ id: 1, ok: true }, { id: 2, ok: true }] })
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const checkboxes = [...container.querySelectorAll('input[type="checkbox"][aria-label]')]
+    await act(async () => { checkboxes[0].click() })
+    await act(async () => { checkboxes[1].click() })
+
+    const completeBtn = [...container.querySelectorAll("button")].find((b) => b.textContent.startsWith("Hoàn tất đã chọn"))
+    await act(async () => { completeBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("Đã hoàn tất 2 đơn.")
+    expect(container.textContent).not.toContain("Đã huỷ")
+  })
+
+  it("shows the partial-success complete wording when some orders fail", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 }), order({ id: 2 })])
+    adminBulkCompleteOrders.mockResolvedValue({
+      results: [
+        { id: 1, ok: true },
+        { id: 2, ok: false, error: "invalid_transition", message: 'Không thể chuyển từ "pending" sang "completed"' },
+      ],
+    })
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const checkboxes = [...container.querySelectorAll('input[type="checkbox"][aria-label]')]
+    await act(async () => { checkboxes[0].click() })
+    await act(async () => { checkboxes[1].click() })
+
+    const completeBtn = [...container.querySelectorAll("button")].find((b) => b.textContent.startsWith("Hoàn tất đã chọn"))
+    await act(async () => { completeBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("Hoàn tất thành công 1/2 đơn")
+    expect(container.textContent).not.toContain("Huỷ thành công")
   })
 })
 

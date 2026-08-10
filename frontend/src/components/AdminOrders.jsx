@@ -72,6 +72,7 @@ export default function AdminOrders() {
 
   const [selected, setSelected] = useState(() => new Set())
   const [bulkResults, setBulkResults] = useState(null)
+  const [bulkAction, setBulkAction] = useState(null)
   const [bulkBusy, setBulkBusy] = useState(false)
 
   const filters = { status: filter, collectionId, dateFrom, dateTo }
@@ -157,6 +158,7 @@ export default function AdminOrders() {
 
     setBulkBusy(true)
     setBulkResults(null)
+    setBulkAction("cancel")
     try {
       // A 200 here only means the request was well-formed — each order's own
       // ok/error must be read individually; some may fail (e.g. an order
@@ -182,6 +184,7 @@ export default function AdminOrders() {
 
     setBulkBusy(true)
     setBulkResults(null)
+    setBulkAction("complete")
     try {
       const { results } = await adminBulkCompleteOrders([...selected])
       setBulkResults(results)
@@ -256,9 +259,13 @@ export default function AdminOrders() {
       {bulkResults && (
         <div className="mb-3 p-3 rounded-xl border border-[var(--border-brand)] text-sm" role="status">
           <p className="font-medium">
-            {failedBulkResults.length === 0
-              ? `Đã huỷ ${bulkResults.length} đơn.`
-              : `Huỷ thành công ${bulkResults.length - failedBulkResults.length}/${bulkResults.length} đơn.`}
+            {bulkAction === "complete"
+              ? (failedBulkResults.length === 0
+                  ? `Đã hoàn tất ${bulkResults.length} đơn.`
+                  : `Hoàn tất thành công ${bulkResults.length - failedBulkResults.length}/${bulkResults.length} đơn.`)
+              : (failedBulkResults.length === 0
+                  ? `Đã huỷ ${bulkResults.length} đơn.`
+                  : `Huỷ thành công ${bulkResults.length - failedBulkResults.length}/${bulkResults.length} đơn.`)}
           </p>
           {failedBulkResults.length > 0 && (
             <ul className="mt-1 text-red-500">
