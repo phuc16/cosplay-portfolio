@@ -28,15 +28,17 @@ function readFileAsBase64(file) {
 // doesn't burn a retry against the proof rate limiter on a doomed upload.
 const MAX_PROOF_BYTES = 8 * 1024 * 1024
 
-function ProofUpload({ token }) {
+function ProofUpload({ token, hasExistingProof }) {
   const { t } = useLanguage()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
-  // Session-only: the buyer-facing order does not expose an existing
-  // payment_proof_url (that field is intentionally stripped for buyers), so
-  // this reflects only what was uploaded during this visit, not history from
-  // an earlier visit or device.
+  // The image itself is session-only: the buyer-facing order deliberately
+  // never exposes the stored payment_proof_url, only whether one exists
+  // (hasExistingProof, from the order fetch). A fresh upload this visit
+  // still shows its own preview via uploadedUrl; a prior visit's upload
+  // shows only the success message below, sourced from hasExistingProof.
   const [uploadedUrl, setUploadedUrl] = useState(null)
+  const alreadyUploaded = Boolean(uploadedUrl) || hasExistingProof
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]
@@ -69,11 +71,14 @@ function ProofUpload({ token }) {
         <img src={uploadedUrl} alt={t("proofUploaded")}
           className="w-32 h-32 object-cover rounded-lg border border-[var(--border-default)] mb-2" />
       )}
+      {alreadyUploaded && (
+        <p className="text-sm text-[var(--text-success)] mb-2">✓ {t("proofUploaded")}</p>
+      )}
 
       <label
         className={`inline-block px-3 py-1.5 text-sm rounded-lg border border-[var(--border-brand)] cursor-pointer hover:bg-[var(--brand-soft)] ${uploading ? "opacity-50 pointer-events-none" : ""}`}
       >
-        {uploadedUrl ? t("proofReplace") : t("proofUpload")}
+        {alreadyUploaded ? t("proofReplace") : t("proofUpload")}
         <input type="file" accept="image/*" onChange={onFile} disabled={uploading} className="hidden" />
       </label>
 
@@ -187,7 +192,7 @@ export default function Order() {
 
       {/* Hidden entirely once the order leaves pending — the API itself
           refuses uploads past that point, so this mirrors the server rule. */}
-      {isPending && <ProofUpload token={token} />}
+      {isPending && <ProofUpload token={token} hasExistingProof={order.has_payment_proof} />}
 
       <h2 className="font-semibold mb-2">{t("orderItems")}</h2>
       {order.items.map((i) => (

@@ -23,7 +23,7 @@ function baseOrder(over = {}) {
     id: 1, order_token: "tok123", status: "confirmed", total: 35000,
     fulfillment_method: "ship", tracking_code: null, created_at: new Date().toISOString(),
     items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1 }],
-    pickup_location: null, pickup_note: null,
+    pickup_location: null, pickup_note: null, has_payment_proof: false,
     ...over,
   }
 }
@@ -282,5 +282,43 @@ describe("Order — payment proof upload styling", () => {
     expect(uploadPaymentProof).toHaveBeenCalled()
     const img = container.querySelector('img[src="https://x/proof.jpg"]')
     expect(img).toBeTruthy()
+  })
+
+  it("shows the success message after a refresh, sourced from has_payment_proof, without an image", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: true }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Uploaded")
+    expect(container.querySelector('label input[type="file"]').closest("label").textContent).toContain("Replace")
+    // No image element for the pre-existing proof — the server never sends
+    // the URL back, only the boolean.
+    expect(container.querySelector('img[alt="Uploaded"]')).toBeNull()
+  })
+
+  it("does not show the success message when no proof is on file", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Uploaded")
+  })
+
+  it("shows a visible success message after a successful upload, not just an image", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    uploadPaymentProof.mockResolvedValue({ url: "https://x/proof.jpg" })
+
+    const container = await renderOrder()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["x"], "proof.jpg", { type: "image/jpeg" })
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Uploaded")
   })
 })
