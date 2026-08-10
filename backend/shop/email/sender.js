@@ -65,6 +65,12 @@ async function sendQueued(limit = 10) {
           <div style="text-align:center;margin-top:16px">
             <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
             <p style="font-size:12px;color:#888">Đưa mã này khi nhận hàng tại sự kiện</p>
+            <p style="font-size:14px;margin-top:8px">
+              Mã xác nhận nhận hàng: <strong>${order.pickup_code}</strong>
+            </p>
+            <p style="font-size:12px;color:#888">
+              Nếu không quét được mã QR (mạng yếu tại sự kiện), hãy đọc mã này cho nhân viên.
+            </p>
           </div>`
         attachments.push({ filename: "order-qr.png", content: png, cid: "orderqr" })
       }

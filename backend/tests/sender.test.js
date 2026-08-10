@@ -224,6 +224,17 @@ describe("sendQueued: pickup QR gating", () => {
     expect(sentArg.attachments).toHaveLength(1)
     expect(sentArg.attachments[0]).toMatchObject({ filename: "order-qr.png", cid: "orderqr" })
   })
+
+  it("pickup order: email includes the pickup_code", async () => {
+    const o = await seedOrder("pickup")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    const [[row]] = await db.query("SELECT pickup_code FROM orders WHERE id = ?", [o.id])
+    expect(sentArg.html).toContain(row.pickup_code)
+  })
 })
 
 describe("sendQueued: no real network connection", () => {
