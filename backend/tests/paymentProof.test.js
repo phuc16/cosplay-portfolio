@@ -138,3 +138,21 @@ describe("POST /api/orders/:token/proof", () => {
     expect(orderKeys.length).toBe(0)
   })
 })
+
+describe("GET /api/orders/:token — has_payment_proof", () => {
+  it("is false before any proof is uploaded", async () => {
+    const o = await seedOrder()
+    const res = await request(app).get(`/api/orders/${o.order_token}`)
+    expect(res.body.has_payment_proof).toBe(false)
+  })
+
+  it("is true after a proof is uploaded, surviving what a page refresh would re-fetch", async () => {
+    const o = await seedOrder()
+    await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+
+    const res = await request(app).get(`/api/orders/${o.order_token}`)
+    expect(res.body.has_payment_proof).toBe(true)
+    // The raw URL must still never reach the buyer — only the boolean does.
+    expect(res.body).not.toHaveProperty("payment_proof_url")
+  })
+})
