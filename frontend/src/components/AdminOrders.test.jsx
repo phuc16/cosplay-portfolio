@@ -229,4 +229,41 @@ describe("AdminOrders — semantic status/action styling (Admin UI plan)", () =>
     const { container } = await renderAdminOrders()
     expect(container.textContent).toContain("some_future_status")
   })
+
+  it("shows the Vietnamese payment-method label in the detail panel, not the raw enum", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, payment_method: "bank" })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, payment_method: "bank", email: "a@b.com", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    const strongTags = [...container.querySelectorAll("strong")].map((el) => el.textContent)
+    expect(strongTags).toContain("Chuyển khoản")
+    expect(strongTags).not.toContain("bank")
+    expect(container.textContent).toContain("Thanh toán:")
+  })
+
+  it("renders the status filter options with Vietnamese text but raw-enum values", async () => {
+    adminListOrders.mockResolvedValue([order()])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const statusSelect = container.querySelector("select")
+    const options = [...statusSelect.querySelectorAll("option")]
+
+    const values = options.map((o) => o.value)
+    expect(values).toEqual(["", "pending", "confirmed", "shipped", "completed", "cancelled"])
+
+    const texts = options.map((o) => o.textContent)
+    expect(texts).toContain("Tất cả")
+    expect(texts).toContain("Đã xác nhận")
+    expect(texts).not.toContain("pending")
+    expect(texts).not.toContain("confirmed")
+    expect(texts).not.toContain("shipped")
+    expect(texts).not.toContain("completed")
+    expect(texts).not.toContain("cancelled")
+  })
 })

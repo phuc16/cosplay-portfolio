@@ -183,7 +183,7 @@ export default function AdminOrders() {
           Trạng thái
           <select value={filter} onChange={(e) => setFilter(e.target.value)}
             className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent">
-            {STATUSES.map((s) => <option key={s} value={s}>{s || "Tất cả"}</option>)}
+            {STATUSES.map((s) => <option key={s} value={s}>{s ? labelFor(STATUS_LABELS, s) : "Tất cả"}</option>)}
           </select>
         </label>
 
@@ -295,7 +295,7 @@ export default function AdminOrders() {
               {detail.note && <p className="mt-1 italic opacity-70">“{detail.note}”</p>}
 
               <p className="mt-2">
-                Thanh toán: <strong>{detail.payment_method}</strong>
+                Thanh toán: <strong>{labelFor(PAYMENT_METHOD_LABELS, detail.payment_method)}</strong>
                 {paymentInfo?.transfer_note && <> · Nội dung CK: <strong>{paymentInfo.transfer_note}</strong></>}
               </p>
 
