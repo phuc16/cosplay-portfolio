@@ -168,3 +168,47 @@ describe("Checkout — payment window notice (Phase 6)", () => {
     expect(container.textContent).not.toContain("must be paid within a limited window")
   })
 })
+
+describe("Checkout — COD restricted to ship orders (Event Pickup Verification plan)", () => {
+  it("hides COD from the payment picker when pickup is selected", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+
+    const container = await renderCheckout()
+    const pickupRadio = [...container.querySelectorAll('input[name="fulfillment"]')][1]
+    await act(async () => { pickupRadio.click() })
+
+    const options = [...container.querySelectorAll("select option")].map((o) => o.value)
+    expect(options).toEqual(["bank"])
+  })
+
+  it("resets away from cod when switching from ship to pickup with cod selected", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+
+    const container = await renderCheckout()
+    const select = container.querySelector("select")
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set.call(select, "cod")
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    expect(select.value).toBe("cod")
+
+    const pickupRadio = [...container.querySelectorAll('input[name="fulfillment"]')][1]
+    await act(async () => { pickupRadio.click() })
+
+    expect(select.value).not.toBe("cod")
+  })
+
+  it("still offers cod for a ship order", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+
+    const container = await renderCheckout()
+    const options = [...container.querySelectorAll("select option")].map((o) => o.value)
+    expect(options).toEqual(["bank", "cod"])
+  })
+})

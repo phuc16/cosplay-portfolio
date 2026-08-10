@@ -83,6 +83,19 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flags.loaded, offered])
 
+  // COD requires a delivery to collect cash at — it does not apply to an
+  // event pickup, which requires prepayment. The server rejects this
+  // combination too (routes/orders.js validate()); this is the UI half.
+  const offeredPayment = useMemo(
+    () => (methods || []).filter((m) => !(m === "cod" && fulfillment === "pickup")),
+    [methods, fulfillment]
+  )
+
+  useEffect(() => {
+    if (!offeredPayment.includes(payment)) setPayment(offeredPayment[0] || "")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offeredPayment])
+
   // Stable across retries so a double-tap or a retried submit cannot create
   // two orders holding two reservations. Held in state (not a pure useMemo) so
   // it can be regenerated if the server ever reports a request_key_conflict —
@@ -188,7 +201,7 @@ export default function Checkout() {
         <select value={payment} onChange={(e) => setPayment(e.target.value)}
           disabled={!methods || methods.length === 0}
           className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent disabled:opacity-50">
-          {(methods || []).map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+          {offeredPayment.map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
         </select>
         {methods && methods.length === 0 && (
           <p className="text-sm text-[var(--text-error)] mt-1">{t("checkoutNoMethods")}</p>
