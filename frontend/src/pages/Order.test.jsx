@@ -200,3 +200,38 @@ describe("Order — Vietnamese countdown copy", () => {
     expect(container.textContent).toContain("còn 3 giờ")
   })
 })
+
+describe("Order — semantic status colour (Admin UI plan)", () => {
+  it("renders the order status as a StatusBadge with the warning variant while pending", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: null }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "cod", amount: 35000 })
+
+    const container = await renderOrder()
+    const badge = [...container.querySelectorAll("span")].find((el) => el.className.includes("var(--surface-"))
+    expect(badge).toBeTruthy()
+    expect(badge.className).toContain("var(--border-warning)")
+  })
+
+  it("renders the order status with the success variant once confirmed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+
+    const container = await renderOrder()
+    const badge = [...container.querySelectorAll("span")].find((el) => el.className.includes("var(--surface-"))
+    expect(badge.className).toContain("var(--border-success)")
+  })
+
+  it("renders the order status with the danger variant once cancelled", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "cancelled" }))
+
+    const container = await renderOrder()
+    const badge = [...container.querySelectorAll("span")].find((el) => el.className.includes("var(--surface-"))
+    expect(badge.className).toContain("var(--border-danger)")
+  })
+
+  it("still falls back to the raw status text for a status with no translation key, per STATUS_KEY's existing fallback", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "some_future_status" }))
+
+    const container = await renderOrder()
+    expect(container.textContent).toContain("some_future_status")
+  })
+})

@@ -6,6 +6,8 @@ import { formatVnd } from "../utils/money"
 import { formatDeadline } from "../utils/orderDeadline"
 import PaymentInstructions from "../components/shop/PaymentInstructions"
 import ShopHeader from "../components/shop/ShopHeader"
+import StatusBadge from "../components/StatusBadge"
+import { variantForStatus } from "../constants/statusVariant"
 
 const STATUS_KEY = {
   pending: "orderPending", confirmed: "orderConfirmed", shipped: "orderShipped",
@@ -87,7 +89,7 @@ function DeadlineBlock({ expiresAt }) {
   if (!info) return null
 
   if (info.passed) {
-    return <p className="text-sm text-[var(--text-error)] mt-1">{t("orderDeadlinePassed")}</p>
+    return <p className="text-sm text-[var(--text-danger)] mt-1">{t("orderDeadlinePassed")}</p>
   }
 
   // "còn {n} giờ" / "{n}h left" is composed here, not stored as a sixth
@@ -95,7 +97,7 @@ function DeadlineBlock({ expiresAt }) {
   // wrapped in locale-specific phrasing, not a fixed label on its own.
   const remaining = lang === "vi" ? `còn ${info.remainingHours} giờ` : `${info.remainingHours}h left`
   return (
-    <p className="text-sm mt-1">
+    <p className="text-sm mt-1 text-[var(--text-warning)]">
       {t("orderDeadline", { time: info.absolute, remaining })}
     </p>
   )
@@ -160,7 +162,14 @@ export default function Order() {
 
       <div className="p-4 rounded-xl border border-[var(--border-brand)] mb-6">
         <p className="text-sm opacity-70">{t("orderStatus")}</p>
-        <p className="font-semibold">{t(STATUS_KEY[order.status])}</p>
+        <p className="font-semibold">
+          {/* STATUS_KEY[order.status] is undefined for an unrecognized status;
+              t(undefined) falls through LanguageContext's own key ?? key
+              chain to return the raw status text — this fallback is already
+              in place and is not changed here, only the wrapping badge is
+              added. */}
+          <StatusBadge label={t(STATUS_KEY[order.status] ?? order.status)} variant={variantForStatus(order.status)} />
+        </p>
         {order.tracking_code && <p className="text-sm mt-1">#{order.tracking_code}</p>}
         {/* Deadline is only meaningful while the seller hasn't yet confirmed
             the transfer — expires_at is never cleared on confirm, so this

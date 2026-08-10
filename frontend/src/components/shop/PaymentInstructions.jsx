@@ -51,7 +51,7 @@ export default function PaymentInstructions({ instructions, token }) {
   const { method, amount, payment_note } = instructions
 
   return (
-    <div className="p-4 rounded-xl border border-[var(--border-brand)] mb-6">
+    <div className="p-4 rounded-xl border border-[var(--border-warning)] bg-[var(--surface-warning)] mb-6">
       <h2 className="font-semibold mb-3">
         {method === "bank" && t("paymentBank")}
         {method === "momo" && t("paymentMomo")}
