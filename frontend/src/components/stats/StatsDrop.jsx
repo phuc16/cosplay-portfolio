@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { adminListCollections, adminGetDropStats } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
-
-const STATUS_LABELS = {
-  pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đã gửi",
-  completed: "Hoàn tất", cancelled: "Đã hủy",
-}
+import { STATUS_LABELS } from "../../admin/orderLabels"
 
 function formatPercent(ratio) {
   if (ratio === null || ratio === undefined) return "—"
