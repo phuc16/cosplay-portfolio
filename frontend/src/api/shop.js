@@ -58,6 +58,9 @@ export const adminTransitionOrder = (id, payload) =>
 export const adminBulkCancelOrders = (ids) =>
   api.post("/api/admin/orders/bulk-cancel", { ids }).then((r) => r.data)
 
+export const adminBulkCompleteOrders = (ids) =>
+  api.post("/api/admin/orders/bulk-complete", { ids }).then((r) => r.data)
+
 // ── Payments ──
 export const fetchPaymentMethods = () =>
   api.get("/api/shop/payment-methods").then((r) => r.data)

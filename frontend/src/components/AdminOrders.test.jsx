@@ -5,6 +5,7 @@ import { act } from "react"
 const adminListOrders = vi.fn()
 const adminListCollections = vi.fn()
 const adminBulkCancelOrders = vi.fn()
+const adminBulkCompleteOrders = vi.fn()
 const adminGetOrder = vi.fn()
 const adminTransitionOrder = vi.fn()
 const fetchPaymentInstructions = vi.fn()
@@ -13,6 +14,7 @@ vi.mock("../api/shop", () => ({
   adminListOrders: (...args) => adminListOrders(...args),
   adminListCollections: (...args) => adminListCollections(...args),
   adminBulkCancelOrders: (...args) => adminBulkCancelOrders(...args),
+  adminBulkCompleteOrders: (...args) => adminBulkCompleteOrders(...args),
   adminGetOrder: (...args) => adminGetOrder(...args),
   adminTransitionOrder: (...args) => adminTransitionOrder(...args),
   fetchPaymentInstructions: (...args) => fetchPaymentInstructions(...args),
@@ -60,6 +62,7 @@ beforeEach(() => {
   adminListOrders.mockReset()
   adminListCollections.mockReset()
   adminBulkCancelOrders.mockReset()
+  adminBulkCompleteOrders.mockReset()
   adminGetOrder.mockReset()
   adminTransitionOrder.mockReset()
   fetchPaymentInstructions.mockReset()
@@ -148,6 +151,47 @@ describe("AdminOrders bulk cancel", () => {
     expect(container.textContent).toContain("Huỷ thành công 1/2 đơn")
     expect(container.textContent).toContain("completed")
     expect(container.textContent).toContain("#2")
+  })
+})
+
+describe("AdminOrders — bulk complete (Event Pickup Verification plan)", () => {
+  it("renders a bulk-complete button beside bulk-cancel, disabled with nothing selected", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const buttons = [...container.querySelectorAll("button")]
+    const completeBtn = buttons.find((b) => b.textContent.startsWith("Hoàn tất đã chọn"))
+    expect(completeBtn).toBeTruthy()
+    expect(completeBtn.disabled).toBe(true)
+  })
+
+  it("uses success styling, not danger, distinct from the cancel button", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const buttons = [...container.querySelectorAll("button")]
+    const completeBtn = buttons.find((b) => b.textContent.startsWith("Hoàn tất đã chọn"))
+    const cancelBtn = buttons.find((b) => b.textContent.startsWith("Huỷ đã chọn"))
+    expect(completeBtn.className).toContain("var(--border-success)")
+    expect(completeBtn.className).not.toBe(cancelBtn.className)
+  })
+
+  it("calls adminBulkCompleteOrders with the selected ids and reloads", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 }), order({ id: 2 })])
+    adminBulkCompleteOrders.mockResolvedValue({ results: [{ id: 1, ok: true }, { id: 2, ok: true }] })
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const checkboxes = [...container.querySelectorAll('input[type="checkbox"][aria-label]')]
+    await act(async () => { checkboxes[0].click() })
+    await act(async () => { checkboxes[1].click() })
+
+    const completeBtn = [...container.querySelectorAll("button")].find((b) => b.textContent.startsWith("Hoàn tất đã chọn"))
+    await act(async () => { completeBtn.click() })
+
+    expect(adminBulkCompleteOrders).toHaveBeenCalledWith([1, 2])
   })
 })
 

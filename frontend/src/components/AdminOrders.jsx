@@ -1,7 +1,7 @@
 import { useEffect, lazy, Suspense, useState } from "react"
 import {
   adminListOrders, adminTransitionOrder, adminGetOrder, fetchPaymentInstructions,
-  adminBulkCancelOrders, adminListCollections,
+  adminBulkCancelOrders, adminBulkCompleteOrders, adminListCollections,
 } from "../api/shop"
 import { formatVnd } from "../utils/money"
 import OrderTimeline from "./OrderTimeline"
@@ -172,6 +172,28 @@ export default function AdminOrders() {
     }
   }
 
+  // For staff who verified pickup buyers offline via the printed roster's
+  // pickup_code (weak event-venue connectivity), applying the actual
+  // completed status can happen later, in one batch, instead of one order
+  // at a time. Same shape as bulkCancel — a 200 only means the request was
+  // well-formed, each order's own ok/error must be read individually.
+  const bulkComplete = async () => {
+    if (selected.size === 0) return
+
+    setBulkBusy(true)
+    setBulkResults(null)
+    try {
+      const { results } = await adminBulkCompleteOrders([...selected])
+      setBulkResults(results)
+      await reload()
+      setSelected(new Set())
+    } catch (e) {
+      setBulkResults([{ id: null, ok: false, error: "server_error", message: e.response?.data?.message || "Hoàn tất hàng loạt thất bại" }])
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   const failedBulkResults = (bulkResults || []).filter((r) => !r.ok)
 
   return (
@@ -223,6 +245,10 @@ export default function AdminOrders() {
           <button type="button" onClick={bulkCancel} disabled={selected.size === 0 || bulkBusy}
             className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.danger} disabled:opacity-50`}>
             {bulkBusy ? "Đang huỷ..." : `Huỷ đã chọn (${selected.size})`}
+          </button>
+          <button type="button" onClick={bulkComplete} disabled={selected.size === 0 || bulkBusy}
+            className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.success} disabled:opacity-50`}>
+            {bulkBusy ? "Đang xử lý..." : `Hoàn tất đã chọn (${selected.size})`}
           </button>
         </div>
       )}
