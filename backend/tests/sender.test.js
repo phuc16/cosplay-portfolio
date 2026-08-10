@@ -225,9 +225,21 @@ describe("sendQueued: pickup QR gating", () => {
     expect(sentArg.attachments[0]).toMatchObject({ filename: "order-qr.png", cid: "orderqr" })
   })
 
-  it("pickup order: email includes the pickup_code", async () => {
+  it("pending pickup order: email does NOT include the pickup_code yet (unpaid)", async () => {
     const o = await seedOrder("pickup")
     await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("cid:orderqr")
+    expect(sentArg.html).not.toContain("Mã xác nhận")
+  })
+
+  it("confirmed (paid) pickup order: email includes the pickup_code", async () => {
+    const o = await seedOrder("pickup")
+    await orders.transitionOrder(o.id, "confirmed")
+    await queue.enqueue(o.id, "payment_confirmed", "a@example.com")
 
     await sender.sendQueued()
 
@@ -236,10 +248,11 @@ describe("sendQueued: pickup QR gating", () => {
     expect(sentArg.html).toContain(row.pickup_code)
   })
 
-  it("pickup order with a null pickup_code (legacy order predating the migration): QR still renders, no 'Mã xác nhận' / literal 'null'", async () => {
+  it("confirmed pickup order with a null pickup_code (legacy order predating the migration): QR still renders, no 'Mã xác nhận' / literal 'null'", async () => {
     const o = await seedOrder("pickup")
+    await orders.transitionOrder(o.id, "confirmed")
     await db.query("UPDATE orders SET pickup_code = NULL WHERE id = ?", [o.id])
-    await queue.enqueue(o.id, "order_placed", "a@example.com")
+    await queue.enqueue(o.id, "payment_confirmed", "a@example.com")
 
     await sender.sendQueued()
 

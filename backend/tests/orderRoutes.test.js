@@ -3,6 +3,7 @@ import request from "supertest"
 import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
+import orders from "../shop/orders/orderRepo.js"
 import redis from "../redis.js"
 import settings from "../shop/payments/settingsRepo.js"
 import { resetTables } from "./helpers/db.js"
@@ -285,16 +286,55 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.pickup_note).toBeNull()
   })
 
-  it("includes pickup_code for a pickup order, null for a ship order", async () => {
+  it("hides pickup_code while the order is still pending (unpaid)", async () => {
     const v = await seed(5, { allow_ship: true, allow_pickup: true })
     const pickup = await request(app).post("/api/orders")
       .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+
     const pickupGet = await request(app).get(`/api/orders/${pickup.body.order_token}`)
-    expect(pickupGet.body.pickup_code).toMatch(/^\d{6}$/)
+    expect(pickupGet.body.pickup_code).toBeNull()
 
     const v2 = await seed(5)
     const ship = await request(app).post("/api/orders").send(body(v2))
     const shipGet = await request(app).get(`/api/orders/${ship.body.order_token}`)
     expect(shipGet.body.pickup_code).toBeNull()
+  })
+
+  it("reveals pickup_code once the order is confirmed (paid)", async () => {
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const pickup = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+
+    const [[pRow]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [pickup.body.order_token])
+    await orders.transitionOrder(pRow.id, "confirmed")
+
+    const res = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    expect(res.body.pickup_code).toMatch(/^\d{6}$/)
+  })
+
+  it("hides pickup_code again once a confirmed order is cancelled", async () => {
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const pickup = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+
+    const [[pRow1]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [pickup.body.order_token])
+    await orders.transitionOrder(pRow1.id, "confirmed")
+    await orders.transitionOrder(pRow1.id, "cancelled")
+
+    const res = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    expect(res.body.pickup_code).toBeNull()
+  })
+
+  it("keeps pickup_code visible once the order is completed", async () => {
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const pickup = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+
+    const [[pRow2]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [pickup.body.order_token])
+    await orders.transitionOrder(pRow2.id, "confirmed")
+    await orders.transitionOrder(pRow2.id, "completed")
+
+    const res = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    expect(res.body.pickup_code).toMatch(/^\d{6}$/)
   })
 })

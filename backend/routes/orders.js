@@ -42,9 +42,15 @@ function toPublicOrder(order) {
     // admin-only, unchanged from before.
     payment_proof_url,
   } = order
+  // The code is only meaningful once the order is actually paid for — an
+  // unpaid pending order (or one that got cancelled after confirming) has
+  // nothing to hand over, and showing the code that early lets a buyer treat
+  // "I placed an order" as "I can collect it" before the seller ever
+  // verified payment.
+  const paidPickupCode = ["confirmed", "completed"].includes(status) ? pickup_code : null
   return {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
-    pickup_location, pickup_note, expires_at, pickup_code,
+    pickup_location, pickup_note, expires_at, pickup_code: paidPickupCode,
     has_payment_proof: Boolean(payment_proof_url),
   }
 }

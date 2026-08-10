@@ -54,6 +54,12 @@ async function sendQueued(limit = 10) {
       // event pickup counter to scan it at, so skip generating and attaching
       // it entirely rather than just hiding it visually.
       const isPickup = order.fulfillment_method === "pickup"
+      // The code is only meaningful once the order is actually paid for —
+      // matches the same gate toPublicOrder applies to the buyer's order
+      // page, so an unpaid pending order's confirmation email never reveals
+      // it early. Read at send time (not enqueue time), so an order
+      // confirmed between enqueue and send still gets the code correctly.
+      const isPaid = ["confirmed", "completed"].includes(order.status)
 
       let html = rendered.html
       const attachments = []
@@ -65,7 +71,7 @@ async function sendQueued(limit = 10) {
           <div style="text-align:center;margin-top:16px">
             <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
             <p style="font-size:12px;color:#888">Đưa mã này khi nhận hàng tại sự kiện</p>
-            ${order.pickup_code ? `
+            ${order.pickup_code && isPaid ? `
             <p style="font-size:14px;margin-top:8px">
               Mã xác nhận nhận hàng: <strong>${order.pickup_code}</strong>
             </p>
