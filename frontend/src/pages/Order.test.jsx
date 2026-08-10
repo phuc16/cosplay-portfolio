@@ -249,3 +249,38 @@ describe("Order — semantic status colour (Admin UI plan)", () => {
     expect(container.textContent).toContain("some_future_status")
   })
 })
+
+describe("Order — payment proof upload styling", () => {
+  it("renders the file input inside a styled, button-looking label, not a bare native input", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    expect(fileInput).toBeTruthy()
+
+    const label = fileInput.closest("label")
+    expect(label).toBeTruthy()
+    expect(label.className).toContain("var(--border-brand)")
+    expect(label.className).toContain("rounded-lg")
+  })
+
+  it("still uploads correctly through the restyled input", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    uploadPaymentProof.mockResolvedValue({ url: "https://x/proof.jpg" })
+
+    const container = await renderOrder()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["x"], "proof.jpg", { type: "image/jpeg" })
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+    await act(async () => {})
+
+    expect(uploadPaymentProof).toHaveBeenCalled()
+    const img = container.querySelector('img[src="https://x/proof.jpg"]')
+    expect(img).toBeTruthy()
+  })
+})

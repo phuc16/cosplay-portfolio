@@ -70,11 +70,11 @@ function ProofUpload({ token }) {
           className="w-32 h-32 object-cover rounded-lg border border-[var(--border-default)] mb-2" />
       )}
 
-      <label className="block">
-        <span className="block text-sm mb-1 opacity-70">
-          {uploadedUrl ? t("proofReplace") : t("proofUpload")}
-        </span>
-        <input type="file" accept="image/*" onChange={onFile} disabled={uploading} />
+      <label
+        className={`inline-block px-3 py-1.5 text-sm rounded-lg border border-[var(--border-brand)] cursor-pointer hover:bg-[var(--brand-soft)] ${uploading ? "opacity-50 pointer-events-none" : ""}`}
+      >
+        {uploadedUrl ? t("proofReplace") : t("proofUpload")}
+        <input type="file" accept="image/*" onChange={onFile} disabled={uploading} className="hidden" />
       </label>
 
       {uploading && <p className="text-sm opacity-60 mt-1">{t("proofUploading")}</p>}
