@@ -36,6 +36,10 @@
   --slate-500: #64748b;
   --red-400: #f87171;
   --red-500: #ef4444;
+  --green-400: #4ade80;
+  --green-500: #22c55e;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
 
   /* --- Semantic aliases — LIGHT MODE (defaults = green scheme; settings may override via applyColorScheme) --- */
   --brand: #6BBF59;
@@ -60,6 +64,27 @@
   --text-on-brand: #ffffff;
   --text-link: #6BBF59;
   --text-error: var(--red-500);
+
+  /* --- Semantic state tokens — success / danger / warning / neutral ---
+     Added for the admin UI & shop state indicators. Deliberately not
+     derived from --brand: --brand is admin-configurable via site settings
+     (applyColorScheme), and state colour must never depend on the seller's
+     chosen decoration. */
+  --surface-success: rgba(34, 197, 94, 0.10);
+  --border-success: rgba(34, 197, 94, 0.50);
+  --text-success: var(--green-500);
+
+  --surface-danger: rgba(239, 68, 68, 0.10);
+  --border-danger: rgba(239, 68, 68, 0.50);
+  --text-danger: var(--red-500);
+
+  --surface-warning: rgba(245, 158, 11, 0.10);
+  --border-warning: rgba(245, 158, 11, 0.50);
+  --text-warning: var(--amber-500);
+
+  --surface-neutral: var(--gray-100);
+  --border-neutral: var(--gray-300);
+  --text-neutral: var(--gray-600);
 
   /* --- Typography --- */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -106,6 +131,22 @@
   --text-faint: var(--slate-500);
   --text-link: #84cf74;
   --text-error: var(--red-400);
+
+  --surface-success: rgba(34, 197, 94, 0.15);
+  --border-success: rgba(74, 222, 128, 0.50);
+  --text-success: var(--green-400);
+
+  --surface-danger: rgba(239, 68, 68, 0.15);
+  --border-danger: rgba(248, 113, 113, 0.50);
+  --text-danger: var(--red-400);
+
+  --surface-warning: rgba(245, 158, 11, 0.15);
+  --border-warning: rgba(251, 191, 36, 0.50);
+  --text-warning: var(--amber-400);
+
+  --surface-neutral: var(--cosplay-card);
+  --border-neutral: var(--cosplay-border);
+  --text-neutral: var(--slate-400);
 }
 
 @layer base {
