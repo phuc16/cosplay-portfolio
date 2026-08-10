@@ -202,3 +202,43 @@ describe("StatsDrop", () => {
     expect(container.textContent).toContain("nhập thêm hàng giữa đợt bán")
   })
 })
+
+describe("StatsDrop — statistics emphasis (Admin UI plan)", () => {
+  it("still renders all five money figures with their original values", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({
+      received_total: 500000, awaiting_payment: 70000, to_collect: 30000, lost: 10000, pending_cod: 20000,
+    }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    expect(container.textContent).toContain("500.000₫")
+    expect(container.textContent).toContain("70.000₫")
+    expect(container.textContent).toContain("30.000₫")
+    expect(container.textContent).toContain("10.000₫")
+    expect(container.textContent).toContain("20.000₫")
+  })
+
+  it("gives the received figure a visibly larger/dominant treatment than the other four", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({ received_total: 500000 }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const dominant = [...container.querySelectorAll("*")].find((el) => el.textContent.trim() === "500.000₫")
+    expect(dominant.className).toContain("text-3xl")
+  })
+
+  it("does not give the same dominant treatment to the four secondary figures", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({ awaiting_payment: 70000 }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const secondary = [...container.querySelectorAll("*")].find((el) => el.textContent.trim() === "70.000₫")
+    expect(secondary.className).not.toContain("text-3xl")
+  })
+})

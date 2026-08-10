@@ -57,26 +57,31 @@ export default function StatsDrop() {
           <p className="opacity-60">Bộ sưu tập này chưa có đơn hàng nào.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <div className="p-3 rounded-xl border border-[var(--border-brand)]">
-                <p className="text-xs opacity-70">Đã nhận</p>
-                <p className="text-lg font-semibold">{formatVnd(stats.received_total)}</p>
+            <div className="mb-4">
+              {/* Received is the figure the seller actually cares about — made
+                  dominant. No figure is removed, renamed, or recomputed: the
+                  same five values render below, just at unequal visual weight. */}
+              <div className="p-4 rounded-xl border border-[var(--border-success)] bg-[var(--surface-success)] mb-3">
+                <p className="text-sm opacity-70">Đã nhận</p>
+                <p className="text-3xl font-bold text-[var(--text-success)]">{formatVnd(stats.received_total)}</p>
               </div>
-              <div className="p-3 rounded-xl border border-[var(--border-brand)]">
-                <p className="text-xs opacity-70">Chờ thanh toán</p>
-                <p className="text-lg font-semibold">{formatVnd(stats.awaiting_payment)}</p>
-              </div>
-              <div className="p-3 rounded-xl border border-[var(--border-brand)]">
-                <p className="text-xs opacity-70">Thu khi giao</p>
-                <p className="text-lg font-semibold">{formatVnd(stats.to_collect)}</p>
-              </div>
-              <div className="p-3 rounded-xl border border-[var(--border-brand)]">
-                <p className="text-xs opacity-70">Đã mất</p>
-                <p className="text-lg font-semibold">{formatVnd(stats.lost)}</p>
-              </div>
-              <div className="p-3 rounded-xl border border-[var(--border-brand)]">
-                <p className="text-xs opacity-70">Đơn COD chưa xác nhận</p>
-                <p className="text-lg font-semibold">{formatVnd(stats.pending_cod)}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl border border-[var(--border-neutral)]">
+                  <p className="text-xs opacity-70">Chờ thanh toán</p>
+                  <p className="text-base font-semibold">{formatVnd(stats.awaiting_payment)}</p>
+                </div>
+                <div className="p-3 rounded-xl border border-[var(--border-neutral)]">
+                  <p className="text-xs opacity-70">Thu khi giao</p>
+                  <p className="text-base font-semibold">{formatVnd(stats.to_collect)}</p>
+                </div>
+                <div className="p-3 rounded-xl border border-[var(--border-neutral)]">
+                  <p className="text-xs opacity-70">Đã mất</p>
+                  <p className="text-base font-semibold">{formatVnd(stats.lost)}</p>
+                </div>
+                <div className="p-3 rounded-xl border border-[var(--border-neutral)]">
+                  <p className="text-xs opacity-70">Đơn COD chưa xác nhận</p>
+                  <p className="text-base font-semibold">{formatVnd(stats.pending_cod)}</p>
+                </div>
               </div>
             </div>
 
