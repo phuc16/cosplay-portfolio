@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter } from "react-router-dom"
 import { LanguageProvider } from "../contexts/LanguageContext"
+import { ThemeProvider } from "../contexts/ThemeContext"
 
 const fetchPaymentMethods = vi.fn()
 const createOrder = vi.fn()
@@ -31,9 +32,11 @@ async function renderCheckout() {
   await act(async () => {
     root.render(
       <MemoryRouter>
-        <LanguageProvider>
-          <Checkout />
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <Checkout />
+          </LanguageProvider>
+        </ThemeProvider>
       </MemoryRouter>
     )
   })

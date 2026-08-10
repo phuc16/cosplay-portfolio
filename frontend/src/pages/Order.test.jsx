@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { LanguageProvider } from "../contexts/LanguageContext"
+import { ThemeProvider } from "../contexts/ThemeContext"
 
 const fetchOrder = vi.fn()
 const fetchPaymentInstructions = vi.fn()
@@ -35,11 +36,13 @@ async function renderOrder() {
   await act(async () => {
     root.render(
       <MemoryRouter initialEntries={["/order/tok123"]}>
-        <LanguageProvider>
-          <Routes>
-            <Route path="/order/:token" element={<Order />} />
-          </Routes>
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <Routes>
+              <Route path="/order/:token" element={<Order />} />
+            </Routes>
+          </LanguageProvider>
+        </ThemeProvider>
       </MemoryRouter>
     )
   })

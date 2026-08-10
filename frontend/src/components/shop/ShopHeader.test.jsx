@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter } from "react-router-dom"
 import { LanguageProvider } from "../../contexts/LanguageContext"
+import { ThemeProvider } from "../../contexts/ThemeContext"
 import { addToCart, clearCart } from "../../shop/cart"
 import ShopHeader from "./ShopHeader"
 
@@ -15,9 +16,11 @@ async function renderHeader() {
   await act(async () => {
     root.render(
       <MemoryRouter>
-        <LanguageProvider>
-          <ShopHeader />
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <ShopHeader />
+          </LanguageProvider>
+        </ThemeProvider>
       </MemoryRouter>
     )
   })
@@ -68,5 +71,48 @@ describe("ShopHeader", () => {
       clearCart()
     })
     expect(cartLink(container).textContent.trim()).toBe("")
+  })
+})
+
+describe("ShopHeader — language and theme controls", () => {
+  beforeEach(() => localStorage.clear())
+
+  it("renders a VI and an EN language button", async () => {
+    const container = await renderHeader()
+    const buttons = [...container.querySelectorAll("button")].map((b) => b.textContent)
+    expect(buttons).toContain("VI")
+    expect(buttons).toContain("EN")
+  })
+
+  it("switches the language when VI is clicked (default is en)", async () => {
+    const container = await renderHeader()
+    expect(localStorage.getItem("lang")).toBe("en")
+
+    const viBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "VI")
+    await act(async () => { viBtn.click() })
+    await act(async () => {})
+
+    expect(localStorage.getItem("lang")).toBe("vi")
+  })
+
+  it("renders a theme toggle button", async () => {
+    const container = await renderHeader()
+    const themeBtn = [...container.querySelectorAll("button")].find((b) =>
+      b.title?.toLowerCase().includes("theme") || b.title?.toLowerCase().includes("giao diện") || b.getAttribute("aria-label")?.toLowerCase().includes("theme")
+    )
+    expect(themeBtn).toBeTruthy()
+  })
+
+  it("toggles the theme when clicked", async () => {
+    const container = await renderHeader()
+    const before = localStorage.getItem("theme")
+
+    const themeBtn = [...container.querySelectorAll("button")].find((b) =>
+      b.title?.toLowerCase().includes("theme") || b.title?.toLowerCase().includes("giao diện") || b.getAttribute("aria-label")?.toLowerCase().includes("theme")
+    )
+    await act(async () => { themeBtn.click() })
+    await act(async () => {})
+
+    expect(localStorage.getItem("theme")).not.toBe(before)
   })
 })
