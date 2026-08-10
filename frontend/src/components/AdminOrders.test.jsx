@@ -114,6 +114,16 @@ describe("AdminOrders bulk cancel", () => {
     confirmSpy.mockRestore()
   })
 
+  it("renders the bulk-cancel button with danger styling, same as the single-order cancel", async () => {
+    adminListOrders.mockResolvedValue([order()])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const bulkBtn = [...container.querySelectorAll("button")].find((b) => b.textContent.startsWith("Huỷ đã chọn"))
+    expect(bulkBtn).toBeTruthy()
+    expect(bulkBtn.className).toContain("var(--border-danger)")
+  })
+
   it("surfaces per-order failures instead of a blanket success message", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 }), order({ id: 2, status: "completed", allowed_transitions: [] })])
     const { container } = await renderAdminOrders()

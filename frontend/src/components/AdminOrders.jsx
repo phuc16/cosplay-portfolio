@@ -221,7 +221,7 @@ export default function AdminOrders() {
             Chọn tất cả ({selected.size}/{orders.length})
           </label>
           <button type="button" onClick={bulkCancel} disabled={selected.size === 0 || bulkBusy}
-            className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)] disabled:opacity-50">
+            className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.danger} disabled:opacity-50`}>
             {bulkBusy ? "Đang huỷ..." : `Huỷ đã chọn (${selected.size})`}
           </button>
         </div>
