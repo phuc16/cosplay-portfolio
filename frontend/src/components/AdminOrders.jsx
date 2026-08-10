@@ -5,6 +5,11 @@ import {
 } from "../api/shop"
 import { formatVnd } from "../utils/money"
 import OrderTimeline from "./OrderTimeline"
+import StatusBadge from "./StatusBadge"
+import { variantForStatus, variantForAction } from "../constants/statusVariant"
+import {
+  STATUS_LABELS, PAYMENT_METHOD_LABELS, FULFILLMENT_METHOD_LABELS, ACTION_LABELS, labelFor,
+} from "../admin/orderLabels"
 
 // Statically importing this would ship the scanner/camera component code to
 // every buyer, even though only the admin route ever renders it (the jsqr
@@ -19,6 +24,24 @@ const STATUSES = ["", "pending", "confirmed", "shipped", "completed", "cancelled
 // backend/shop/orders/domain.js) — the frontend keeps zero independent copy
 // of the transition rules.
 const nextStatuses = (order) => order.allowed_transitions || []
+
+// Every class string references only tokens asserted to exist by
+// frontend/src/utils/semanticTokens.test.js.
+const ACTION_BUTTON_CLASSES = {
+  success: "border-[var(--border-success)] text-[var(--text-success)] hover:bg-[var(--surface-success)]",
+  danger: "border-[var(--border-danger)] text-[var(--text-danger)] hover:bg-[var(--surface-danger)]",
+  neutral: "border-[var(--border-neutral)] text-[var(--text-neutral)] hover:bg-[var(--surface-neutral)]",
+}
+
+/** Orders with at least one legal transition surface first, so the seller
+ * doesn't have to scan a full list to find what needs attention. Stable
+ * sort (Array.prototype.sort is stable since ES2019) — orders within each
+ * group keep the API's original relative order. */
+function byActionableFirst(a, b) {
+  const aRank = nextStatuses(a).length > 0 ? 0 : 1
+  const bRank = nextStatuses(b).length > 0 ? 0 : 1
+  return aRank - bRank
+}
 
 /** Strips filter params that are empty, so the query string only ever
  * carries what the seller actually chose. */
@@ -233,25 +256,30 @@ export default function AdminOrders() {
         </Suspense>
       )}
 
-      {orders.map((o) => (
-        <div key={o.id} className="mb-3 p-3 rounded-xl border border-[var(--border-brand)]">
+      {[...orders].sort(byActionableFirst).map((o) => (
+        <div key={o.id} data-order-id={o.id} className="mb-3 p-3 rounded-xl border border-[var(--border-brand)]">
           <div className="flex justify-between items-start gap-3 flex-wrap">
             <div className="flex items-start gap-2">
               <input type="checkbox" className="mt-1" checked={selected.has(o.id)}
                 onChange={() => toggleSelected(o.id)} aria-label={`Chọn đơn #${o.id}`} />
               <div>
                 <p className="font-medium">#{o.id} · {o.buyer_name} · {o.phone}</p>
-                <p className="text-sm opacity-70">
-                  {o.status} · {o.fulfillment_method} · {o.payment_method} · {formatVnd(o.total)}
-                </p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <StatusBadge label={labelFor(STATUS_LABELS, o.status)} variant={variantForStatus(o.status)} />
+                  <span className="text-sm opacity-70">{labelFor(FULFILLMENT_METHOD_LABELS, o.fulfillment_method)}</span>
+                  <span className="text-sm opacity-70">{labelFor(PAYMENT_METHOD_LABELS, o.payment_method)}</span>
+                  <span className="text-sm opacity-70">{formatVnd(o.total)}</span>
+                </div>
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button type="button" onClick={() => openDetail(o.id)}
-                className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Chi tiết</button>
+                className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.neutral}`}>Chi tiết</button>
               {nextStatuses(o).map((to) => (
                 <button key={to} type="button" onClick={() => move(o, to)}
-                  className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">{to}</button>
+                  className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES[variantForAction(to)]}`}>
+                  {labelFor(ACTION_LABELS, to)}
+                </button>
               ))}
             </div>
           </div>

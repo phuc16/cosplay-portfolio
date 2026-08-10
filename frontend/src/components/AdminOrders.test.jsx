@@ -140,3 +140,83 @@ describe("AdminOrders bulk cancel", () => {
     expect(container.textContent).toContain("#2")
   })
 })
+
+describe("AdminOrders — semantic status/action styling (Admin UI plan)", () => {
+  it("renders the status as a Vietnamese-labelled badge, not the raw enum", async () => {
+    adminListOrders.mockResolvedValue([order({ status: "confirmed" })])
+    const { container } = await renderAdminOrders()
+    expect(container.textContent).toContain("Đã xác nhận")
+    expect(container.textContent).not.toContain("confirmed ·")
+  })
+
+  it("renders payment and fulfilment method with Vietnamese labels, not raw enums", async () => {
+    adminListOrders.mockResolvedValue([order({ payment_method: "bank", fulfillment_method: "ship" })])
+    const { container } = await renderAdminOrders()
+    expect(container.textContent).toContain("Chuyển khoản")
+    expect(container.textContent).toContain("Giao hàng")
+  })
+
+  it("renders the cancel action button with danger styling and a Vietnamese label", async () => {
+    adminListOrders.mockResolvedValue([order({ allowed_transitions: ["shipped", "cancelled"] })])
+    const { container } = await renderAdminOrders()
+    const buttons = [...container.querySelectorAll("button")]
+    const cancelBtn = buttons.find((b) => b.textContent === "Hủy")
+    expect(cancelBtn).toBeTruthy()
+    expect(cancelBtn.className).toContain("var(--border-danger)")
+  })
+
+  it("renders a confirm-type action button (shipped) with success styling, not danger", async () => {
+    adminListOrders.mockResolvedValue([order({ allowed_transitions: ["shipped", "cancelled"] })])
+    const { container } = await renderAdminOrders()
+    const buttons = [...container.querySelectorAll("button")]
+    const shippedBtn = buttons.find((b) => b.textContent === "Đã gửi")
+    expect(shippedBtn).toBeTruthy()
+    expect(shippedBtn.className).toContain("var(--border-success)")
+  })
+
+  it("fails if cancel and a confirm-type action ever render with the same class string again", async () => {
+    adminListOrders.mockResolvedValue([order({ allowed_transitions: ["shipped", "cancelled"] })])
+    const { container } = await renderAdminOrders()
+    const buttons = [...container.querySelectorAll("button")]
+    const cancelBtn = buttons.find((b) => b.textContent === "Hủy")
+    const shippedBtn = buttons.find((b) => b.textContent === "Đã gửi")
+    expect(cancelBtn.className).not.toBe(shippedBtn.className)
+  })
+
+  it("keeps 'Chi tiết' neutral, distinct from both success and danger actions", async () => {
+    adminListOrders.mockResolvedValue([order({ allowed_transitions: ["cancelled"] })])
+    const { container } = await renderAdminOrders()
+    const buttons = [...container.querySelectorAll("button")]
+    const detailBtn = buttons.find((b) => b.textContent === "Chi tiết")
+    expect(detailBtn.className).toContain("var(--border-neutral)")
+    expect(detailBtn.className).not.toContain("var(--border-danger)")
+  })
+
+  it("still shows the confirm() guard before cancelling (unchanged behavior)", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false)
+    adminTransitionOrder.mockResolvedValue({})
+    adminListOrders.mockResolvedValue([order({ allowed_transitions: ["cancelled"] })])
+    const { container } = await renderAdminOrders()
+    const cancelBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Hủy")
+    await act(async () => { cancelBtn.click() })
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(adminTransitionOrder).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+
+  it("surfaces an order with a pending action above one with none, without hiding either", async () => {
+    adminListOrders.mockResolvedValue([
+      order({ id: 1, status: "completed", allowed_transitions: [] }),
+      order({ id: 2, status: "pending", allowed_transitions: ["confirmed", "cancelled"] }),
+    ])
+    const { container } = await renderAdminOrders()
+    const ids = [...container.querySelectorAll("[data-order-id]")].map((el) => el.dataset.orderId)
+    expect(ids).toEqual(["2", "1"])
+  })
+
+  it("falls back to the raw value for an unknown status, never rendering blank", async () => {
+    adminListOrders.mockResolvedValue([order({ status: "some_future_status", allowed_transitions: [] })])
+    const { container } = await renderAdminOrders()
+    expect(container.textContent).toContain("some_future_status")
+  })
+})
