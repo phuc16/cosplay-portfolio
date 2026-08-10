@@ -6,8 +6,9 @@ const STATUSES = ["pending", "confirmed", "shipped", "completed", "cancelled"]
 
 // A griefed drop is at most a few dozen orders; this is generous headroom
 // while still bounding how many DB transactions + email enqueues one request
-// can trigger.
-const BULK_CANCEL_MAX = 100
+// can trigger. Shared by bulk-cancel and bulk-complete — same reasoning
+// applies to both.
+const BULK_ACTION_MAX = 100
 
 // The legal next-statuses for a given order, per the real canTransition state
 // machine — the single source of truth. Sent to the frontend so it never needs
@@ -90,10 +91,10 @@ module.exports = function adminOrderRoutes() {
       if (!Array.isArray(ids) || ids.length === 0) {
         return res.status(400).json({ error: "invalid_input", message: "ids phải là mảng khác rỗng" })
       }
-      if (ids.length > BULK_CANCEL_MAX) {
+      if (ids.length > BULK_ACTION_MAX) {
         return res.status(400).json({
           error: "invalid_input",
-          message: `Chỉ có thể huỷ tối đa ${BULK_CANCEL_MAX} đơn mỗi lần`,
+          message: `Chỉ có thể huỷ tối đa ${BULK_ACTION_MAX} đơn mỗi lần`,
         })
       }
 
@@ -127,6 +128,57 @@ module.exports = function adminOrderRoutes() {
 
       res.json({ results })
     } catch (err) { oops(res, err, "Lỗi huỷ hàng loạt đơn") }
+  })
+
+  // Bulk complete — lets staff who verified pickup buyers offline (via the
+  // printed roster's pickup_code, when event-venue connectivity was too weak
+  // for the live QR-scan flow) batch-apply the completed status once
+  // connectivity returns, instead of one order at a time. Mirrors
+  // bulk-cancel exactly: same transitionOrder() call per order, same
+  // per-order error isolation, same cap.
+  router.post("/orders/bulk-complete", async (req, res) => {
+    try {
+      const { ids } = req.body
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "invalid_input", message: "ids phải là mảng khác rỗng" })
+      }
+      if (ids.length > BULK_ACTION_MAX) {
+        return res.status(400).json({
+          error: "invalid_input",
+          message: `Chỉ có thể hoàn tất tối đa ${BULK_ACTION_MAX} đơn mỗi lần`,
+        })
+      }
+
+      const results = []
+      for (const rawId of ids) {
+        const id = Number(rawId)
+        if (!Number.isInteger(id) || id <= 0) {
+          results.push({ id: rawId, ok: false, error: "invalid_input", message: "ID đơn hàng không hợp lệ" })
+          continue
+        }
+
+        try {
+          const order = await repo.getOrderById(id)
+          if (!order) {
+            results.push({ id, ok: false, error: "not_found", message: "Không tìm thấy đơn hàng" })
+            continue
+          }
+
+          const ok = await repo.transitionOrder(id, "completed")
+          results.push(ok
+            ? { id, ok: true }
+            : {
+                id, ok: false, error: "invalid_transition",
+                message: `Không thể chuyển từ "${order.status}" sang "completed"`,
+              })
+        } catch (err) {
+          console.error(`[ADMIN/ORDERS] Lỗi hoàn tất đơn ${id} trong hoàn tất hàng loạt:`, err)
+          results.push({ id, ok: false, error: "server_error", message: "Lỗi server. Thử lại sau." })
+        }
+      }
+
+      res.json({ results })
+    } catch (err) { oops(res, err, "Lỗi hoàn tất hàng loạt đơn") }
   })
 
   return router

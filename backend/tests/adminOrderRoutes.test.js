@@ -252,3 +252,68 @@ describe("POST /api/admin/orders/bulk-cancel", () => {
     expect(res.body.error).toBe("invalid_input")
   })
 })
+
+describe("POST /api/admin/orders/bulk-complete", () => {
+  it("requires a token", async () => {
+    const res = await request(app).post("/api/admin/orders/bulk-complete").send({ ids: [1] })
+    expect(res.status).toBe(401)
+  })
+
+  it("completes multiple confirmed pickup orders", async () => {
+    const a = await seedOrder({ fulfillment_method: "pickup" })
+    const b = await seedOrder({ fulfillment_method: "pickup" })
+    await orders.transitionOrder(a.id, "confirmed")
+    await orders.transitionOrder(b.id, "confirmed")
+
+    const res = await authed(request(app).post("/api/admin/orders/bulk-complete"))
+      .send({ ids: [a.id, b.id] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(2)
+    expect(res.body.results.every((r) => r.ok)).toBe(true)
+
+    const [[rowA]] = await db.query("SELECT status FROM orders WHERE id = ?", [a.id])
+    const [[rowB]] = await db.query("SELECT status FROM orders WHERE id = ?", [b.id])
+    expect(rowA.status).toBe("completed")
+    expect(rowB.status).toBe("completed")
+  })
+
+  it("isolates a failing order from the others in the same batch", async () => {
+    const ok1 = await seedOrder({ fulfillment_method: "pickup" })
+    await orders.transitionOrder(ok1.id, "confirmed")
+    const stillPending = await seedOrder({ fulfillment_method: "pickup" })
+    const ok2 = await seedOrder({ fulfillment_method: "pickup" })
+    await orders.transitionOrder(ok2.id, "confirmed")
+
+    const res = await authed(request(app).post("/api/admin/orders/bulk-complete"))
+      .send({ ids: [ok1.id, stillPending.id, ok2.id, 999999] })
+
+    expect(res.status).toBe(200)
+    const byId = Object.fromEntries(res.body.results.map((r) => [r.id, r]))
+    expect(byId[ok1.id].ok).toBe(true)
+    expect(byId[ok2.id].ok).toBe(true)
+    expect(byId[stillPending.id].ok).toBe(false)
+    expect(byId[stillPending.id].error).toBe("invalid_transition")
+    expect(byId[999999].ok).toBe(false)
+    expect(byId[999999].error).toBe("not_found")
+  })
+
+  it("rejects a non-array ids payload", async () => {
+    const res = await authed(request(app).post("/api/admin/orders/bulk-complete")).send({ ids: "1,2" })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("rejects an empty ids array", async () => {
+    const res = await authed(request(app).post("/api/admin/orders/bulk-complete")).send({ ids: [] })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("rejects a batch larger than the cap", async () => {
+    const ids = Array.from({ length: 101 }, (_, i) => i + 1)
+    const res = await authed(request(app).post("/api/admin/orders/bulk-complete")).send({ ids })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+})
