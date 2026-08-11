@@ -528,6 +528,18 @@ describe("releaseExpiredOrders", () => {
     expect(v.stock_qty).toBe(5)
   })
 
+  it("records a cancel_reason explaining the auto-cancel, for the buyer's email", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    await db.query("UPDATE orders SET expires_at = ? WHERE id = ?",
+      [new Date(Date.now() - 1000), res.id])
+
+    await repo.releaseExpiredOrders(new Date())
+
+    const [[o]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [res.id])
+    expect(o.cancel_reason).toMatch(/quá hạn chuyển khoản/)
+  })
+
   it("never touches COD orders", async () => {
     const { variantId } = await seedVariant(5)
     const res = await repo.createOrder(order(variantId, 2, { payment_method: "cod" }))

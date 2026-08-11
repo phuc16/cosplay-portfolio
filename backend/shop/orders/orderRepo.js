@@ -516,6 +516,7 @@ async function releaseExpiredOrders(now = new Date()) {
     const cancelled = await transitionOrder(row.id, "cancelled", {
       expectedFromStatus: "pending",
       expiredBefore: now,
+      cancel_reason: "Đơn hàng tự động hủy do quá hạn chuyển khoản.",
     })
     if (cancelled) released += 1
   }
