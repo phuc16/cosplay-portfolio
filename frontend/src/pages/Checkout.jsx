@@ -7,6 +7,36 @@ import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import AddressFields from "../components/shop/AddressFields"
 import ShopHeader from "../components/shop/ShopHeader"
+import vietqrLogo from "../assets/vietqr-logo.svg"
+
+// One icon per payment method, shown alongside its label in the picker —
+// bank reuses the same VietQR mark already used on the order's payment
+// instructions page, so the two screens read as the same payment. Momo and
+// COD have no bundled brand asset, so they get a lightweight monogram/icon
+// instead of a real logo.
+const PAYMENT_ICONS = {
+  bank: <img src={vietqrLogo} alt="" className="h-6 w-auto object-contain" />,
+  momo: (
+    <span
+      className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+      style={{ background: "#A50064" }}
+    >
+      M
+    </span>
+  ),
+  paypal: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#003087" className="shrink-0">
+      <path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944 3.72a.77.77 0 01.758-.633h5.165c2.35 0 4.128.633 5.33 1.898 1.205 1.264 1.794 2.995 1.77 5.193-.048 3.19-.882 5.358-2.505 6.506-1.623 1.148-3.735 1.707-6.337 1.676H9.38l-.598 3.48a.641.641 0 01-.633.548z" />
+    </svg>
+  ),
+  cod: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="shrink-0">
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <circle cx="12" cy="12" r="3" />
+      <path strokeLinecap="round" d="M6 9v.01M18 15v.01" />
+    </svg>
+  ),
+}
 
 // Default to both open (rather than none) while the collection fetch is in
 // flight, so the picker doesn't flash empty before settling to what the
@@ -42,6 +72,9 @@ async function loadFulfillmentFlags(cart) {
 export default function Checkout() {
   const { t } = useLanguage()
   const navigate = useNavigate()
+  const PAYMENT_LABELS = {
+    bank: t("paymentBank"), momo: t("paymentMomo"), paypal: t("paymentPaypal"), cod: t("paymentCod"),
+  }
   // State, not a one-time useMemo: a variant_not_found response needs to
   // drop the stale line(s) and re-render with what's left.
   const [cart, setCart] = useState(() => readCart())
@@ -207,13 +240,29 @@ export default function Checkout() {
         </div>
       )}
 
-      <label className="block mb-4">
+      <div className="mb-4">
         <span className="block text-sm mb-1">{t("checkoutPayment")}</span>
-        <select value={payment} onChange={(e) => setPayment(e.target.value)}
-          disabled={!methods || methods.length === 0}
-          className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent disabled:opacity-50">
-          {offeredPayment.map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
-        </select>
+        <div role="radiogroup" aria-label={t("checkoutPayment")} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {offeredPayment.map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={payment === m}
+              onClick={() => setPayment(m)}
+              disabled={!methods || methods.length === 0}
+              className={
+                "flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border text-xs sm:text-sm transition disabled:opacity-50 disabled:cursor-not-allowed " +
+                (payment === m
+                  ? "border-[var(--brand)] bg-[var(--brand-soft)] font-semibold"
+                  : "border-[var(--border-brand)] hover:bg-[var(--brand-soft)]")
+              }
+            >
+              {PAYMENT_ICONS[m]}
+              {PAYMENT_LABELS[m]}
+            </button>
+          ))}
+        </div>
         {methods && methods.length === 0 && (
           <p className="text-sm text-[var(--text-error)] mt-1">{t("checkoutNoMethods")}</p>
         )}
@@ -223,7 +272,7 @@ export default function Checkout() {
         {payment && payment !== "cod" && (
           <p className="text-xs opacity-70 mt-1">{t("checkoutPaymentWindow")}</p>
         )}
-      </label>
+      </div>
 
       <label className="block mb-6">
         <span className="block text-sm mb-1">{t("checkoutNote")}</span>

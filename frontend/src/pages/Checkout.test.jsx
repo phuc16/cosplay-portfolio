@@ -80,8 +80,8 @@ describe("Checkout payment methods", () => {
     const placeOrderBtn = container.querySelector("button.w-full")
     expect(placeOrderBtn.disabled).toBe(false)
 
-    const options = [...container.querySelectorAll("select option")].map((o) => o.value)
-    expect(options).toEqual(["bank", "cod"])
+    const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
+    expect(options).toEqual(["Bank transfer", "Cash on delivery"])
     expect(container.textContent).not.toContain("No payment method is set up right now")
   })
 
@@ -167,8 +167,8 @@ describe("Checkout — payment window notice (Phase 6)", () => {
 
     const container = await renderCheckout()
 
-    const select = container.querySelector("select")
-    expect(select.value).toBe("cod")
+    const codBtn = [...container.querySelectorAll('[role="radio"]')].find((b) => b.textContent.includes("Cash on delivery"))
+    expect(codBtn.getAttribute("aria-checked")).toBe("true")
     expect(container.textContent).not.toContain("must be paid within a limited window")
   })
 })
@@ -183,8 +183,8 @@ describe("Checkout — COD restricted to ship orders (Event Pickup Verification 
     const pickupRadio = [...container.querySelectorAll('input[name="fulfillment"]')][1]
     await act(async () => { pickupRadio.click() })
 
-    const options = [...container.querySelectorAll("select option")].map((o) => o.value)
-    expect(options).toEqual(["bank"])
+    const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
+    expect(options).toEqual(["Bank transfer"])
   })
 
   it("resets away from cod when switching from ship to pickup with cod selected", async () => {
@@ -193,17 +193,15 @@ describe("Checkout — COD restricted to ship orders (Event Pickup Verification 
     fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
 
     const container = await renderCheckout()
-    const select = container.querySelector("select")
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set.call(select, "cod")
-      select.dispatchEvent(new Event("change", { bubbles: true }))
-    })
-    expect(select.value).toBe("cod")
+    const codBtn = () => [...container.querySelectorAll('[role="radio"]')].find((b) => b.textContent.includes("Cash on delivery"))
+    await act(async () => { codBtn().click() })
+    expect(codBtn().getAttribute("aria-checked")).toBe("true")
 
     const pickupRadio = [...container.querySelectorAll('input[name="fulfillment"]')][1]
     await act(async () => { pickupRadio.click() })
 
-    expect(select.value).not.toBe("cod")
+    // cod itself is no longer even offered once pickup is selected.
+    expect(codBtn()).toBeUndefined()
   })
 
   it("still offers cod for a ship order", async () => {
@@ -212,8 +210,8 @@ describe("Checkout — COD restricted to ship orders (Event Pickup Verification 
     fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
 
     const container = await renderCheckout()
-    const options = [...container.querySelectorAll("select option")].map((o) => o.value)
-    expect(options).toEqual(["bank", "cod"])
+    const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
+    expect(options).toEqual(["Bank transfer", "Cash on delivery"])
   })
 })
 
