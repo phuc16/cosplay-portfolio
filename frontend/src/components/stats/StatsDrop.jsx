@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { adminListCollections, adminGetDropStats } from "../../api/shop"
+import { adminListCollections, adminGetDropStats, adminDownloadDropStatsCsv } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 import { STATUS_LABELS } from "../../admin/orderLabels"
 
@@ -13,6 +13,7 @@ export default function StatsDrop() {
   const [collectionId, setCollectionId] = useState("")
   const [stats, setStats] = useState(null)
   const [error, setError] = useState("")
+  const [exporting, setExporting] = useState(false)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -33,21 +34,52 @@ export default function StatsDrop() {
     })
   }, [collectionId])
 
+  const downloadCsv = async () => {
+    if (!collectionId) return
+    setError("")
+    setExporting(true)
+    try {
+      const blob = await adminDownloadDropStatsCsv(collectionId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `drop-${collectionId}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError("Không xuất được CSV")
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div>
-      <label className="flex flex-col text-xs gap-1 mb-4 max-w-xs">
-        Bộ sưu tập
-        <select
-          value={collectionId}
-          onChange={(e) => { setStats(null); setCollectionId(e.target.value) }}
-          className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-        >
-          <option value="">— Chọn một bộ sưu tập —</option>
-          {collections.map((c) => (
-            <option key={c.id} value={c.id}>{c.title}</option>
-          ))}
-        </select>
-      </label>
+      <div className="flex items-end gap-3 mb-4 flex-wrap">
+        <label className="flex flex-col text-xs gap-1 max-w-xs">
+          Bộ sưu tập
+          <select
+            value={collectionId}
+            onChange={(e) => { setStats(null); setCollectionId(e.target.value) }}
+            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          >
+            <option value="">— Chọn một bộ sưu tập —</option>
+            {collections.map((c) => (
+              <option key={c.id} value={c.id}>{c.title}</option>
+            ))}
+          </select>
+        </label>
+        {stats && (
+          <button
+            type="button"
+            onClick={downloadCsv}
+            disabled={exporting}
+            className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-brand)] disabled:opacity-50"
+          >
+            {exporting ? "Đang xuất..." : "Xuất CSV"}
+          </button>
+        )}
+      </div>
 
       {error && <p className="text-red-500 mb-3">{error}</p>}
       {!collectionId && <p className="opacity-60">Chọn một bộ sưu tập để xem thống kê.</p>}

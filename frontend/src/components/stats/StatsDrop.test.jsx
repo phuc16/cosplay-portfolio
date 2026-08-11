@@ -4,13 +4,17 @@ import { act } from "react"
 
 const adminListCollections = vi.fn()
 const adminGetDropStats = vi.fn()
+const adminDownloadDropStatsCsv = vi.fn()
 
 vi.mock("../../api/shop", () => ({
   adminListCollections: (...args) => adminListCollections(...args),
   adminGetDropStats: (...args) => adminGetDropStats(...args),
+  adminDownloadDropStatsCsv: (...args) => adminDownloadDropStatsCsv(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+globalThis.URL.createObjectURL = vi.fn(() => "blob:mock")
+globalThis.URL.revokeObjectURL = vi.fn()
 
 const { default: StatsDrop } = await import("./StatsDrop")
 
@@ -50,6 +54,7 @@ async function flush() {
 beforeEach(() => {
   adminListCollections.mockReset()
   adminGetDropStats.mockReset()
+  adminDownloadDropStatsCsv.mockReset()
   adminListCollections.mockResolvedValue([{ id: 1, title: "Drop" }])
 })
 
@@ -240,5 +245,44 @@ describe("StatsDrop — statistics emphasis (Admin UI plan)", () => {
 
     const secondary = [...container.querySelectorAll("*")].find((el) => el.textContent.trim() === "70.000₫")
     expect(secondary.className).not.toContain("text-3xl")
+  })
+})
+
+describe("StatsDrop — CSV export", () => {
+  it("has no export button before a collection is selected", async () => {
+    const container = await renderStatsDrop()
+    await flush()
+    const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))
+    expect(exportBtn).toBeUndefined()
+  })
+
+  it("downloads a CSV for the selected collection", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats())
+    adminDownloadDropStatsCsv.mockResolvedValue(new Blob(["csv"], { type: "text/csv" }))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))
+    await act(async () => { exportBtn.click() })
+    await flush()
+
+    expect(adminDownloadDropStatsCsv).toHaveBeenCalledWith("1")
+  })
+
+  it("shows an error message when the CSV export fails", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats())
+    adminDownloadDropStatsCsv.mockRejectedValue(new Error("network down"))
+    const container = await renderStatsDrop()
+    await flush()
+    setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))
+    await act(async () => { exportBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("Không xuất được CSV")
   })
 })

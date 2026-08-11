@@ -203,14 +203,18 @@ async function getDropStats(collectionId) {
  * product_variants, which no longer has their row. A deleted variant cannot
  * be restocked, so its absence from a restock list is correct, not a gap.
  */
-async function getRestockStats() {
+async function getRestockStats(collectionId) {
+  const where = collectionId ? "WHERE c.id = ?" : ""
+  const params = collectionId ? [collectionId] : []
   const [variantRows] = await db.query(
     `SELECT v.id AS variant_id, v.label, v.stock_qty,
             p.name AS product_name,
             c.id AS collection_id, c.title AS collection_title, c.created_at AS collection_created_at
        FROM product_variants v
        JOIN products p ON p.id = v.product_id
-       JOIN collections c ON c.id = p.collection_id`
+       JOIN collections c ON c.id = p.collection_id
+       ${where}`,
+    params
   )
 
   const [salesRows] = await db.query(

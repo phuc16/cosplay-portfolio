@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { csvEscape, toCsvRow, toCsv, bookkeepingToCsv } from "../shop/stats/csv.js"
+import { csvEscape, toCsvRow, toCsv, bookkeepingToCsv, dropStatsToCsv, restockStatsToCsv } from "../shop/stats/csv.js"
 
 describe("csvEscape", () => {
   it("leaves a plain value unquoted", () => {
@@ -61,5 +61,58 @@ describe("bookkeepingToCsv", () => {
     expect(lines[0]).toBe("Bộ sưu tập,Đã nhận,Chờ thanh toán,Thu khi giao,Đã mất,Đơn COD chưa xác nhận")
     expect(lines[1]).toBe('"Drop, mùa hè",100000,20000,30000,5000,15000')
     expect(lines[2]).toBe("Tổng cộng,100000,20000,30000,5000,15000")
+  })
+})
+
+describe("dropStatsToCsv", () => {
+  const stats = {
+    collection_id: 1,
+    collection_title: "Drop",
+    variants: [
+      { variant_id: 1, product_name: "Card", variant_label: "A1", sold: 3, deleted: false, unlimited: false, remaining: 7, sell_through: 0.3, time_to_sellout_days: null },
+      { variant_id: 2, product_name: "Card", variant_label: "A2", sold: 10, deleted: false, unlimited: false, remaining: 0, sell_through: 1, time_to_sellout_days: 2.4 },
+      { variant_id: null, product_name: "Card", variant_label: "A3 (đã xóa)", sold: 1, deleted: true, unlimited: false, remaining: null, sell_through: null, time_to_sellout_days: null },
+      { variant_id: 4, product_name: "Card", variant_label: "A4", sold: 5, deleted: false, unlimited: true, remaining: null, sell_through: null, time_to_sellout_days: null },
+    ],
+  }
+
+  it("includes a header row and one row per variant", () => {
+    const out = dropStatsToCsv(stats)
+    const lines = out.replace("﻿", "").split("\r\n")
+    expect(lines[0]).toBe("Sản phẩm,Phân loại,Đã bán,Còn lại,Tỷ lệ bán hết,Thời gian bán hết (ngày)")
+    expect(lines[1]).toBe("Card,A1,3,7,30,")
+    expect(lines[2]).toBe("Card,A2,10,0,100,3")
+  })
+
+  it("leaves remaining/sell-through blank for a deleted variant", () => {
+    const out = dropStatsToCsv(stats)
+    const lines = out.replace("﻿", "").split("\r\n")
+    expect(lines[3]).toBe("Card,A3 (đã xóa),1,,,")
+  })
+
+  it("shows 'không giới hạn' remaining and no sell-through for an unlimited variant", () => {
+    const out = dropStatsToCsv(stats)
+    const lines = out.replace("﻿", "").split("\r\n")
+    expect(lines[4]).toBe("Card,A4,5,không giới hạn,,")
+  })
+})
+
+describe("restockStatsToCsv", () => {
+  const rows = [
+    { variant_id: 1, collection_title: "Drop, mùa hè", product_name: "Card", label: "A1", sold: 5, unlimited: false, remaining: 5, velocity: 1.23456, sell_through: 0.5, time_to_sellout_days: null },
+    { variant_id: 2, collection_title: "Drop 2", product_name: "Poster", label: "B1", sold: 2, unlimited: true, remaining: null, velocity: 2, sell_through: null, time_to_sellout_days: null },
+  ]
+
+  it("includes a header row and one row per variant, sorted as given", () => {
+    const out = restockStatsToCsv(rows)
+    const lines = out.replace("﻿", "").split("\r\n")
+    expect(lines[0]).toBe("Bộ sưu tập,Sản phẩm,Phân loại,Đã bán,Còn lại,Vận tốc (đơn vị/ngày),Tỷ lệ bán hết,Thời gian bán hết (ngày)")
+    expect(lines[1]).toBe('"Drop, mùa hè",Card,A1,5,5,1.23,50,')
+  })
+
+  it("shows 'không giới hạn' and no sell-through for an unlimited variant", () => {
+    const out = restockStatsToCsv(rows)
+    const lines = out.replace("﻿", "").split("\r\n")
+    expect(lines[2]).toBe("Drop 2,Poster,B1,2,không giới hạn,2,,")
   })
 })

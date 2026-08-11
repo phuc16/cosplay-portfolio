@@ -133,4 +133,13 @@ describe("getRestockStats", () => {
     const slowIndex = rows.findIndex((r) => r.variant_id === slow.variantId)
     expect(fastIndex).toBeLessThan(slowIndex)
   })
+
+  it("filters to a single collection when collectionId is given", async () => {
+    const a = await seedVariant()
+    const b = await seedVariant()
+
+    const rows = await statsRepo.getRestockStats(a.collectionId)
+    expect(rows.map((r) => r.variant_id)).toEqual([a.variantId])
+    expect(rows.map((r) => r.variant_id)).not.toContain(b.variantId)
+  })
 })

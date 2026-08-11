@@ -38,4 +38,44 @@ function bookkeepingToCsv(stats) {
   return toCsv(headers, rows)
 }
 
-module.exports = { csvEscape, toCsvRow, toCsv, bookkeepingToCsv }
+/**
+ * Serialize a single collection's drop-stats view (see
+ * statsRepo.getDropStats) into its per-variant CSV — the same table
+ * rendered on screen, one row per variant.
+ */
+function dropStatsToCsv(stats) {
+  const headers = ["Sản phẩm", "Phân loại", "Đã bán", "Còn lại", "Tỷ lệ bán hết", "Thời gian bán hết (ngày)"]
+  const rows = stats.variants.map((v) => [
+    v.product_name,
+    v.variant_label,
+    v.sold,
+    v.deleted ? "" : v.unlimited ? "không giới hạn" : v.remaining,
+    v.deleted || v.unlimited ? "" : v.sell_through === null ? "" : Math.round(v.sell_through * 1000) / 10,
+    v.time_to_sellout_days === null ? "" : Math.ceil(v.time_to_sellout_days),
+  ])
+  return toCsv(headers, rows)
+}
+
+/**
+ * Serialize the restock-stats view (see statsRepo.getRestockStats) into
+ * the same velocity-ranked per-variant CSV shown on screen.
+ */
+function restockStatsToCsv(rows) {
+  const headers = [
+    "Bộ sưu tập", "Sản phẩm", "Phân loại", "Đã bán", "Còn lại",
+    "Vận tốc (đơn vị/ngày)", "Tỷ lệ bán hết", "Thời gian bán hết (ngày)",
+  ]
+  const csvRows = rows.map((v) => [
+    v.collection_title,
+    v.product_name,
+    v.label,
+    v.sold,
+    v.unlimited ? "không giới hạn" : v.remaining,
+    Math.round(v.velocity * 100) / 100,
+    v.unlimited || v.sell_through === null ? "" : Math.round(v.sell_through * 1000) / 10,
+    v.time_to_sellout_days === null ? "" : Math.ceil(v.time_to_sellout_days),
+  ])
+  return toCsv(headers, csvRows)
+}
+
+module.exports = { csvEscape, toCsvRow, toCsv, bookkeepingToCsv, dropStatsToCsv, restockStatsToCsv }

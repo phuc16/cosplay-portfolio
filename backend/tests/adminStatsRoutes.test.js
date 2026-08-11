@@ -69,6 +69,44 @@ describe("GET /api/admin/stats/restock", () => {
     expect(Array.isArray(res.body)).toBe(true)
     expect(res.body.length).toBeGreaterThan(0)
   })
+
+  it("filters to a single collection via collection_id", async () => {
+    const cid = await seed()
+    const otherCid = await catalog.createCollection({ title: "Other", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: otherCid, name: "Other card", price: 10000 })
+    await catalog.replaceVariants(pid, [{ label: "B1", stock_qty: 5 }])
+
+    const res = await authed(request(app).get(`/api/admin/stats/restock?collection_id=${cid}`))
+    expect(res.status).toBe(200)
+    expect(res.body.every((r) => r.collection_id === cid)).toBe(true)
+  })
+})
+
+describe("GET /api/admin/stats/restock/export.csv", () => {
+  it("returns a CSV attachment matching the JSON view", async () => {
+    await seed()
+    const res = await authed(request(app).get("/api/admin/stats/restock/export.csv"))
+    expect(res.status).toBe(200)
+    expect(res.headers["content-type"]).toContain("text/csv")
+    expect(res.headers["content-disposition"]).toContain("attachment")
+    expect(res.text).toContain("Bộ sưu tập,Sản phẩm,Phân loại,Đã bán,Còn lại")
+  })
+})
+
+describe("GET /api/admin/stats/drop/:collectionId/export.csv", () => {
+  it("returns a CSV attachment matching the JSON view", async () => {
+    const cid = await seed()
+    const res = await authed(request(app).get(`/api/admin/stats/drop/${cid}/export.csv`))
+    expect(res.status).toBe(200)
+    expect(res.headers["content-type"]).toContain("text/csv")
+    expect(res.headers["content-disposition"]).toContain("attachment")
+    expect(res.text).toContain("Sản phẩm,Phân loại,Đã bán,Còn lại")
+  })
+
+  it("404s an unknown collection", async () => {
+    const res = await authed(request(app).get("/api/admin/stats/drop/999999/export.csv"))
+    expect(res.status).toBe(404)
+  })
 })
 
 describe("GET /api/admin/stats/bookkeeping", () => {

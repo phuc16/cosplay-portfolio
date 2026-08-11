@@ -2,15 +2,27 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 
+const adminListCollections = vi.fn()
 const adminGetRestockStats = vi.fn()
+const adminDownloadRestockStatsCsv = vi.fn()
 
 vi.mock("../../api/shop", () => ({
+  adminListCollections: (...args) => adminListCollections(...args),
   adminGetRestockStats: (...args) => adminGetRestockStats(...args),
+  adminDownloadRestockStatsCsv: (...args) => adminDownloadRestockStatsCsv(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+globalThis.URL.createObjectURL = vi.fn(() => "blob:mock")
+globalThis.URL.revokeObjectURL = vi.fn()
 
 const { default: StatsRestock } = await import("./StatsRestock")
+
+function setSelectValue(el, value) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+  setter.call(el, value)
+  el.dispatchEvent(new Event("change", { bubbles: true }))
+}
 
 async function renderStatsRestock() {
   const container = document.createElement("div")
@@ -25,7 +37,10 @@ async function flush() {
 }
 
 beforeEach(() => {
+  adminListCollections.mockReset()
   adminGetRestockStats.mockReset()
+  adminDownloadRestockStatsCsv.mockReset()
+  adminListCollections.mockResolvedValue([{ id: 1, title: "Drop" }, { id: 2, title: "Second Drop" }])
 })
 
 describe("StatsRestock", () => {
@@ -122,5 +137,52 @@ describe("StatsRestock", () => {
     const container = await renderStatsRestock()
     await flush()
     expect(container.textContent).toContain("không còn hiển thị được")
+  })
+
+  it("loads all collections with no filter by default", async () => {
+    adminGetRestockStats.mockResolvedValue([])
+    await renderStatsRestock()
+    await flush()
+    expect(adminGetRestockStats).toHaveBeenCalledWith(undefined)
+  })
+
+  it("re-fetches scoped to the selected collection when the filter changes", async () => {
+    adminGetRestockStats.mockResolvedValue([])
+    const container = await renderStatsRestock()
+    await flush()
+
+    setSelectValue(container.querySelector("select"), "2")
+    await flush()
+
+    expect(adminGetRestockStats).toHaveBeenLastCalledWith("2")
+  })
+
+  it("downloads a CSV scoped to the current filter", async () => {
+    adminGetRestockStats.mockResolvedValue([])
+    adminDownloadRestockStatsCsv.mockResolvedValue(new Blob(["csv"], { type: "text/csv" }))
+    const container = await renderStatsRestock()
+    await flush()
+
+    setSelectValue(container.querySelector("select"), "2")
+    await flush()
+
+    const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))
+    await act(async () => { exportBtn.click() })
+    await flush()
+
+    expect(adminDownloadRestockStatsCsv).toHaveBeenCalledWith("2")
+  })
+
+  it("shows an error message when the CSV export fails", async () => {
+    adminGetRestockStats.mockResolvedValue([])
+    adminDownloadRestockStatsCsv.mockRejectedValue(new Error("network down"))
+    const container = await renderStatsRestock()
+    await flush()
+
+    const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))
+    await act(async () => { exportBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("Không xuất được CSV")
   })
 })

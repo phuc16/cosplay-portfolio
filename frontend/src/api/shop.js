@@ -94,8 +94,17 @@ export const adminListFailedEmails = () =>
 export const adminGetDropStats = (collectionId) =>
   api.get(`/api/admin/stats/drop/${collectionId}`).then((r) => r.data)
 
-export const adminGetRestockStats = () =>
-  api.get("/api/admin/stats/restock").then((r) => r.data)
+export const adminDownloadDropStatsCsv = (collectionId) =>
+  api.get(`/api/admin/stats/drop/${collectionId}/export.csv`, { responseType: "blob" }).then((r) => r.data)
+
+export const adminGetRestockStats = (collectionId) =>
+  api.get("/api/admin/stats/restock", { params: collectionId ? { collection_id: collectionId } : {} }).then((r) => r.data)
+
+export const adminDownloadRestockStatsCsv = (collectionId) =>
+  api.get("/api/admin/stats/restock/export.csv", {
+    params: collectionId ? { collection_id: collectionId } : {},
+    responseType: "blob",
+  }).then((r) => r.data)
 
 export const adminGetBookkeepingStats = (params) =>
   api.get("/api/admin/stats/bookkeeping", { params }).then((r) => r.data)
