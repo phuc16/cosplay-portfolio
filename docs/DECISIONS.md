@@ -147,3 +147,11 @@ Place order just repeats the same 409 forever. Backend now reports which
 variant_ids were missing; Checkout.jsx removes exactly those from the
 cart on that specific error and re-renders with what's left, so a retry
 actually succeeds.
+
+## 2026-08-11 — Admin order "Chi tiết" now collapses again
+
+Chi tiết only ever opened an order's detail panel — there was no way to
+close it back up once expanded, so a seller who'd looked at one order was
+stuck with its full timeline/address/payment-proof/items staying visible.
+Button now toggles (relabels to "Ẩn" while open), matching the
+expand/collapse pattern already used for AdminCollections' product list.
