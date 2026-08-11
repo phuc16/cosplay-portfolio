@@ -155,3 +155,10 @@ close it back up once expanded, so a seller who'd looked at one order was
 stuck with its full timeline/address/payment-proof/items staying visible.
 Button now toggles (relabels to "Ẩn" while open), matching the
 expand/collapse pattern already used for AdminCollections' product list.
+
+## 2026-08-11 — Order/proof rate-limit messages made actionable
+
+"Quá nhiều đơn. Thử lại sau." gave no count and no wait time. Now states
+the cap (10 đơn/giờ, 20 lần/giờ for proof uploads) and a concrete minutes-
+remaining figure computed from express-rate-limit's resetTime, same
+pattern as the existing login-lockout message.
