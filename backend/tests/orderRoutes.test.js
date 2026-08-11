@@ -161,6 +161,10 @@ describe("POST /api/orders", () => {
     // label: `Rất tiếc, "không tồn tại" vừa hết hàng.`
     expect(res.body.message).not.toContain('"không tồn tại"')
     expect(res.body.message).not.toContain("vừa hết hàng")
+    // The client needs this to actually remove the stale line from the
+    // cart itself — "refresh the page" alone does nothing for a bad id
+    // sitting in localStorage.
+    expect(res.body.variant_ids).toEqual([999999])
   })
 
   // This exact path guards a cross-buyer PII leak: a request_key shared by

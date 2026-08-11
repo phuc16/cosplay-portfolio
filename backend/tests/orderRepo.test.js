@@ -95,6 +95,20 @@ describe("createOrder", () => {
     await expect(repo.createOrder(order(999999))).rejects.not.toThrow(repo.OutOfStockError)
   })
 
+  it("reports exactly which variant_ids were missing, so the client knows what to drop from the cart", async () => {
+    const { variantId } = await seedVariant(5)
+    try {
+      await repo.createOrder({
+        ...order(variantId),
+        items: [{ variant_id: variantId, qty: 1 }, { variant_id: 999999, qty: 1 }],
+      })
+      throw new Error("expected createOrder to reject")
+    } catch (err) {
+      expect(err).toBeInstanceOf(repo.VariantNotFoundError)
+      expect(err.missingVariantIds).toEqual([999999])
+    }
+  })
+
   it("rolls back everything if one line of a multi-item order is short", async () => {
     const { pid, variantId } = await seedVariant(5)
     await catalog.replaceVariants(pid, [

@@ -26,9 +26,14 @@ class OutOfStockError extends Error {
  * message, reading as if that literal string were a product name.
  */
 class VariantNotFoundError extends Error {
-  constructor() {
+  constructor(missingIds) {
     super("Một sản phẩm trong giỏ hàng không còn tồn tại")
     this.name = "VariantNotFoundError"
+    // The route uses this to tell the client exactly which cart lines to
+    // drop — the buyer has no way to know which one is stale otherwise,
+    // and "refresh the page" alone does nothing: a stale line lives in
+    // localStorage, not anything a page reload would clear.
+    this.missingVariantIds = missingIds
   }
 }
 
@@ -160,7 +165,10 @@ async function createOrder(input) {
         FOR UPDATE OF v`,
       ids
     )
-    if (rows.length !== ids.length) throw new VariantNotFoundError()
+    if (rows.length !== ids.length) {
+      const foundIds = new Set(rows.map((r) => r.id))
+      throw new VariantNotFoundError(ids.filter((id) => !foundIds.has(id)))
+    }
 
     // Every line's collection must actually offer the requested fulfillment
     // method. A cart could in principle span collections; check each row's

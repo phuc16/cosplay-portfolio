@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { readCart, cartTotal, clearCart } from "../shop/cart"
+import { readCart, cartTotal, clearCart, removeFromCart } from "../shop/cart"
 import { generateRequestKey } from "../shop/requestKey"
 import { createOrder, fetchCollection, fetchPaymentMethods } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
@@ -42,7 +42,9 @@ async function loadFulfillmentFlags(cart) {
 export default function Checkout() {
   const { t } = useLanguage()
   const navigate = useNavigate()
-  const cart = useMemo(() => readCart(), [])
+  // State, not a one-time useMemo: a variant_not_found response needs to
+  // drop the stale line(s) and re-render with what's left.
+  const [cart, setCart] = useState(() => readCart())
 
   const [buyer, setBuyer] = useState({ buyer_name: "", phone: "", email: "" })
   const [address, setAddress] = useState({ address_raw: "" })
@@ -121,6 +123,15 @@ export default function Checkout() {
       // buyer must not be stuck resending the same colliding key forever.
       if (e.response?.data?.error === "request_key_conflict") {
         setRequestKey(generateRequestKey())
+      }
+      // A stale cart line (its variant was deleted after being added) — the
+      // server tells us exactly which variant_ids to drop. Removing them
+      // here is the only way "try again" can actually succeed; the buyer
+      // has no way to identify or remove a bad line themselves, since this
+      // page never shows individual cart items.
+      if (e.response?.data?.error === "variant_not_found") {
+        for (const id of e.response.data.variant_ids || []) removeFromCart(id)
+        setCart(readCart())
       }
       setError(
         e.response?.status === 409

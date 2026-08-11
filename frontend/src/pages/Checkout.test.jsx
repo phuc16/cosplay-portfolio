@@ -4,6 +4,7 @@ import { act } from "react"
 import { MemoryRouter } from "react-router-dom"
 import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
+import { readCart } from "../shop/cart"
 
 const fetchPaymentMethods = vi.fn()
 const createOrder = vi.fn()
@@ -213,5 +214,51 @@ describe("Checkout — COD restricted to ship orders (Event Pickup Verification 
     const container = await renderCheckout()
     const options = [...container.querySelectorAll("select option")].map((o) => o.value)
     expect(options).toEqual(["bank", "cod"])
+  })
+})
+
+describe("Checkout — variant_not_found recovery", () => {
+  it("removes the stale line(s) from the cart itself, not just shows an error", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([
+      { variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop" },
+      { variant_id: 2, qty: 1, product_name: "Poster", variant_label: "Std", price: 90000, image_url: null, collection_slug: "drop" },
+    ]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          error: "variant_not_found",
+          message: "Rất tiếc, một sản phẩm trong giỏ hàng không còn tồn tại. Đã tự động xóa khỏi giỏ hàng, vui lòng kiểm tra lại và thử lại.",
+          variant_ids: [2],
+        },
+      },
+    })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(container.textContent).toContain("Đã tự động xóa khỏi giỏ hàng")
+    const remaining = readCart()
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].variant_id).toBe(1)
+  })
+
+  it("shows the empty-cart state if the stale line was the only item", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([
+      { variant_id: 2, qty: 1, product_name: "Poster", variant_label: "Std", price: 90000, image_url: null, collection_slug: "drop" },
+    ]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockRejectedValue({
+      response: { status: 409, data: { error: "variant_not_found", message: "x", variant_ids: [2] } },
+    })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(readCart()).toEqual([])
+    expect(container.textContent).toContain("Your cart is empty")
   })
 })

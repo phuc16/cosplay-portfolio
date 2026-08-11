@@ -135,7 +135,8 @@ module.exports = function orderRoutes() {
       if (err instanceof repo.VariantNotFoundError) {
         return res.status(409).json({
           error: "variant_not_found",
-          message: "Rất tiếc, một sản phẩm trong giỏ hàng không còn tồn tại. Vui lòng làm mới trang và thử lại.",
+          message: "Rất tiếc, một sản phẩm trong giỏ hàng không còn tồn tại. Đã tự động xóa khỏi giỏ hàng, vui lòng kiểm tra lại và thử lại.",
+          variant_ids: err.missingVariantIds,
         })
       }
       if (err instanceof repo.OutOfStockError) {
