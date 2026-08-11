@@ -18,14 +18,28 @@ function escapeHtml(value) {
 
 const formatVnd = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`
 
+// Matches --brand in frontend/src/index.css, so mail visually matches the site.
+const BRAND = "#6BBF59"
+
 function itemsHtml(items = []) {
   const rows = items.map((i) => `
     <tr>
-      <td style="padding:6px 0">${escapeHtml(i.product_name_snapshot)} · ${escapeHtml(i.variant_label_snapshot)} × ${Number(i.qty)}</td>
-      <td style="padding:6px 0;text-align:right">${formatVnd(i.unit_price_snapshot * i.qty)}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px">${escapeHtml(i.product_name_snapshot)} · ${escapeHtml(i.variant_label_snapshot)} × ${Number(i.qty)}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-size:14px;white-space:nowrap">${formatVnd(i.unit_price_snapshot * i.qty)}</td>
     </tr>`).join("")
-  return `<table style="width:100%;border-collapse:collapse">${rows}</table>`
+  return `<table style="width:100%;border-collapse:collapse;margin-top:12px">${rows}</table>`
 }
+
+// A visually distinct total row, reused across templates below — table-based
+// so it renders correctly in Outlook too. {{total}} is a literal placeholder
+// here, substituted at render time like everywhere else.
+const TOTAL_ROW = `
+    <table style="width:100%;border-collapse:collapse">
+      <tr>
+        <td style="padding:10px 0 0;font-weight:700;font-size:15px">Tổng cộng</td>
+        <td style="padding:10px 0 0;font-weight:700;font-size:15px;text-align:right;color:${BRAND}">{{total}}</td>
+      </tr>
+    </table>`
 
 function buildVars(order) {
   return {
@@ -62,47 +76,55 @@ function validatePlaceholders(text) {
   return [...new Set(found.filter((name) => !PLACEHOLDERS.includes(name)))]
 }
 
+// Header bar + card, with the "view order" link as a footer — same shape
+// for every email so the seller's mail always reads as one consistent brand.
 const wrap = (inner) => `
-<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#222">
-  <h2 style="margin:0 0 16px">{{shop_name}}</h2>
-  ${inner}
-  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-  <p style="font-size:12px;color:#888">Xem đơn hàng: <a href="{{order_url}}">{{order_url}}</a></p>
+<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#fff">
+  <div style="background:${BRAND};padding:18px 24px;border-radius:12px 12px 0 0">
+    <span style="color:#fff;font-size:17px;font-weight:700">{{shop_name}}</span>
+  </div>
+  <div style="padding:24px;border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;color:#222;font-size:14px;line-height:1.6">
+    ${inner}
+    <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#999">
+      <a href="{{order_url}}" style="color:${BRAND};text-decoration:none;font-weight:600">Xem đơn hàng →</a>
+    </p>
+  </div>
 </div>`
 
 const DEFAULT_TEMPLATES = {
   order_placed: {
     subject: "Đã nhận đơn hàng #{{order_id}}",
     body_html: wrap(`
-      <p>Chào {{buyer_name}},</p>
-      <p>Mình đã nhận được đơn hàng của bạn. Vui lòng thanh toán và tải ảnh chuyển khoản lên trang đơn hàng để mình xác nhận nhé.</p>
+      <p style="margin:0 0 12px">Cảm ơn <strong>{{buyer_name}}</strong> đã đặt hàng! Vui lòng chuyển khoản và tải ảnh chuyển khoản lên trang đơn hàng để mình xác nhận nhé.</p>
       {{items}}
-      <p style="font-weight:bold;margin-top:12px">Tổng: {{total}}</p>
-      <p style="font-size:13px;color:#666">Phí ship trả cho shipper khi nhận hàng.</p>
-      <p>{{payment_note}}</p>`),
+      ${TOTAL_ROW}
+      <p style="font-size:12px;color:#888;margin:12px 0 0">Phí ship trả cho shipper khi nhận hàng.</p>
+      <p style="font-size:13px;margin:8px 0 0">{{payment_note}}</p>`),
   },
   payment_confirmed: {
     subject: "Đã xác nhận thanh toán đơn #{{order_id}}",
     body_html: wrap(`
-      <p>Chào {{buyer_name}},</p>
-      <p>Mình đã xác nhận thanh toán cho đơn hàng của bạn. Mình sẽ chuẩn bị và gửi hàng sớm nhất có thể.</p>
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, mình đã xác nhận thanh toán — sẽ chuẩn bị và gửi hàng sớm nhất có thể.</p>
       {{items}}
-      <p style="font-weight:bold;margin-top:12px">Tổng: {{total}}</p>`),
+      ${TOTAL_ROW}`),
   },
   shipped: {
     subject: "Đơn #{{order_id}} đã được gửi đi",
     body_html: wrap(`
-      <p>Chào {{buyer_name}},</p>
-      <p>Đơn hàng của bạn đã được bàn giao cho đơn vị vận chuyển.</p>
-      <p>Mã vận đơn: <strong>{{tracking_code}}</strong></p>
-      <p style="font-size:13px;color:#666">Phí ship trả cho shipper khi nhận hàng.</p>`),
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, đơn hàng của bạn đã được bàn giao cho đơn vị vận chuyển.</p>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><td style="padding:10px 14px;background:#f6faf4;border-radius:8px;font-size:14px">
+          Mã vận đơn: <strong style="color:${BRAND}">{{tracking_code}}</strong>
+        </td></tr>
+      </table>
+      <p style="font-size:12px;color:#888;margin:12px 0 0">Phí ship trả cho shipper khi nhận hàng.</p>`),
   },
   cancelled: {
     subject: "Đơn #{{order_id}} đã bị hủy",
     body_html: wrap(`
-      <p>Chào {{buyer_name}},</p>
-      <p>Đơn hàng của bạn đã bị hủy. Nếu bạn đã thanh toán, vui lòng liên hệ để mình hoàn tiền.</p>
-      {{items}}`),
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, đơn hàng của bạn đã bị hủy. Nếu bạn đã thanh toán, vui lòng liên hệ để mình hoàn tiền.</p>
+      {{items}}
+      ${TOTAL_ROW}`),
   },
 }
 

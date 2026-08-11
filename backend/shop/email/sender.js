@@ -50,10 +50,12 @@ async function sendQueued(limit = 10) {
         templates.buildVars({ ...order, payment_note: settings.payment_note })
       )
 
-      // The QR block only makes sense for a pickup order — a ship order has no
-      // event pickup counter to scan it at, so skip generating and attaching
-      // it entirely rather than just hiding it visually.
-      const isPickup = order.fulfillment_method === "pickup"
+      // The QR block only makes sense for a pickup order that is still
+      // collectible — a ship order has no event pickup counter to scan it
+      // at, and a cancelled order has nothing left to hand over, so skip
+      // generating and attaching it entirely rather than just hiding it
+      // visually.
+      const isPickup = order.fulfillment_method === "pickup" && order.status !== "cancelled"
       // The code is only meaningful once the order is actually paid for —
       // matches the same gate toPublicOrder applies to the buyer's order
       // page, so an unpaid pending order's confirmation email never reveals

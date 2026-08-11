@@ -248,6 +248,21 @@ describe("sendQueued: pickup QR gating", () => {
     expect(sentArg.html).toContain(row.pickup_code)
   })
 
+  it("cancelled pickup order: no QR image, attachment, or pickup caption at all", async () => {
+    const o = await seedOrder("pickup")
+    // transitionOrder already auto-enqueues the "cancelled" email itself
+    // (TRANSITION_EMAILS) — no need to enqueue a second one here.
+    await orders.transitionOrder(o.id, "cancelled")
+
+    await sender.sendQueued()
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1)
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("cid:orderqr")
+    expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
+    expect(sentArg.attachments).toEqual([])
+  })
+
   it("confirmed pickup order with a null pickup_code (legacy order predating the migration): QR still renders, no 'Mã xác nhận' / literal 'null'", async () => {
     const o = await seedOrder("pickup")
     await orders.transitionOrder(o.id, "confirmed")
