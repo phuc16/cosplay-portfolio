@@ -44,3 +44,10 @@ details — only the modal's add button is disabled for those.
 The JWT is saved to localStorage and restored on mount (still bounded by the
 server's 8h token expiry) — previously a page refresh always dropped the
 seller back to the login screen even mid-session.
+
+## 2026-08-11 — Variant detail modal lists all variants for easy switching
+
+The modal opened by a single chip only showed that one variant, making it
+tedious to compare photocard codes (close, reopen a different chip, repeat).
+The full variant list now also appears inside the modal, so switching
+between them doesn't require closing it.
