@@ -118,7 +118,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
           onClick={() => setView(null)}
         >
           <div
-            className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] p-4"
+            className="w-full max-w-4xl max-h-[85vh] overflow-y-auto rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] p-4 sm:p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -135,7 +135,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
             {/* CSS columns (not a grid), so each thumbnail keeps its own
                 landscape/portrait aspect ratio instead of being cropped
                 into a forced square. */}
-            <div className="columns-3 sm:columns-4 gap-2">
+            <div className="columns-3 sm:columns-6 lg:columns-8 gap-3">
               {product.variants.map((v) => {
                 const img = v.image_url || cover
                 return (
@@ -144,12 +144,14 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
                     type="button"
                     onClick={() => openDetail(v)}
                     title={stockLabel(v, t)}
-                    className="relative block w-full mb-2 break-inside-avoid rounded-lg overflow-hidden border border-[var(--border-brand)]"
+                    className="group relative block w-full mb-3 break-inside-avoid rounded-xl overflow-hidden border border-[var(--border-brand)] transition hover:border-[var(--brand)] hover:shadow-lg"
                   >
                     {img && <img src={img} alt={v.label} className="w-full h-auto block" />}
-                    <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-white">
-                      {v.label}
-                    </span>
+                    <div className="absolute inset-x-0 bottom-0 pt-4 pb-1.5 px-1.5 bg-gradient-to-t from-black/80 to-transparent">
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[var(--brand)] text-white shadow-sm">
+                        {v.label}
+                      </span>
+                    </div>
                     {isSoldOut(v) && (
                       <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] text-white">
                         {t("shopSoldOut")}
