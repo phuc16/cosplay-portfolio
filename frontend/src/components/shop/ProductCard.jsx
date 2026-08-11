@@ -100,6 +100,28 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
               <p className="text-sm opacity-70">{stockLabel(preview, t)}</p>
 
+              {product.variants.length > 1 && (
+                <ul className="flex flex-wrap gap-2">
+                  {product.variants.map((v) => (
+                    <li key={v.id}>
+                      <button
+                        type="button"
+                        onClick={() => setPreview(v)}
+                        title={stockLabel(v, t)}
+                        className={
+                          "px-2 py-1 rounded-lg text-xs border transition " +
+                          (v.id === preview.id
+                            ? "border-[var(--brand)] bg-[var(--brand-soft)] font-semibold"
+                            : "border-[var(--border-brand)] hover:bg-[var(--brand-soft)]")
+                        }
+                      >
+                        {v.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
               <div className="flex gap-2 mt-2">
                 <button
                   type="button"

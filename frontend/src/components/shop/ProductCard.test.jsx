@@ -94,4 +94,29 @@ describe("ProductCard — variant detail modal", () => {
     const addBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
     expect(addBtn.disabled).toBe(true)
   })
+
+  it("lists every variant inside the modal so the buyer can switch without closing it", async () => {
+    const { container } = await renderCard()
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const dialogLabels = [...dialog.querySelectorAll("button")].map((b) => b.textContent)
+    expect(dialogLabels).toContain("A1")
+    expect(dialogLabels).toContain("B2")
+  })
+
+  it("switches the preview photo/details when another variant is picked inside the modal", async () => {
+    const { container } = await renderCard()
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const switchToB2 = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "B2")
+    await act(async () => { switchToB2.click() })
+
+    const updatedDialog = container.querySelector('[role="dialog"]')
+    expect(updatedDialog.textContent).toContain("Poster · B2")
+    expect(updatedDialog.querySelector('img[src="https://x/a1.jpg"]')).toBeNull()
+  })
 })
