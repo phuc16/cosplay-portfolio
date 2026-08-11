@@ -171,3 +171,13 @@ with a card grid (role="radiogroup"), each showing an icon: bank reuses the
 existing VietQR mark, PayPal reuses the same logo path used in the
 portfolio's own support-links section, Momo gets a brand-pink monogram (no
 bundled asset), COD gets a plain cash icon (no brand to show).
+
+## 2026-08-11 — Pickup instruction line also gated by payment confirmation
+
+"Đưa mã này khi nhận hàng tại sự kiện" was shown on every pickup order's
+email regardless of payment status, including the very first (pending,
+unpaid) order_placed email — same premature-instruction problem the
+pickup_code gating already solved, just left ungated on this line. Now
+requires isPaid, same as the confirmation-code block. The QR image itself
+stays ungated — still shown on any non-cancelled pickup order regardless
+of payment method/status, since it's just a scannable order lookup link.
