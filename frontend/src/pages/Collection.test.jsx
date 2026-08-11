@@ -60,7 +60,9 @@ describe("Collection — add-to-cart toast", () => {
     fetchCollection.mockResolvedValue(baseCollection())
     const container = await renderCollection()
 
-    const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+    const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
     await act(async () => { addBtn.click() })
 
     const toastLink = container.querySelector('a[role="status"]')
@@ -73,7 +75,9 @@ describe("Collection — add-to-cart toast", () => {
     fetchCollection.mockResolvedValue(baseCollection())
     const container = await renderCollection()
 
-    const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+    const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
     await act(async () => { addBtn.click() })
     expect(container.querySelector('a[role="status"]')).toBeTruthy()
 
