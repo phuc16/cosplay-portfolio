@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { adminSaveVariants } from "../api/shop"
+import { adminSaveVariants, adminUploadImage } from "../api/shop"
 
 /**
  * Variants are edited as a whole list and saved in one request, because a
@@ -34,6 +34,26 @@ export default function AdminVariants({ product, onSaved }) {
 
   const addRow = () => setRows([...rows, { label: "", stock_qty: "" }])
   const removeRow = (i) => setRows(rows.filter((_, idx) => idx !== i))
+
+  // Each row's photo is uploaded on pick (same pattern as AdminProducts),
+  // rather than deferred to save time — a photocard sheet is entered one
+  // row at a time and the seller needs to see each thumbnail land before
+  // moving to the next code.
+  const pickImage = async (i, file) => {
+    setError("")
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(",")[1])
+        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
+        reader.readAsDataURL(file)
+      })
+      const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
+      update(i, "image_url", url)
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Tải ảnh lên thất bại")
+    }
+  }
 
   // "A1, A2, B1" or one code per line -> one row each.
   const applyBulk = () => {
@@ -83,7 +103,10 @@ export default function AdminVariants({ product, onSaved }) {
       </div>
 
       {rows.map((r, i) => (
-        <div key={r.id || i} className="flex gap-2 mb-2">
+        <div key={r.id || i} className="flex gap-2 mb-2 items-center">
+          {r.image_url && (
+            <img src={r.image_url} alt="" className="w-9 h-9 object-cover rounded-lg shrink-0" />
+          )}
           <input
             value={r.label}
             onChange={(e) => update(i, "label", e.target.value)}
@@ -96,6 +119,13 @@ export default function AdminVariants({ product, onSaved }) {
             placeholder="SL (trống = không giới hạn)"
             inputMode="numeric"
             className="w-48 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+          <input
+            type="file"
+            accept="image/*"
+            aria-label={`Ảnh cho ${r.label || `dòng ${i + 1}`}`}
+            onChange={(e) => e.target.files?.[0] && pickImage(i, e.target.files[0])}
+            className="w-28 text-xs shrink-0"
           />
           <button type="button" onClick={() => removeRow(i)} className="px-2 opacity-70">✕</button>
         </div>
