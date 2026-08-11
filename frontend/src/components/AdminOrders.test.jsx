@@ -335,6 +335,25 @@ describe("AdminOrders — semantic status/action styling (Admin UI plan)", () =>
     expect(container.textContent).toContain("some_future_status")
   })
 
+  it("collapses the detail panel again when 'Chi tiết' (now 'Ẩn') is clicked a second time", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, email: "a@b.com", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết" || b.textContent === "Ẩn")
+
+    await act(async () => { detailBtn().click() })
+    await flush()
+    expect(container.textContent).toContain("a@b.com")
+    expect(detailBtn().textContent).toBe("Ẩn")
+
+    await act(async () => { detailBtn().click() })
+    await flush()
+    expect(container.textContent).not.toContain("a@b.com")
+    expect(detailBtn().textContent).toBe("Chi tiết")
+  })
+
   it("shows the Vietnamese payment-method label in the detail panel, not the raw enum", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1, payment_method: "bank" })])
     adminGetOrder.mockResolvedValue(order({ id: 1, payment_method: "bank", email: "a@b.com", items: [] }))

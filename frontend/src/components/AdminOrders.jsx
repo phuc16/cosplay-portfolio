@@ -306,8 +306,10 @@ export default function AdminOrders() {
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={() => openDetail(o.id)}
-                className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.neutral}`}>Chi tiết</button>
+              <button type="button" onClick={() => (detail?.id === o.id ? setDetail(null) : openDetail(o.id))}
+                className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.neutral}`}>
+                {detail?.id === o.id ? "Ẩn" : "Chi tiết"}
+              </button>
               {nextStatuses(o).map((to) => (
                 <button key={to} type="button" onClick={() => move(o, to)}
                   className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES[variantForAction(to)]}`}>
