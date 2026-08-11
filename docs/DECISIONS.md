@@ -63,3 +63,11 @@ on the product card now opens that full grid; picking a thumbnail opens the
 single-variant detail (photo, price, stock, Add to cart) with a "View all"
 link back to the grid. Individual chips below the card still jump straight
 to a variant's detail. A single-variant product skips the gallery.
+
+## 2026-08-11 — Quantity picker added to the variant detail modal
+
+Adding more than one of a variant required adding once then editing qty in
+the cart afterward. Added a +/- stepper in the detail modal, clamped to
+remaining stock (no ceiling for unlimited variants), resetting to 1 every
+time a variant's detail is (re)opened so a stale quantity never carries
+over into a different pick.
