@@ -121,3 +121,13 @@ picked from the variant count (2 columns for <=2 variants, up through
 product doesn't get stretched into a handful of oversized thumbnails.
 Label chips changed from a plain dark box to a brand-green pill on a
 gradient scrim, with a hover highlight on each thumbnail.
+
+## 2026-08-11 — Shop moved from /shop to /merchandise, discoverable from the main site
+
+The shop lived at /shop with no link to it from the main portfolio page —
+only reachable if a visitor already knew the URL. Route renamed to
+/merchandise (and /merchandise/:slug), added as a nav tab on the main site
+(next to Thông tin/Dự án/Liên hệ) and as a button in the Hỗ trợ section
+alongside Gumroad/PayPal. The shop's own display name (shopTitle) changed
+from "Merch" to "Merchandise" to match, kept identical in both languages
+(same precedent as "Merch" itself never being translated).
