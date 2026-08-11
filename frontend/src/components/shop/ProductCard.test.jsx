@@ -24,10 +24,11 @@ async function renderCard(props = {}) {
   document.body.appendChild(container)
   const root = createRoot(container)
   const onAdded = props.onAdded || vi.fn()
+  const product = props.product || baseProduct()
   await act(async () => {
     root.render(
       <LanguageProvider>
-        <ProductCard product={baseProduct()} collectionSlug="drop" orderable={true} onAdded={onAdded} {...props} />
+        <ProductCard product={product} collectionSlug="drop" orderable={true} onAdded={onAdded} {...props} />
       </LanguageProvider>
     )
   })
@@ -39,7 +40,7 @@ beforeEach(() => {
 })
 
 describe("ProductCard — variant detail modal", () => {
-  it("opens a modal showing the variant's own photo when a chip is clicked", async () => {
+  it("opens the detail modal showing the variant's own photo when a chip is clicked", async () => {
     const { container } = await renderCard()
     const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
     await act(async () => { chip.click() })
@@ -94,29 +95,67 @@ describe("ProductCard — variant detail modal", () => {
     const addBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
     expect(addBtn.disabled).toBe(true)
   })
+})
 
-  it("lists every variant inside the modal so the buyer can switch without closing it", async () => {
+describe("ProductCard — full variant gallery", () => {
+  it("clicking anywhere on the card (cover image) opens the full gallery of all variants", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
 
     const dialog = container.querySelector('[role="dialog"]')
-    const dialogLabels = [...dialog.querySelectorAll("button")].map((b) => b.textContent)
-    expect(dialogLabels).toContain("A1")
-    expect(dialogLabels).toContain("B2")
+    expect(dialog).toBeTruthy()
+    expect(dialog.querySelector('img[src="https://x/a1.jpg"]')).toBeTruthy()
+    expect(dialog.querySelector('img[alt="B2"][src="https://x/cover.jpg"]')).toBeTruthy() // B2 has no own photo, falls back to cover
+    const labels = [...dialog.querySelectorAll("span")].map((s) => s.textContent)
+    expect(labels).toContain("A1")
+    expect(labels).toContain("B2")
   })
 
-  it("switches the preview photo/details when another variant is picked inside the modal", async () => {
+  it("clicking a thumbnail in the gallery opens that variant's detail modal", async () => {
+    const { container } = await renderCard()
+    const coverImg = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { coverImg.click() })
+
+    const gallery = container.querySelector('[role="dialog"]')
+    const b2Thumb = [...gallery.querySelectorAll("button")].find((b) => b.textContent.includes("B2"))
+    await act(async () => { b2Thumb.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).toContain("Poster · B2")
+    expect(dialog.querySelector("h3").textContent).toContain("B2")
+  })
+
+  it("the detail modal has a link back to the full gallery", async () => {
     const { container } = await renderCard()
     const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
     await act(async () => { chip.click() })
 
-    const dialog = container.querySelector('[role="dialog"]')
-    const switchToB2 = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "B2")
-    await act(async () => { switchToB2.click() })
+    const viewAllBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "View all")
+    await act(async () => { viewAllBtn.click() })
 
-    const updatedDialog = container.querySelector('[role="dialog"]')
-    expect(updatedDialog.textContent).toContain("Poster · B2")
-    expect(updatedDialog.querySelector('img[src="https://x/a1.jpg"]')).toBeNull()
+    const dialog = container.querySelector('[role="dialog"]')
+    const labels = [...dialog.querySelectorAll("span")].map((s) => s.textContent)
+    expect(labels).toContain("A1")
+    expect(labels).toContain("B2")
+  })
+
+  it("a single-variant product skips the gallery and opens detail directly from a card click", async () => {
+    const single = baseProduct({ variants: [{ id: 9, label: "Std", stock_qty: null, image_url: null }] })
+    const { container } = await renderCard({ product: single })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).toContain("Poster · Std")
+    expect(dialog.querySelector("button")?.textContent).not.toBe("Close")
+  })
+
+  it("does not open the picker from a card click when the collection is closed (not orderable)", async () => {
+    const { container } = await renderCard({ orderable: false })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 })
