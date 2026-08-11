@@ -51,3 +51,15 @@ The modal opened by a single chip only showed that one variant, making it
 tedious to compare photocard codes (close, reopen a different chip, repeat).
 The full variant list now also appears inside the modal, so switching
 between them doesn't require closing it.
+(Superseded same day — see the full photo-grid gallery entry below.)
+
+## 2026-08-11 — Full photo-grid gallery to browse all variants at once
+
+The text-chip switcher inside the detail modal wasn't what the user meant
+by "see the full list" — for photocard-style products (A1, A2, B1...),
+buyers are used to a page of thumbnails with codes overlaid (like the old
+Google Form order image), not a one-photo-at-a-time view. Clicking anywhere
+on the product card now opens that full grid; picking a thumbnail opens the
+single-variant detail (photo, price, stock, Add to cart) with a "View all"
+link back to the grid. Individual chips below the card still jump straight
+to a variant's detail. A single-variant product skips the gallery.
