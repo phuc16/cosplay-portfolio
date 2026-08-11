@@ -132,7 +132,10 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
               </button>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {/* CSS columns (not a grid), so each thumbnail keeps its own
+                landscape/portrait aspect ratio instead of being cropped
+                into a forced square. */}
+            <div className="columns-3 sm:columns-4 gap-2">
               {product.variants.map((v) => {
                 const img = v.image_url || cover
                 return (
@@ -141,9 +144,9 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
                     type="button"
                     onClick={() => openDetail(v)}
                     title={stockLabel(v, t)}
-                    className="relative aspect-square rounded-lg overflow-hidden border border-[var(--border-brand)]"
+                    className="relative block w-full mb-2 break-inside-avoid rounded-lg overflow-hidden border border-[var(--border-brand)]"
                   >
-                    {img && <img src={img} alt={v.label} className="w-full h-full object-cover" />}
+                    {img && <img src={img} alt={v.label} className="w-full h-auto block" />}
                     <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-white">
                       {v.label}
                     </span>
@@ -168,14 +171,14 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
           onClick={() => setView(null)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] overflow-hidden"
+            className="w-full max-w-sm max-h-[85vh] overflow-x-hidden overflow-y-auto rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)]"
             onClick={(e) => e.stopPropagation()}
           >
             {(detail.image_url || cover) && (
               <img
                 src={detail.image_url || cover}
                 alt={`${product.name} — ${detail.label}`}
-                className="w-full aspect-square object-cover"
+                className="w-full h-auto block"
               />
             )}
             <div className="p-4 flex flex-col gap-2">
