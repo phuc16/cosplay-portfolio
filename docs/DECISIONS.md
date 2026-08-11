@@ -131,3 +131,19 @@ only reachable if a visitor already knew the URL. Route renamed to
 alongside Gumroad/PayPal. The shop's own display name (shopTitle) changed
 from "Merch" to "Merchandise" to match, kept identical in both languages
 (same precedent as "Merch" itself never being translated).
+
+## 2026-08-11 — Placeholder-label bug fixed, then recovery made actually actionable
+
+Found via live testing: a stale cart line (variant deleted after being
+added) reused OutOfStockError with the literal placeholder "không tồn tại"
+standing in as a fake product label — buyer saw `Rất tiếc, "không tồn
+tại" vừa hết hàng`. Split into a distinct VariantNotFoundError first.
+
+Then realized the fixed message's own advice — "refresh the page and try
+again" — didn't actually work: a stale cart line lives in localStorage,
+Checkout never lists individual items, and the buyer has no way to find
+or remove the bad one themselves. Refreshing does nothing; retrying
+Place order just repeats the same 409 forever. Backend now reports which
+variant_ids were missing; Checkout.jsx removes exactly those from the
+cart on that specific error and re-renders with what's left, so a retry
+actually succeeds.
