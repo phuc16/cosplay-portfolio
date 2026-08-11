@@ -46,9 +46,14 @@ export default function ShopHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--border-brand)] bg-[var(--bg-page)]/90 backdrop-blur">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to="/merchandise" className="font-semibold text-[var(--text-strong)]">
-          {t("shopTitle")}
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/merchandise" className="font-semibold text-[var(--text-strong)]">
+            {t("shopTitle")}
+          </Link>
+          <Link to="/" className="text-sm text-[var(--text-link)] hover:underline">
+            {t("home")}
+          </Link>
+        </div>
         <div className="flex items-center gap-1">
           {["vi", "en"].map((l) => (
             <button
