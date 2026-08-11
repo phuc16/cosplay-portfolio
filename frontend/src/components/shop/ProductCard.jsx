@@ -13,18 +13,33 @@ function stockLabel(variant, t) {
 
 const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 
+/** null/undefined stock_qty means unlimited — clamp only when a real ceiling exists. */
+const clampQty = (n, v) => {
+  const max = v.stock_qty === null || v.stock_qty === undefined ? Infinity : v.stock_qty
+  return Math.min(Math.max(1, n), max)
+}
+
 export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
   const { t } = useLanguage()
   const cover = product.images?.[0] || product.variants?.find((v) => v.image_url)?.image_url
   const hasVariants = product.variants?.length > 0
   // null = closed, "grid" = full variant gallery, an object = single-variant detail.
   const [view, setView] = useState(null)
+  const [qty, setQty] = useState(1)
   const detail = view && typeof view === "object" ? view : null
+
+  // Every path that opens a variant's detail goes through this, so quantity
+  // never carries over stale from a previously viewed (or the same,
+  // reselected) variant.
+  const openDetail = (v) => {
+    setQty(1)
+    setView(v)
+  }
 
   const commitAdd = (v) => {
     addToCart({
       variant_id: v.id,
-      qty: 1,
+      qty,
       product_name: product.name,
       variant_label: v.label,
       price: product.price,
@@ -38,7 +53,8 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
   const openPicker = () => {
     if (!orderable || !hasVariants) return
     // A single-variant product has nothing to "browse" — go straight to its detail.
-    setView(product.variants.length === 1 ? product.variants[0] : "grid")
+    if (product.variants.length === 1) openDetail(product.variants[0])
+    else setView("grid")
   }
 
   return (
@@ -79,7 +95,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
               <button
                 type="button"
                 disabled={!orderable}
-                onClick={() => setView(v)}
+                onClick={() => openDetail(v)}
                 className={
                   "px-2 py-1 rounded-lg text-xs border transition " +
                   (isSoldOut(v) ? "opacity-40 line-through border-current cursor-not-allowed"
@@ -123,7 +139,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
                   <button
                     key={v.id}
                     type="button"
-                    onClick={() => setView(v)}
+                    onClick={() => openDetail(v)}
                     title={stockLabel(v, t)}
                     className="relative aspect-square rounded-lg overflow-hidden border border-[var(--border-brand)]"
                   >
@@ -177,6 +193,42 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
               </div>
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
               <p className="text-sm opacity-70">{stockLabel(detail, t)}</p>
+
+              {!isSoldOut(detail) && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQty((q) => clampQty(q - 1, detail))}
+                    disabled={qty <= 1}
+                    aria-label={t("shopQtyDecrease")}
+                    className="w-8 h-8 rounded-lg border border-[var(--border-brand)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={detail.stock_qty ?? undefined}
+                    value={qty}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      if (Number.isInteger(n)) setQty(clampQty(n, detail))
+                    }}
+                    aria-label={t("cartQty")}
+                    className="w-14 text-center px-1 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setQty((q) => clampQty(q + 1, detail))}
+                    disabled={detail.stock_qty !== null && detail.stock_qty !== undefined && qty >= detail.stock_qty}
+                    aria-label={t("shopQtyIncrease")}
+                    className="w-8 h-8 rounded-lg border border-[var(--border-brand)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
 
               <div className="flex gap-2 mt-2">
                 <button

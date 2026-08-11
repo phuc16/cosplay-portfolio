@@ -97,6 +97,101 @@ describe("ProductCard — variant detail modal", () => {
   })
 })
 
+describe("ProductCard — quantity in the detail modal", () => {
+  it("defaults to qty 1 and adds that quantity to cart", async () => {
+    const { container } = await renderCard()
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const qtyInput = dialog.querySelector('input[type="number"]')
+    expect(qtyInput.value).toBe("1")
+
+    const addBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
+    await act(async () => { addBtn.click() })
+
+    expect(readCart()[0].qty).toBe(1)
+  })
+
+  it("increments and decrements via the +/- buttons", async () => {
+    const { container } = await renderCard()
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+
+    let dialog = container.querySelector('[role="dialog"]')
+    const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
+    const minus = dialog.querySelector('button[aria-label="Decrease quantity"]')
+
+    await act(async () => { plus.click() })
+    await act(async () => { plus.click() })
+    dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="number"]').value).toBe("3")
+
+    await act(async () => { minus.click() })
+    dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="number"]').value).toBe("2")
+
+    const addBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
+    await act(async () => { addBtn.click() })
+    expect(readCart()[0].qty).toBe(2)
+  })
+
+  it("clamps quantity to the variant's remaining stock", async () => {
+    const { container } = await renderCard({
+      product: baseProduct({ variants: [{ id: 3, label: "A1", stock_qty: 2, image_url: null }] }),
+    })
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+
+    let dialog = container.querySelector('[role="dialog"]')
+    const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
+
+    await act(async () => { plus.click() })
+    await act(async () => { plus.click() })
+    await act(async () => { plus.click() }) // one extra past the stock ceiling of 2
+
+    dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="number"]').value).toBe("2")
+    expect(plus.disabled).toBe(true)
+  })
+
+  it("does not clamp quantity for an unlimited-stock variant", async () => {
+    const { container } = await renderCard({
+      product: baseProduct({ variants: [{ id: 4, label: "A1", stock_qty: null, image_url: null }] }),
+    })
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
+    for (let i = 0; i < 10; i++) {
+      await act(async () => { plus.click() })
+    }
+    expect(container.querySelector('[role="dialog"] input[type="number"]').value).toBe("11")
+  })
+
+  it("resets quantity back to 1 when switching to a different variant via the gallery", async () => {
+    const { container } = await renderCard()
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
+    await act(async () => { chip.click() })
+
+    let dialog = container.querySelector('[role="dialog"]')
+    const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
+    await act(async () => { plus.click() })
+    dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="number"]').value).toBe("2")
+
+    const viewAllBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "View all")
+    await act(async () => { viewAllBtn.click() })
+    const gallery = container.querySelector('[role="dialog"]')
+    const a1Thumb = [...gallery.querySelectorAll("button")].find((b) => b.textContent.includes("A1"))
+    await act(async () => { a1Thumb.click() })
+
+    dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="number"]').value).toBe("1")
+  })
+})
+
 describe("ProductCard — full variant gallery", () => {
   it("clicking anywhere on the card (cover image) opens the full gallery of all variants", async () => {
     const { container } = await renderCard()

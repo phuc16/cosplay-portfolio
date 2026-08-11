@@ -31,6 +31,8 @@ export const translations = {
     shopAddedToCart: "Added {item} to cart",
     shopVariantClose: "Close",
     shopViewAll: "View all",
+    shopQtyDecrease: "Decrease quantity",
+    shopQtyIncrease: "Increase quantity",
 
     // Cart & Checkout
     cart: "Cart", cartEmpty: "Your cart is empty.", cartTotal: "Total",
@@ -157,6 +159,8 @@ export const translations = {
     shopAddedToCart: "Đã thêm {item} vào giỏ hàng",
     shopVariantClose: "Đóng",
     shopViewAll: "Xem tất cả",
+    shopQtyDecrease: "Giảm số lượng",
+    shopQtyIncrease: "Tăng số lượng",
 
     // Cart & Checkout
     cart: "Giỏ hàng", cartEmpty: "Giỏ hàng của bạn đang trống.", cartTotal: "Tổng cộng",
