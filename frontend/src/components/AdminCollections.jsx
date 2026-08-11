@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import {
   adminListCollections, adminCreateCollection, adminUpdateCollection,
-  adminDeleteCollection, adminUploadImage,
+  adminDeleteCollection, adminCopyCollection, adminUploadImage,
 } from "../api/shop"
 import AdminProducts from "./AdminProducts"
 
@@ -81,6 +81,16 @@ export default function AdminCollections() {
     }
   }
 
+  const copy = async (id) => {
+    setError("")
+    try {
+      await adminCopyCollection(id)
+      await reload()
+    } catch (e) {
+      setError(e.response?.data?.message || "Sao chép bộ sưu tập thất bại")
+    }
+  }
+
   return (
     <div>
       <h3 className="text-xl font-semibold mb-4">Bộ sưu tập</h3>
@@ -97,6 +107,7 @@ export default function AdminCollections() {
                 {expandedId === c.id ? "Ẩn" : "Sản phẩm"}
               </button>
               <button type="button" onClick={() => edit(c)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Sửa</button>
+              <button type="button" onClick={() => copy(c.id)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Sao chép</button>
               <button type="button" onClick={() => remove(c.id)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Xóa</button>
             </div>
           </div>

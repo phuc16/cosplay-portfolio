@@ -199,3 +199,103 @@ describe("deleteCollection", () => {
     expect(variants).toHaveLength(0)
   })
 })
+
+describe("updateCollection", () => {
+  it("re-derives the slug from a renamed title", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "draft" })
+
+    await repo.updateCollection(cid, { title: "Fes HH2027", status: "draft" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.slug).toBe("fes-hh2027")
+  })
+
+  it("keeps the same slug when the title is unchanged (no needless -2 bump)", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "draft" })
+
+    await repo.updateCollection(cid, { title: "Fes HH2026", status: "active" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.slug).toBe("fes-hh2026")
+  })
+
+  it("de-duplicates the new slug against other collections", async () => {
+    await repo.createCollection({ title: "Summer", status: "draft" })
+    const cid = await repo.createCollection({ title: "Other", status: "draft" })
+
+    await repo.updateCollection(cid, { title: "Summer", status: "draft" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.slug).toBe("summer-2")
+  })
+})
+
+describe("copyCollection", () => {
+  it("returns null for a nonexistent collection", async () => {
+    expect(await repo.copyCollection(999999)).toBeNull()
+  })
+
+  it("creates a new draft collection with '(Copy)' appended to the title, regardless of the source's status", async () => {
+    const cid = await repo.createCollection({
+      title: "Fes HH2026", status: "active", description: "Desc",
+      cover_image: "https://x/cover.jpg", thumbnail_image: "https://x/thumb.jpg",
+      allow_ship: true, allow_pickup: true,
+      pickup_location: "Trạm sự kiện", pickup_note: "Quầy check-in",
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+
+    expect(copy.title).toBe("Fes HH2026 (Copy)")
+    expect(copy.slug).toBe("fes-hh2026-copy")
+    expect(copy.status).toBe("draft")
+    expect(copy.description).toBe("Desc")
+    expect(copy.cover_image).toBe("https://x/cover.jpg")
+    expect(copy.thumbnail_image).toBe("https://x/thumb.jpg")
+    expect(copy.allow_ship).toBe(true)
+    expect(copy.allow_pickup).toBe(true)
+    expect(copy.pickup_location).toBe("Trạm sự kiện")
+    expect(copy.pickup_note).toBe("Quầy check-in")
+  })
+
+  it("copies every product and variant into the new collection, leaving the source untouched", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Photocard", description: "d", price: 35000, images: ["https://x/p.jpg"],
+    })
+    await repo.replaceVariants(pid, [
+      { label: "A1", image_url: "https://x/a1.jpg", stock_qty: 12 },
+      { label: "B2", image_url: null, stock_qty: null },
+    ])
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+
+    expect(copy.products).toHaveLength(1)
+    expect(copy.products[0].name).toBe("Photocard")
+    expect(copy.products[0].price).toBe(35000)
+    expect(copy.products[0].images).toEqual(["https://x/p.jpg"])
+    const labels = copy.products[0].variants.map((v) => v.label).sort()
+    expect(labels).toEqual(["A1", "B2"])
+    const a1 = copy.products[0].variants.find((v) => v.label === "A1")
+    expect(a1.image_url).toBe("https://x/a1.jpg")
+    expect(a1.stock_qty).toBe(12)
+    const b2 = copy.products[0].variants.find((v) => v.label === "B2")
+    expect(b2.stock_qty).toBeNull()
+
+    // Source collection and its product/variant ids must be untouched.
+    const source = await repo.getCollectionDetailById(cid)
+    expect(source.products).toHaveLength(1)
+    expect(source.products[0].id).not.toBe(copy.products[0].id)
+  })
+
+  it("second copy of the same source gets a further-deduplicated slug", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "active" })
+
+    await repo.copyCollection(cid)
+    const secondCopyId = await repo.copyCollection(cid)
+
+    const secondCopy = await repo.getCollectionDetailById(secondCopyId)
+    expect(secondCopy.slug).toBe("fes-hh2026-copy-2")
+  })
+})

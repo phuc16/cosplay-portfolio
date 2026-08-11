@@ -23,6 +23,9 @@ export const adminUpdateCollection = (id, data) =>
 export const adminDeleteCollection = (id) =>
   api.delete(`/api/admin/collections/${id}`).then((r) => r.data)
 
+export const adminCopyCollection = (id) =>
+  api.post(`/api/admin/collections/${id}/copy`).then((r) => r.data)
+
 export const adminCreateProduct = (collectionId, data) =>
   api.post(`/api/admin/collections/${collectionId}/products`, data).then((r) => r.data)
 

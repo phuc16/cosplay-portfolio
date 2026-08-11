@@ -144,6 +144,45 @@ describe("PUT /api/admin/collections/:id", () => {
     expect(res.status).toBe(404)
     expect(res.body.error).toBe("not_found")
   })
+
+  it("re-derives the slug when the title changes", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "draft" })
+
+    await authed(request(app).put(`/api/admin/collections/${cid}`))
+      .send({ title: "Fes HH2027", status: "draft" })
+
+    const [c] = await repo.listAllCollections()
+    expect(c.slug).toBe("fes-hh2027")
+  })
+})
+
+describe("POST /api/admin/collections/:id/copy", () => {
+  it("rejects unauthenticated access", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "active" })
+    const res = await request(app).post(`/api/admin/collections/${cid}/copy`)
+    expect(res.status).toBe(401)
+  })
+
+  it("creates a draft copy with products/variants and returns its id", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Photocard", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/copy`))
+    expect(res.status).toBe(201)
+    expect(res.body.id).toBeGreaterThan(0)
+
+    const copy = await repo.getCollectionDetailById(res.body.id)
+    expect(copy.title).toBe("Fes HH2026 (Copy)")
+    expect(copy.status).toBe("draft")
+    expect(copy.products[0].variants[0].label).toBe("A1")
+  })
+
+  it("returns 404 for a nonexistent collection", async () => {
+    const res = await authed(request(app).post("/api/admin/collections/999999/copy"))
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe("not_found")
+  })
 })
 
 describe("products and variants", () => {

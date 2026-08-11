@@ -103,6 +103,16 @@ module.exports = function adminCatalogRoutes() {
     } catch (err) { oops(res, err, "Lỗi sửa collection") }
   })
 
+  router.post("/collections/:id/copy", async (req, res) => {
+    try {
+      const newId = await repo.copyCollection(req.params.id)
+      if (newId === null) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
+
+      await cache.invalidate()
+      res.status(201).json({ id: newId })
+    } catch (err) { oops(res, err, "Lỗi sao chép collection") }
+  })
+
   router.delete("/collections/:id", async (req, res) => {
     try {
       const ok = await repo.deleteCollection(req.params.id)

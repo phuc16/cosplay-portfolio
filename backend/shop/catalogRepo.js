@@ -177,26 +177,88 @@ async function insertCollection(data, slug, sortOrder) {
   return res.insertId
 }
 
-async function updateCollection(id, data) {
-  const [res] = await db.query(
-    `UPDATE collections
-        SET title = ?, description = ?, cover_image = ?, thumbnail_image = ?, status = ?,
-            allow_ship = ?, allow_pickup = ?, pickup_location = ?, pickup_note = ?
-      WHERE id = ?`,
-    [
-      data.title,
-      data.description || null,
-      data.cover_image || null,
-      data.thumbnail_image || null,
-      data.status || "draft",
-      data.allow_ship === undefined ? true : Boolean(data.allow_ship),
-      Boolean(data.allow_pickup),
-      data.pickup_location || null,
-      data.pickup_note || null,
-      id,
-    ]
-  )
-  return res.affectedRows > 0
+async function updateCollection(id, data, attempt = 0) {
+  // The slug is re-derived from the title on every edit (not just at
+  // creation) so a renamed collection's URL always matches its current
+  // name — otherwise a copy renamed away from "X (Copy)" would keep the
+  // stale "-copy" slug forever. Other collections' slugs are the collision
+  // set; excluding this row's own current slug means an unchanged title
+  // never gets needlessly bumped to "-2".
+  const [rows] = await db.query("SELECT slug FROM collections WHERE id != ?", [id])
+  const slug = uniqueSlug(slugify(data.title), rows.map((r) => r.slug))
+
+  try {
+    const [res] = await db.query(
+      `UPDATE collections
+          SET title = ?, slug = ?, description = ?, cover_image = ?, thumbnail_image = ?, status = ?,
+              allow_ship = ?, allow_pickup = ?, pickup_location = ?, pickup_note = ?
+        WHERE id = ?`,
+      [
+        data.title,
+        slug,
+        data.description || null,
+        data.cover_image || null,
+        data.thumbnail_image || null,
+        data.status || "draft",
+        data.allow_ship === undefined ? true : Boolean(data.allow_ship),
+        Boolean(data.allow_pickup),
+        data.pickup_location || null,
+        data.pickup_note || null,
+        id,
+      ]
+    )
+    return res.affectedRows > 0
+  } catch (err) {
+    // Same TOCTOU race as createCollection: two concurrent renames landing
+    // on the same slug both read it as free and one loses on the unique index.
+    if (err.code === "ER_DUP_ENTRY" && attempt < 5) {
+      return updateCollection(id, data, attempt + 1)
+    }
+    throw err
+  }
+}
+
+/**
+ * Duplicate a collection along with every product and variant inside it —
+ * saves re-entering a large photocard sheet from scratch for a similar
+ * drop. The copy always starts as `draft` regardless of the source's
+ * status, since it still needs review/edits (dates, title) before it should
+ * be orderable. Images are referenced, not re-uploaded — both collections
+ * point at the same MinIO objects.
+ */
+async function copyCollection(id) {
+  const source = await getCollectionDetailById(id)
+  if (!source) return null
+
+  const newId = await createCollection({
+    title: `${source.title} (Copy)`,
+    description: source.description,
+    cover_image: source.cover_image,
+    thumbnail_image: source.thumbnail_image,
+    status: "draft",
+    allow_ship: source.allow_ship,
+    allow_pickup: source.allow_pickup,
+    pickup_location: source.pickup_location,
+    pickup_note: source.pickup_note,
+  })
+
+  for (const p of source.products) {
+    const newProductId = await createProduct({
+      collection_id: newId,
+      name: p.name,
+      description: p.description,
+      price: p.price,
+      images: p.images,
+    })
+    if (p.variants.length) {
+      await replaceVariants(
+        newProductId,
+        p.variants.map((v) => ({ label: v.label, image_url: v.image_url, stock_qty: v.stock_qty }))
+      )
+    }
+  }
+
+  return newId
 }
 
 async function deleteCollection(id) {
@@ -331,6 +393,7 @@ module.exports = {
   getCollectionDetailById,
   createCollection,
   updateCollection,
+  copyCollection,
   deleteCollection,
   createProduct,
   updateProduct,
