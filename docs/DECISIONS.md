@@ -111,3 +111,13 @@ already-shared collection also changes its public `/shop/:slug` URL — any
 link shared before the rename breaks. Acceptable per explicit request, but
 worth knowing before renaming an active collection with an existing
 audience.
+
+## 2026-08-11 — Gallery grid widened, columns scale with variant count, chips restyled
+
+The variant gallery modal was capped at max-w-lg / 3-4 columns — cramped
+for a 40+ code photocard sheet. Widened to max-w-4xl with columns now
+picked from the variant count (2 columns for <=2 variants, up through
+3/6/8 for 17+) instead of a fixed responsive breakpoint, so a 2-variant
+product doesn't get stretched into a handful of oversized thumbnails.
+Label chips changed from a plain dark box to a brand-green pill on a
+gradient scrim, with a hover highlight on each thumbnail.
