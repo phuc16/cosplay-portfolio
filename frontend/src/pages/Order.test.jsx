@@ -24,7 +24,7 @@ function baseOrder(over = {}) {
     id: 1, order_token: "tok123", status: "confirmed", total: 35000,
     fulfillment_method: "ship", tracking_code: null, created_at: new Date().toISOString(),
     items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1 }],
-    pickup_location: null, pickup_note: null, has_payment_proof: false,
+    pickup_location: null, pickup_note: null, has_payment_proof: false, payment_proof_url: null,
     ...over,
   }
 }
@@ -287,17 +287,19 @@ describe("Order — payment proof upload styling", () => {
     expect(img).toBeTruthy()
   })
 
-  it("shows the success message after a refresh, sourced from has_payment_proof, without an image", async () => {
-    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: true }))
+  it("shows the success message and the uploaded image after a refresh, from payment_proof_url", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
 
     const container = await renderOrder()
 
     expect(container.textContent).toContain("Uploaded")
     expect(container.querySelector('label input[type="file"]').closest("label").textContent).toContain("Replace")
-    // No image element for the pre-existing proof — the server never sends
-    // the URL back, only the boolean.
-    expect(container.querySelector('img[alt="Uploaded"]')).toBeNull()
+    const img = container.querySelector('img[alt="Uploaded"]')
+    expect(img).toBeTruthy()
+    expect(img.src).toBe("https://x/proof.jpg")
   })
 
   it("does not show the success message when no proof is on file", async () => {

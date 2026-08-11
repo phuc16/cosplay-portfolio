@@ -144,15 +144,17 @@ describe("GET /api/orders/:token — has_payment_proof", () => {
     const o = await seedOrder()
     const res = await request(app).get(`/api/orders/${o.order_token}`)
     expect(res.body.has_payment_proof).toBe(false)
+    expect(res.body.payment_proof_url).toBeNull()
   })
 
   it("is true after a proof is uploaded, surviving what a page refresh would re-fetch", async () => {
     const o = await seedOrder()
-    await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    const uploaded = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
 
     const res = await request(app).get(`/api/orders/${o.order_token}`)
     expect(res.body.has_payment_proof).toBe(true)
-    // The raw URL must still never reach the buyer — only the boolean does.
-    expect(res.body).not.toHaveProperty("payment_proof_url")
+    // The buyer sees the same image on every visit, not just the upload
+    // session — same URL the upload response returned.
+    expect(res.body.payment_proof_url).toBe(uploaded.body.url)
   })
 })

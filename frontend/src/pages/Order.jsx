@@ -28,17 +28,15 @@ function readFileAsBase64(file) {
 // doesn't burn a retry against the proof rate limiter on a doomed upload.
 const MAX_PROOF_BYTES = 8 * 1024 * 1024
 
-function ProofUpload({ token, hasExistingProof }) {
+function ProofUpload({ token, existingProofUrl }) {
   const { t } = useLanguage()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
-  // The image itself is session-only: the buyer-facing order deliberately
-  // never exposes the stored payment_proof_url, only whether one exists
-  // (hasExistingProof, from the order fetch). A fresh upload this visit
-  // still shows its own preview via uploadedUrl; a prior visit's upload
-  // shows only the success message below, sourced from hasExistingProof.
+  // A fresh upload this visit overrides what the order fetch returned, so
+  // replacing the proof updates the preview immediately without a refetch.
   const [uploadedUrl, setUploadedUrl] = useState(null)
-  const alreadyUploaded = Boolean(uploadedUrl) || hasExistingProof
+  const previewUrl = uploadedUrl || existingProofUrl
+  const alreadyUploaded = Boolean(previewUrl)
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]
@@ -67,8 +65,8 @@ function ProofUpload({ token, hasExistingProof }) {
     <div className="p-4 rounded-xl border border-[var(--border-brand)] mb-6">
       <h2 className="font-semibold mb-2">{t("proofTitle")}</h2>
 
-      {uploadedUrl && (
-        <img src={uploadedUrl} alt={t("proofUploaded")}
+      {previewUrl && (
+        <img src={previewUrl} alt={t("proofUploaded")}
           className="w-32 h-32 object-cover rounded-lg border border-[var(--border-default)] mb-2" />
       )}
       {alreadyUploaded && (
@@ -192,7 +190,7 @@ export default function Order() {
 
       {/* Hidden entirely once the order leaves pending — the API itself
           refuses uploads past that point, so this mirrors the server rule. */}
-      {isPending && <ProofUpload token={token} hasExistingProof={order.has_payment_proof} />}
+      {isPending && <ProofUpload token={token} existingProofUrl={order.payment_proof_url} />}
 
       <h2 className="font-semibold mb-2">{t("orderItems")}</h2>
       {order.items.map((i) => (

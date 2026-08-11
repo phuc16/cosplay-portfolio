@@ -35,11 +35,10 @@ function toPublicOrder(order) {
     // read aloud/show staff, verifiable against the printed roster without
     // network. Always null for a ship order.
     pickup_code,
-    // Whether a payment-proof screenshot is on file, without exposing its
-    // storage URL — the buyer needs their upload to survive a page refresh
-    // (nothing else in this response changes on upload, so the frontend
-    // can't infer it any other way), but the raw payment_proof_url stays
-    // admin-only, unchanged from before.
+    // The proof screenshot itself, so the buyer sees what they uploaded on
+    // every visit, not just the one where they uploaded it — same trust
+    // boundary as the rest of this response, which already requires the
+    // order_token to reach.
     payment_proof_url,
   } = order
   // The code is only meaningful once the order is actually paid for — an
@@ -52,6 +51,7 @@ function toPublicOrder(order) {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
     pickup_location, pickup_note, expires_at, pickup_code: paidPickupCode,
     has_payment_proof: Boolean(payment_proof_url),
+    payment_proof_url: payment_proof_url || null,
   }
 }
 

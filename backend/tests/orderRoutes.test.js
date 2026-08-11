@@ -287,7 +287,6 @@ describe("GET /api/orders/:token", () => {
     // phase adds may widen that: these fields must still never appear.
     expect(res.body).not.toHaveProperty("request_key")
     expect(res.body).not.toHaveProperty("stock_released_at")
-    expect(res.body).not.toHaveProperty("payment_proof_url")
     expect(res.body).not.toHaveProperty("note")
     expect(res.body).not.toHaveProperty("buyer_name")
     expect(res.body).not.toHaveProperty("phone")
