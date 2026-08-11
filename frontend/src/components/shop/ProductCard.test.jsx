@@ -253,4 +253,28 @@ describe("ProductCard — full variant gallery", () => {
 
     expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
+
+  it("uses a narrow column layout for a small number of variants", async () => {
+    // 2 variants from baseProduct().
+    const { container } = await renderCard()
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const grid = container.querySelector('[role="dialog"] .columns-2')
+    expect(grid).toBeTruthy()
+    expect(grid.className).not.toContain("columns-8")
+  })
+
+  it("uses a wide column layout for a large photocard-style sheet", async () => {
+    const many = baseProduct({
+      variants: Array.from({ length: 24 }, (_, i) => ({ id: i + 1, label: `V${i + 1}`, stock_qty: 5, image_url: null })),
+    })
+    const { container } = await renderCard({ product: many })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const grid = container.querySelector('[role="dialog"] [class*="columns-3"]')
+    expect(grid).toBeTruthy()
+    expect(grid.className).toContain("lg:columns-8")
+  })
 })

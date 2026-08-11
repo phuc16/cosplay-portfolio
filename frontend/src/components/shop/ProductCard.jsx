@@ -19,6 +19,21 @@ const clampQty = (n, v) => {
   return Math.min(Math.max(1, n), max)
 }
 
+/**
+ * Column count scales with how many variants there are to show — a 2-code
+ * product stretched across 8 columns leaves the thumbnails huge and the
+ * layout mostly empty, while a 40+ code photocard sheet needs every column
+ * it can get. Every class here must appear literally (not built from a
+ * template string) so Tailwind's content scanner generates it.
+ */
+function galleryColumnClasses(count) {
+  if (count <= 2) return "columns-2"
+  if (count <= 4) return "columns-2 sm:columns-3"
+  if (count <= 8) return "columns-2 sm:columns-4"
+  if (count <= 16) return "columns-3 sm:columns-5 lg:columns-6"
+  return "columns-3 sm:columns-6 lg:columns-8"
+}
+
 export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
   const { t } = useLanguage()
   const cover = product.images?.[0] || product.variants?.find((v) => v.image_url)?.image_url
@@ -135,7 +150,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
             {/* CSS columns (not a grid), so each thumbnail keeps its own
                 landscape/portrait aspect ratio instead of being cropped
                 into a forced square. */}
-            <div className="columns-3 sm:columns-6 lg:columns-8 gap-3">
+            <div className={galleryColumnClasses(product.variants.length) + " gap-3"}>
               {product.variants.map((v) => {
                 const img = v.image_url || cover
                 return (
