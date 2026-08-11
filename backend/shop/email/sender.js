@@ -50,12 +50,11 @@ async function sendQueued(limit = 10) {
         templates.buildVars({ ...order, payment_note: settings.payment_note })
       )
 
-      // The QR block only makes sense for a pickup order that is still
-      // collectible — a ship order has no event pickup counter to scan it
-      // at, and a cancelled order has nothing left to hand over, so skip
-      // generating and attaching it entirely rather than just hiding it
-      // visually.
-      const isPickup = order.fulfillment_method === "pickup" && order.status !== "cancelled"
+      // The QR is a link to the order's own status page — useful for any
+      // order (open it on a phone, or a pickup staffer scans it), except a
+      // cancelled one, which has nothing left to act on.
+      const showOrderQr = order.status !== "cancelled"
+      const isPickup = order.fulfillment_method === "pickup"
       // The code is only meaningful once the order is actually paid for —
       // matches the same gate toPublicOrder applies to the buyer's order
       // page, so an unpaid pending order's confirmation email never reveals
@@ -65,14 +64,16 @@ async function sendQueued(limit = 10) {
 
       let html = rendered.html
       const attachments = []
-      if (isPickup) {
+      if (showOrderQr) {
         // cid: attachment rather than a data URI (Gmail strips those) or a
         // remote URL (blocked by default in many clients).
         const png = await qr.qrPngBuffer(qr.orderUrl(order.order_token))
-        html += `
-          <div style="text-align:center;margin-top:16px">
-            <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
-            ${isPaid ? `
+        // A ship order's QR is just a convenient link to the order page — no
+        // pickup instructions apply, so it gets a plain, ungated caption.
+        const caption = !isPickup
+          ? `<p style="font-size:12px;color:#888">Mã QR đơn hàng</p>`
+          : isPaid
+            ? `
             <p style="font-size:12px;color:#888">Đưa mã này khi nhận hàng tại sự kiện</p>
             ${order.pickup_code ? `
             <p style="font-size:14px;margin-top:8px">
@@ -80,8 +81,12 @@ async function sendQueued(limit = 10) {
             </p>
             <p style="font-size:12px;color:#888">
               Nếu không quét được mã QR (mạng yếu tại sự kiện), hãy đọc mã này cho nhân viên.
-            </p>` : ""}` : `
-            <p style="font-size:12px;color:#888">Mã QR đơn hàng — hướng dẫn nhận hàng sẽ hiển thị sau khi đơn được xác nhận thanh toán.</p>`}
+            </p>` : ""}`
+            : `<p style="font-size:12px;color:#888">Mã QR đơn hàng — hướng dẫn nhận hàng sẽ hiển thị sau khi đơn được xác nhận thanh toán.</p>`
+        html += `
+          <div style="text-align:center;margin-top:16px">
+            <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
+            ${caption}
           </div>`
         attachments.push({ filename: "order-qr.png", content: png, cid: "orderqr" })
       }

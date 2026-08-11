@@ -197,8 +197,8 @@ describe("sendQueued: send-time template rendering", () => {
   })
 })
 
-describe("sendQueued: pickup QR gating", () => {
-  it("ship order: no QR image or attachment", async () => {
+describe("sendQueued: order QR gating", () => {
+  it("ship order: has the QR image/attachment with a plain caption, no pickup instructions", async () => {
     const o = await seedOrder("ship")
     await queue.enqueue(o.id, "order_placed", "a@example.com")
 
@@ -206,8 +206,36 @@ describe("sendQueued: pickup QR gating", () => {
 
     expect(sendMailMock).toHaveBeenCalledTimes(1)
     const sentArg = sendMailMock.mock.calls[0][0]
-    expect(sentArg.html).not.toContain("cid:orderqr")
+    expect(sentArg.html).toContain("cid:orderqr")
+    expect(sentArg.html).toContain("Mã QR đơn hàng")
     expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
+    expect(sentArg.html).not.toContain("Mã xác nhận")
+    expect(sentArg.attachments).toHaveLength(1)
+    expect(sentArg.attachments[0]).toMatchObject({ filename: "order-qr.png", cid: "orderqr" })
+  })
+
+  it("confirmed (paid) ship order: still just the plain caption, no pickup instructions leak in", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "confirmed")
+    await queue.enqueue(o.id, "payment_confirmed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("cid:orderqr")
+    expect(sentArg.html).toContain("Mã QR đơn hàng")
+    expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
+  })
+
+  it("cancelled ship order: no QR image or attachment", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "cancelled")
+
+    await sender.sendQueued()
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1)
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("cid:orderqr")
     expect(sentArg.attachments).toEqual([])
   })
 
