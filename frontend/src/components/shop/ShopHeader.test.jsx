@@ -43,11 +43,11 @@ describe("ShopHeader", () => {
     expect(shopLink).toBeTruthy()
   })
 
-  it("links back to the main portfolio site, next to the shop title", async () => {
+  it("links back to the main portfolio site, as an icon button in the header controls", async () => {
     const container = await renderHeader()
     const homeLink = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/")
     expect(homeLink).toBeTruthy()
-    expect(homeLink.textContent).toBe("Home")
+    expect(homeLink.getAttribute("aria-label")).toBe("Home")
   })
 
   it("shows no count badge for an empty cart", async () => {

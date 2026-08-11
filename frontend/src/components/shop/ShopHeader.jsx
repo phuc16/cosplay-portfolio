@@ -16,6 +16,12 @@ const moonIcon = (
   </svg>
 )
 
+const homeIcon = (
+  <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 11.5L12 4l9 7.5M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9" />
+  </svg>
+)
+
 // Same glyph as the portfolio's shopping icon, but here it only ever points
 // at /cart — the shop itself is reached via the text link beside it, so
 // there is no second destination for it to be mistaken for.
@@ -46,15 +52,18 @@ export default function ShopHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--border-brand)] bg-[var(--bg-page)]/90 backdrop-blur">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/merchandise" className="font-semibold text-[var(--text-strong)]">
-            {t("shopTitle")}
-          </Link>
-          <Link to="/" className="text-sm text-[var(--text-link)] hover:underline">
-            {t("home")}
-          </Link>
-        </div>
+        <Link to="/merchandise" className="font-semibold text-[var(--text-strong)]">
+          {t("shopTitle")}
+        </Link>
         <div className="flex items-center gap-1">
+          <Link
+            to="/"
+            aria-label={t("home")}
+            title={t("home")}
+            className="flex items-center justify-center w-9 h-9 rounded-lg text-[var(--text-body)] hover:text-[var(--text-link)]"
+          >
+            {homeIcon}
+          </Link>
           {["vi", "en"].map((l) => (
             <button
               key={l}
