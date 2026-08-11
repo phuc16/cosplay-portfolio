@@ -121,6 +121,28 @@ describe("POST /api/admin/collections", () => {
     const res = await request(app).get("/api/shop/collections")
     expect(res.body).toHaveLength(1)
   })
+
+  it("stores a custom payment_deadline_hours", async () => {
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title: "Fes", status: "active", payment_deadline_hours: 12 })
+    expect(res.status).toBe(201)
+
+    const detail = await repo.getCollectionDetailById(res.body.id)
+    expect(detail.payment_deadline_hours).toBe(12)
+  })
+
+  it("rejects a zero or negative payment_deadline_hours", async () => {
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title: "Fes", status: "active", payment_deadline_hours: 0 })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("rejects a non-integer payment_deadline_hours", async () => {
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title: "Fes", status: "active", payment_deadline_hours: 6.5 })
+    expect(res.status).toBe(400)
+  })
 })
 
 describe("PUT /api/admin/collections/:id", () => {

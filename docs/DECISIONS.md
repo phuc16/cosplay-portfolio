@@ -197,6 +197,47 @@ just a convenient order-lookup link, not something pickup-specific, any
 non-cancelled order (ship or pickup) now gets it attached. Ship orders get
 a plain "Mã QR đơn hàng" caption, no pickup instructions or payment gating.
 
+## 2026-08-11 — Restock stats gets a collection filter, both stats views get CSV export
+
+Restock stats always showed every collection mixed together, with no way to
+narrow to one drop. Added the same collection-select filter StatsDrop
+already had. Separately, both StatsDrop and StatsRestock now have a "Xuất
+CSV" button (matching the existing bookkeeping CSV export), server-rendered
+so it's guaranteed identical to the on-screen table, respecting whatever
+collection filter is active.
+
+## 2026-08-11 — Per-collection payment (transfer) deadline override
+
+The 48-hour reservation window before an unpaid order auto-cancels was a
+single global constant (`RESERVATION_HOURS`/`.env`), no way to give one
+drop a shorter or longer window than another. Added
+`collections.payment_deadline_hours` (nullable int, positive-integer
+validated); when set it overrides the system default for every order
+placed against that collection, COD orders unaffected (COD never expires).
+Left blank on a collection, behavior is unchanged. Carried over on collection
+copy, like every other collection setting.
+
+## 2026-08-11 — Buyer sees their uploaded payment-proof photo on every visit
+
+Previously the order page only showed a "✓ Đã tải lên" text confirmation on
+a return visit — the actual photo only rendered in the same session it was
+uploaded, because the public order API deliberately withheld
+`payment_proof_url` (only exposing the boolean `has_payment_proof`). Buyer
+asked to see the photo itself every time, so the field is now included in
+the public order response — no new exposure of trust boundary, since
+reaching this response at all already requires the order's own token, same
+gate that already protects buyer_name/phone/address on the same response.
+
+## 2026-08-11 — Auto-cancelled (expired) orders explain why in their email
+
+The admin's manual-cancel reason (see below) only covered admin-initiated
+cancellations. An order auto-cancelled by the payment-deadline sweep
+(`releaseExpiredOrders`) went out with no reason at all. Now sets the same
+`cancel_reason` column to a fixed message ("Đơn hàng tự động hủy do quá hạn
+chuyển khoản.") on the sweep's cancel transition — reuses the exact same
+storage column and email-rendering path the admin-reason feature built, no
+new code path.
+
 ## 2026-08-11 — Admin cancel reason, included in the buyer's cancellation email
 
 Cancelling gave the buyer no explanation. Admin's "Hủy" action now prompts

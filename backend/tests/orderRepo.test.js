@@ -146,6 +146,28 @@ describe("createOrder", () => {
     expect(o.cod_amount).toBe(35000)
   })
 
+  it("uses the collection's own payment_deadline_hours override for the expiry, not the system default", async () => {
+    const { variantId } = await seedVariant(5, { payment_deadline_hours: 6 })
+    const before = Date.now()
+    const res = await repo.createOrder(order(variantId))
+    const [[o]] = await db.query("SELECT expires_at FROM orders WHERE id = ?", [res.id])
+
+    const hoursAhead = (new Date(o.expires_at).getTime() - before) / (60 * 60 * 1000)
+    expect(hoursAhead).toBeGreaterThan(5.9)
+    expect(hoursAhead).toBeLessThan(6.1)
+  })
+
+  it("falls back to the system default expiry when the collection has no override", async () => {
+    const { variantId } = await seedVariant(5)
+    const before = Date.now()
+    const res = await repo.createOrder(order(variantId))
+    const [[o]] = await db.query("SELECT expires_at FROM orders WHERE id = ?", [res.id])
+
+    const hoursAhead = (new Date(o.expires_at).getTime() - before) / (60 * 60 * 1000)
+    expect(hoursAhead).toBeGreaterThan(47.9)
+    expect(hoursAhead).toBeLessThan(48.1)
+  })
+
   it("reuses the existing order when the same request_key is replayed", async () => {
     const { variantId } = await seedVariant(5)
     const first = await repo.createOrder(order(variantId, 1, { request_key: "abc123" }))

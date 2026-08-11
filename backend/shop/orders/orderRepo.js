@@ -156,7 +156,7 @@ async function createOrder(input) {
     // block, while the same on product_variants does.
     const [rows] = await conn.query(
       `SELECT v.id, v.label, v.stock_qty, p.id AS product_id, p.name AS product_name,
-              p.price, p.collection_id, c.allow_ship, c.allow_pickup
+              p.price, p.collection_id, c.allow_ship, c.allow_pickup, c.payment_deadline_hours
          FROM product_variants v
          JOIN products p ON p.id = v.product_id
          JOIN collections c ON c.id = p.collection_id
@@ -215,7 +215,10 @@ async function createOrder(input) {
     }
 
     const token = domain.generateOrderToken()
-    const expiresAt = domain.computeExpiry(input.payment_method)
+    // Falls back to domain.RESERVATION_HOURS (via computeExpiry's default
+    // parameter) when the collection has no override configured.
+    const deadlineHours = byId.get(lines[0].variant_id).payment_deadline_hours || undefined
+    const expiresAt = domain.computeExpiry(input.payment_method, new Date(), deadlineHours)
     const isPickup = input.fulfillment_method === "pickup"
     const pickupCode = isPickup ? domain.generatePickupCode() : null
 

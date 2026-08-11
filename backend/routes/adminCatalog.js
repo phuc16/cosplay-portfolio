@@ -34,6 +34,10 @@ function validateCollection(body) {
   if (body.allow_ship === false && body.allow_pickup === false) {
     return "Phải chọn ít nhất một hình thức nhận hàng"
   }
+  if (body.payment_deadline_hours !== undefined && body.payment_deadline_hours !== null && body.payment_deadline_hours !== "") {
+    const hours = Number(body.payment_deadline_hours)
+    if (!Number.isInteger(hours) || hours <= 0) return "Hạn chuyển khoản phải là số giờ nguyên dương"
+  }
   return null
 }
 

@@ -16,6 +16,7 @@ const blank = {
   title: "", description: "", status: "draft",
   allow_ship: true, allow_pickup: false,
   pickup_location: "", pickup_note: "",
+  payment_deadline_hours: "",
   cover_image: "", thumbnail_image: "",
 }
 
@@ -66,6 +67,7 @@ export default function AdminCollections() {
       title: c.title, description: c.description || "", status: c.status,
       allow_ship: c.allow_ship, allow_pickup: c.allow_pickup,
       pickup_location: c.pickup_location || "", pickup_note: c.pickup_note || "",
+      payment_deadline_hours: c.payment_deadline_hours || "",
       cover_image: c.cover_image || "", thumbnail_image: c.thumbnail_image || "",
     })
   }
@@ -140,6 +142,18 @@ export default function AdminCollections() {
         >
           {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+
+        <label className="block text-sm mb-3">
+          Hạn chuyển khoản (giờ, để trống dùng mặc định hệ thống)
+          <input
+            type="number"
+            min="1"
+            value={draft.payment_deadline_hours}
+            onChange={(e) => setDraft({ ...draft, payment_deadline_hours: e.target.value })}
+            placeholder="Mặc định"
+            className="w-full mt-1 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+        </label>
 
         <div className="flex gap-4 mb-3 text-sm">
           <label className="flex items-center gap-2">

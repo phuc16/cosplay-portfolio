@@ -37,6 +37,18 @@ describe("createCollection", () => {
     expect(c.allow_ship).toBe(true)
     expect(c.allow_pickup).toBe(true)
   })
+
+  it("stores a custom payment_deadline_hours override", async () => {
+    await repo.createCollection({ title: "Fes", status: "active", payment_deadline_hours: 24 })
+    const [c] = await repo.listAllCollections()
+    expect(c.payment_deadline_hours).toBe(24)
+  })
+
+  it("leaves payment_deadline_hours null when not given", async () => {
+    await repo.createCollection({ title: "Fes", status: "active" })
+    const [c] = await repo.listAllCollections()
+    expect(c.payment_deadline_hours).toBeNull()
+  })
 })
 
 describe("listPublicCollections", () => {
@@ -227,6 +239,16 @@ describe("updateCollection", () => {
 
     const detail = await repo.getCollectionDetailById(cid)
     expect(detail.slug).toBe("summer-2")
+  })
+
+  it("updates payment_deadline_hours, and clears it back to null when omitted", async () => {
+    const cid = await repo.createCollection({ title: "Fes", status: "draft", payment_deadline_hours: 24 })
+
+    await repo.updateCollection(cid, { title: "Fes", status: "draft", payment_deadline_hours: 72 })
+    expect((await repo.getCollectionDetailById(cid)).payment_deadline_hours).toBe(72)
+
+    await repo.updateCollection(cid, { title: "Fes", status: "draft" })
+    expect((await repo.getCollectionDetailById(cid)).payment_deadline_hours).toBeNull()
   })
 })
 

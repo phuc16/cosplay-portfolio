@@ -158,8 +158,8 @@ async function insertCollection(data, slug, sortOrder) {
   const [res] = await db.query(
     `INSERT INTO collections
        (title, slug, description, cover_image, thumbnail_image, status,
-        allow_ship, allow_pickup, pickup_location, pickup_note, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        allow_ship, allow_pickup, pickup_location, pickup_note, payment_deadline_hours, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.title,
       slug,
@@ -171,6 +171,7 @@ async function insertCollection(data, slug, sortOrder) {
       Boolean(data.allow_pickup),
       data.pickup_location || null,
       data.pickup_note || null,
+      data.payment_deadline_hours || null,
       sortOrder,
     ]
   )
@@ -191,7 +192,7 @@ async function updateCollection(id, data, attempt = 0) {
     const [res] = await db.query(
       `UPDATE collections
           SET title = ?, slug = ?, description = ?, cover_image = ?, thumbnail_image = ?, status = ?,
-              allow_ship = ?, allow_pickup = ?, pickup_location = ?, pickup_note = ?
+              allow_ship = ?, allow_pickup = ?, pickup_location = ?, pickup_note = ?, payment_deadline_hours = ?
         WHERE id = ?`,
       [
         data.title,
@@ -204,6 +205,7 @@ async function updateCollection(id, data, attempt = 0) {
         Boolean(data.allow_pickup),
         data.pickup_location || null,
         data.pickup_note || null,
+        data.payment_deadline_hours || null,
         id,
       ]
     )
@@ -240,6 +242,7 @@ async function copyCollection(id) {
     allow_pickup: source.allow_pickup,
     pickup_location: source.pickup_location,
     pickup_note: source.pickup_note,
+    payment_deadline_hours: source.payment_deadline_hours,
   })
 
   for (const p of source.products) {
