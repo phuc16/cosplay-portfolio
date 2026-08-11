@@ -181,3 +181,27 @@ pickup_code gating already solved, just left ungated on this line. Now
 requires isPaid, same as the confirmation-code block. The QR image itself
 stays ungated — still shown on any non-cancelled pickup order regardless
 of payment method/status, since it's just a scannable order lookup link.
+
+## 2026-08-11 — Momo QR stays manual-upload (not auto-generated)
+
+Considered auto-generating a Momo QR from the public nhantien.momo.vn/<phone>
+link (no amount/note pre-fill, unlike VietQR which is an open documented
+standard). User chose to keep the existing manual-upload flow instead —
+Momo's real QR format is proprietary/undocumented, so auto-generating one
+risked producing a subtly wrong code for a real-money flow.
+
+## 2026-08-11 — Order QR extended to ship orders too
+
+The QR (a link to the order's own status page) was pickup-only. Since it's
+just a convenient order-lookup link, not something pickup-specific, any
+non-cancelled order (ship or pickup) now gets it attached. Ship orders get
+a plain "Mã QR đơn hàng" caption, no pickup instructions or payment gating.
+
+## 2026-08-11 — Admin cancel reason, included in the buyer's cancellation email
+
+Cancelling gave the buyer no explanation. Admin's "Hủy" action now prompts
+for an optional reason (dismissing the prompt only skips the reason, not
+the cancellation — the existing confirm() guard still gates that). Stored
+in a new orders.cancel_reason column, appended to the cancelled email as
+"Lý do hủy: ..." only when present (omitted entirely otherwise, not an
+empty label), escaped like every other buyer-facing string in email HTML.
