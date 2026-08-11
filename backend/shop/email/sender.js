@@ -72,14 +72,16 @@ async function sendQueued(limit = 10) {
         html += `
           <div style="text-align:center;margin-top:16px">
             <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
+            ${isPaid ? `
             <p style="font-size:12px;color:#888">Đưa mã này khi nhận hàng tại sự kiện</p>
-            ${order.pickup_code && isPaid ? `
+            ${order.pickup_code ? `
             <p style="font-size:14px;margin-top:8px">
               Mã xác nhận nhận hàng: <strong>${order.pickup_code}</strong>
             </p>
             <p style="font-size:12px;color:#888">
               Nếu không quét được mã QR (mạng yếu tại sự kiện), hãy đọc mã này cho nhân viên.
-            </p>` : ""}
+            </p>` : ""}` : `
+            <p style="font-size:12px;color:#888">Mã QR đơn hàng — hướng dẫn nhận hàng sẽ hiển thị sau khi đơn được xác nhận thanh toán.</p>`}
           </div>`
         attachments.push({ filename: "order-qr.png", content: png, cid: "orderqr" })
       }

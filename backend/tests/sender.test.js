@@ -211,7 +211,7 @@ describe("sendQueued: pickup QR gating", () => {
     expect(sentArg.attachments).toEqual([])
   })
 
-  it("pickup order: has the QR image and attachment", async () => {
+  it("pickup order: has the QR image and attachment even while still pending", async () => {
     const o = await seedOrder("pickup")
     await queue.enqueue(o.id, "order_placed", "a@example.com")
 
@@ -220,12 +220,11 @@ describe("sendQueued: pickup QR gating", () => {
     expect(sendMailMock).toHaveBeenCalledTimes(1)
     const sentArg = sendMailMock.mock.calls[0][0]
     expect(sentArg.html).toContain("cid:orderqr")
-    expect(sentArg.html).toContain("nhận hàng tại sự kiện")
     expect(sentArg.attachments).toHaveLength(1)
     expect(sentArg.attachments[0]).toMatchObject({ filename: "order-qr.png", cid: "orderqr" })
   })
 
-  it("pending pickup order: email does NOT include the pickup_code yet (unpaid)", async () => {
+  it("pending pickup order: email does NOT include the pickup_code or the pickup caption yet (unpaid)", async () => {
     const o = await seedOrder("pickup")
     await queue.enqueue(o.id, "order_placed", "a@example.com")
 
@@ -234,9 +233,12 @@ describe("sendQueued: pickup QR gating", () => {
     const sentArg = sendMailMock.mock.calls[0][0]
     expect(sentArg.html).toContain("cid:orderqr")
     expect(sentArg.html).not.toContain("Mã xác nhận")
+    // "Bring this code at pickup" is premature instruction before the seller
+    // has actually confirmed the payment — same gate as the code itself.
+    expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
   })
 
-  it("confirmed (paid) pickup order: email includes the pickup_code", async () => {
+  it("confirmed (paid) pickup order: email includes the pickup_code and the pickup caption", async () => {
     const o = await seedOrder("pickup")
     await orders.transitionOrder(o.id, "confirmed")
     await queue.enqueue(o.id, "payment_confirmed", "a@example.com")
@@ -246,6 +248,7 @@ describe("sendQueued: pickup QR gating", () => {
     const sentArg = sendMailMock.mock.calls[0][0]
     const [[row]] = await db.query("SELECT pickup_code FROM orders WHERE id = ?", [o.id])
     expect(sentArg.html).toContain(row.pickup_code)
+    expect(sentArg.html).toContain("nhận hàng tại sự kiện")
   })
 
   it("cancelled pickup order: no QR image, attachment, or pickup caption at all", async () => {
