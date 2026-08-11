@@ -71,3 +71,16 @@ the cart afterward. Added a +/- stepper in the detail modal, clamped to
 remaining stock (no ceiling for unlimited variants), resetting to 1 every
 time a variant's detail is (re)opened so a stale quantity never carries
 over into a different pick.
+
+## 2026-08-11 — Default email templates redesigned, brand-matched
+
+Cancelled-order emails were showing the pickup QR block ("Đưa mã này khi
+nhận hàng tại sự kiện") even though a cancelled order has nothing left to
+pick up — fixed by also gating isPickup on the order not being cancelled.
+Separately, the four default templates (order_placed, payment_confirmed,
+shipped, cancelled) were redesigned to be more compact and match the site's
+brand green (#6BBF59, same as frontend/src/index.css's --brand): a header
+bar, tighter spacing, a highlighted total row, and a badge-style tracking
+code for the shipped email. Only the code-level fallback defaults changed —
+templates a seller already edited in the DB are untouched; the admin UI's
+"reset to default" reads the new ones live.
