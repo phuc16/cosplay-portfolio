@@ -202,6 +202,26 @@ describe("POST /api/orders", () => {
   })
 })
 
+describe("POST /api/orders — rate limiting", () => {
+  it("blocks the 11th request within an hour with a readable, actionable message", async () => {
+    // Any POST to /api/orders counts against the limiter before the route
+    // handler runs, so a body that 400s still consumes budget — no need to
+    // seed a real variant or place 10 real orders.
+    for (let i = 0; i < 10; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await request(app).post("/api/orders").send({})
+    }
+    const res = await request(app).post("/api/orders").send({})
+
+    expect(res.status).toBe(429)
+    expect(res.body.error).toBe("too_many_requests")
+    // The old message was just "Quá nhiều đơn. Thử lại sau." — no count, no
+    // wait time, nothing actionable.
+    expect(res.body.message).toContain("10 đơn")
+    expect(res.body.message).toMatch(/\d+ phút/)
+  })
+})
+
 describe("GET /api/orders/:token", () => {
   it("returns the order with its items", async () => {
     const v = await seed()

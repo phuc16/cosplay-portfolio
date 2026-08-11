@@ -59,6 +59,13 @@ const keyGen = (req) =>
 const makeStore = (prefix) =>
   new RedisStore({ sendCommand: (...args) => redis.call(...args), prefix })
 
+/** express-rate-limit sets req.rateLimit.resetTime (a Date) on a blocked request. */
+const minutesUntilReset = (req) => {
+  const resetTime = req.rateLimit?.resetTime
+  const ms = resetTime instanceof Date ? resetTime.getTime() - Date.now() : 0
+  return Math.max(1, Math.ceil(ms / 60000))
+}
+
 // Public API: 120 req/phút
 const publicLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -98,7 +105,10 @@ const orderLimiter = rateLimit({
   store: makeStore("rl:order:"),
   handler: (req, res) => {
     console.warn(`[RATE LIMIT] Order IP ${keyGen(req)} bị chặn`)
-    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều đơn. Thử lại sau." })
+    res.status(429).json({
+      error: "too_many_requests",
+      message: `Bạn đã đặt quá nhiều đơn trong 1 giờ qua (tối đa 10 đơn). Vui lòng thử lại sau khoảng ${minutesUntilReset(req)} phút.`,
+    })
   },
 })
 
@@ -116,7 +126,10 @@ const proofLimiter = rateLimit({
   store: makeStore("rl:proof:"),
   handler: (req, res) => {
     console.warn(`[RATE LIMIT] Proof IP ${keyGen(req)} bị chặn`)
-    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều lần tải ảnh. Thử lại sau." })
+    res.status(429).json({
+      error: "too_many_requests",
+      message: `Bạn đã tải ảnh chuyển khoản quá nhiều lần trong 1 giờ qua (tối đa 20 lần). Vui lòng thử lại sau khoảng ${minutesUntilReset(req)} phút.`,
+    })
   },
 })
 
