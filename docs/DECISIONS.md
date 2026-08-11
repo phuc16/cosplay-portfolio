@@ -162,3 +162,12 @@ expand/collapse pattern already used for AdminCollections' product list.
 the cap (10 đơn/giờ, 20 lần/giờ for proof uploads) and a concrete minutes-
 remaining figure computed from express-rate-limit's resetTime, same
 pattern as the existing login-lockout message.
+
+## 2026-08-11 — Payment method picker uses logos, like every other checkout
+
+The `<select>` showing raw uppercase text (BANK/MOMO/PAYPAL/COD) didn't
+match how buyers actually recognize payment methods elsewhere. Replaced
+with a card grid (role="radiogroup"), each showing an icon: bank reuses the
+existing VietQR mark, PayPal reuses the same logo path used in the
+portfolio's own support-links section, Momo gets a brand-pink monogram (no
+bundled asset), COD gets a plain cash icon (no brand to show).
