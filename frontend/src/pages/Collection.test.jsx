@@ -36,11 +36,11 @@ async function renderCollection() {
   const root = createRoot(container)
   await act(async () => {
     root.render(
-      <MemoryRouter initialEntries={["/shop/drop"]}>
+      <MemoryRouter initialEntries={["/merchandise/drop"]}>
         <ThemeProvider>
           <LanguageProvider>
             <Routes>
-              <Route path="/shop/:slug" element={<Collection />} />
+              <Route path="/merchandise/:slug" element={<Collection />} />
             </Routes>
           </LanguageProvider>
         </ThemeProvider>

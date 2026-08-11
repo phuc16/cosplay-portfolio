@@ -20,7 +20,7 @@ export default function Cart() {
         <main className="max-w-3xl mx-auto px-4 py-10">
           <h1 className="text-2xl font-bold mb-4">{t("cart")}</h1>
           <p className="opacity-70 mb-4">{t("cartEmpty")}</p>
-          <Link to="/shop" className="text-[var(--text-link)]">{t("shopBack")}</Link>
+          <Link to="/merchandise" className="text-[var(--text-link)]">{t("shopBack")}</Link>
         </main>
       </>
     )
@@ -35,7 +35,7 @@ export default function Cart() {
       {cart.map((c) => (
         <div key={c.variant_id} className="flex gap-3 items-center py-3 border-b border-[var(--border-brand)]">
           {c.collection_slug ? (
-            <Link to={`/shop/${c.collection_slug}`} className="flex gap-3 items-center flex-1 min-w-0">
+            <Link to={`/merchandise/${c.collection_slug}`} className="flex gap-3 items-center flex-1 min-w-0">
               {c.image_url && <img src={c.image_url} alt="" className="w-16 h-16 object-cover rounded-lg" />}
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{c.product_name}</p>

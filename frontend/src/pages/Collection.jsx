@@ -52,7 +52,7 @@ export default function Collection() {
         <ShopHeader />
         <main className="max-w-5xl mx-auto px-4 py-10">
           <p className="opacity-70 mb-4">{t("shopNotFound")}</p>
-          <Link to="/shop" className="text-[var(--text-link)]">{t("shopBack")}</Link>
+          <Link to="/merchandise" className="text-[var(--text-link)]">{t("shopBack")}</Link>
         </main>
       </>
     )
@@ -64,7 +64,7 @@ export default function Collection() {
     <>
       <ShopHeader />
       <main className="max-w-5xl mx-auto px-4 py-10">
-      <Link to="/shop" className="text-sm text-[var(--text-link)]">← {t("shopBack")}</Link>
+      <Link to="/merchandise" className="text-sm text-[var(--text-link)]">← {t("shopBack")}</Link>
 
       {collection.cover_image && (
         <img

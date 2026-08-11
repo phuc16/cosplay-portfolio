@@ -28,7 +28,7 @@ export default function Shop() {
         {collections?.map((c) => (
           <Link
             key={c.id}
-            to={`/shop/${c.slug}`}
+            to={`/merchandise/${c.slug}`}
             className="rounded-2xl border border-[var(--border-brand)] overflow-hidden hover:shadow-[var(--shadow-pink-hover)] transition"
           >
             {(c.thumbnail_image || c.cover_image) && (

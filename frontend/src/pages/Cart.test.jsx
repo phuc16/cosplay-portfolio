@@ -44,7 +44,7 @@ describe("Cart — clicking an item goes to its product", () => {
 
     const link = [...container.querySelectorAll("a")].find((a) => a.textContent.includes("Poster A4"))
     expect(link).toBeTruthy()
-    expect(link.getAttribute("href")).toBe("/shop/drop")
+    expect(link.getAttribute("href")).toBe("/merchandise/drop")
   })
 
   it("renders plainly (no link) when the item has no collection_slug", async () => {

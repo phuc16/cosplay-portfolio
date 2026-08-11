@@ -39,7 +39,7 @@ describe("ShopHeader", () => {
 
   it("links back to the collection list", async () => {
     const container = await renderHeader()
-    const shopLink = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/shop")
+    const shopLink = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/merchandise")
     expect(shopLink).toBeTruthy()
   })
 

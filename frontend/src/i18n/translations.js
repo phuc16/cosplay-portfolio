@@ -12,7 +12,7 @@ export const translations = {
 
     // Shop
     shop: "Shop",
-    shopTitle: "Merch",
+    shopTitle: "Merchandise",
     shopDesc: "Pick what you like, then place an order.",
     shopEmpty: "No collections yet.",
     shopLoading: "Loading...",
@@ -140,7 +140,7 @@ export const translations = {
 
     // Shop
     shop: "Shop",
-    shopTitle: "Merch",
+    shopTitle: "Merchandise",
     shopDesc: "Chọn món bạn thích rồi đặt hàng.",
     shopEmpty: "Chưa có bộ sưu tập nào.",
     shopLoading: "Đang tải...",

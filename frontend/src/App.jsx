@@ -17,8 +17,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Portfolio />} />
             <Route path="/admin" element={<Admin />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/shop/:slug" element={<Collection />} />
+            <Route path="/merchandise" element={<Shop />} />
+            <Route path="/merchandise/:slug" element={<Collection />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order/:token" element={<Order />} />
