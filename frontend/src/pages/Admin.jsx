@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import axios from "axios"
+import { api } from "../api/api"
 import AdminAlbums from "../components/AdminAlbums"
 import AdminSettings from "../components/AdminSettings"
 import AdminCollections from "../components/AdminCollections"
@@ -10,13 +11,45 @@ import AdminStats from "../components/AdminStats"
 import AdminShipping from "../components/AdminShipping"
 import { useTheme } from "../contexts/ThemeContext"
 
+const TOKEN_KEY = "admin_token"
+
 export default function Admin() {
   const { theme, toggleTheme } = useTheme()
   const [tab, setTab] = useState("albums")
-  const [token, setToken] = useState("")
+  // Read once at mount, applying the saved token to axios immediately so the
+  // very first admin API call (before any effect runs) still authenticates —
+  // without this, a page refresh loses the session even though the JWT
+  // (8h expiry) is still valid.
+  const [token, setToken] = useState(() => {
+    const saved = localStorage.getItem(TOKEN_KEY)
+    if (saved) axios.defaults.headers.common["Authorization"] = "Bearer " + saved
+    return saved || ""
+  })
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+
+  const logout = () => {
+    setToken("")
+    delete axios.defaults.headers.common["Authorization"]
+    localStorage.removeItem(TOKEN_KEY)
+  }
+
+  // A restored or still-active token can still expire mid-session (8h JWT) —
+  // when that happens the server answers 401/403 and every admin tab would
+  // otherwise sit there silently failing. Drop back to the login screen
+  // instead of leaving a session that looks alive but isn't.
+  useEffect(() => {
+    if (!token) return
+    const id = api.interceptors.response.use(
+      (res) => res,
+      (err) => {
+        if (err.response?.status === 401 || err.response?.status === 403) logout()
+        return Promise.reject(err)
+      }
+    )
+    return () => api.interceptors.response.eject(id)
+  }, [token])
 
   const login = async (e) => {
     e?.preventDefault()
@@ -24,6 +57,7 @@ export default function Admin() {
     try {
       const r = await axios.post("/api/login", { username, password })
       axios.defaults.headers.common["Authorization"] = "Bearer " + r.data.token
+      localStorage.setItem(TOKEN_KEY, r.data.token)
       setToken(r.data.token)
     } catch (err) {
       const msg = err.response?.data?.message || "Sai tên đăng nhập hoặc mật khẩu"
@@ -101,10 +135,7 @@ export default function Admin() {
               )}
             </button>
             <button
-              onClick={() => {
-                setToken("")
-                delete axios.defaults.headers.common["Authorization"]
-              }}
+              onClick={logout}
               className="text-sm text-gray-600 dark:text-slate-500 hover:text-pink-500 dark:hover:text-pink-400"
             >
               Đăng xuất
