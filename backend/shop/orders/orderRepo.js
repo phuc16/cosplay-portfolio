@@ -432,6 +432,9 @@ async function transitionOrder(id, toStatus, extra = {}) {
     if (toStatus === "cancelled") sets.push("cancelled_at = NOW()")
     if (extra.tracking_code !== undefined) { sets.push("tracking_code = ?"); params.push(extra.tracking_code) }
     if (extra.shipping_fee !== undefined) { sets.push("shipping_fee = ?"); params.push(extra.shipping_fee) }
+    if (toStatus === "cancelled" && extra.cancel_reason !== undefined) {
+      sets.push("cancel_reason = ?"); params.push(extra.cancel_reason)
+    }
     params.push(id)
 
     await conn.query(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, params)

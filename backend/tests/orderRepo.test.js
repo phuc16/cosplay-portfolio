@@ -358,6 +358,33 @@ describe("transitionOrder", () => {
     expect(v.stock_qty).toBeNull()
   })
 
+  it("stores an admin-supplied cancel_reason", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId))
+    await repo.transitionOrder(res.id, "cancelled", { cancel_reason: "Hết hàng thực tế" })
+
+    const [[o]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [res.id])
+    expect(o.cancel_reason).toBe("Hết hàng thực tế")
+  })
+
+  it("leaves cancel_reason null when none is given", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId))
+    await repo.transitionOrder(res.id, "cancelled")
+
+    const [[o]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [res.id])
+    expect(o.cancel_reason).toBeNull()
+  })
+
+  it("ignores a cancel_reason passed for a non-cancelling transition", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId))
+    await repo.transitionOrder(res.id, "confirmed", { cancel_reason: "should not be stored" })
+
+    const [[o]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [res.id])
+    expect(o.cancel_reason).toBeNull()
+  })
+
   it("refuses an illegal transition", async () => {
     const { variantId } = await seedVariant(5)
     const res = await repo.createOrder(order(variantId))

@@ -106,7 +106,14 @@ export default function AdminOrders() {
       const code = prompt("Mã vận đơn (có thể bỏ trống):")
       if (code) payload.tracking_code = code
     }
-    if (to === "cancelled" && !confirm("Hủy đơn này? Kho sẽ được hoàn lại.")) return
+    if (to === "cancelled") {
+      if (!confirm("Hủy đơn này? Kho sẽ được hoàn lại.")) return
+      // Included in the buyer's cancellation email when present — see
+      // sender.js. Cancelling the prompt itself (Escape/Cancel) just skips
+      // the reason, not the cancellation already confirmed above.
+      const reason = prompt("Lý do hủy đơn (có thể bỏ trống, sẽ gửi kèm email cho khách):")
+      if (reason && reason.trim()) payload.cancel_reason = reason.trim()
+    }
 
     try {
       await adminTransitionOrder(order.id, payload)

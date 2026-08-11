@@ -64,6 +64,20 @@ async function sendQueued(limit = 10) {
 
       let html = rendered.html
       const attachments = []
+
+      // Appended rather than a template placeholder: the cancelled template
+      // is static and shared by every cancellation, most of which have no
+      // reason at all (admin skipped the prompt, or the order predates this
+      // field) — a placeholder would either always show an empty "Lý do
+      // hủy:" label or need its own conditional the substitution engine
+      // can't express, same reasoning as the QR block below.
+      if (order.status === "cancelled" && order.cancel_reason) {
+        html += `
+          <p style="font-size:14px;margin-top:12px">
+            <strong>Lý do hủy:</strong> ${templates.escapeHtml(order.cancel_reason)}
+          </p>`
+      }
+
       if (showOrderQr) {
         // cid: attachment rather than a data URI (Gmail strips those) or a
         // remote URL (blocked by default in many clients).

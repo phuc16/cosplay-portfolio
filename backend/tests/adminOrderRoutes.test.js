@@ -179,6 +179,44 @@ describe("POST /api/admin/orders/:id/transition", () => {
     expect(res.status).toBe(404)
     expect(res.body.error).toBe("not_found")
   })
+
+  it("stores a trimmed cancel_reason when cancelling", async () => {
+    const o = await seedOrder()
+    await authed(request(app).post(`/api/admin/orders/${o.id}/transition`))
+      .send({ to: "cancelled", cancel_reason: "  Hết hàng thực tế  " })
+
+    const [[row]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [o.id])
+    expect(row.cancel_reason).toBe("Hết hàng thực tế")
+  })
+
+  it("ignores a blank/whitespace-only cancel_reason", async () => {
+    const o = await seedOrder()
+    await authed(request(app).post(`/api/admin/orders/${o.id}/transition`))
+      .send({ to: "cancelled", cancel_reason: "   " })
+
+    const [[row]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [o.id])
+    expect(row.cancel_reason).toBeNull()
+  })
+
+  it("truncates an overlong cancel_reason to 500 chars rather than erroring", async () => {
+    const o = await seedOrder()
+    const long = "a".repeat(600)
+    const res = await authed(request(app).post(`/api/admin/orders/${o.id}/transition`))
+      .send({ to: "cancelled", cancel_reason: long })
+
+    expect(res.status).toBe(200)
+    const [[row]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [o.id])
+    expect(row.cancel_reason).toHaveLength(500)
+  })
+
+  it("ignores cancel_reason on a non-cancelling transition", async () => {
+    const o = await seedOrder()
+    await authed(request(app).post(`/api/admin/orders/${o.id}/transition`))
+      .send({ to: "confirmed", cancel_reason: "should not be stored" })
+
+    const [[row]] = await db.query("SELECT cancel_reason FROM orders WHERE id = ?", [o.id])
+    expect(row.cancel_reason).toBeNull()
+  })
 })
 
 describe("POST /api/admin/orders/bulk-cancel", () => {

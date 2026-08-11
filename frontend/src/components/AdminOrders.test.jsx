@@ -319,6 +319,41 @@ describe("AdminOrders — semantic status/action styling (Admin UI plan)", () =>
     confirmSpy.mockRestore()
   })
 
+  it("includes a trimmed cancel_reason from the prompt when cancelling", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("  Hết hàng thực tế  ")
+    adminTransitionOrder.mockResolvedValue({})
+    adminListOrders.mockResolvedValue([order({ allowed_transitions: ["cancelled"] })])
+    const { container } = await renderAdminOrders()
+
+    const cancelBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Hủy")
+    await act(async () => { cancelBtn.click() })
+
+    expect(promptSpy).toHaveBeenCalled()
+    expect(adminTransitionOrder).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ to: "cancelled", cancel_reason: "Hết hàng thực tế" })
+    )
+    vi.restoreAllMocks()
+  })
+
+  it("still cancels the order even if the reason prompt is skipped (empty/dismissed)", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    vi.spyOn(window, "prompt").mockReturnValue(null)
+    adminTransitionOrder.mockResolvedValue({})
+    adminListOrders.mockResolvedValue([order({ allowed_transitions: ["cancelled"] })])
+    const { container } = await renderAdminOrders()
+
+    const cancelBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Hủy")
+    await act(async () => { cancelBtn.click() })
+
+    expect(adminTransitionOrder).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ cancel_reason: expect.anything() })
+    )
+    vi.restoreAllMocks()
+  })
+
   it("surfaces an order with a pending action above one with none, without hiding either", async () => {
     adminListOrders.mockResolvedValue([
       order({ id: 1, status: "completed", allowed_transitions: [] }),

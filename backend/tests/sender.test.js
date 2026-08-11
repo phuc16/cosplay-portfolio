@@ -294,6 +294,38 @@ describe("sendQueued: order QR gating", () => {
     expect(sentArg.attachments).toEqual([])
   })
 
+  it("cancelled order: includes the admin's cancel_reason when present", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "cancelled", { cancel_reason: "Hết hàng thực tế" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("Lý do hủy")
+    expect(sentArg.html).toContain("Hết hàng thực tế")
+  })
+
+  it("cancelled order: omits the reason block entirely when no reason was given", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "cancelled")
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("Lý do hủy")
+  })
+
+  it("cancelled order: escapes HTML in an admin-supplied cancel_reason", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "cancelled", { cancel_reason: "<script>alert(1)</script>" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("<script>")
+    expect(sentArg.html).toContain("&lt;script&gt;")
+  })
+
   it("confirmed pickup order with a null pickup_code (legacy order predating the migration): QR still renders, no 'Mã xác nhận' / literal 'null'", async () => {
     const o = await seedOrder("pickup")
     await orders.transitionOrder(o.id, "confirmed")

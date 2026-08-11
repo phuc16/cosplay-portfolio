@@ -54,7 +54,7 @@ module.exports = function adminOrderRoutes() {
 
   router.post("/orders/:id/transition", async (req, res) => {
     try {
-      const { to, tracking_code, shipping_fee } = req.body
+      const { to, tracking_code, shipping_fee, cancel_reason } = req.body
       if (!STATUSES.includes(to)) {
         return res.status(400).json({ error: "invalid_input", message: "Trạng thái không hợp lệ" })
       }
@@ -67,6 +67,11 @@ module.exports = function adminOrderRoutes() {
       if (shipping_fee !== undefined) {
         const n = Number(shipping_fee)
         extra.shipping_fee = Number.isFinite(n) ? n : null
+      }
+      // Only meaningful alongside to === "cancelled"; transitionOrder itself
+      // already guards writing it to any other target status.
+      if (to === "cancelled" && typeof cancel_reason === "string" && cancel_reason.trim()) {
+        extra.cancel_reason = cancel_reason.trim().slice(0, 500)
       }
 
       const ok = await repo.transitionOrder(Number(req.params.id), to, extra)
