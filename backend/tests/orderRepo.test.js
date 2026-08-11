@@ -90,6 +90,11 @@ describe("createOrder", () => {
     await expect(repo.createOrder({ ...order(1), items: [] })).rejects.toThrow(repo.EmptyCartError)
   })
 
+  it("rejects a cart referencing a variant_id that does not exist, with a distinct error from OutOfStockError", async () => {
+    await expect(repo.createOrder(order(999999))).rejects.toThrow(repo.VariantNotFoundError)
+    await expect(repo.createOrder(order(999999))).rejects.not.toThrow(repo.OutOfStockError)
+  })
+
   it("rolls back everything if one line of a multi-item order is short", async () => {
     const { pid, variantId } = await seedVariant(5)
     await catalog.replaceVariants(pid, [

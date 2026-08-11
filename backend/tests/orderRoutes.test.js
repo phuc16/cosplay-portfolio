@@ -148,6 +148,21 @@ describe("POST /api/orders", () => {
     expect(res.body.error).toBe("out_of_stock")
   })
 
+  // A stale cart (e.g. the admin deleted the variant after it was added)
+  // used to reuse out_of_stock's quoted-label message with the literal
+  // placeholder "không tồn tại" standing in as a fake product name.
+  it("returns a distinct variant_not_found error (not out_of_stock) for a nonexistent variant_id", async () => {
+    const v = await seed()
+    const res = await request(app).post("/api/orders")
+      .send(body(v, { items: [{ variant_id: 999999, qty: 1 }] }))
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe("variant_not_found")
+    // The old bug quoted the literal placeholder as if it were a product
+    // label: `Rất tiếc, "không tồn tại" vừa hết hàng.`
+    expect(res.body.message).not.toContain('"không tồn tại"')
+    expect(res.body.message).not.toContain("vừa hết hàng")
+  })
+
   // This exact path guards a cross-buyer PII leak: a request_key shared by
   // two different buyers must be refused, not silently treated as a retry
   // that hands buyer B buyer A's order_token.

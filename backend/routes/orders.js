@@ -129,6 +129,15 @@ module.exports = function orderRoutes() {
     } catch (err) {
       if (err instanceof repo.EmptyCartError) return bad(res, err.message)
       if (err instanceof repo.FulfillmentNotOfferedError) return bad(res, err.message)
+      // A cart line's variant_id matches no row at all (deleted, or a stale
+      // cart carrying an id that never existed) — distinct from a real
+      // OutOfStockError, which always has an actual product label to quote.
+      if (err instanceof repo.VariantNotFoundError) {
+        return res.status(409).json({
+          error: "variant_not_found",
+          message: "Rất tiếc, một sản phẩm trong giỏ hàng không còn tồn tại. Vui lòng làm mới trang và thử lại.",
+        })
+      }
       if (err instanceof repo.OutOfStockError) {
         return res.status(409).json({
           error: "out_of_stock",

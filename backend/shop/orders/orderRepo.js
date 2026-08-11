@@ -18,6 +18,20 @@ class OutOfStockError extends Error {
   }
 }
 
+/**
+ * Distinct from OutOfStockError: a cart line's variant_id matches no row at
+ * all (deleted, or never existed) rather than one that exists but is sold
+ * out. Reusing OutOfStockError for this used to stuff the placeholder label
+ * "không tồn tại" ("doesn't exist") into the buyer-facing quoted-label
+ * message, reading as if that literal string were a product name.
+ */
+class VariantNotFoundError extends Error {
+  constructor() {
+    super("Một sản phẩm trong giỏ hàng không còn tồn tại")
+    this.name = "VariantNotFoundError"
+  }
+}
+
 class EmptyCartError extends Error {
   constructor() {
     super("Giỏ hàng trống")
@@ -146,7 +160,7 @@ async function createOrder(input) {
         FOR UPDATE OF v`,
       ids
     )
-    if (rows.length !== ids.length) throw new OutOfStockError("không tồn tại")
+    if (rows.length !== ids.length) throw new VariantNotFoundError()
 
     // Every line's collection must actually offer the requested fulfillment
     // method. A cart could in principle span collections; check each row's
@@ -502,6 +516,7 @@ module.exports = {
   transitionOrder,
   releaseExpiredOrders,
   OutOfStockError,
+  VariantNotFoundError,
   EmptyCartError,
   RequestKeyConflictError,
   FulfillmentNotOfferedError,
