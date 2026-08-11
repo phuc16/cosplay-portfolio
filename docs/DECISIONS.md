@@ -84,3 +84,30 @@ bar, tighter spacing, a highlighted total row, and a badge-style tracking
 code for the shipped email. Only the code-level fallback defaults changed —
 templates a seller already edited in the DB are untouched; the admin UI's
 "reset to default" reads the new ones live.
+
+## 2026-08-11 — Variant/product photos no longer forced into a square crop
+
+Photos are shot in whatever aspect ratio the seller took them (portrait
+photocards, landscape posters), but the gallery grid and detail modal
+cropped every one into a square via aspect-square + object-cover. Gallery
+thumbnails now use a CSS-columns masonry layout so each keeps its natural
+ratio uncropped; the detail modal shows the photo at natural size, with the
+modal itself made scrollable for unusually tall shots.
+
+## 2026-08-11 — Admin can copy a collection (with products/variants)
+
+Setting up a similar drop meant re-entering every product and re-uploading
+every photocard code from scratch. `POST /collections/:id/copy` duplicates
+the collection plus every product/variant underneath it (title suffixed
+"(Copy)", always starts as `draft` regardless of the source's status).
+Images are referenced, not re-uploaded. Slug is derived from the title the
+normal way, so a second copy naturally lands on "-copy-2".
+
+Also (explicitly requested alongside this): `updateCollection` now
+re-derives the slug from the title on every edit, not just at creation —
+otherwise a copy renamed away from "X (Copy)" would keep the stale "-copy"
+URL forever. Caveat worth remembering: this means renaming an already-live,
+already-shared collection also changes its public `/shop/:slug` URL — any
+link shared before the rename breaks. Acceptable per explicit request, but
+worth knowing before renaming an active collection with an existing
+audience.
