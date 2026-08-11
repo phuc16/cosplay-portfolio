@@ -34,11 +34,23 @@ export default function Cart() {
 
       {cart.map((c) => (
         <div key={c.variant_id} className="flex gap-3 items-center py-3 border-b border-[var(--border-brand)]">
-          {c.image_url && <img src={c.image_url} alt="" className="w-16 h-16 object-cover rounded-lg" />}
-          <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{c.product_name}</p>
-            <p className="text-sm opacity-70">{c.variant_label} · {formatVnd(c.price)}</p>
-          </div>
+          {c.collection_slug ? (
+            <Link to={`/shop/${c.collection_slug}`} className="flex gap-3 items-center flex-1 min-w-0">
+              {c.image_url && <img src={c.image_url} alt="" className="w-16 h-16 object-cover rounded-lg" />}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{c.product_name}</p>
+                <p className="text-sm opacity-70">{c.variant_label} · {formatVnd(c.price)}</p>
+              </div>
+            </Link>
+          ) : (
+            <>
+              {c.image_url && <img src={c.image_url} alt="" className="w-16 h-16 object-cover rounded-lg" />}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{c.product_name}</p>
+                <p className="text-sm opacity-70">{c.variant_label} · {formatVnd(c.price)}</p>
+              </div>
+            </>
+          )}
           <input
             type="number" min="1" value={c.qty}
             onChange={(e) => change(c.variant_id, Number(e.target.value))}
