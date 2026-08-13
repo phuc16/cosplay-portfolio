@@ -3,7 +3,7 @@ const repo = require("../shop/orders/orderRepo")
 const catalogCache = require("../shop/catalogCache")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const { buildInstructions } = require("../shop/payments/instructions")
-const { processShopImage, storeShopImage } = require("../shop/images")
+const { processShopImage, storeShopImage, InvalidImageError } = require("../shop/images")
 const emailQueue = require("../shop/email/queue")
 const qr = require("../shop/orders/qr")
 const db = require("../db")
@@ -251,14 +251,17 @@ module.exports = function orderRoutes() {
       }
 
       // Decoding/processing failures mean the input itself is bad (corrupt,
-      // truncated, or an unsupported format) — always a 400, regardless of
-      // sharp's exact error message. Storage failures below are real server
-      // errors and fall through to the outer catch.
+      // truncated, too large, or an unsupported format) — always a 400.
+      // InvalidImageError's message is written for the buyer (e.g. "too
+      // large, max 50MB") and safe to show as-is; any other error is an
+      // unexpected sharp failure, so it falls back to a generic message
+      // rather than leaking internals. Storage failures below are real
+      // server errors and fall through to the outer catch.
       let processed
       try {
         processed = await processShopImage(Buffer.from(base64, "base64"))
-      } catch {
-        return bad(res, "Ảnh không hợp lệ")
+      } catch (err) {
+        return bad(res, err instanceof InvalidImageError ? err.message : "Ảnh không hợp lệ")
       }
 
       const url = await storeShopImage(`proofs/${order.id}`, processed)

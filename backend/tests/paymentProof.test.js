@@ -83,6 +83,9 @@ describe("POST /api/orders/:token/proof", () => {
       .send({ base64: oversized.toString("base64") })
 
     expect(res.status).toBe(400)
+    // The regression that matters: a buyer seeing this needs to know it was
+    // too big, not a generic "invalid image" that hides what to actually fix.
+    expect(res.body.message).toContain("quá lớn")
   })
 
   it("404s an unknown token", async () => {

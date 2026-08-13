@@ -1,7 +1,7 @@
 const express = require("express")
 const repo = require("../shop/catalogRepo")
 const cache = require("../shop/catalogCache")
-const { processShopImage, storeShopImage } = require("../shop/images")
+const { processShopImage, storeShopImage, InvalidImageError } = require("../shop/images")
 
 const STATUSES = ["draft", "active", "closed", "archived"]
 
@@ -187,13 +187,16 @@ module.exports = function adminCatalogRoutes() {
     const buffer = Buffer.from(base64, "base64")
     console.log(`[ADMIN/CATALOG] upload ảnh shop size≈${Math.round(buffer.length / 1024)}KB`)
 
-    // Decoding/processing failures mean the input itself is bad (corrupt, truncated, or
-    // an unsupported format) — always a 400, regardless of sharp's exact error message.
+    // Decoding/processing failures mean the input itself is bad (corrupt, truncated,
+    // too large, or an unsupported format) — always a 400. InvalidImageError's message
+    // is written for the end user (e.g. "too large, max 50MB") and safe to show as-is;
+    // any other error is an unexpected sharp failure, so it falls back to a generic
+    // message rather than leaking internals.
     let processed
     try {
       processed = await processShopImage(buffer)
     } catch (err) {
-      return bad(res, "Ảnh không hợp lệ")
+      return bad(res, err instanceof InvalidImageError ? err.message : "Ảnh không hợp lệ")
     }
 
     try {

@@ -5,13 +5,11 @@ const storage = require("./../storage")
 const MAX_WIDTH = 1920
 const WEBP_QUALITY = 82
 
-// Comfortably above the frontend's 8MB client-side guard on payment-proof
-// uploads (frontend/src/pages/Order.jsx MAX_PROOF_BYTES) so a file the client
-// already accepted is never rejected here, and well under the 50MB request
-// body limit (server.js UPLOAD_LIMIT) — this caps how much memory/CPU a
-// single sharp decode can be made to spend on the 2GB droplet, independent
-// of how big a base64 payload the body parser will even accept.
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+// Matches server.js's UPLOAD_LIMIT (the request body ceiling) — every
+// uploaded image is re-encoded to WebP right away (processShopImage), so a
+// large *input* never becomes a large stored file; this constant only bounds
+// what a single sharp decode has to handle per request, not disk usage.
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 // Sniffed from magic bytes rather than trusted from any client-supplied
 // content-type/extension, since both upload call sites only ever receive a

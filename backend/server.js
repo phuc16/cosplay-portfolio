@@ -28,10 +28,13 @@ const app = express()
 // right by exactly that many hops, recovering the real client address
 // regardless of what the client prepends.
 app.set("trust proxy", 2)
-const UPLOAD_LIMIT = "50mb"
+// Images are capped at 50MB decoded (shop/images.js MAX_UPLOAD_BYTES); base64
+// inflates that by ~4/3, plus a little JSON overhead — 70mb comfortably fits
+// the largest image this app will ever accept.
+const UPLOAD_LIMIT = "70mb"
 // A VTP result spreadsheet is at most MAX_IMPORT_ROWS (200) data rows of
 // plain text — a few hundred KB even with formatting. 10mb is a generous
-// ceiling for that, far below the 50mb image limit, so a malformed/huge
+// ceiling for that, far below the image limit, so a malformed/huge
 // upload here can't be used to bypass the image path's specific tuning.
 const IMPORT_LIMIT = "10mb"
 const TRACKING_IMPORT_PREVIEW_PATH = "/api/admin/shipping/tracking-import/preview"

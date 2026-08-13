@@ -256,6 +256,29 @@ change was needed: `catalogRepo.replaceVariants` already derives each
 variant's `sort_order` from its position in the array the frontend sends,
 so reordering `rows` client-side before save is the entire feature.
 
+## 2026-08-13 — Shop image upload cap raised from 15MB to 50MB
+
+Live testing hit this directly: an admin's ~31MB product photo was
+rejected outright. Every uploaded image (product/variant photos, payment
+proof) is re-encoded to WebP immediately (`processShopImage`), so a large
+*input* was never a disk-usage problem — only a per-request decode-time
+memory/CPU cost, which is an acceptable tradeoff per explicit direction.
+Raised `MAX_UPLOAD_BYTES` (`backend/shop/images.js`) from 15MB to 50MB,
+and the request body ceiling (`UPLOAD_LIMIT`, `backend/server.js`) from
+50mb to 70mb so a 50MB image's base64 encoding (~1.33x inflation) still
+fits in the body the size check needs to see, rather than getting rejected
+earlier by the body-parser with a less specific 413.
+
+Also fixed a real bug surfaced by the same failed upload: both upload
+routes (`adminCatalog.js`, `orders.js`) always returned the generic "Ảnh
+không hợp lệ" ("invalid image") regardless of *why* validation failed,
+discarding `InvalidImageError`'s specific, user-safe message (e.g. "too
+large, max 50MB" vs. "unsupported format"). The admin saw "invalid image"
+for what was actually an oversized-but-otherwise-fine JPEG, with no way to
+tell what to actually fix. Now surfaces the specific message for
+`InvalidImageError`, still falling back to the generic message for any
+other (unexpected) sharp failure so internals never leak.
+
 ## 2026-08-13 — X-Forwarded-For spoofing bypassed every rate limiter and the login lockout
 
 A follow-up security review (requested after the previous hardening pass)

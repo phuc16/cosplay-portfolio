@@ -379,6 +379,9 @@ describe("POST /api/admin/shop/image", () => {
 
     expect(res.status).toBe(400)
     expect(res.body.error).toBe("invalid_input")
+    // The regression that matters: an admin seeing this needs to know it was
+    // too big, not a generic "invalid image" that hides what to actually fix.
+    expect(res.body.message).toContain("quá lớn")
   })
 
   it("still accepts a real, correctly-sized image", async () => {
