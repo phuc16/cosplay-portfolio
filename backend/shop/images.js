@@ -1,4 +1,5 @@
 const sharp = require("sharp")
+const crypto = require("crypto")
 const storage = require("./../storage")
 
 const MAX_WIDTH = 1920
@@ -86,7 +87,11 @@ async function processShopImage(buffer) {
  */
 async function storeShopImage(folder, processed) {
   const safeFolder = String(folder || "misc").replace(/[^a-z0-9/_-]/gi, "")
-  const key = `shop/${safeFolder}/${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`
+  // crypto.randomBytes, not Date.now()+Math.random(): these keys are the only
+  // thing gating access to a buyer's payment-proof photo behind the public,
+  // unauthenticated /api/storage proxy, so the suffix needs to be
+  // unguessable, not merely unique.
+  const key = `shop/${safeFolder}/${crypto.randomBytes(16).toString("hex")}.webp`
 
   await storage.upload(key, processed, "image/webp")
   return storage.proxyUrl(key)

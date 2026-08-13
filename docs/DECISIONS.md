@@ -256,6 +256,38 @@ change was needed: `catalogRepo.replaceVariants` already derives each
 variant's `sort_order` from its position in the array the frontend sends,
 so reordering `rows` client-side before save is the entire feature.
 
+## 2026-08-13 — Security hardening: CORS allowlist, helmet headers, unguessable payment-proof storage keys
+
+A security audit of the payment/order flow flagged the admin-credentials
+default-fallback as the one blocker to fix before launch (deferred — prod
+already sets `ADMIN_USERNAME`/`ADMIN_PASSWORD`), plus several Medium items
+fixed now: CORS was wide open (`cors()`, no allowlist) on every route
+including admin; no security response headers (`helmet`) were set anywhere,
+notable because the admin JWT lives in `localStorage` with no containment
+if any future XSS landed; JWT verification didn't pin `algorithms:
+["HS256"]` (a latent alg-confusion landmine); and payment-proof photo
+object-storage keys were generated from `Date.now()+Math.random()` —
+combined with sequential order IDs and the public, unauthenticated
+`/api/storage/:path` proxy, a buyer's bank-transfer screenshot was
+guessable/brute-forceable rather than truly access-controlled.
+
+Fixes: CORS now allowlists `SITE_URL` (reused, not a new env var) with a
+warn-and-allow-all fallback only when unset (dev/test convenience, since
+prod always sets it); `helmet()` added with CSP disabled (this API only
+returns JSON/images, never HTML) and `crossOriginResourcePolicy` disabled
+too (its same-origin default would otherwise block cross-origin `<img>`
+loads in local dev, where frontend :5173 and backend :5000 are different
+origins — the storage proxy already sets its own permissive
+`Access-Control-Allow-Origin` for exactly that case); JWT verify now pins
+HS256; payment-proof storage keys switched to `crypto.randomBytes(16)`,
+matching the pattern already used for `order_token`. Also swept every
+random/ID generator in the backend for the same class of issue — confirmed
+every other one is either already a CSPRNG guarding real access (order
+token, worker-lease holder ID) or a sequential/weak ID that's fine because
+it's never used alone as a credential (order rows are always gated by
+`order_token` or the admin JWT; public portfolio image keys have no
+confidentiality requirement to begin with).
+
 ## 2026-08-11 — Admin cancel reason, included in the buyer's cancellation email
 
 Cancelling gave the buyer no explanation. Admin's "Hủy" action now prompts

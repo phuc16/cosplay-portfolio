@@ -5,6 +5,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const express = require("express")
+const helmet = require("helmet")
 const cors = require("cors")
 const crypto = require("crypto")
 const jwt = require("jsonwebtoken")
@@ -27,7 +28,25 @@ const largeJson = express.json({ limit: UPLOAD_LIMIT })
 const importJson = express.json({ limit: IMPORT_LIMIT })
 const smallJson = express.json({ limit: "1mb" })
 
-app.use(cors())
+// SITE_URL is already a required env var (used for email/QR links) — reuse it
+// as the CORS allowlist instead of a second var. Falls back to allow-all only
+// when unset, matching the JWT_SECRET warning below, so a missing env var
+// degrades dev ergonomics rather than silently reopening this in prod.
+if (!process.env.SITE_URL) {
+  console.warn("Warning: SITE_URL not set. CORS will allow all origins.")
+}
+// This server only ever returns JSON or image bytes, never HTML, so a CSP
+// (meant to constrain a page's own scripts/styles) is inert here — the real
+// value is the frame/sniff/HSTS headers, so those stay on and CSP is skipped
+// to avoid a false sense of coverage or a misconfigured directive breaking
+// the storage-proxy image responses.
+// crossOriginResourcePolicy also disabled: its "same-origin" default is
+// enforced by the browser independently of CORS, and would block <img> loads
+// from /api/storage in local dev (frontend :5173, backend :5000 — two
+// origins) even though that route already sets its own permissive
+// Access-Control-Allow-Origin for exactly this purpose.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }))
+app.use(cors(process.env.SITE_URL ? { origin: process.env.SITE_URL } : undefined))
 app.use((req, res, next) => {
   if (req.method === "POST" && /^\/api\/(image$|upload\/|admin\/shop\/image$|orders\/[^/]+\/proof$)/.test(req.path)) {
     return largeJson(req, res, next)
