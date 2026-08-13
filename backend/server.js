@@ -9,7 +9,7 @@ const helmet = require("helmet")
 const cors = require("cors")
 const crypto = require("crypto")
 const jwt = require("jsonwebtoken")
-const { rateLimit } = require("express-rate-limit")
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit")
 const { RedisStore } = require("rate-limit-redis")
 const db = require("./db")
 const redis = require("./redis")
@@ -17,6 +17,17 @@ const auth = require("./auth")
 const storage = require("./storage")
 
 const app = express()
+// Production path is client -> host Nginx -> frontend container's Nginx ->
+// this server (see deploy/DEPLOY.md §9.2 and frontend/nginx.conf's /api
+// block) — exactly 2 reverse proxies, each appending its own observed
+// address via $proxy_add_x_forwarded_for. Without this, Express (and every
+// req.ip-based rate limiter/lockout below) trusted the leftmost entry of
+// X-Forwarded-For, which is whatever the original client sent — fully
+// attacker-controlled, letting a single attacker get a fresh rate-limit
+// bucket on every request. `trust proxy: 2` makes req.ip walk in from the
+// right by exactly that many hops, recovering the real client address
+// regardless of what the client prepends.
+app.set("trust proxy", 2)
 const UPLOAD_LIMIT = "50mb"
 // A VTP result spreadsheet is at most MAX_IMPORT_ROWS (200) data rows of
 // plain text — a few hundred KB even with formatting. 10mb is a generous
@@ -73,8 +84,11 @@ app.use((err, req, res, next) => {
 })
 
 // Rate limiting (chống DDoS)
-const keyGen = (req) =>
-  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+// ipKeyGenerator normalizes an IPv6 address to its /56 subnet before using it
+// as a key — a bare IPv6 address varies too easily (a /64 or larger block is
+// trivial for one attacker to rotate through) to be a stable per-client key
+// on its own.
+const keyGen = (req) => (req.ip ? ipKeyGenerator(req.ip) : "unknown")
 
 const makeStore = (prefix) =>
   new RedisStore({ sendCommand: (...args) => redis.call(...args), prefix })
@@ -212,8 +226,11 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin"
 const LOGIN_MAX_ATTEMPTS = 5
 const LOGIN_LOCKOUT_MINUTES = 15
 
+// Same IPv6-subnet normalization as keyGen above — the login lockout below
+// is a hand-rolled rate limit and needs the same protection against an
+// attacker rotating through addresses in one /64 to dodge it.
 function getClientIp(req) {
-  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+  return req.ip ? ipKeyGenerator(req.ip) : "unknown"
 }
 
 // Constant-time string comparison — prevents character-by-character timing attacks

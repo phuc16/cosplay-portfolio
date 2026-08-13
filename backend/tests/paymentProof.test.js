@@ -106,9 +106,6 @@ describe("POST /api/orders/:token/proof", () => {
     const firstUrl = first.body.url
     expect(firstUrl).toBeTruthy()
 
-    // Small delay to ensure Date.now() generates a distinct timestamp for the second key
-    await new Promise(r => setTimeout(r, 1))
-
     // Second upload
     const second = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
     expect(second.status).toBe(201)

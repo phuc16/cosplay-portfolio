@@ -256,6 +256,37 @@ change was needed: `catalogRepo.replaceVariants` already derives each
 variant's `sort_order` from its position in the array the frontend sends,
 so reordering `rows` client-side before save is the entire feature.
 
+## 2026-08-13 — X-Forwarded-For spoofing bypassed every rate limiter and the login lockout
+
+A follow-up security review (requested after the previous hardening pass)
+found a HIGH-severity gap the first audit missed: `keyGen`/`getClientIp`
+in `backend/server.js` trusted the *leftmost* entry of `X-Forwarded-For`
+for rate-limit keys and the admin login lockout. In production the real
+chain is client → host Nginx → frontend container's Nginx → this server
+(`deploy/DEPLOY.md` §9.2, `frontend/nginx.conf`'s `/api` block) — each hop
+*appends* via `$proxy_add_x_forwarded_for`, so the leftmost entry is
+whatever the original client sent, fully attacker-controlled. Combined
+with the already-known default-admin-credentials fallback (deferred, prod
+sets real ones), this meant the 5-attempt login lockout, the 10/hour order
+limiter, and every other rate limiter could be defeated by sending a new
+fake IP on every request — no actual rate limiting at all.
+
+Fixed with `app.set("trust proxy", 2)` (exactly the two Nginx hops in the
+real chain) plus switching both key functions to Express's own `req.ip`
+(which becomes trustworthy once `trust proxy` is set correctly), further
+wrapped in `express-rate-limit`'s `ipKeyGenerator` helper so an attacker
+can't rotate through addresses in the same IPv6 /64 to get a fresh bucket
+either. Also bumped `sharp` (0.34.5 → 0.35.3) for a libvips CVE fix, since
+it decodes attacker-supplied bytes on the unauthenticated payment-proof
+upload route, and ran `npm audit fix` for two other non-breaking
+transitive fixes (`ip-address`, `body-parser`). Left `nodemailer` and
+`uuid`/`exceljs` on their current majors — both need a breaking upgrade,
+and neither's vulnerable code path (SMTP `envelope.size`/`List-*`
+headers/`jsonTransport`/raw-message options for nodemailer; buffer-provided
+UUID generation for uuid) is actually used anywhere in this codebase, so
+deferred to a dedicated upgrade rather than risking the email-sending path
+under this review's time budget.
+
 ## 2026-08-13 — Static FAQ page added at /merchandise/faq, no admin panel (yet)
 
 Buyer confusion during live testing had already driven several UX fixes
