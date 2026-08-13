@@ -12,6 +12,7 @@ export default function AdminVariants({ product, onSaved }) {
   const [bulk, setBulk] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
+  const [batchUploading, setBatchUploading] = useState(false)
 
   // This component is keyed by the parent on the stable product.id, so it is
   // NOT remounted after a save -- `rows` would otherwise keep holding
@@ -34,6 +35,50 @@ export default function AdminVariants({ product, onSaved }) {
 
   const addRow = () => setRows([...rows, { label: "", stock_qty: "" }])
   const removeRow = (i) => setRows(rows.filter((_, idx) => idx !== i))
+
+  // Row order IS sort_order — save() sends `rows` in array order and
+  // catalogRepo.replaceVariants derives sort_order from each entry's index,
+  // so moving a row here is the entire reorder feature; nothing else needed.
+  const moveRow = (i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= rows.length) return
+    const next = [...rows]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setRows(next)
+  }
+
+  const stripExt = (filename) => filename.replace(/\.[^./\\]+$/, "").trim()
+
+  // One image per variant code: filename (minus extension) becomes the
+  // label, so a seller can select a whole folder of "A1.png, A2.png..."
+  // photocards at once instead of adding rows one at a time. Uploaded rows
+  // land in the review list alongside existing ones — nothing is saved
+  // until the seller presses "Lưu phân loại", so this is a staging step,
+  // not an immediate write.
+  const batchUpload = async (files) => {
+    setError("")
+    setBatchUploading(true)
+    try {
+      const uploaded = []
+      for (const file of files) {
+        try {
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result).split(",")[1])
+            reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
+            reader.readAsDataURL(file)
+          })
+          const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
+          uploaded.push({ label: stripExt(file.name), stock_qty: "", image_url: url })
+        } catch (e) {
+          setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
+        }
+      }
+      if (uploaded.length) setRows([...rows.filter((r) => r.label.trim()), ...uploaded])
+    } finally {
+      setBatchUploading(false)
+    }
+  }
 
   // Each row's photo is uploaded on pick (same pattern as AdminProducts),
   // rather than deferred to save time — a photocard sheet is entered one
@@ -102,11 +147,55 @@ export default function AdminVariants({ product, onSaved }) {
         </button>
       </div>
 
+      <div className="mb-3">
+        <label
+          className={`inline-block px-3 py-1 text-sm rounded-lg border border-[var(--border-brand)] cursor-pointer ${batchUploading ? "opacity-50 pointer-events-none" : ""}`}
+        >
+          {batchUploading ? "Đang tải ảnh..." : "Tải ảnh hàng loạt (tên file = mã)"}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            aria-label="Tải ảnh hàng loạt"
+            onChange={(e) => {
+              const files = [...(e.target.files || [])]
+              e.target.value = ""
+              if (files.length) batchUpload(files)
+            }}
+            disabled={batchUploading}
+            className="hidden"
+          />
+        </label>
+        <p className="text-xs opacity-60 mt-1">
+          Ví dụ: A1.png, A2.png, B1.png → tạo 3 phân loại A1, A2, B1. Kiểm tra và sửa lại trước khi lưu.
+        </p>
+      </div>
+
       {rows.map((r, i) => (
         <div key={r.id || i} className="flex gap-2 mb-2 items-center">
           {r.image_url && (
             <img src={r.image_url} alt="" className="w-9 h-9 object-cover rounded-lg shrink-0" />
           )}
+          <div className="flex flex-col shrink-0">
+            <button
+              type="button"
+              onClick={() => moveRow(i, -1)}
+              disabled={i === 0}
+              aria-label={`Đưa lên trên: ${r.label || `dòng ${i + 1}`}`}
+              className="px-1 leading-none disabled:opacity-30"
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              onClick={() => moveRow(i, 1)}
+              disabled={i === rows.length - 1}
+              aria-label={`Đưa xuống dưới: ${r.label || `dòng ${i + 1}`}`}
+              className="px-1 leading-none disabled:opacity-30"
+            >
+              ▼
+            </button>
+          </div>
           <input
             value={r.label}
             onChange={(e) => update(i, "label", e.target.value)}

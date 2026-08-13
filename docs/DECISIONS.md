@@ -238,6 +238,24 @@ chuyển khoản.") on the sweep's cancel transition — reuses the exact same
 storage column and email-rendering path the admin-reason feature built, no
 new code path.
 
+## 2026-08-13 — Admin can batch-add phân loại by uploading multiple images, and reorder them
+
+Entering a 40-code photocard sheet one row at a time (label, then pick its
+photo) was tedious. AdminVariants.jsx now has a "Tải ảnh hàng loạt" picker
+accepting multiple files at once — each file's name minus extension (e.g.
+`A1.png` → `A1`) becomes that row's label, and the file itself is uploaded
+as its photo. Uploaded rows land in the existing editable list alongside
+any already-typed rows; nothing is saved until the seller presses the
+existing "Lưu phân loại" button, so review/edit/remove before confirming
+works exactly as it already did for manually-added rows. A failed upload
+in the batch reports its own error but doesn't drop the others that
+succeeded.
+
+Separately, rows can now be reordered with per-row ▲/▼ buttons. No backend
+change was needed: `catalogRepo.replaceVariants` already derives each
+variant's `sort_order` from its position in the array the frontend sends,
+so reordering `rows` client-side before save is the entire feature.
+
 ## 2026-08-11 — Admin cancel reason, included in the buyer's cancellation email
 
 Cancelling gave the buyer no explanation. Admin's "Hủy" action now prompts
