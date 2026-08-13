@@ -256,6 +256,24 @@ change was needed: `catalogRepo.replaceVariants` already derives each
 variant's `sort_order` from its position in the array the frontend sends,
 so reordering `rows` client-side before save is the entire feature.
 
+## 2026-08-13 — Static FAQ page added at /merchandise/faq, no admin panel (yet)
+
+Buyer confusion during live testing had already driven several UX fixes
+this session (add-to-cart toast, pickup-code gating, stale-cart recovery,
+etc.) — a FAQ was the cheaper fix for the remaining "buyer doesn't know
+X" gap than a guided tour would have been (considered and rejected: a
+tour needs a new dependency and step-target coupling to UI that breaks on
+redesign, with no evidence yet that guessing, not reading, is the actual
+problem).
+
+Content (payment methods incl. the COD/pickup restriction, payment
+deadline, proof upload, order-link recovery, pickup code timing, shipping
+being receiver-pays, cancellation, sold-out variants) lives in a static
+bilingual file (`frontend/src/shop/faq.js`), not a `site_settings`-backed
+admin panel — this content changes rarely enough that editing the file
+directly is simpler than building CRUD for it. Revisit if it turns out to
+need frequent editing.
+
 ## 2026-08-13 — Security hardening: CORS allowlist, helmet headers, unguessable payment-proof storage keys
 
 A security audit of the payment/order flow flagged the admin-credentials

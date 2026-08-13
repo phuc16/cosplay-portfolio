@@ -4,6 +4,7 @@ import { LanguageProvider } from "./contexts/LanguageContext"
 import Portfolio from "./pages/Portfolio"
 import Admin from "./pages/Admin"
 import Shop from "./pages/Shop"
+import Faq from "./pages/Faq"
 import Collection from "./pages/Collection"
 import Cart from "./pages/Cart"
 import Checkout from "./pages/Checkout"
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/" element={<Portfolio />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/merchandise" element={<Shop />} />
+            <Route path="/merchandise/faq" element={<Faq />} />
             <Route path="/merchandise/:slug" element={<Collection />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />

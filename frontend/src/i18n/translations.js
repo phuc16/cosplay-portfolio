@@ -33,6 +33,9 @@ export const translations = {
     shopViewAll: "View all",
     shopQtyDecrease: "Decrease quantity",
     shopQtyIncrease: "Increase quantity",
+    shopFaqLink: "FAQ",
+    shopFaqTitle: "Frequently asked questions",
+    shopFaqDesc: "Payment, shipping, pickup — answers to what buyers ask most.",
 
     // Cart & Checkout
     cart: "Cart", cartEmpty: "Your cart is empty.", cartTotal: "Total",
@@ -161,6 +164,9 @@ export const translations = {
     shopViewAll: "Xem tất cả",
     shopQtyDecrease: "Giảm số lượng",
     shopQtyIncrease: "Tăng số lượng",
+    shopFaqLink: "Hỏi đáp",
+    shopFaqTitle: "Câu hỏi thường gặp",
+    shopFaqDesc: "Thanh toán, vận chuyển, nhận hàng — giải đáp những câu hỏi phổ biến nhất.",
 
     // Cart & Checkout
     cart: "Giỏ hàng", cartEmpty: "Giỏ hàng của bạn đang trống.", cartTotal: "Tổng cộng",

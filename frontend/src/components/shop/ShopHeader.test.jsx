@@ -50,6 +50,12 @@ describe("ShopHeader", () => {
     expect(homeLink.getAttribute("aria-label")).toBe("Home")
   })
 
+  it("links to the FAQ page", async () => {
+    const container = await renderHeader()
+    const faqLink = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/merchandise/faq")
+    expect(faqLink).toBeTruthy()
+  })
+
   it("shows no count badge for an empty cart", async () => {
     const container = await renderHeader()
     expect(cartLink(container).textContent.trim()).toBe("")

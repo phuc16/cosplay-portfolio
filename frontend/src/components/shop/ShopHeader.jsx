@@ -64,6 +64,12 @@ export default function ShopHeader() {
           >
             {homeIcon}
           </Link>
+          <Link
+            to="/merchandise/faq"
+            className="px-2 py-0.5 rounded-md text-[13px] font-medium text-[var(--text-body)] hover:text-[var(--text-link)]"
+          >
+            {t("shopFaqLink")}
+          </Link>
           {["vi", "en"].map((l) => (
             <button
               key={l}
