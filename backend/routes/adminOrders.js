@@ -18,6 +18,10 @@ function withAllowedTransitions(order) {
   if (!order) return order
   return {
     ...order,
+    // Computed here rather than sent as a separate lookup: the admin list/
+    // detail views show this instead of the raw id (see AdminOrders.jsx),
+    // and it's a pure function of fields the row already has.
+    order_code: domain.formatOrderCode(order.id, order.created_at),
     allowed_transitions: TRANSITION_TARGETS.filter((to) =>
       domain.canTransition(order.status, to, order.fulfillment_method)
     ),

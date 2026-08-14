@@ -4,7 +4,7 @@ import t from "../shop/email/templates.js"
 const order = {
   id: 12, order_token: "abcd1234efgh", buyer_name: "Nguyễn Văn A", total: 105000,
   status: "pending", payment_method: "bank", fulfillment_method: "ship",
-  tracking_code: null,
+  tracking_code: null, created_at: "2026-08-14T12:00:00Z",
   items: [
     { product_name_snapshot: "Photocard", variant_label_snapshot: "A1", qty: 2, unit_price_snapshot: 35000 },
     { product_name_snapshot: "Poster", variant_label_snapshot: "Std", qty: 1, unit_price_snapshot: 35000 },
@@ -17,7 +17,8 @@ describe("renderTemplate", () => {
       { subject: "Đơn {{order_id}}", body_html: "<p>Chào {{buyer_name}}</p>" },
       t.buildVars(order)
     )
-    expect(out.subject).toBe("Đơn 12")
+    // Date fixed at 2026-08-14 regardless of local TZ; suffix is a fixed hash of id 12.
+    expect(out.subject).toBe("Đơn 2608145VR0F1LR")
     expect(out.html).toContain("Nguyễn Văn A")
   })
 

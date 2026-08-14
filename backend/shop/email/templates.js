@@ -1,4 +1,5 @@
 const db = require("./../../db")
+const { formatOrderCode } = require("./../orders/domain")
 
 const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
@@ -93,7 +94,7 @@ const TOTAL_ROW = `
 
 function buildVars(order) {
   return {
-    order_id: escapeHtml(order.id),
+    order_id: escapeHtml(formatOrderCode(order.id, order.created_at)),
     order_token: escapeHtml(order.order_token),
     order_url: `${SITE_URL}/order/${order.order_token}`,
     buyer_name: escapeHtml(order.buyer_name),

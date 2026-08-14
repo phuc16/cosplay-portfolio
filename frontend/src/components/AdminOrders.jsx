@@ -301,9 +301,9 @@ export default function AdminOrders() {
           <div className="flex justify-between items-start gap-3 flex-wrap">
             <div className="flex items-start gap-2">
               <input type="checkbox" className="mt-1" checked={selected.has(o.id)}
-                onChange={() => toggleSelected(o.id)} aria-label={`Chọn đơn #${o.id}`} />
+                onChange={() => toggleSelected(o.id)} aria-label={`Chọn đơn #${o.order_code || o.id}`} />
               <div>
-                <p className="font-medium">#{o.id} · {o.buyer_name} · {o.phone}</p>
+                <p className="font-medium">#{o.order_code || o.id} · {o.buyer_name} · {o.phone}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <StatusBadge label={labelFor(STATUS_LABELS, o.status)} variant={variantForStatus(o.status)} />
                   <span className="text-sm opacity-70">{labelFor(FULFILLMENT_METHOD_LABELS, o.fulfillment_method)}</span>

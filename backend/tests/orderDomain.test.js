@@ -23,6 +23,34 @@ describe("generatePickupCode", () => {
   })
 })
 
+describe("formatOrderCode", () => {
+  it("is a YYMMDD date prefix plus an 8-character alphanumeric suffix (14 chars total)", () => {
+    const code = d.formatOrderCode(12, "2026-08-14T12:00:00Z")
+    expect(code).toMatch(/^\d{6}[0-9A-Z]{8}$/)
+    expect(code).toHaveLength(14)
+    expect(code.slice(0, 6)).toBe("260814")
+  })
+
+  it("is deterministic for the same id and date (no randomness, no storage needed)", () => {
+    expect(d.formatOrderCode(12, "2026-08-14T12:00:00Z")).toBe(d.formatOrderCode(12, "2026-08-14T12:00:00Z"))
+  })
+
+  it("differs between different ids on the same date", () => {
+    expect(d.formatOrderCode(1, "2026-08-14T12:00:00Z")).not.toBe(d.formatOrderCode(2, "2026-08-14T12:00:00Z"))
+  })
+
+  it("differs between the same id on different dates (date prefix changes)", () => {
+    expect(d.formatOrderCode(12, "2026-08-14T12:00:00Z")).not.toBe(d.formatOrderCode(12, "2026-08-15T12:00:00Z"))
+  })
+
+  it("does not read as an obviously zero-padded small number", () => {
+    // A naive base-36 encode of a small id (e.g. "000C") would be an
+    // instant giveaway of low order volume; the hash-based suffix should
+    // not collapse to a short run of leading zeros for small ids.
+    expect(d.formatOrderCode(1, "2026-08-14T12:00:00Z").slice(6)).not.toMatch(/^0+/)
+  })
+})
+
 describe("computeTotal", () => {
   it("sums price times quantity", () => {
     expect(d.computeTotal([
