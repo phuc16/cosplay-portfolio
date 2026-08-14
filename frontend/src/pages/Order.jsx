@@ -6,7 +6,7 @@ import { useParams } from "react-router-dom"
 import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
-import { formatDeadline } from "../utils/orderDeadline"
+import { formatDeadline, formatVnDateTime } from "../utils/orderDeadline"
 import PaymentInstructions from "../components/shop/PaymentInstructions"
 import ShopHeader from "../components/shop/ShopHeader"
 import StatusBadge from "../components/StatusBadge"
@@ -190,8 +190,8 @@ export default function Order() {
               added. */}
           <StatusBadge label={t(STATUS_KEY[order.status] ?? order.status)} variant={variantForStatus(order.status)} />
         </p>
-        {statusTimestamp(order) && (
-          <p className="text-xs opacity-60 mt-1">{new Date(statusTimestamp(order)).toLocaleString("vi-VN")}</p>
+        {formatVnDateTime(statusTimestamp(order)) && (
+          <p className="text-xs opacity-60 mt-1">{formatVnDateTime(statusTimestamp(order))}</p>
         )}
         {order.tracking_code && <p className="text-sm mt-1">#{order.tracking_code}</p>}
         {/* Deadline is only meaningful while the seller hasn't yet confirmed

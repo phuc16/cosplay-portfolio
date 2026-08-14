@@ -370,13 +370,15 @@ describe("sendQueued: footer (social links + automated-email notice)", () => {
     await sender.sendQueued()
 
     const html = sendMailMock.mock.calls[0][0].html
-    expect(html).toContain('alt="facebook"')
-    expect(html).toContain('alt="messenger"')
-    expect(html).not.toContain('alt="instagram"')
-    expect(html).not.toContain('alt="x"')
     expect(html).toContain("https://facebook.com/shop")
     expect(html).toContain("https://m.me/shopusername")
-    expect(html.indexOf('alt="facebook"')).toBeLessThan(html.indexOf('alt="messenger"'))
+    expect(html).not.toContain("https://x.com/shop")
+    // Plain colored-circle + letter badges (not <img>s — a data-URI <img>
+    // version of this rendered as a broken-image icon in real testing).
+    expect(html).toContain(">f</a>")
+    expect(html).toContain(">M</a>")
+    expect(html).not.toContain(">IG</a>")
+    expect(html.indexOf(">f</a>")).toBeLessThan(html.indexOf(">M</a>"))
   })
 
   it("uses a full m.me URL as-is instead of double-prefixing it (matches the value admin actually saves)", async () => {

@@ -18,6 +18,7 @@ vi.mock("../api/shop", () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: Order, statusTimestamp } = await import("./Order")
+const { formatVnDateTime } = await import("../utils/orderDeadline")
 
 function baseOrder(over = {}) {
   return {
@@ -348,7 +349,7 @@ describe("Order — status timestamp", () => {
 
     const container = await renderOrder()
 
-    expect(container.textContent).toContain(new Date("2026-08-14T06:00:00Z").toLocaleString("vi-VN"))
+    expect(container.textContent).toContain(formatVnDateTime("2026-08-14T06:00:00Z"))
   })
 
   it("shows nothing extra when the matching timestamp is missing", async () => {

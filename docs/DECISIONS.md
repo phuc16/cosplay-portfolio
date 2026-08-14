@@ -328,6 +328,38 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
+## 2026-08-14 — Email footer regressions from the last two entries: duplicate notice, broken icons
+
+Real-send screenshot surfaced two bugs from the footer work above:
+
+1. **The "automated email" notice appeared twice** — once above the QR
+   (with an empty "Thêm  vào danh bạ" — the email address missing) and
+   once below it (correct). Root cause: the local dev DB's
+   `email_templates` table had stale rows saved via the admin UI from
+   *before* this session's footer refactor, still containing the old
+   `{{shop_email}}`/`{{social_links}}` placeholders baked directly into
+   `body_html`. Those two placeholders were removed from `buildVars` in
+   the refactor, so `substitute()` correctly rendered them as empty
+   (its documented behavior for an unknown placeholder) — the stale
+   *content*, not the substitution logic, was the bug. Fixed by deleting
+   the 4 stale rows from the local dev DB so they fall back to the
+   current (correct) `DEFAULT_TEMPLATES`; this only affected already-saved
+   custom templates, not a code path.
+2. **Social badges rendered as a broken-image icon with overlapping alt
+   text** — the data-URI `<img>` approach from the entry below didn't
+   render in real-world testing, contradicting the assumption that an
+   `<img>` degrades more gracefully than inline SVG. Reverted to plain
+   colored-circle + letter badges (facebook "f", messenger "M", instagram
+   "IG") — no image loading involved at all, so it can't fail this way
+   regardless of client.
+
+Also extracted the order-page's date formatting into a shared
+`formatVnDateTime` (`frontend/src/utils/orderDeadline.js`, used by both
+`formatDeadline` and `Order.jsx`'s new status timestamp) after the raw
+`toLocaleString("vi-VN")` version produced a format
+("14:22:32 14/8/2026") inconsistent with the existing deadline line's
+"HH:mm dd/MM" convention.
+
 ## 2026-08-14 — Email footer refined: fewer platforms, real logos, moved below the QR
 
 Follow-up feedback on the entry above, from a screenshot of the actual
