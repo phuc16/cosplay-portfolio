@@ -2,10 +2,23 @@ const express = require("express")
 const ExcelJS = require("exceljs")
 const db = require("../db")
 const orders = require("../shop/orders/orderRepo")
+const domain = require("../shop/orders/domain")
 const { LOAI_HANG_HOA_VALUES, orderCode } = require("../shop/shipping/vtpMapping")
 const { buildExportWorkbook } = require("../shop/shipping/vtpWorkbook")
 const trackingImport = require("../shop/shipping/trackingImport")
 const { buildRoster } = require("../shop/shipping/roster")
+
+// The admin-recognisable code everywhere else in the app (AdminOrders, the
+// buyer's own order page/emails) is domain.formatOrderCode — never the "DH"
+// + id code, which exists only as the literal Column B value VTP's own
+// import/export files round-trip on (see vtpMapping.js). Screens the admin
+// reads before/after that round-trip should show the code they actually
+// recognise; only text that has to match a real VTP file's contents keeps
+// the DH-format. Falls back to "#id" when there's no order row to hash
+// (id not found, or not yet fetched at this point in the request).
+function displayCode(id, createdAt) {
+  return createdAt ? domain.formatOrderCode(id, createdAt) : `#${id}`
+}
 
 // exceljs cell.value can be a rich-text object ({richText: [...]}), a
 // formula-result object ({result: ...}), a hyperlink object ({text/hyperlink}),
@@ -51,7 +64,7 @@ module.exports = function adminShippingRoutes() {
       const eligible = rows.filter((o) => o.fulfillment_method === "ship" && !o.tracking_code)
       res.json(eligible.map((o) => ({
         id: o.id,
-        order_code: orderCode(o.id),
+        order_code: domain.formatOrderCode(o.id, o.created_at),
         buyer_name: o.buyer_name,
         phone: o.phone,
         address_province: o.address_province,
@@ -128,7 +141,7 @@ module.exports = function adminShippingRoutes() {
         if (seenIds.has(id)) {
           preExcluded.push({
             order_id: id, reason: "duplicate_order_id",
-            message: `${orderCode(id)}: trùng lặp trong yêu cầu, chỉ xuất một lần`,
+            message: `${displayCode(id)}: trùng lặp trong yêu cầu, chỉ xuất một lần`,
           })
           continue
         }
@@ -139,7 +152,7 @@ module.exports = function adminShippingRoutes() {
       for (const id of ids) {
         const order = await orders.getOrderById(id)
         if (!order) {
-          preExcluded.push({ order_id: id, reason: "not_found", message: `${orderCode(id)}: không tìm thấy đơn hàng` })
+          preExcluded.push({ order_id: id, reason: "not_found", message: `${displayCode(id)}: không tìm thấy đơn hàng` })
           continue
         }
         if (order.status === "confirmed" && order.fulfillment_method === "ship" && !order.tracking_code) {
@@ -148,7 +161,7 @@ module.exports = function adminShippingRoutes() {
           preExcluded.push({
             order_id: order.id,
             reason: "not_eligible",
-            message: `${orderCode(order.id)}: đơn không còn đủ điều kiện xuất (đã hủy, đổi trạng thái, hoặc đã có mã vận đơn)`,
+            message: `${displayCode(order.id, order.created_at)}: đơn không còn đủ điều kiện xuất (đã hủy, đổi trạng thái, hoặc đã có mã vận đơn)`,
           })
         }
       }
@@ -317,7 +330,7 @@ module.exports = function adminShippingRoutes() {
       }
 
       const [orderRows] = await db.query(
-        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code
+        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code, created_at
            FROM orders
           WHERE collection_id = ? AND status = 'confirmed' AND fulfillment_method = 'pickup'`,
         [collectionId]

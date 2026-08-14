@@ -162,6 +162,7 @@ export default function ShippingExport() {
                     <th></th>
                     <th className="pr-2">Mã đơn</th>
                     <th className="pr-2">Người nhận</th>
+                    <th className="pr-2">SĐT</th>
                     <th className="pr-2">Tỉnh/Thành</th>
                     <th className="pr-2">Giá trị</th>
                     <th>Miễn phí ship</th>
@@ -179,6 +180,7 @@ export default function ShippingExport() {
                       </td>
                       <td className="pr-2 py-1">{o.order_code}</td>
                       <td className="pr-2 py-1">{o.buyer_name}</td>
+                      <td className="pr-2 py-1">{o.phone}</td>
                       <td className="pr-2 py-1">{o.address_province || "—"}</td>
                       <td className="pr-2 py-1">{formatVnd(o.total)}</td>
                       <td className="py-1">

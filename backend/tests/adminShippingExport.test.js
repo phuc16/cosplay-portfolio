@@ -7,6 +7,7 @@ import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import { orderCode } from "../shop/shipping/vtpMapping.js"
+import { formatOrderCode } from "../shop/orders/domain.js"
 import { resetTables } from "./helpers/db.js"
 
 const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
@@ -79,16 +80,17 @@ describe("GET /api/admin/shipping/export/orders", () => {
     const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
     expect(res.status).toBe(200)
     expect(res.body.find((o) => o.id === id)).toBeDefined()
-    expect(res.body.find((o) => o.id === id).order_code).toBe(`DH${id}`)
   })
 
-  it("listing's order_code matches the orderCode() helper", async () => {
+  it("listing's order_code matches the same buyer-facing code shown everywhere else in admin (not the DH/VTP code)", async () => {
     const id = await seed()
+    const stored = await orders.getOrderById(id)
     const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
     expect(res.status).toBe(200)
     const order = res.body.find((o) => o.id === id)
     expect(order).toBeDefined()
-    expect(order.order_code).toBe(orderCode(id))
+    expect(order.order_code).toBe(formatOrderCode(id, stored.created_at))
+    expect(order.order_code).not.toBe(orderCode(id))
   })
 
   it("excludes an order that already has a tracking code", async () => {
@@ -213,12 +215,13 @@ describe("POST /api/admin/shipping/export", () => {
 
   it("reports an order_id that is no longer eligible (raced by another admin action) in excluded, not silently", async () => {
     const id = await seed()
+    const stored = await orders.getOrderById(id)
     await orders.transitionOrder(id, "cancelled")
     const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id], batch }))
     expect(res.status).toBe(200)
     expect(res.body.exported_count).toBe(0)
     expect(res.body.excluded).toEqual([
-      { order_id: id, reason: "not_eligible", message: expect.stringContaining(orderCode(id)) },
+      { order_id: id, reason: "not_eligible", message: expect.stringContaining(formatOrderCode(id, stored.created_at)) },
     ])
   })
 
@@ -274,7 +277,7 @@ describe("POST /api/admin/shipping/export", () => {
     expect(res.status).toBe(200)
     expect(res.body.exported_count).toBe(1)
     expect(res.body.excluded).toEqual([
-      { order_id: id, reason: "duplicate_order_id", message: expect.stringContaining(orderCode(id)) },
+      { order_id: id, reason: "duplicate_order_id", message: expect.stringContaining(`#${id}`) },
     ])
     expect(res.body.exported_count + res.body.excluded.length).toBe(2)
 

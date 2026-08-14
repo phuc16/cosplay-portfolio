@@ -1,4 +1,4 @@
-const { orderCode } = require("./vtpMapping")
+const { formatOrderCode } = require("../orders/domain")
 
 const PREPAID_METHODS = new Set(["bank", "momo", "paypal"])
 
@@ -28,7 +28,7 @@ function buildRoster(orders) {
       if (order.cod_amount === null || order.cod_amount === undefined) {
         excluded.push({
           order_id: order.id, reason: "cod_missing_amount",
-          message: `${orderCode(order.id)}: đơn COD nhưng chưa có số tiền thu hộ`,
+          message: `${formatOrderCode(order.id, order.created_at)}: đơn COD nhưng chưa có số tiền thu hộ`,
         })
         continue
       }
@@ -37,7 +37,7 @@ function buildRoster(orders) {
 
     rows.push({
       order_id: order.id,
-      order_code: orderCode(order.id),
+      order_code: formatOrderCode(order.id, order.created_at),
       buyer_name: order.buyer_name,
       phone: order.phone,
       pickup_code: order.pickup_code,

@@ -90,6 +90,13 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("DH2")
   })
 
+  it("shows the buyer's phone so an admin can match an order without decoding order_code", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order({ phone: "0901234567" })])
+    const container = await renderShippingExport()
+    await flush()
+    expect(container.textContent).toContain("0901234567")
+  })
+
   it("filters the visible list by order code, name, or phone, client-side (no extra API call)", async () => {
     adminListShippingExportOrders.mockResolvedValue([
       order({ id: 1, order_code: "DH1", buyer_name: "Nguyễn Văn A", phone: "0901234567" }),

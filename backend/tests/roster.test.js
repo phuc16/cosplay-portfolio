@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest"
 import { buildRoster } from "../shop/shipping/roster.js"
+import { formatOrderCode } from "../shop/orders/domain.js"
 
 function order(over = {}) {
   return {
     id: 1, buyer_name: "Nguyễn An", phone: "0901111111",
-    payment_method: "bank", cod_amount: null,
+    payment_method: "bank", cod_amount: null, created_at: "2026-01-01T00:00:00.000Z",
     items: [{ product_name_snapshot: "Photocard", variant_label_snapshot: "A1", qty: 2 }],
     ...over,
   }
@@ -59,7 +60,10 @@ describe("buildRoster — paid vs collect-at-handover", () => {
   it("excludes a COD order with a null cod_amount, never showing 'collect ₫0'", () => {
     const { rows, excluded } = buildRoster([order({ id: 7, payment_method: "cod", cod_amount: null })])
     expect(rows).toEqual([])
-    expect(excluded).toEqual([{ order_id: 7, reason: "cod_missing_amount", message: expect.stringContaining("DH7") }])
+    expect(excluded).toEqual([{
+      order_id: 7, reason: "cod_missing_amount",
+      message: expect.stringContaining(formatOrderCode(7, "2026-01-01T00:00:00.000Z")),
+    }])
   })
 })
 
@@ -77,9 +81,9 @@ describe("buildRoster — items", () => {
     ])
   })
 
-  it("gives every row an order_code derived the same way the shipping export does", () => {
-    const { rows } = buildRoster([order({ id: 42 })])
-    expect(rows[0].order_code).toBe("DH42")
+  it("gives every row the same buyer-facing order_code shown elsewhere in admin", () => {
+    const { rows } = buildRoster([order({ id: 42, created_at: "2026-02-03T00:00:00.000Z" })])
+    expect(rows[0].order_code).toBe(formatOrderCode(42, "2026-02-03T00:00:00.000Z"))
   })
 })
 
