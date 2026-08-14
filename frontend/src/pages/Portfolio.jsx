@@ -66,7 +66,7 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
     { label: lang === "vi" ? "Thông tin" : "Info", href: "#info" },
     { label: lang === "vi" ? "Dự án" : "Project", href: "#project" },
     { label: lang === "vi" ? "Liên hệ" : "Contact", href: "#contact" },
-    { label: "Merchandise", href: "/merchandise" },
+    { label: lang === "vi" ? "Cửa hàng" : "Merchandise", href: "/merchandise" },
   ]
   const s = {
     header: { position: "sticky", top: 0, zIndex: 30, background: "color-mix(in srgb, var(--bg-page) 55%, transparent)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid color-mix(in srgb, var(--border-default) 40%, transparent)" },
@@ -494,7 +494,7 @@ function ContactSection({ data, lang }) {
           <div className="support-row" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
             <Link to="/merchandise" style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-start", gap: 6, width: BTN_W, padding: "8px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-brand)", color: "var(--brand)", fontSize: "var(--text-sm)", fontWeight: 600, background: "var(--brand-soft)", textDecoration: "none", boxSizing: "border-box" }}>
               <span style={{ display: "flex", flexShrink: 0 }}>{icons.bag}</span>
-              Merchandise
+              {vi ? "Cửa hàng" : "Merchandise"}
             </Link>
             {data.supports.filter((sp) => sp.platform !== "gank").map((sp) => (
               <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer" style={s.btn(sp.color)}>

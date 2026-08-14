@@ -256,6 +256,14 @@ change was needed: `catalogRepo.replaceVariants` already derives each
 variant's `sort_order` from its position in the array the frontend sends,
 so reordering `rows` client-side before save is the entire feature.
 
+## 2026-08-14 — "Merchandise" now translated to Vietnamese ("Cửa hàng")
+
+Reverses part of the 2026-08-11 decision to keep "Merchandise" identical
+in both languages (same precedent as "Merch"). Updated `shopTitle`
+(`frontend/src/i18n/translations.js`) and the two places Portfolio.jsx
+hardcoded the English word regardless of `lang` — the main-site nav tab
+and the Hỗ trợ section's shop button.
+
 ## 2026-08-13 — Shop image upload cap raised from 15MB to 50MB
 
 Live testing hit this directly: an admin's ~31MB product photo was

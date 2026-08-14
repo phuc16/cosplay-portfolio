@@ -143,7 +143,7 @@ export const translations = {
 
     // Shop
     shop: "Shop",
-    shopTitle: "Merchandise",
+    shopTitle: "Cửa hàng",
     shopDesc: "Chọn món bạn thích rồi đặt hàng.",
     shopEmpty: "Chưa có bộ sưu tập nào.",
     shopLoading: "Đang tải...",
