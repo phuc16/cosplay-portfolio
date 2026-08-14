@@ -49,6 +49,17 @@ describe("formatDeadline", () => {
     expect(result.remainingHours).toBe(3)
   })
 
+  it("DB ROUNDING NOISE: a deadline set to exactly N hours away still reports N, not N+1, when expires_at lands a second or two past the exact mark", () => {
+    // Reproduces the real bug: orders.expires_at is a DATETIME with no
+    // fractional-second precision, so a "48 hours from now" deadline can be
+    // stored 1-2 seconds past the exact mark. Viewed right after creation
+    // (now == the exact configured moment), that stray second must not
+    // bump the display from 48 to 49.
+    const now = new Date("2026-08-14T07:22:32Z")
+    const result = formatDeadline("2026-08-16T07:22:33Z", now) // 48h + 1s
+    expect(result.remainingHours).toBe(48)
+  })
+
   it("SWEEP WINDOW: a deadline in the past reports passed:true and remainingHours:0, never a negative or zero-looking 'time left'", () => {
     const now = new Date("2026-08-09T10:00:05Z") // 5 seconds after the deadline
     const result = formatDeadline("2026-08-09T10:00:00Z", now)

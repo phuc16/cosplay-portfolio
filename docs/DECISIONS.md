@@ -328,6 +328,42 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
+## 2026-08-14 — Social-link badges removed from the email footer entirely
+
+The letter-badge fallback (facebook "f", messenger "M", instagram "IG")
+from the previous entry rendered correctly, but per explicit feedback a
+fake-looking letter badge was judged worse than no badge at all — cut
+outright rather than tried a third icon approach. The footer now keeps
+only the sign-off and "automated email, add to contacts" notice.
+`sender.js`'s `getSocialLinks` (the `contact.social`/`contact.contactLinks`
+lookup) was removed as dead code along with it — no separate migration or
+data cleanup needed, since badges were only ever appended at send time by
+`footerHtml()`, never baked into a stored `email_templates` row.
+
+## 2026-08-14 — Order deadline off-by-one: "48 giờ" showed "còn 49 giờ"
+
+Reported live: setting a 48-hour payment deadline showed "còn 49 giờ" on
+the order page immediately after placing the order. Root cause: DB
+inspection confirmed `orders.expires_at` (a `DATETIME` column, no
+fractional-second precision) is stored ~1 second later than the exact
+"created_at + N hours" mark — e.g. `created_at` 07:22:32 → `expires_at`
+07:22:33 for a 48h deadline, not 07:22:32. Since `formatDeadline`'s
+remaining-time calculation always rounds up (`Math.ceil`, by design — see
+the SWEEP WINDOW tests — so a deadline minutes away never misreads as "0
+hours left"), that stray extra second was enough to round 48.0003 hours
+up to 49 for the brief window right after an order is placed (before
+naturally correcting to 48 a moment later, which is exactly why it read
+as a bug rather than a display quirk — the *first* thing a buyer sees is
+the wrong one).
+
+Fixed by subtracting a 5-second buffer before rounding
+(`frontend/src/utils/orderDeadline.js`) — enough to absorb the storage
+rounding noise without weakening the existing "never shows 0 minutes
+early" guarantee at the low end (subtracting 5 seconds from an
+already-short remaining window doesn't change the rounded-up hour count
+there, since `Math.max(1, ...)` already floors the display at 1
+regardless).
+
 ## 2026-08-14 — Email footer regressions from the last two entries: duplicate notice, broken icons
 
 Real-send screenshot surfaced two bugs from the footer work above:

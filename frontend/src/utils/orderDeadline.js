@@ -1,14 +1,4 @@
 /**
- * Formats orders.expires_at for the buyer-facing order page.
- *
- * The single place the Asia/Ho_Chi_Minh timezone rule (matching the
- * convention Plan 4's bookkeeping cutoff established) and the sweep-window
- * edge case are applied — see the spec's Deadline Display and Error
- * Handling sections. Every call site renders nothing when this returns
- * null: a missing or unparsable deadline must never be mistakable for an
- * urgent one, and must never render as the literal string "Invalid Date".
- */
-/**
  * "HH:mm dd/MM" in Asia/Ho_Chi_Minh, the shared display format for any
  * order-related timestamp on the buyer's order page (deadline, and the
  * per-status timestamp — see Order.jsx's statusTimestamp). Returns null
@@ -37,6 +27,16 @@ export function formatVnDateTime(iso) {
   return `${part("hour")}:${part("minute")} ${part("day")}/${part("month")}`
 }
 
+/**
+ * Formats orders.expires_at for the buyer-facing order page.
+ *
+ * The single place the Asia/Ho_Chi_Minh timezone rule (matching the
+ * convention Plan 4's bookkeeping cutoff established) and the sweep-window
+ * edge case are applied — see the spec's Deadline Display and Error
+ * Handling sections. Every call site renders nothing when this returns
+ * null: a missing or unparsable deadline must never be mistakable for an
+ * urgent one, and must never render as the literal string "Invalid Date".
+ */
 export function formatDeadline(expiresAt, now = new Date()) {
   if (!expiresAt) return null
 
@@ -46,14 +46,22 @@ export function formatDeadline(expiresAt, now = new Date()) {
   const passed = deadline.getTime() <= now.getTime()
   const absolute = formatVnDateTime(expiresAt)
 
-  // Never a countdown once the deadline has passed — the sweep window (the
-  // worker cancels a pending order every ~5s) means expires_at can be in
-  // the past while status is still pending. Showing "còn 0 giờ" here would
-  // read as "there's still time," which is the one outcome this feature
-  // must never produce.
+  // A few seconds' buffer absorbs sub-second rounding noise from DB storage:
+  // orders.expires_at is a DATETIME with no fractional-second precision, so
+  // the stored value can land up to ~1s after the exact "created_at + N
+  // hours" mark. Without this buffer, viewing an order in the first second
+  // or two after creation could show one hour more than what was actually
+  // configured (48h set → "còn 49 giờ" shown) before it self-corrects to 48
+  // moments later — confusing on the very first load, which is the one
+  // moment a buyer is most likely to be looking. This buffer is on the
+  // opposite side from — and doesn't fight with — the "never show 0
+  // prematurely" rounding-up behavior for a deadline actually close to
+  // expiring: at the low end a few seconds of buffer is negligible, since
+  // Math.max(1, ...) already floors the display at 1 regardless.
+  const BUFFER_MS = 5000
   const remainingHours = passed
     ? 0
-    : Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / (60 * 60 * 1000)))
+    : Math.max(1, Math.ceil((deadline.getTime() - now.getTime() - BUFFER_MS) / (60 * 60 * 1000)))
 
   return { absolute, remainingHours, passed }
 }
