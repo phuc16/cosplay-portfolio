@@ -341,7 +341,7 @@ describe("sendQueued: order QR gating", () => {
   })
 })
 
-describe("sendQueued: footer (social links + automated-email notice)", () => {
+describe("sendQueued: footer (automated-email notice)", () => {
   it("renders the notice after the QR block, not before it", async () => {
     const o = await seedOrder("ship")
     await queue.enqueue(o.id, "order_placed", "a@example.com")
@@ -352,54 +352,7 @@ describe("sendQueued: footer (social links + automated-email notice)", () => {
     expect(html.indexOf("cid:orderqr")).toBeLessThan(html.indexOf("email tự động"))
   })
 
-  it("renders only facebook/messenger/instagram badges, skipping any platform not configured, in fb/messenger/ig order", async () => {
-    await db.query("DELETE FROM site_settings")
-    await db.query("INSERT INTO site_settings (config) VALUES (?)", [JSON.stringify({
-      contact: {
-        social: [
-          { platform: "facebook", url: "https://facebook.com/shop" },
-          { platform: "x", url: "https://x.com/shop" },
-        ],
-        contactLinks: [{ type: "messenger", value: "shopusername" }],
-      },
-    })])
-
-    const o = await seedOrder("ship")
-    await queue.enqueue(o.id, "order_placed", "a@example.com")
-
-    await sender.sendQueued()
-
-    const html = sendMailMock.mock.calls[0][0].html
-    expect(html).toContain("https://facebook.com/shop")
-    expect(html).toContain("https://m.me/shopusername")
-    expect(html).not.toContain("https://x.com/shop")
-    // Plain colored-circle + letter badges (not <img>s — a data-URI <img>
-    // version of this rendered as a broken-image icon in real testing).
-    expect(html).toContain(">f</a>")
-    expect(html).toContain(">M</a>")
-    expect(html).not.toContain(">IG</a>")
-    expect(html.indexOf(">f</a>")).toBeLessThan(html.indexOf(">M</a>"))
-  })
-
-  it("uses a full m.me URL as-is instead of double-prefixing it (matches the value admin actually saves)", async () => {
-    await db.query("DELETE FROM site_settings")
-    await db.query("INSERT INTO site_settings (config) VALUES (?)", [JSON.stringify({
-      contact: { contactLinks: [{ type: "messenger", value: "https://m.me/kamimoe1911" }] },
-    })])
-
-    const o = await seedOrder("ship")
-    await queue.enqueue(o.id, "order_placed", "a@example.com")
-
-    await sender.sendQueued()
-
-    const html = sendMailMock.mock.calls[0][0].html
-    expect(html).toContain("https://m.me/kamimoe1911")
-    expect(html).not.toContain("https://m.me/https://")
-  })
-
-  it("renders no badge row at all when nothing is configured", async () => {
-    await db.query("DELETE FROM site_settings")
-
+  it("no longer renders any social-link badges — cut per explicit feedback (fake-looking letter badges were worse than none)", async () => {
     const o = await seedOrder("ship")
     await queue.enqueue(o.id, "order_placed", "a@example.com")
 

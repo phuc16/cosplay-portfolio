@@ -1,6 +1,5 @@
 const nodemailer = require("nodemailer")
 const db = require("./../../db")
-const redis = require("./../../redis")
 const queue = require("./queue")
 const templates = require("./templates")
 const orderRepo = require("./../orders/orderRepo")
@@ -11,53 +10,6 @@ let transport = null
 
 function isConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
-}
-
-/**
- * Only the shop's Facebook, Instagram, and Messenger — the three channels
- * that actually matter for a buyer reaching out, not every platform the
- * portfolio's fixed social-platform list supports. Facebook/Instagram come
- * from contact.social (full URLs, same shape the portfolio page reads);
- * Messenger comes from contact.contactLinks (a username, same field the
- * portfolio's quick-contact buttons use — transformed the same way
- * Portfolio.jsx's contactHref does). Reads the same Redis cache GET
- * /api/settings warms, so this rarely costs an extra DB round trip;
- * failures here must never block a send, so any error just yields no
- * social row.
- */
-async function getSocialLinks() {
-  try {
-    const cached = await redis.get("settings")
-    let config
-    if (cached) {
-      config = JSON.parse(cached)
-    } else {
-      const [rows] = await db.query("SELECT config FROM site_settings ORDER BY id LIMIT 1")
-      config = rows[0]?.config
-        ? (typeof rows[0].config === "string" ? JSON.parse(rows[0].config) : rows[0].config)
-        : {}
-    }
-    const social = config?.contact?.social || []
-    const contactLinks = config?.contact?.contactLinks || []
-    const facebookUrl = social.find((s) => s.platform === "facebook")?.url
-    const messenger = contactLinks.find((c) => c.type === "messenger")?.value
-    const instagramUrl = social.find((s) => s.platform === "instagram")?.url
-    // Same transform as Portfolio.jsx's contactHref: the admin field accepts
-    // either a bare username or a full m.me URL (the one actually saved
-    // today is a full URL) — only bare values get the https://m.me/ prefix.
-    const messengerUrl = messenger
-      ? (/^https?:\/\//i.test(messenger) ? messenger : `https://m.me/${messenger.replace(/^@/, "")}`)
-      : null
-
-    // Display order: Facebook, Messenger, Instagram.
-    const links = []
-    if (facebookUrl) links.push({ platform: "facebook", url: facebookUrl })
-    if (messengerUrl) links.push({ platform: "messenger", url: messengerUrl })
-    if (instagramUrl) links.push({ platform: "instagram", url: instagramUrl })
-    return links
-  } catch {
-    return []
-  }
 }
 
 function getTransport() {
@@ -83,9 +35,6 @@ async function sendQueued(limit = 10) {
   const pending = await queue.claimPending(limit)
   let sent = 0
   let failed = 0
-  // Fetched once per batch, not per message — the same footer social links
-  // apply to every send in this run, and site settings change rarely.
-  const social = await getSocialLinks()
 
   for (const row of pending) {
     try {
@@ -157,7 +106,7 @@ async function sendQueued(limit = 10) {
       }
 
       // Always last — below the QR block above, whether or not it rendered.
-      html += templates.footerHtml(social)
+      html += templates.footerHtml()
 
       await getTransport().sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,

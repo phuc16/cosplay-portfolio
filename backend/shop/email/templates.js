@@ -14,36 +14,20 @@ const SITE_URL = process.env.SITE_URL || ""
 // of spam, so it has to be the literal envelope sender, not a display name.
 const SHOP_EMAIL = process.env.SMTP_FROM || process.env.SMTP_USER || ""
 
-// Only these three — the shop's actual channels, not every platform the
-// (unused-here) fixed social-platform list in AdminSettings supports.
-// Plain colored circle + letter, not an image: a first attempt embedded
-// each platform's real logo as a data-URI <img>, but that rendered as a
-// broken-image icon with overlapping alt text in real-world testing (at
-// least one major mail client blocks data-URI images) — worse than a
-// clean letter badge. Plain background-color + text needs no image
-// loading at all, so it can't fail this way.
-const SOCIAL_BADGE = {
-  facebook: { label: "f", color: "#1877F2" },
-  messenger: { label: "M", color: "#0084FF" },
-  instagram: { label: "IG", color: "#E4405F" },
-}
-
 /**
- * Footer badges (facebook/instagram/messenger only, from site_settings —
- * see sender.js's getSocialLinks) + the "automated email" notice. Appended
- * by sender.js AFTER the order-QR block rather than substituted into the
- * template body, so it always renders as the very last section of the
- * mail, below the QR — not baked into `wrap()`, which finishes before the
- * QR is even built.
+ * The "automated email" notice, appended by sender.js AFTER the order-QR
+ * block rather than substituted into the template body, so it always
+ * renders as the very last section of the mail, below the QR — not baked
+ * into `wrap()`, which finishes before the QR is even built.
+ *
+ * Previously also rendered a row of social-link badges here. Tried real
+ * brand logos as data-URI <img>s first (broken-image icon in real
+ * testing), then plain colored-circle + letter badges as a fallback — cut
+ * entirely per explicit feedback: a fake-looking letter badge was worse
+ * than no badge at all.
  */
-function footerHtml(social = []) {
-  const links = social.filter((s) => SOCIAL_BADGE[s.platform] && s.url)
-  const badges = links.length
-    ? `<table role="presentation" style="width:100%;margin-top:20px"><tr><td style="text-align:center">${links.map((s) => `
-      <a href="${escapeHtml(s.url)}" style="display:inline-block;width:32px;height:32px;line-height:32px;border-radius:50%;background:${SOCIAL_BADGE[s.platform].color};color:#fff;text-align:center;text-decoration:none;font-size:13px;font-weight:700;margin:0 4px">${SOCIAL_BADGE[s.platform].label}</a>`).join("")}
-    </td></tr></table>`
-    : ""
-  return `${badges}
+function footerHtml() {
+  return `
     <p style="margin:16px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:11px;color:#999;text-align:center;line-height:1.6">
       Đây là email tự động, vui lòng không trả lời email này.<br/>
       Thêm <a href="mailto:${escapeHtml(SHOP_EMAIL)}" style="color:${BRAND};text-decoration:none">${escapeHtml(SHOP_EMAIL)}</a> vào danh bạ để không bỏ lỡ email từ ${escapeHtml(SHOP_NAME)}.
