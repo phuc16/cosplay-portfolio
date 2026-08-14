@@ -341,6 +341,58 @@ describe("sendQueued: order QR gating", () => {
   })
 })
 
+describe("sendQueued: footer (social links + automated-email notice)", () => {
+  it("renders the notice after the QR block, not before it", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html.indexOf("cid:orderqr")).toBeLessThan(html.indexOf("email tự động"))
+  })
+
+  it("renders only facebook/messenger/instagram badges, skipping any platform not configured, in fb/messenger/ig order", async () => {
+    await db.query("DELETE FROM site_settings")
+    await db.query("INSERT INTO site_settings (config) VALUES (?)", [JSON.stringify({
+      contact: {
+        social: [
+          { platform: "facebook", url: "https://facebook.com/shop" },
+          { platform: "x", url: "https://x.com/shop" },
+        ],
+        contactLinks: [{ type: "messenger", value: "shopusername" }],
+      },
+    })])
+
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain('alt="facebook"')
+    expect(html).toContain('alt="messenger"')
+    expect(html).not.toContain('alt="instagram"')
+    expect(html).not.toContain('alt="x"')
+    expect(html).toContain("https://facebook.com/shop")
+    expect(html).toContain("https://m.me/shopusername")
+    expect(html.indexOf('alt="facebook"')).toBeLessThan(html.indexOf('alt="messenger"'))
+  })
+
+  it("renders no badge row at all when nothing is configured", async () => {
+    await db.query("DELETE FROM site_settings")
+
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).not.toContain("border-radius:50%")
+    expect(html).toContain("email tự động")
+  })
+})
+
 describe("sendQueued: no real network connection", () => {
   it("actually goes through the mocked transport (mock invoked, not bypassed)", async () => {
     const o = await seedOrder()

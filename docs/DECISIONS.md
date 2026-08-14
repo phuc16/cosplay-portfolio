@@ -286,6 +286,39 @@ accurate. Social links are fetched once per `sendQueued` batch (not once
 per message) since they change rarely and every email in a batch shares
 the same footer.
 
+## 2026-08-14 — Email footer refined: fewer platforms, real logos, moved below the QR
+
+Follow-up feedback on the entry above, from a screenshot of the actual
+rendered footer: only Facebook, Messenger, and Instagram should show (not
+every configured social platform), using real logo glyphs instead of
+plain letter badges, and the whole footer needed to be the very last
+section — below the order QR, which it wasn't (QR is appended by
+sender.js after the template renders, so content baked into `wrap()`'s
+footer always landed above it).
+
+Messenger isn't in `contact.social` at all — it lives in
+`contact.contactLinks` (the portfolio page's quick-contact list), so
+`sender.js`'s social-link lookup now reads both: Facebook/Instagram URLs
+from `contact.social`, Messenger from `contact.contactLinks` (transformed
+to `https://m.me/<username>`, same as `Portfolio.jsx`'s `contactHref`).
+Display order is fixed at Facebook → Messenger → Instagram per explicit
+request, regardless of the order platforms happen to appear in config.
+
+Badges now embed each platform's real SVG logo (same path data as
+`Portfolio.jsx`'s icons) as a `data:image/svg+xml;base64` `<img>` rather
+than an inline `<svg>` element or a plain letter — an `<img>` degrades
+more predictably across mail clients (Outlook's renderer in particular
+often drops inline SVG) and needs no image hosting.
+
+Structurally, the whole footer (badges + "automated email" notice) moved
+out of `wrap()` — which finishes rendering before the QR block even
+exists — into a new `templates.footerHtml(social)`, called by `sender.js`
+and string-appended *after* the QR/cancel-reason blocks, the same way
+those are appended today. `{{shop_email}}`/`{{social_links}}` are no
+longer template placeholders (removed from `PLACEHOLDERS` and its
+frontend mirror) since the footer isn't part of the substitutable
+template body anymore.
+
 ## 2026-08-14 — Tablet-specific grid/thumbnail breakpoints added across shop + portfolio
 
 A responsive audit found every grid layout in the shop and portfolio

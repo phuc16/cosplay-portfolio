@@ -14,20 +14,41 @@ function isConfigured() {
 }
 
 /**
- * The site's configured social links (contact.social), for the footer badge
- * row every email gets. Reads the same Redis cache GET /api/settings warms,
- * so this rarely costs an extra DB round trip; failures here must never
- * block a send, so any error just yields no social row.
+ * Only the shop's Facebook, Instagram, and Messenger — the three channels
+ * that actually matter for a buyer reaching out, not every platform the
+ * portfolio's fixed social-platform list supports. Facebook/Instagram come
+ * from contact.social (full URLs, same shape the portfolio page reads);
+ * Messenger comes from contact.contactLinks (a username, same field the
+ * portfolio's quick-contact buttons use — transformed the same way
+ * Portfolio.jsx's contactHref does). Reads the same Redis cache GET
+ * /api/settings warms, so this rarely costs an extra DB round trip;
+ * failures here must never block a send, so any error just yields no
+ * social row.
  */
 async function getSocialLinks() {
   try {
     const cached = await redis.get("settings")
-    if (cached) return JSON.parse(cached)?.contact?.social || []
-    const [rows] = await db.query("SELECT config FROM site_settings ORDER BY id LIMIT 1")
-    const config = rows[0]?.config
-      ? (typeof rows[0].config === "string" ? JSON.parse(rows[0].config) : rows[0].config)
-      : {}
-    return config.contact?.social || []
+    let config
+    if (cached) {
+      config = JSON.parse(cached)
+    } else {
+      const [rows] = await db.query("SELECT config FROM site_settings ORDER BY id LIMIT 1")
+      config = rows[0]?.config
+        ? (typeof rows[0].config === "string" ? JSON.parse(rows[0].config) : rows[0].config)
+        : {}
+    }
+    const social = config?.contact?.social || []
+    const contactLinks = config?.contact?.contactLinks || []
+    const facebookUrl = social.find((s) => s.platform === "facebook")?.url
+    const messenger = contactLinks.find((c) => c.type === "messenger")?.value
+    const instagramUrl = social.find((s) => s.platform === "instagram")?.url
+
+    // Display order: Facebook, Messenger, Instagram.
+    const links = []
+    if (facebookUrl) links.push({ platform: "facebook", url: facebookUrl })
+    if (messenger) links.push({ platform: "messenger", url: `https://m.me/${messenger.replace(/^@/, "")}` })
+    if (instagramUrl) links.push({ platform: "instagram", url: instagramUrl })
+    return links
   } catch {
     return []
   }
@@ -71,7 +92,7 @@ async function sendQueued(limit = 10) {
 
       const rendered = templates.renderTemplate(
         tpl,
-        templates.buildVars({ ...order, payment_note: settings.payment_note, social })
+        templates.buildVars({ ...order, payment_note: settings.payment_note })
       )
 
       // The QR is a link to the order's own status page — useful for any
@@ -128,6 +149,9 @@ async function sendQueued(limit = 10) {
           </div>`
         attachments.push({ filename: "order-qr.png", content: png, cid: "orderqr" })
       }
+
+      // Always last — below the QR block above, whether or not it rendered.
+      html += templates.footerHtml(social)
 
       await getTransport().sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
