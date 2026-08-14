@@ -380,3 +380,4 @@ docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" c
 | Lỗi 526 Invalid SSL certificate | Chứng chỉ origin hết hạn/sai domain → `certbot renew --dry-run` trên droplet |
 | Ảnh chậm/không cache | `curl -sI .../api/storage/xxx.webp \| grep cf-cache-status` — `HIT` là qua CDN; `MISS` liên tục thì kiểm tra header `Cache-Control` từ backend |
 | Compose từ chối chạy (`required variable ... is missing`) | Thiếu biến trong `.env` — cố ý, điền đủ secrets |
+| Gợi ý địa chỉ (Goong) không hiện dù đã set `VITE_GOONG_API_KEY` | Kiểm tra Content-Security-Policy trong `frontend/nginx.conf` có `connect-src ... https://rsapi.goong.io` chưa — thiếu thì browser chặn fetch âm thầm (không lỗi rõ ràng). Cloudflare không liên quan (request gọi thẳng từ browser tới Goong, không qua domain của mình) |

@@ -328,6 +328,29 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
+## 2026-08-14 — CSP was silently blocking the Goong address-autocomplete fetch
+
+After wiring up the Goong API key (entry below), the checkout's address
+field still showed no suggestions — a working key, correct Goong CORS
+headers, and a rebuilt frontend image all confirmed via direct `curl`,
+yet nothing appeared in the actual browser. Root cause:
+`frontend/nginx.conf`'s Content-Security-Policy had `connect-src 'self'`,
+which blocks the browser from making *any* `fetch()` to a cross-origin
+URL — `AddressFields.jsx` calls `rsapi.goong.io` directly from client-side
+JS, so the request never left the browser at all, and the component's
+`fetch().catch()` silently swallowed the resulting CSP violation with no
+visible error. `curl` has no CSP to enforce, which is why every
+server-side check looked fine.
+
+Fixed by adding `https://rsapi.goong.io` to `connect-src`. Since
+`frontend/nginx.conf` is baked into the single Docker image
+(`phuc16/cosplay-frontend`) shared by both `docker-compose.yml` (local)
+and `docker-compose.pull.yml` (prod), and the host-level nginx config in
+`deploy/DEPLOY.md` doesn't duplicate any CSP header, this fix covers
+production automatically once the image is rebuilt/pushed
+(`./scripts/build-push.sh`) and pulled on the server — no separate
+prod-specific config needed changing.
+
 ## 2026-08-14 — Wired up the Goong Maps API key for checkout address autocomplete
 
 `frontend/src/components/shop/AddressFields.jsx` already implemented
