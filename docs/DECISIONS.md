@@ -328,6 +328,34 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
+## 2026-08-14 — Wired up the Goong Maps API key for checkout address autocomplete
+
+`frontend/src/components/shop/AddressFields.jsx` already implemented
+Goong-based address autocomplete (Vietnam-specific, splits into
+street/ward/district/province) — it just had no `VITE_GOONG_API_KEY`
+configured anywhere, so it silently degraded to a plain textarea in
+every environment. Confirmed this design is already compatible with the
+ViettelPost export: `vtpMapping.js`'s `assembleAddress()` joins exactly
+these same four fields with `", "`, falling back to `address_raw` — no
+VTP-specific admin-division codes needed, just the free-text fields this
+component already produces.
+
+Since `VITE_*` vars are inlined into the frontend bundle at Vite *build*
+time, not read at container runtime, wiring the key up required more than
+an env var: added it to `frontend/Dockerfile` (`ARG`/`ENV`),
+`docker-compose.yml`'s frontend `build.args`, and `scripts/build-push.sh`
+(the production image build/push script) — a container restart alone
+would never pick up a changed value, only a rebuild. Documented in both
+`.env.example` and `deploy/DEPLOY.md`.
+
+The key the user first provided (`gmGSsj...`) was rejected by both
+Goong's Place/AutoComplete and Geocode endpoints with
+`API_KEY_UNAUTHORIZED` — Goong issues separate "Maps Key" (tiles/embeds)
+and "API Key" (REST services) credentials, and this was very likely the
+former. User is getting the correct API Key; all the wiring above is
+already in place and just needs the working key dropped into `.env`
+(gitignored, not committed) followed by `docker compose build frontend`.
+
 ## 2026-08-14 — Social-link badges removed from the email footer entirely
 
 The letter-badge fallback (facebook "f", messenger "M", instagram "IG")

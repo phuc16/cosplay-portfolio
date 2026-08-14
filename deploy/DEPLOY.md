@@ -148,6 +148,12 @@ SHOP_NAME=Tên Shop
 
 # Email của bạn (seller) - nhận bản sao mỗi đơn hàng mới (tuỳ chọn)
 ADMIN_EMAIL=you@example.com
+
+# Goong Maps API key - gợi ý địa chỉ khi checkout (tuỳ chọn, để trống thì
+# ô địa chỉ dùng textarea thường). LƯU Ý: đây là biến build-time của Vite,
+# phải build lại image frontend (./scripts/build-push.sh) mỗi khi đổi giá
+# trị này - đặt lại biến môi trường của container KHÔNG có tác dụng.
+VITE_GOONG_API_KEY=
 ```
 
 Tạo secret mạnh:

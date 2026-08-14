@@ -114,7 +114,10 @@ services:
 
   frontend:
     image: phuc16/cosplay-frontend:latest
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_GOONG_API_KEY: ${VITE_GOONG_API_KEY:-}
     restart: unless-stopped
     ports:
       - "5173:80"
