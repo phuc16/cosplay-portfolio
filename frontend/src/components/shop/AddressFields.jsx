@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
-
-const GOONG_KEY = import.meta.env.VITE_GOONG_API_KEY
+import { fetchAddressAutocomplete } from "../../api/shop"
 
 /**
  * Goong is Vietnam-specific and handles ward/district/province properly.
- * When no key is configured, or the lookup fails, this degrades to a plain
- * textarea — a buyer must never be blocked from ordering by a third party.
+ * Proxied through our own backend (routes/shop.js) rather than called
+ * directly with a bundled API key — see that route's comment for why. When
+ * the lookup returns no predictions (backend has no key configured, Goong
+ * is down, rate-limited, etc.), this degrades to a plain textarea — a buyer
+ * must never be blocked from ordering by a third party.
  */
 export default function AddressFields({ value, onChange }) {
   const { t } = useLanguage()
@@ -19,13 +21,10 @@ export default function AddressFields({ value, onChange }) {
   // avoids a set-state-in-effect trap where a sync reset followed by an async
   // setter in the same effect trips react-hooks/set-state-in-effect.
   useEffect(() => {
-    if (!GOONG_KEY || query.trim().length < 4) return
+    if (query.trim().length < 4) return
 
     const timer = setTimeout(() => {
-      fetch(
-        `https://rsapi.goong.io/Place/AutoComplete?api_key=${GOONG_KEY}&input=${encodeURIComponent(query)}`
-      )
-        .then((res) => res.json())
+      fetchAddressAutocomplete(query)
         .then((data) => setSuggestions(data.predictions?.slice(0, 5) || []))
         .catch(() => setSuggestions([])) // silent: the manual field below still works
     }, 350)
@@ -33,16 +32,19 @@ export default function AddressFields({ value, onChange }) {
     return () => clearTimeout(timer)
   }, [query])
 
-  const visibleSuggestions = GOONG_KEY && query.trim().length >= 4 ? suggestions : []
+  const visibleSuggestions = query.trim().length >= 4 ? suggestions : []
 
   const pick = (s) => {
-    const parts = s.structured_formatting?.secondary_text?.split(",").map((x) => x.trim()) || []
+    // Structured district/commune/province from Goong's `more_compound`
+    // option, not parsed from free-text secondary_text — that broke on any
+    // formatting variation Goong wasn't contractually bound to keep.
+    const compound = s.compound || {}
     onChange({
       address_raw: s.description,
       address_street: s.structured_formatting?.main_text || s.description,
-      address_ward: parts[0] || null,
-      address_district: parts[1] || null,
-      address_province: parts[2] || null,
+      address_ward: compound.commune || null,
+      address_district: compound.district || null,
+      address_province: compound.province || null,
     })
     setQuery(s.description)
     setSuggestions([])

@@ -7,6 +7,11 @@ export const fetchCollections = () =>
 export const fetchCollection = (slug) =>
   api.get(`/api/shop/collections/${slug}`).then((r) => r.data)
 
+// Proxied through our backend (see routes/shop.js) rather than calling Goong
+// directly from the browser — keeps the API key server-side only.
+export const fetchAddressAutocomplete = (input) =>
+  api.get("/api/shop/address-autocomplete", { params: { input } }).then((r) => r.data)
+
 // ── Admin catalog (JWT is set globally on axios by Admin.jsx) ──
 export const adminListCollections = () =>
   api.get("/api/admin/collections").then((r) => r.data)

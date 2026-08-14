@@ -150,10 +150,10 @@ SHOP_NAME=Tên Shop
 ADMIN_EMAIL=you@example.com
 
 # Goong Maps API key - gợi ý địa chỉ khi checkout (tuỳ chọn, để trống thì
-# ô địa chỉ dùng textarea thường). LƯU Ý: đây là biến build-time của Vite,
-# phải build lại image frontend (./scripts/build-push.sh) mỗi khi đổi giá
-# trị này - đặt lại biến môi trường của container KHÔNG có tác dụng.
-VITE_GOONG_API_KEY=
+# ô địa chỉ dùng textarea thường). Biến của backend - proxy qua API của
+# mình (backend/routes/shop.js), không gửi thẳng cho browser, nên chỉ cần
+# restart container backend khi đổi giá trị, không cần build lại image.
+GOONG_API_KEY=
 ```
 
 Tạo secret mạnh:
@@ -380,4 +380,4 @@ docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" c
 | Lỗi 526 Invalid SSL certificate | Chứng chỉ origin hết hạn/sai domain → `certbot renew --dry-run` trên droplet |
 | Ảnh chậm/không cache | `curl -sI .../api/storage/xxx.webp \| grep cf-cache-status` — `HIT` là qua CDN; `MISS` liên tục thì kiểm tra header `Cache-Control` từ backend |
 | Compose từ chối chạy (`required variable ... is missing`) | Thiếu biến trong `.env` — cố ý, điền đủ secrets |
-| Gợi ý địa chỉ (Goong) không hiện dù đã set `VITE_GOONG_API_KEY` | Kiểm tra Content-Security-Policy trong `frontend/nginx.conf` có `connect-src ... https://rsapi.goong.io` chưa — thiếu thì browser chặn fetch âm thầm (không lỗi rõ ràng). Cloudflare không liên quan (request gọi thẳng từ browser tới Goong, không qua domain của mình) |
+| Gợi ý địa chỉ (Goong) không hiện dù đã set `GOONG_API_KEY` | Kiểm tra backend đã restart với biến mới chưa (`docker compose restart backend`); test trực tiếp `GET /api/shop/address-autocomplete?input=...` qua backend xem có trả `predictions` không |

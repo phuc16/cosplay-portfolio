@@ -77,6 +77,7 @@ services:
       SITE_URL: ${SITE_URL:-}
       SHOP_NAME: ${SHOP_NAME:-Shop}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      GOONG_API_KEY: ${GOONG_API_KEY:-}
     logging: *logging
 
   worker:
@@ -114,10 +115,7 @@ services:
 
   frontend:
     image: phuc16/cosplay-frontend:latest
-    build:
-      context: ./frontend
-      args:
-        VITE_GOONG_API_KEY: ${VITE_GOONG_API_KEY:-}
+    build: ./frontend
     restart: unless-stopped
     ports:
       - "5173:80"

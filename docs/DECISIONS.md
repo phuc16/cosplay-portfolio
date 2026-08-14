@@ -328,6 +328,37 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
+## 2026-08-14 — Goong autocomplete moved server-side: performance params + spam protection
+
+Two follow-up asks on the just-shipped Goong integration: (1) had all of
+Goong's documented v2 performance parameters been applied, and (2) how to
+stop a spammer from running up the shop owner's Goong bill, since the key
+lived in the public JS bundle. Fetched Goong's v2 Autocomplete docs
+directly: the endpoint is `v2/place/autocomplete` (our code was calling
+the older `Place/AutoComplete`), and supports `limit`, `location`+
+`radius` (geographic bias), and `more_compound=true` (structured
+district/commune/province on each result) — none of which were in use.
+Also, `AddressFields.jsx` was parsing ward/district/province by
+comma-splitting `secondary_text`, when Goong's own response already
+carries this as a structured `compound` object once `more_compound=true`
+is requested — fragile guessing replaced with the field made for this.
+
+On spam protection: domain/referrer restriction on Goong's side (their
+own suggested mitigation) only stops casual reuse by real browsers — a
+script extracting the key from the bundle can set any `Referer` header it
+wants, since that header is entirely client-controlled. The actual fix is
+architectural: moved the call server-side entirely
+(`GET /api/shop/address-autocomplete`, `backend/routes/shop.js`), so the
+key never reaches the browser at all, plus a dedicated `addressLimiter`
+(20/min per IP, same Redis-backed pattern as every other limiter in
+`server.js`) caps worst-case spend independent of whatever limit Goong
+itself allows. This reverses the previous two entries' Vite build-time
+wiring: `GOONG_API_KEY` is now a plain backend runtime env var (a
+container restart picks up a changed value — no rebuild needed, an
+improvement over the old build-arg approach), and the CSP's `connect-src`
+addition for `rsapi.goong.io` was removed since the browser no longer
+talks to Goong directly.
+
 ## 2026-08-14 — CSP was silently blocking the Goong address-autocomplete fetch
 
 After wiring up the Goong API key (entry below), the checkout's address
