@@ -71,7 +71,7 @@ describe("Checkout payment methods", () => {
 
     const submit = [...container.querySelectorAll("button")].find((b) => b.type === "button" && b.textContent !== "...")
     // The place-order button is the only non-radio button with disabled state tied to methods.
-    const placeOrderBtn = container.querySelector("button.w-full")
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
     expect(placeOrderBtn).toBeTruthy()
     expect(placeOrderBtn.disabled).toBe(true)
 
@@ -85,7 +85,7 @@ describe("Checkout payment methods", () => {
 
     const container = await renderCheckout()
 
-    const placeOrderBtn = container.querySelector("button.w-full")
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
     expect(placeOrderBtn.disabled).toBe(false)
 
     const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
@@ -99,7 +99,7 @@ describe("Checkout payment methods", () => {
 
     const container = await renderCheckout()
 
-    const placeOrderBtn = container.querySelector("button.w-full")
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
     expect(placeOrderBtn.disabled).toBe(true)
   })
 })
@@ -242,7 +242,7 @@ describe("Checkout — variant_not_found recovery", () => {
     })
 
     const container = await renderCheckout()
-    const placeOrderBtn = container.querySelector("button.w-full")
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
     await act(async () => { placeOrderBtn.click() })
 
     expect(container.textContent).toContain("Đã tự động xóa khỏi giỏ hàng")
@@ -261,7 +261,7 @@ describe("Checkout — variant_not_found recovery", () => {
     })
 
     const container = await renderCheckout()
-    const placeOrderBtn = container.querySelector("button.w-full")
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
     await act(async () => { placeOrderBtn.click() })
 
     expect(readCart()).toEqual([])

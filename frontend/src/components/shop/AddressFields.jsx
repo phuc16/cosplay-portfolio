@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { fetchProvinces, fetchWards, searchAddress } from "../../api/shop"
+import SearchableSelect from "./SearchableSelect"
 
 const searchIcon = (
   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,23 +125,25 @@ export default function AddressFields({ value, onChange }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm mb-1">{t("checkoutProvince")}</label>
-          <select value={provinceCode} onChange={(e) => onProvinceChange(e.target.value)} className={selectCls}>
-            <option value="">{t("checkoutSelectProvince")}</option>
-            {provinces.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
-          </select>
+          <SearchableSelect
+            value={provinceCode}
+            onChange={onProvinceChange}
+            options={provinces}
+            placeholder={t("checkoutSelectProvince")}
+            label={t("checkoutProvince")}
+          />
         </div>
 
         <div>
           <label className="block text-sm mb-1">{t("checkoutWard")}</label>
-          <select
+          <SearchableSelect
             value={wardCode}
-            onChange={(e) => onWardChange(e.target.value)}
+            onChange={onWardChange}
+            options={wards}
+            placeholder={t("checkoutSelectWard")}
+            label={t("checkoutWard")}
             disabled={!provinceCode}
-            className={`${selectCls} disabled:opacity-50`}
-          >
-            <option value="">{t("checkoutSelectWard")}</option>
-            {wards.map((w) => <option key={w.code} value={w.code}>{w.name}</option>)}
-          </select>
+          />
         </div>
 
         <div className="sm:col-span-2 relative">
@@ -150,6 +153,12 @@ export default function AddressFields({ value, onChange }) {
               type="text"
               value={street}
               onChange={(e) => onStreetChange(e.target.value)}
+              onKeyDown={(e) => {
+                // This field lives inside the checkout form — without
+                // preventDefault, Enter would submit the whole order instead
+                // of just running the search.
+                if (e.key === "Enter") { e.preventDefault(); onSearchStreet() }
+              }}
               placeholder={t("checkoutStreetPlaceholder")}
               className={selectCls}
             />

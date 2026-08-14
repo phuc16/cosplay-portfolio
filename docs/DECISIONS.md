@@ -328,6 +328,39 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
+## 2026-08-14 — Province/ward pickers replaced with a custom searchable dropdown
+
+The native `<select>` used for province/ward rendered its option list with
+OS-level UI (a plain white list, browser-default blue highlight) that
+ignores nearly all app CSS — clashing hard with the dark theme, and with
+no way to filter a 100+-item ward list by typing. Replaced both with a new
+`SearchableSelect` component (`frontend/src/components/shop/SearchableSelect.jsx`):
+a styled trigger button + dropdown (matching the existing
+`bg-[var(--surface-card)]`/`border-[var(--border-brand)]` card style used
+elsewhere) with a type-to-filter text input at the top, fully
+CSS-controllable since none of it is native browser chrome. Also added
+Enter-to-search on the street field (previously click-only), with
+`preventDefault` so Enter doesn't submit the whole checkout form instead.
+
+Caught a real regression from this while re-running the full suite (not
+just the touched files): several pre-existing `Checkout.test.jsx` tests
+located the submit button via the fragile `button.w-full` selector, which
+now also matched `SearchableSelect`'s trigger buttons (same utility
+class) — `container.querySelector` silently grabbed the wrong button,
+one row of "the button's `disabled` is false" assertions failed loudly,
+but two others (clicking what they *thought* was submit) failed
+confusingly since nothing looked wrong until stale-cart-removal text
+never appeared. Fixed by narrowing the test selector to
+`button.w-full.rounded-xl` — the submit button's own `rounded-xl` isn't
+shared with the new dropdown's `rounded-lg`, no app markup needed to
+change. Worth remembering: a fragile DOM selector shared between an old
+test and new markup can silently drift instead of failing outright.
+
+Also added a short FAQ entry ("Cách nhập địa chỉ giao hàng thế nào?")
+covering the province/ward/street flow and mentioning the search button
+by name for apartment/complex addresses, using this exact Vinhomes
+example as the illustration.
+
 ## 2026-08-14 — Street-search suggestion picker lost building/complex names
 
 Live testing surfaced the bug immediately: picking "Sảnh chính S3.01, CC
