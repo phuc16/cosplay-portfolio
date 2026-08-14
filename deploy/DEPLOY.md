@@ -148,6 +148,11 @@ SHOP_NAME=Tên Shop
 
 # Email của bạn (seller) - nhận bản sao mỗi đơn hàng mới (tuỳ chọn)
 ADMIN_EMAIL=you@example.com
+
+# Goong Maps API key - tìm gợi ý số nhà/tên đường khi checkout, chỉ gọi khi
+# bấm nút tìm kiếm (không gọi khi gõ từng ký tự). Tuỳ chọn, để trống thì nút
+# tìm kiếm không trả kết quả nhưng ô nhập vẫn dùng bình thường.
+GOONG_API_KEY=
 ```
 
 Tạo secret mạnh:

@@ -5,10 +5,12 @@ import { LanguageProvider } from "../../contexts/LanguageContext"
 
 const fetchProvinces = vi.fn()
 const fetchWards = vi.fn()
+const searchAddress = vi.fn()
 
 vi.mock("../../api/shop", () => ({
   fetchProvinces: (...args) => fetchProvinces(...args),
   fetchWards: (...args) => fetchWards(...args),
+  searchAddress: (...args) => searchAddress(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -47,8 +49,10 @@ function setInputValue(el, value) {
 beforeEach(() => {
   fetchProvinces.mockReset()
   fetchWards.mockReset()
+  searchAddress.mockReset()
   fetchProvinces.mockResolvedValue(PROVINCES)
   fetchWards.mockResolvedValue(HCM_WARDS)
+  searchAddress.mockResolvedValue({ predictions: [] })
 })
 
 describe("AddressFields — province/ward picker (no live per-keystroke autocomplete)", () => {
@@ -116,5 +120,67 @@ describe("AddressFields — province/ward picker (no live per-keystroke autocomp
 
     const provinceOptions = [...container.querySelectorAll("select")[0].querySelectorAll("option")]
     expect(provinceOptions).toHaveLength(1) // just the placeholder
+  })
+})
+
+describe("AddressFields — on-demand street search (not per-keystroke)", () => {
+  it("never calls searchAddress just from typing in the street field", async () => {
+    const { container } = await renderField()
+    await act(async () => setInputValue(container.querySelector("input"), "66B Nguyen Si Sach"))
+
+    expect(searchAddress).not.toHaveBeenCalled()
+  })
+
+  it("disables the search button until at least 3 characters are typed", async () => {
+    const { container } = await renderField()
+    const searchBtn = container.querySelector('button[aria-label="Search address"]')
+    expect(searchBtn.disabled).toBe(true)
+
+    await act(async () => setInputValue(container.querySelector("input"), "66"))
+    expect(searchBtn.disabled).toBe(true)
+
+    await act(async () => setInputValue(container.querySelector("input"), "66B"))
+    expect(searchBtn.disabled).toBe(false)
+  })
+
+  it("clicking the search button calls searchAddress with the street text plus the picked ward/province", async () => {
+    const { container } = await renderField()
+    const [provinceSelect, wardSelect] = container.querySelectorAll("select")
+    await act(async () => setSelectValue(provinceSelect, "30"))
+    await act(async () => setSelectValue(wardSelect, "00003"))
+    await act(async () => setInputValue(container.querySelector("input"), "66B Nguyen Si Sach"))
+
+    const searchBtn = container.querySelector('button[aria-label="Search address"]')
+    await act(async () => searchBtn.click())
+
+    expect(searchAddress).toHaveBeenCalledWith("66B Nguyen Si Sach", "Hiệp Bình", "Hồ Chí Minh")
+  })
+
+  it("picking a search result fills the street field and re-emits address_raw, without overriding the already-picked ward/province", async () => {
+    searchAddress.mockResolvedValue({
+      predictions: [{
+        place_id: "1",
+        description: "66b Nguyễn Sĩ Sách, Tân Sơn, Hồ Chí Minh",
+        structured_formatting: { main_text: "66b Nguyễn Sĩ Sách" },
+      }],
+    })
+    const { container, onChange } = await renderField()
+    const [provinceSelect, wardSelect] = container.querySelectorAll("select")
+    await act(async () => setSelectValue(provinceSelect, "30"))
+    await act(async () => setSelectValue(wardSelect, "00003"))
+    await act(async () => setInputValue(container.querySelector("input"), "66B Nguyen Si Sach"))
+    await act(async () => container.querySelector('button[aria-label="Search address"]').click())
+
+    const suggestionBtn = [...container.querySelectorAll("li button")][0]
+    await act(async () => suggestionBtn.click())
+
+    expect(container.querySelector("input").value).toBe("66b Nguyễn Sĩ Sách")
+    expect(onChange).toHaveBeenLastCalledWith({
+      address_raw: "66b Nguyễn Sĩ Sách, Hiệp Bình, Hồ Chí Minh",
+      address_street: "66b Nguyễn Sĩ Sách",
+      address_ward: "Hiệp Bình",
+      address_district: null,
+      address_province: "Hồ Chí Minh",
+    })
   })
 })

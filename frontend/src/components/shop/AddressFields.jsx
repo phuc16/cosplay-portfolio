@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
-import { fetchProvinces, fetchWards } from "../../api/shop"
+import { fetchProvinces, fetchWards, searchAddress } from "../../api/shop"
+
+const searchIcon = (
+  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <circle cx="11" cy="11" r="7" strokeWidth="2" />
+    <path strokeLinecap="round" strokeWidth="2" d="M21 21l-4.35-4.35" />
+  </svg>
+)
 
 /**
  * Province (34) + ward picked from reference data, not a live per-keystroke
@@ -12,9 +19,12 @@ import { fetchProvinces, fetchWards } from "../../api/shop"
  * keeps us off a third party's free API almost entirely rather than baking
  * a copy of the data into this repo to go stale.
  *
- * Street/house-number stays a plain text field — no autocomplete — since
- * province+ward are already exact, and that free-text remainder is short
- * enough not to need one.
+ * Street/house-number is a plain text field with an optional on-demand
+ * search: a button, not per-keystroke autocomplete, so a buyer chooses when
+ * to spend a lookup rather than firing one on every character typed. The
+ * already-picked ward/province scope the search query, which resolves a
+ * short, ambiguous street name to the right area instead of a same-named
+ * street elsewhere in the country.
  */
 export default function AddressFields({ value, onChange }) {
   const { t } = useLanguage()
@@ -23,6 +33,8 @@ export default function AddressFields({ value, onChange }) {
   const [provinceCode, setProvinceCode] = useState("")
   const [wardCode, setWardCode] = useState("")
   const [street, setStreet] = useState(value.address_street || "")
+  const [streetSuggestions, setStreetSuggestions] = useState([])
+  const [searching, setSearching] = useState(false)
 
   useEffect(() => {
     fetchProvinces()
@@ -69,6 +81,27 @@ export default function AddressFields({ value, onChange }) {
 
   const onStreetChange = (text) => {
     setStreet(text)
+    setStreetSuggestions([])
+    emit({ provinceCode, wardCode, street: text })
+  }
+
+  // Explicit click only — never wired to onChange/an effect, so this never
+  // fires per keystroke the way the original Goong design did.
+  const onSearchStreet = () => {
+    if (street.trim().length < 3 || searching) return
+    const wardName = wards.find((w) => w.code === wardCode)?.name || ""
+    const provinceName = provinces.find((p) => p.code === provinceCode)?.name || ""
+    setSearching(true)
+    searchAddress(street, wardName, provinceName)
+      .then((data) => setStreetSuggestions(data.predictions?.slice(0, 5) || []))
+      .catch(() => setStreetSuggestions([]))
+      .finally(() => setSearching(false))
+  }
+
+  const pickStreetSuggestion = (s) => {
+    const text = s.structured_formatting?.main_text || s.description
+    setStreet(text)
+    setStreetSuggestions([])
     emit({ provinceCode, wardCode, street: text })
   }
 
@@ -99,15 +132,43 @@ export default function AddressFields({ value, onChange }) {
           </select>
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-2 relative">
           <label className="block text-sm mb-1">{t("checkoutStreet")}</label>
-          <input
-            type="text"
-            value={street}
-            onChange={(e) => onStreetChange(e.target.value)}
-            placeholder={t("checkoutStreetPlaceholder")}
-            className={selectCls}
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={street}
+              onChange={(e) => onStreetChange(e.target.value)}
+              placeholder={t("checkoutStreetPlaceholder")}
+              className={selectCls}
+            />
+            <button
+              type="button"
+              onClick={onSearchStreet}
+              disabled={street.trim().length < 3 || searching}
+              aria-label={t("checkoutStreetSearch")}
+              title={t("checkoutStreetSearch")}
+              className="shrink-0 px-3 rounded-lg border border-[var(--border-brand)] disabled:opacity-40"
+            >
+              {searchIcon}
+            </button>
+          </div>
+
+          {streetSuggestions.length > 0 && (
+            <ul className="absolute z-10 w-full bg-[var(--surface-card)] border border-[var(--border-brand)] rounded-lg mt-1 overflow-hidden">
+              {streetSuggestions.map((s) => (
+                <li key={s.place_id || s.description}>
+                  <button
+                    type="button"
+                    onClick={() => pickStreetSuggestion(s)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--brand-soft)]"
+                  >
+                    {s.description}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

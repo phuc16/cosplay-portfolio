@@ -65,5 +65,44 @@ module.exports = function shopRoutes() {
     }
   })
 
+  // On-demand street/house-number search, gated behind an explicit
+  // search-button click in AddressFields.jsx (not fired per keystroke —
+  // that per-character design was tried and dropped for calling Goong far
+  // too often). ward/province scope the query text so a short, ambiguous
+  // street name resolves to the right province instead of a same-named
+  // street elsewhere in the country. Proxied server-side (key never reaches
+  // the browser) with its own addressLimiter (server.js) as defense in
+  // depth against a script bypassing the button and hitting this directly.
+  router.get("/address-search", async (req, res) => {
+    const goongApiKey = process.env.GOONG_API_KEY || ""
+    const input = String(req.query.input || "").trim()
+    const ward = String(req.query.ward || "").trim()
+    const province = String(req.query.province || "").trim()
+    if (input.length < 3) return res.json({ predictions: [] })
+    if (!goongApiKey) return res.json({ predictions: [] })
+
+    try {
+      const query = [input, ward, province].filter(Boolean).join(", ")
+      const url = new URL("https://rsapi.goong.io/v2/place/autocomplete")
+      url.searchParams.set("api_key", goongApiKey)
+      url.searchParams.set("input", query)
+      url.searchParams.set("limit", "5")
+      url.searchParams.set("more_compound", "true")
+
+      const goongRes = await fetch(url)
+      if (!goongRes.ok) {
+        console.warn(`[SHOP] Goong autocomplete trả về ${goongRes.status}`)
+        return res.json({ predictions: [] })
+      }
+      const data = await goongRes.json()
+      res.json({ predictions: data.predictions || [] })
+    } catch (err) {
+      // Never surfaces as an error to the buyer — the search button just
+      // shows no results, same as an empty response.
+      console.error("[SHOP] Lỗi gọi Goong autocomplete:", err.message)
+      res.json({ predictions: [] })
+    }
+  })
+
   return router
 }

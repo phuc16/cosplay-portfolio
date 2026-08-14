@@ -131,6 +131,24 @@ const storageLimiter = rateLimit({
   },
 })
 
+// On-demand street search: 20/phút per IP. Only fires on an explicit
+// search-button click (not per keystroke), but still capped independent of
+// whatever limit Goong itself allows, in case a script bypasses the button
+// and hits the endpoint directly — the key never reaches the browser to be
+// extracted and called that way, but the route itself is still public.
+const addressLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:address:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Address IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều yêu cầu. Thử lại sau." })
+  },
+})
+
 // Order creation: 10/hour per IP. Reservation holds stock, so unchecked
 // submissions could exhaust a limited drop before anyone pays.
 const orderLimiter = rateLimit({
@@ -293,6 +311,9 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 })
 
 // ── SHOP: public storefront ──
+// address-search gets its own stricter limiter ahead of the router's
+// general publicLimiter (both apply; addressLimiter's 20/min binds first).
+app.use(`${API_PREFIX}/shop/address-search`, addressLimiter)
 app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
 
 // ── ORDERS: public order creation + lookup. Creation gets its own stricter

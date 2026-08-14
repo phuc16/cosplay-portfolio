@@ -328,7 +328,28 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
-## 2026-08-14 — Replaced Goong autocomplete with a static province/ward picker, then moved that off local static files onto a cached API
+## 2026-08-14 — Goong brought back, but only for an on-demand street search
+
+Follow-up: is there still a place for Goong now that province/ward are a
+static picker? Yes, for the free-text street/house-number field, but
+scoped very differently from the original design. Explicitly gated
+behind a search-button click in `AddressFields.jsx` — never wired to
+`onChange` or an effect — so it can never fire per keystroke the way the
+original design (and its 6-calls-per-address problem) did. The click
+handler sends the already-picked ward + province name alongside the
+typed text (`GET /api/shop/address-search`, `backend/routes/shop.js`),
+which measurably improves relevance: searching "66B Nguyễn Sĩ Sách" alone
+matched a same-named street in Bắc Ninh; adding ", Long Bình, Hồ Chí
+Minh" correctly resolved it to the intended Hồ Chí Minh address (verified
+directly against Goong's API before wiring this up).
+
+Brought back `GOONG_API_KEY` (backend-only, still never sent to the
+browser) and a dedicated `addressLimiter` (20/min per IP) as defense in
+depth in case a script bypasses the button and hits the route directly —
+though the button-gated design already keeps real usage far under that.
+Picking a suggestion only fills the street field; the buyer's own
+province/ward picks are never overwritten by whatever Goong's `compound`
+data says, since those are already the source of truth.
 
 Live testing showed the real cost of the per-keystroke Goong design: typing
 one address fired 6+ requests (network tab: `input=512,` → `input=512,+`

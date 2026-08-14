@@ -15,6 +15,11 @@ export const fetchProvinces = () =>
 export const fetchWards = (provinceCode) =>
   api.get(`/api/shop/wards/${provinceCode}`).then((r) => r.data)
 
+// On-demand street search — only called from an explicit search-button
+// click (see AddressFields.jsx), never per keystroke.
+export const searchAddress = (input, ward, province) =>
+  api.get("/api/shop/address-search", { params: { input, ward, province } }).then((r) => r.data)
+
 // ── Admin catalog (JWT is set globally on axios by Admin.jsx) ──
 export const adminListCollections = () =>
   api.get("/api/admin/collections").then((r) => r.data)

@@ -9,11 +9,19 @@ import { readCart } from "../shop/cart"
 const fetchPaymentMethods = vi.fn()
 const createOrder = vi.fn()
 const fetchCollection = vi.fn()
+// AddressFields.jsx (rendered when fulfillment === "ship") calls these on
+// mount — must resolve, not just exist, or its effect throws synchronously.
+const fetchProvinces = vi.fn().mockResolvedValue([])
+const fetchWards = vi.fn().mockResolvedValue([])
+const searchAddress = vi.fn().mockResolvedValue({ predictions: [] })
 
 vi.mock("../api/shop", () => ({
   fetchPaymentMethods: (...args) => fetchPaymentMethods(...args),
   createOrder: (...args) => createOrder(...args),
   fetchCollection: (...args) => fetchCollection(...args),
+  fetchProvinces: (...args) => fetchProvinces(...args),
+  fetchWards: (...args) => fetchWards(...args),
+  searchAddress: (...args) => searchAddress(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
