@@ -328,6 +328,19 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
+## 2026-08-14 — Street-search suggestion picker lost building/complex names
+
+Live testing surfaced the bug immediately: picking "Sảnh chính S3.01, CC
+Vinhomes Grand Park, Nguyễn Xiển, Long Bình, Hồ Chí Minh" only filled
+"Sảnh chính S3.01" — `structured_formatting.main_text` is Goong's *short*
+label for a named place (a building/complex), not the full detail; "CC
+Vinhomes Grand Park" and the street name were silently dropped. Fixed by
+using `description` (the full string) instead, with the already-known
+ward+province suffix stripped off the end (we already have those from our
+own pickers — no need to duplicate them into `address_street`, and Goong's
+own guess for them can differ slightly from what the buyer actually
+selected).
+
 ## 2026-08-14 — Goong brought back, but only for an on-demand street search
 
 Follow-up: is there still a place for Goong now that province/ward are a

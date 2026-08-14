@@ -52,9 +52,12 @@ export default function AddressFields({ value, onChange }) {
       .catch(() => setWards([]))
   }, [provinceCode])
 
+  const wardNameFor = (code) => wards.find((w) => w.code === code)?.name || ""
+  const provinceNameFor = (code) => provinces.find((p) => p.code === code)?.name || ""
+
   const emit = (next) => {
-    const provinceName = provinces.find((p) => p.code === next.provinceCode)?.name || ""
-    const wardName = wards.find((w) => w.code === next.wardCode)?.name || ""
+    const provinceName = provinceNameFor(next.provinceCode)
+    const wardName = wardNameFor(next.wardCode)
     const parts = [next.street, wardName, provinceName].filter(Boolean)
     onChange({
       address_raw: parts.join(", "),
@@ -89,17 +92,25 @@ export default function AddressFields({ value, onChange }) {
   // fires per keystroke the way the original Goong design did.
   const onSearchStreet = () => {
     if (street.trim().length < 3 || searching) return
-    const wardName = wards.find((w) => w.code === wardCode)?.name || ""
-    const provinceName = provinces.find((p) => p.code === provinceCode)?.name || ""
     setSearching(true)
-    searchAddress(street, wardName, provinceName)
+    searchAddress(street, wardNameFor(wardCode), provinceNameFor(provinceCode))
       .then((data) => setStreetSuggestions(data.predictions?.slice(0, 5) || []))
       .catch(() => setStreetSuggestions([]))
       .finally(() => setSearching(false))
   }
 
   const pickStreetSuggestion = (s) => {
-    const text = s.structured_formatting?.main_text || s.description
+    // s.structured_formatting.main_text is too short for anything Goong
+    // treats as a named place (e.g. an apartment block: "Sảnh chính S3.01"
+    // alone, dropping "CC Vinhomes Grand Park" entirely) — the full
+    // description carries the detail. It also repeats the ward/province we
+    // already sent it (and already have from our own pickers), so that
+    // known suffix is stripped rather than duplicated into address_street.
+    let text = s.description || s.structured_formatting?.main_text || ""
+    const suffix = [wardNameFor(wardCode), provinceNameFor(provinceCode)].filter(Boolean).join(", ")
+    if (suffix && text.endsWith(suffix)) {
+      text = text.slice(0, text.length - suffix.length).replace(/,\s*$/, "")
+    }
     setStreet(text)
     setStreetSuggestions([])
     emit({ provinceCode, wardCode, street: text })

@@ -156,28 +156,30 @@ describe("AddressFields — on-demand street search (not per-keystroke)", () => 
     expect(searchAddress).toHaveBeenCalledWith("66B Nguyen Si Sach", "Hiệp Bình", "Hồ Chí Minh")
   })
 
-  it("picking a search result fills the street field and re-emits address_raw, without overriding the already-picked ward/province", async () => {
+  it("picking a search result fills the street field with the full description (not the too-short main_text), stripping the already-known ward/province suffix", async () => {
     searchAddress.mockResolvedValue({
       predictions: [{
         place_id: "1",
-        description: "66b Nguyễn Sĩ Sách, Tân Sơn, Hồ Chí Minh",
-        structured_formatting: { main_text: "66b Nguyễn Sĩ Sách" },
+        description: "Sảnh chính S3.01, CC Vinhomes Grand Park, Nguyễn Xiển, Hiệp Bình, Hồ Chí Minh",
+        // main_text alone would lose "CC Vinhomes Grand Park" — the real
+        // bug this test guards against.
+        structured_formatting: { main_text: "Sảnh chính S3.01" },
       }],
     })
     const { container, onChange } = await renderField()
     const [provinceSelect, wardSelect] = container.querySelectorAll("select")
     await act(async () => setSelectValue(provinceSelect, "30"))
     await act(async () => setSelectValue(wardSelect, "00003"))
-    await act(async () => setInputValue(container.querySelector("input"), "66B Nguyen Si Sach"))
+    await act(async () => setInputValue(container.querySelector("input"), "Sanh chinh S3.01"))
     await act(async () => container.querySelector('button[aria-label="Search address"]').click())
 
     const suggestionBtn = [...container.querySelectorAll("li button")][0]
     await act(async () => suggestionBtn.click())
 
-    expect(container.querySelector("input").value).toBe("66b Nguyễn Sĩ Sách")
+    expect(container.querySelector("input").value).toBe("Sảnh chính S3.01, CC Vinhomes Grand Park, Nguyễn Xiển")
     expect(onChange).toHaveBeenLastCalledWith({
-      address_raw: "66b Nguyễn Sĩ Sách, Hiệp Bình, Hồ Chí Minh",
-      address_street: "66b Nguyễn Sĩ Sách",
+      address_raw: "Sảnh chính S3.01, CC Vinhomes Grand Park, Nguyễn Xiển, Hiệp Bình, Hồ Chí Minh",
+      address_street: "Sảnh chính S3.01, CC Vinhomes Grand Park, Nguyễn Xiển",
       address_ward: "Hiệp Bình",
       address_district: null,
       address_province: "Hồ Chí Minh",
