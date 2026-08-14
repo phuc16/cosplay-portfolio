@@ -42,11 +42,17 @@ async function getSocialLinks() {
     const facebookUrl = social.find((s) => s.platform === "facebook")?.url
     const messenger = contactLinks.find((c) => c.type === "messenger")?.value
     const instagramUrl = social.find((s) => s.platform === "instagram")?.url
+    // Same transform as Portfolio.jsx's contactHref: the admin field accepts
+    // either a bare username or a full m.me URL (the one actually saved
+    // today is a full URL) — only bare values get the https://m.me/ prefix.
+    const messengerUrl = messenger
+      ? (/^https?:\/\//i.test(messenger) ? messenger : `https://m.me/${messenger.replace(/^@/, "")}`)
+      : null
 
     // Display order: Facebook, Messenger, Instagram.
     const links = []
     if (facebookUrl) links.push({ platform: "facebook", url: facebookUrl })
-    if (messenger) links.push({ platform: "messenger", url: `https://m.me/${messenger.replace(/^@/, "")}` })
+    if (messengerUrl) links.push({ platform: "messenger", url: messengerUrl })
     if (instagramUrl) links.push({ platform: "instagram", url: instagramUrl })
     return links
   } catch {

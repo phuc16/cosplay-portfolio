@@ -379,6 +379,22 @@ describe("sendQueued: footer (social links + automated-email notice)", () => {
     expect(html.indexOf('alt="facebook"')).toBeLessThan(html.indexOf('alt="messenger"'))
   })
 
+  it("uses a full m.me URL as-is instead of double-prefixing it (matches the value admin actually saves)", async () => {
+    await db.query("DELETE FROM site_settings")
+    await db.query("INSERT INTO site_settings (config) VALUES (?)", [JSON.stringify({
+      contact: { contactLinks: [{ type: "messenger", value: "https://m.me/kamimoe1911" }] },
+    })])
+
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("https://m.me/kamimoe1911")
+    expect(html).not.toContain("https://m.me/https://")
+  })
+
   it("renders no badge row at all when nothing is configured", async () => {
     await db.query("DELETE FROM site_settings")
 
