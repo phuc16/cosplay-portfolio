@@ -198,23 +198,28 @@
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
 /* ── Responsive (portfolio page) — mirrors the reference breakpoints ── */
+/* Tablet (761-980px) gets its own 2-column treatment for the 3-card info
+   grid, instead of falling all the way to mobile's single column — the
+   extra width over a phone was otherwise going unused. */
+@media (min-width: 761px) and (max-width: 980px) {
+  .info-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
 @media (max-width: 980px) {
-  .info-grid { grid-template-columns: 1fr !important; }
   .proj-grid { grid-template-columns: 1fr !important; }
-  .contact-card { grid-template-columns: 1fr !important; }
 }
 @media (max-width: 760px) {
   .nav-links { display: none !important; }
   .nav-inner { padding: 0 16px !important; }
   .sec-wrap { padding-left: 16px !important; padding-right: 16px !important; }
   .album-grid { grid-template-columns: 1fr 1fr !important; }
+  .info-grid { grid-template-columns: 1fr !important; }
   .hero-card { height: 300px !important; }
   .hero-left { max-width: 100% !important; padding: 0 24px 28px !important; }
   .hero-title { font-size: 36px !important; }
   /* Cutout stays right + pops above the card, but rises less so it never
      reaches the navbar's VI/EN switch (card sits 20px below the navbar). */
   .hero-cutout { top: -18px !important; }
-  .contact-card { padding: 24px 20px !important; gap: 24px !important; }
+  .contact-card { grid-template-columns: 1fr !important; padding: 24px 20px !important; gap: 24px !important; }
   .footer-char { display: none !important; }
   .support-row { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; }
   /* Footer: stack + center the two lines, no Admin button on mobile */
@@ -222,7 +227,10 @@
   .footer-admin { display: none !important; }
 }
 @media (max-width: 460px) {
-  .hero-card { height: 300px !important; }
+  /* Narrower than the width shrinking justifies a flat 300px — scaled down
+     further so a 375px-wide phone doesn't get the same hero height as a
+     750px-wide one. */
+  .hero-card { height: 240px !important; }
   .hero-left { padding: 0 18px 22px !important; }
   .hero-title { font-size: 30px !important; }
   .album-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }

@@ -28,10 +28,10 @@ const clampQty = (n, v) => {
  */
 function galleryColumnClasses(count) {
   if (count <= 2) return "columns-2"
-  if (count <= 4) return "columns-2 sm:columns-3"
-  if (count <= 8) return "columns-2 sm:columns-4"
-  if (count <= 16) return "columns-3 sm:columns-5 lg:columns-6"
-  return "columns-3 sm:columns-6 lg:columns-8"
+  if (count <= 4) return "columns-2 sm:columns-3 md:columns-4"
+  if (count <= 8) return "columns-2 sm:columns-3 md:columns-4 lg:columns-5"
+  if (count <= 16) return "columns-3 sm:columns-4 md:columns-5 lg:columns-6"
+  return "columns-3 sm:columns-5 md:columns-6 lg:columns-8"
 }
 
 export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {

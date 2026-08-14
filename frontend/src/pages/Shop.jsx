@@ -24,7 +24,7 @@ export default function Shop() {
       {collections === null && <p className="opacity-60">{t("shopLoading")}</p>}
       {collections?.length === 0 && <p className="opacity-60">{t("shopEmpty")}</p>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
         {collections?.map((c) => (
           <Link
             key={c.id}

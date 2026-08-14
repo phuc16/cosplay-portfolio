@@ -256,6 +256,35 @@ change was needed: `catalogRepo.replaceVariants` already derives each
 variant's `sort_order` from its position in the array the frontend sends,
 so reordering `rows` client-side before save is the entire feature.
 
+## 2026-08-14 — Tablet-specific grid/thumbnail breakpoints added across shop + portfolio
+
+A responsive audit found every grid layout in the shop and portfolio
+jumped straight from a mobile (Tailwind `sm:`, ≤640px) breakpoint to a
+desktop one (`lg:`, ≥1024px) with no `md:` (768px) rung — so a tablet in
+portrait or landscape (768-1023px, e.g. any iPad) got the exact same
+layout as a phone in landscape, wasting the extra width. Confirmed against
+`AdminAlbumImages.jsx`, which already used the full `sm:`/`md:`/`lg:`
+ladder — proving the gap elsewhere was an inconsistency, not a framework
+limit.
+
+Fixed: the collection grid (Shop.jsx) and product grid (Collection.jsx)
+now step 1→2→3 columns at `sm:`/`md:` instead of 1→2→3 at `sm:`/`lg:`. The
+variant-photo gallery masonry (`ProductCard.jsx`'s `galleryColumnClasses`)
+gained a `md:` rung at every tier. On the portfolio page, the 3-card info
+grid (photos/info/achievements) now gets a dedicated 2-column tablet
+layout (761-980px) instead of collapsing straight to mobile's 1 column —
+matching `useBreakpoint()`'s existing mobile/tablet/desktop buckets, which
+some CSS already tracked but didn't fully use. The hero ("wallpaper")
+card's height, previously a flat 300px at both ≤760px and ≤460px, now
+scales down further to 240px at ≤460px, since a 375px-wide phone and a
+750px-wide one were getting an identical banner height/aspect. The
+per-slide hero-cover crop positioning is percentage-based, so it adapts to
+the new height automatically — no separate fix needed there.
+
+No list/grid view-mode toggle exists anywhere in the app, confirmed by
+grep — "list type of an item" in the request most likely referred to the
+existing single-column mobile collapse, not a feature to add.
+
 ## 2026-08-14 — "Merchandise" now translated to Vietnamese ("Cửa hàng")
 
 Reverses part of the 2026-08-11 decision to keep "Merchandise" identical
