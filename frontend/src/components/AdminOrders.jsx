@@ -45,12 +45,13 @@ function byActionableFirst(a, b) {
 
 /** Strips filter params that are empty, so the query string only ever
  * carries what the seller actually chose. */
-function buildFilterParams({ status, collectionId, dateFrom, dateTo }) {
+function buildFilterParams({ status, collectionId, dateFrom, dateTo, search }) {
   const params = {}
   if (status) params.status = status
   if (collectionId) params.collection_id = collectionId
   if (dateFrom) params.date_from = dateFrom
   if (dateTo) params.date_to = dateTo
+  if (search) params.search = search
   return params
 }
 
@@ -61,6 +62,15 @@ export default function AdminOrders() {
   const [collectionId, setCollectionId] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  // Debounced separately from the other filters (which apply immediately on
+  // change) so typing a name/phone/email doesn't fire a request per
+  // keystroke — only once the seller pauses for 400ms.
+  const [searchInput, setSearchInput] = useState("")
+  const [search, setSearch] = useState("")
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 400)
+    return () => clearTimeout(timer)
+  }, [searchInput])
   const [detail, setDetail] = useState(null)
   // The transfer note is derived (backend/shop/payments/instructions.js
   // transferNote), not stored on the order row — reused via the same public
@@ -75,7 +85,7 @@ export default function AdminOrders() {
   const [bulkAction, setBulkAction] = useState(null)
   const [bulkBusy, setBulkBusy] = useState(false)
 
-  const filters = { status: filter, collectionId, dateFrom, dateTo }
+  const filters = { status: filter, collectionId, dateFrom, dateTo, search }
   const reload = () => adminListOrders(buildFilterParams(filters)).then(setOrders)
 
   useEffect(() => {
@@ -88,7 +98,7 @@ export default function AdminOrders() {
     setSelected(new Set())
     setBulkResults(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, collectionId, dateFrom, dateTo])
+  }, [filter, collectionId, dateFrom, dateTo, search])
 
   const openDetail = async (id) => {
     const o = await adminGetOrder(id)
@@ -210,6 +220,17 @@ export default function AdminOrders() {
     <div>
       <div className="flex items-end gap-3 mb-4 flex-wrap">
         <h3 className="text-xl font-semibold">Đơn hàng</h3>
+
+        <label className="flex flex-col text-xs gap-1">
+          Tìm kiếm
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Mã đơn, tên, SĐT, email..."
+            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent w-48"
+          />
+        </label>
 
         <label className="flex flex-col text-xs gap-1">
           Trạng thái

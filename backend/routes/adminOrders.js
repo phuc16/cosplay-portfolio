@@ -43,6 +43,7 @@ module.exports = function adminOrderRoutes() {
         collection_id: req.query.collection_id,
         date_from: req.query.date_from,
         date_to: req.query.date_to,
+        search: req.query.search,
       })
       res.json(orders.map(withAllowedTransitions))
     } catch (err) { oops(res, err, "Lỗi liệt kê đơn") }

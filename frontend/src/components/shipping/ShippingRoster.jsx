@@ -2,11 +2,24 @@ import { useEffect, useRef, useState } from "react"
 import { adminListCollections, adminGetPickupRoster } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 
+// Hides a non-matching row on screen (className "hidden") but forces it back
+// with "print:table-row" when actually printing — this is a physical
+// checklist staff hand out at the event door, so filtering it for a quick
+// on-screen lookup must never also silently drop people from the printed
+// page.
+function matchesSearch(r, term) {
+  if (!term) return true
+  const needle = term.trim().toLowerCase()
+  if (!needle) return true
+  return [r.order_code, r.buyer_name, r.phone, r.pickup_code].some((f) => String(f || "").toLowerCase().includes(needle))
+}
+
 export default function ShippingRoster() {
   const [collections, setCollections] = useState([])
   const [collectionId, setCollectionId] = useState("")
   const [roster, setRoster] = useState(null)
   const [error, setError] = useState("")
+  const [search, setSearch] = useState("")
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -51,6 +64,18 @@ export default function ShippingRoster() {
           </select>
         </label>
         {roster && (
+          <label className="flex flex-col text-xs gap-1 max-w-xs">
+            Tìm kiếm
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Mã đơn, tên, SĐT, mã nhận..."
+              className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+          </label>
+        )}
+        {roster && (
           <button type="button" onClick={() => window.print()}
             className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-brand)]">
             In
@@ -75,7 +100,11 @@ export default function ShippingRoster() {
           {roster.rows.length === 0
             ? <p className="opacity-60">Không có đơn nhận tại chỗ nào đã xác nhận trong bộ sưu tập này.</p>
             : (
-              <div className="overflow-x-auto">
+              <>
+                {search.trim() && roster.rows.every((r) => !matchesSearch(r, search)) && (
+                  <p className="opacity-60 mb-3 print:hidden">Không tìm thấy đơn nào khớp.</p>
+                )}
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left opacity-70">
@@ -91,7 +120,10 @@ export default function ShippingRoster() {
                   </thead>
                   <tbody>
                     {roster.rows.map((r) => (
-                      <tr key={r.order_id} className="border-t border-[var(--border-brand)]">
+                      <tr
+                        key={r.order_id}
+                        className={`border-t border-[var(--border-brand)] ${matchesSearch(r, search) ? "" : "hidden print:table-row"}`}
+                      >
                         <td className="pr-2 py-1">☐</td>
                         <td className="pr-2 py-1">{r.order_code}</td>
                         <td className="pr-2 py-1">{r.pickup_code}</td>
@@ -114,7 +146,8 @@ export default function ShippingRoster() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </>
             )}
         </>
       )}

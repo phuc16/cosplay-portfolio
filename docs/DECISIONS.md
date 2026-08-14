@@ -5,6 +5,24 @@ outside of the formal specs in `docs/superpowers/specs/`. Each entry is a
 decision the user made during live testing or discussion — not a
 implementation detail (those live in code comments/commit messages).
 
+## 2026-08-14 — Admin order search: no scope on "statistic" pages, id search doesn't match the display code
+
+Asked for search across order/ship/statistic admin pages, by id, name,
+phone, or email. The statistic pages (`StatsDrop`, `StatsRestock`,
+`StatsBookkeeping`) only render aggregates — no per-order listing exists
+there to search, so that part of the request has no surface to attach to
+in the current app.
+
+Delivered: server-side search on `GET /api/admin/orders` (id/name/phone/
+email, `AND`-combined with the existing status/collection/date filters);
+client-side search on `ShippingExport` and `ShippingRoster` (both already
+fetch their full, non-paginated order lists in one shot, so a backend
+param would be pure overhead). A numeric search term only matches an
+order's raw `id`, never the Shopee-style `order_code` shown to buyers —
+`order_code` is a computed display value, not a stored column, so matching
+it would need decoding first, same rule as everywhere else `order_code`
+isn't the DB key.
+
 ## 2026-08-10 — Pickup code only revealed once paid
 
 `pickup_code` (Event Pickup Verification) must only be shown to the buyer

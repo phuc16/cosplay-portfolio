@@ -77,6 +77,62 @@ describe("GET /api/admin/orders", () => {
     expect(res.status).toBe(200)
     expect(res.body.map((row) => row.id)).toContain(o.id)
   })
+
+  describe("search", () => {
+    it("matches by exact numeric id", async () => {
+      const o = await seedOrder()
+      await seedOrder({ buyer: { ...buyer, buyer_name: "Someone Else" } })
+
+      const res = await authed(request(app).get(`/api/admin/orders?search=${o.id}`))
+      expect(res.body.map((row) => row.id)).toEqual([o.id])
+    })
+
+    it("matches by partial buyer name, case-insensitively", async () => {
+      const o = await seedOrder({ buyer: { ...buyer, buyer_name: "Nguyễn Văn A" } })
+      await seedOrder({ buyer: { ...buyer, buyer_name: "Someone Else" } })
+
+      const res = await authed(request(app).get("/api/admin/orders?search=nguyễn"))
+      expect(res.body.map((row) => row.id)).toEqual([o.id])
+    })
+
+    it("matches by partial phone", async () => {
+      const o = await seedOrder({ buyer: { ...buyer, phone: "0912345678" } })
+      await seedOrder({ buyer: { ...buyer, phone: "0987654321" } })
+
+      const res = await authed(request(app).get("/api/admin/orders?search=1234"))
+      expect(res.body.map((row) => row.id)).toEqual([o.id])
+    })
+
+    it("matches by partial email", async () => {
+      const o = await seedOrder({ buyer: { ...buyer, email: "buyer@gmail.com" } })
+      await seedOrder({ buyer: { ...buyer, email: "other@yahoo.com" } })
+
+      const res = await authed(request(app).get("/api/admin/orders?search=gmail"))
+      expect(res.body.map((row) => row.id)).toEqual([o.id])
+    })
+
+    it("returns an empty list rather than everything when nothing matches", async () => {
+      await seedOrder()
+      const res = await authed(request(app).get("/api/admin/orders?search=doesnotexist"))
+      expect(res.body).toEqual([])
+    })
+
+    it("a numeric search term that isn't an order id still matches on phone/email substring", async () => {
+      const o = await seedOrder({ buyer: { ...buyer, phone: "0912345678" } })
+      // "12345" isn't this order's id, but is a substring of its phone.
+      const res = await authed(request(app).get("/api/admin/orders?search=12345"))
+      expect(res.body.map((row) => row.id)).toContain(o.id)
+    })
+
+    it("combines with other filters (status) rather than overriding them", async () => {
+      const matchButWrongStatus = await seedOrder({ buyer: { ...buyer, buyer_name: "Findme" } })
+      const matchAndRightStatus = await seedOrder({ buyer: { ...buyer, buyer_name: "Findme Too" } })
+      await orders.transitionOrder(matchAndRightStatus.id, "confirmed")
+
+      const res = await authed(request(app).get("/api/admin/orders?search=findme&status=confirmed"))
+      expect(res.body.map((row) => row.id)).toEqual([matchAndRightStatus.id])
+    })
+  })
 })
 
 describe("allowed_transitions", () => {

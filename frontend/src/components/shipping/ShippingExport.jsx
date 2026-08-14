@@ -53,8 +53,21 @@ function downloadBase64(base64, filename) {
   URL.revokeObjectURL(url)
 }
 
+// Client-side, not a backend param: this list is already fetched in full
+// (every ship order still awaiting a tracking code — never large enough to
+// paginate), so filtering what's already in memory is simpler than adding
+// a search param to a route with no other filters today.
+function matchesSearch(o, term) {
+  if (!term) return true
+  const needle = term.trim().toLowerCase()
+  if (!needle) return true
+  return [String(o.id), o.order_code, o.buyer_name, o.phone]
+    .some((f) => String(f || "").toLowerCase().includes(needle))
+}
+
 export default function ShippingExport() {
   const [orders, setOrders] = useState([])
+  const [search, setSearch] = useState("")
   const [selected, setSelected] = useState(new Set())
   const [tenHangHoa, setTenHangHoa] = useState("")
   const [trongLuong, setTrongLuong] = useState("")
@@ -120,51 +133,68 @@ export default function ShippingExport() {
     }
   }
 
+  const visibleOrders = orders.filter((o) => matchesSearch(o, search))
+
   return (
     <div>
       {orders.length === 0 && <p className="opacity-60">Không có đơn nào cần xuất.</p>}
 
       {orders.length > 0 && (
         <>
-          <div className="overflow-x-auto -mx-1 px-1 mb-4">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="text-left opacity-70">
-                  <th></th>
-                  <th className="pr-2">Mã đơn</th>
-                  <th className="pr-2">Người nhận</th>
-                  <th className="pr-2">Tỉnh/Thành</th>
-                  <th className="pr-2">Giá trị</th>
-                  <th>Miễn phí ship</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => (
-                  <tr key={o.id} className="border-t border-[var(--border-brand)]">
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(o.id)}
-                        onChange={() => toggleSelected(o.id)}
-                      />
-                    </td>
-                    <td className="pr-2 py-1">{o.order_code}</td>
-                    <td className="pr-2 py-1">{o.buyer_name}</td>
-                    <td className="pr-2 py-1">{o.address_province || "—"}</td>
-                    <td className="pr-2 py-1">{formatVnd(o.total)}</td>
-                    <td className="py-1">
-                      <input
-                        type="checkbox"
-                        data-testid={`freeship-${o.id}`}
-                        checked={o.shipping_payer === "seller"}
-                        onChange={() => toggleFreeship(o)}
-                      />
-                    </td>
+          <label className="flex flex-col text-xs gap-1 mb-3 max-w-xs">
+            Tìm kiếm
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Mã đơn, tên, SĐT..."
+              className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+          </label>
+
+          {visibleOrders.length === 0 && <p className="opacity-60 mb-4">Không tìm thấy đơn nào khớp.</p>}
+
+          {visibleOrders.length > 0 && (
+            <div className="overflow-x-auto -mx-1 px-1 mb-4">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="text-left opacity-70">
+                    <th></th>
+                    <th className="pr-2">Mã đơn</th>
+                    <th className="pr-2">Người nhận</th>
+                    <th className="pr-2">Tỉnh/Thành</th>
+                    <th className="pr-2">Giá trị</th>
+                    <th>Miễn phí ship</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {visibleOrders.map((o) => (
+                    <tr key={o.id} className="border-t border-[var(--border-brand)]">
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(o.id)}
+                          onChange={() => toggleSelected(o.id)}
+                        />
+                      </td>
+                      <td className="pr-2 py-1">{o.order_code}</td>
+                      <td className="pr-2 py-1">{o.buyer_name}</td>
+                      <td className="pr-2 py-1">{o.address_province || "—"}</td>
+                      <td className="pr-2 py-1">{formatVnd(o.total)}</td>
+                      <td className="py-1">
+                        <input
+                          type="checkbox"
+                          data-testid={`freeship-${o.id}`}
+                          checked={o.shipping_payer === "seller"}
+                          onChange={() => toggleFreeship(o)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <label className="flex flex-col text-xs gap-1">

@@ -341,6 +341,24 @@ async function listOrders(filter = {}) {
   const to = parseDateBoundary(filter.date_to, { endOfDay: true })
   if (to) { where.push("created_at <= ?"); params.push(to) }
 
+  // Free-text search across the identifiers an admin actually has on hand
+  // when looking up a specific order: its numeric id, the buyer's name,
+  // phone, or email. order_code (the Shopee-style display code) is a
+  // computed value, not a column, so an id search only matches the raw
+  // numeric id — a buyer quoting their display code would need it decoded
+  // first, same as everywhere else order_code isn't the DB key.
+  const search = String(filter.search || "").trim()
+  if (search) {
+    const clauses = ["buyer_name LIKE ?", "phone LIKE ?", "email LIKE ?"]
+    const clauseParams = [`%${search}%`, `%${search}%`, `%${search}%`]
+    if (/^\d+$/.test(search)) {
+      clauses.unshift("id = ?")
+      clauseParams.unshift(Number(search))
+    }
+    where.push(`(${clauses.join(" OR ")})`)
+    params.push(...clauseParams)
+  }
+
   const [rows] = await db.query(
     `SELECT * FROM orders ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY created_at DESC, id DESC`,

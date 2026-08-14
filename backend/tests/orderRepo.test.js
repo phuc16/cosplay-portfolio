@@ -630,6 +630,46 @@ describe("listOrders date filter", () => {
   })
 })
 
+describe("listOrders search", () => {
+  it("matches an exact numeric id, not just as a substring of something else", async () => {
+    const { variantId: v1 } = await seedVariant(5)
+    const match = await repo.createOrder(order(v1, 1))
+    const { variantId: v2 } = await seedVariant(5)
+    await repo.createOrder(order(v2, 1))
+
+    const rows = await repo.listOrders({ search: String(match.id) })
+    expect(rows.map((r) => r.id)).toEqual([match.id])
+  })
+
+  it("matches a phone/email/name substring case-insensitively when the term isn't numeric", async () => {
+    const { variantId } = await seedVariant(5)
+    const match = await repo.createOrder(order(variantId, 1, {
+      buyer: { ...buyer, buyer_name: "Trần Thị B", phone: "0911222333", email: "tranthib@example.com" },
+    }))
+    const { variantId: v2 } = await seedVariant(5)
+    await repo.createOrder(order(v2, 1, { buyer: { ...buyer, buyer_name: "Someone Else", phone: "0900000001", email: "other@example.com" } }))
+
+    expect((await repo.listOrders({ search: "trần" })).map((r) => r.id)).toEqual([match.id])
+    expect((await repo.listOrders({ search: "1222" })).map((r) => r.id)).toEqual([match.id])
+    expect((await repo.listOrders({ search: "tranthib" })).map((r) => r.id)).toEqual([match.id])
+  })
+
+  it("returns nothing rather than every order when the term matches no one", async () => {
+    const { variantId } = await seedVariant(5)
+    await repo.createOrder(order(variantId, 1))
+
+    expect(await repo.listOrders({ search: "nobody-has-this-name" })).toEqual([])
+  })
+
+  it("ignores a blank/whitespace-only search rather than matching nothing", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+
+    const rows = await repo.listOrders({ search: "   " })
+    expect(rows.map((r) => r.id)).toContain(res.id)
+  })
+})
+
 describe("getOrderByToken", () => {
   it("returns the order with its items", async () => {
     const { variantId } = await seedVariant(5)

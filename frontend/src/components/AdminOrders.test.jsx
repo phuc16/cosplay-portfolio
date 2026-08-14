@@ -97,6 +97,27 @@ describe("AdminOrders filters", () => {
       status: "pending", collection_id: "7", date_from: "2026-08-01", date_to: "2026-08-08",
     })
   })
+
+  it("sends search alongside the other filters, but only after the debounce settles (not per keystroke)", async () => {
+    adminListOrders.mockResolvedValue([order()])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    adminListOrders.mockClear()
+    adminListOrders.mockResolvedValue([order()])
+
+    const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT, email..."]')
+    await act(async () => setInputValue(searchInput, "0900000000"))
+
+    // Right after typing, the debounce (400ms) hasn't elapsed yet.
+    expect(adminListOrders).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450))
+    })
+
+    expect(adminListOrders).toHaveBeenLastCalledWith({ search: "0900000000" })
+  })
 })
 
 describe("AdminOrders bulk cancel", () => {

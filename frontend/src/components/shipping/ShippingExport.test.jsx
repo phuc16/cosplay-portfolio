@@ -90,6 +90,34 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("DH2")
   })
 
+  it("filters the visible list by order code, name, or phone, client-side (no extra API call)", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, order_code: "DH1", buyer_name: "Nguyễn Văn A", phone: "0901234567" }),
+      order({ id: 2, order_code: "DH2", buyer_name: "Trần Thị B", phone: "0909999999" }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+    adminListShippingExportOrders.mockClear()
+
+    const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT..."]')
+    await act(async () => setInputValue(searchInput, "trần"))
+
+    expect(container.textContent).toContain("DH2")
+    expect(container.textContent).not.toContain("DH1")
+    expect(adminListShippingExportOrders).not.toHaveBeenCalled()
+  })
+
+  it("shows a no-match message, not a crash, when the search matches nothing", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    const container = await renderShippingExport()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT..."]')
+    await act(async () => setInputValue(searchInput, "nobody"))
+
+    expect(container.textContent).toContain("Không tìm thấy đơn nào khớp")
+  })
+
   it("toggles freeship via adminSetShippingPayer when the freeship checkbox is clicked", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminSetShippingPayer.mockResolvedValue({ ok: true })

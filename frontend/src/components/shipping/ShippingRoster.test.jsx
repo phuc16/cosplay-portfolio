@@ -22,6 +22,14 @@ async function setSelectValue(el, value) {
   })
 }
 
+async function setInputValue(el, value) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+  await act(async () => {
+    setter.call(el, value)
+    el.dispatchEvent(new Event("change", { bubbles: true }))
+  })
+}
+
 async function renderComponent() {
   const container = document.createElement("div")
   document.body.appendChild(container)
@@ -217,5 +225,57 @@ describe("ShippingRoster", () => {
 
     expect(container.textContent).toContain("Người Hai")
     expect(container.textContent).not.toContain("Người Một")
+  })
+
+  it("hides non-matching rows on screen but keeps them for print, so a lookup can't shrink the printed roster", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+        },
+        {
+          order_id: 2, order_code: "DH2", buyer_name: "Trần Văn B", phone: "0900000002",
+          items: [{ product_name: "Poster", variant_label: "Std", qty: 1 }], paid: false, amount_due: 75000,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+    adminGetPickupRoster.mockClear()
+
+    const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT, mã nhận..."]')
+    await setInputValue(searchInput, "trần")
+
+    const rows = container.querySelectorAll("tbody tr")
+    expect(rows).toHaveLength(2)
+    expect(rows[0].className).toContain("hidden")
+    expect(rows[0].className).toContain("print:table-row")
+    expect(rows[1].className).not.toContain("hidden")
+    expect(adminGetPickupRoster).not.toHaveBeenCalled()
+  })
+
+  it("shows a no-match message, not a crash, when the search matches nothing", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT, mã nhận..."]')
+    await setInputValue(searchInput, "nobody")
+
+    expect(container.textContent).toContain("Không tìm thấy đơn nào khớp")
   })
 })
