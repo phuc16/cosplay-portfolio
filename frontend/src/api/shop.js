@@ -7,10 +7,13 @@ export const fetchCollections = () =>
 export const fetchCollection = (slug) =>
   api.get(`/api/shop/collections/${slug}`).then((r) => r.data)
 
-// Proxied through our backend (see routes/shop.js) rather than calling Goong
-// directly from the browser — keeps the API key server-side only.
-export const fetchAddressAutocomplete = (input) =>
-  api.get("/api/shop/address-autocomplete", { params: { input } }).then((r) => r.data)
+// Province/ward reference data — proxied + cached server-side (30 days,
+// see backend/shop/vnAddress.js), not a live per-keystroke lookup.
+export const fetchProvinces = () =>
+  api.get("/api/shop/provinces").then((r) => r.data)
+
+export const fetchWards = (provinceCode) =>
+  api.get(`/api/shop/wards/${provinceCode}`).then((r) => r.data)
 
 // ── Admin catalog (JWT is set globally on axios by Admin.jsx) ──
 export const adminListCollections = () =>

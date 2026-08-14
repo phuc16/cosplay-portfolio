@@ -148,12 +148,6 @@ SHOP_NAME=Tên Shop
 
 # Email của bạn (seller) - nhận bản sao mỗi đơn hàng mới (tuỳ chọn)
 ADMIN_EMAIL=you@example.com
-
-# Goong Maps API key - gợi ý địa chỉ khi checkout (tuỳ chọn, để trống thì
-# ô địa chỉ dùng textarea thường). Biến của backend - proxy qua API của
-# mình (backend/routes/shop.js), không gửi thẳng cho browser, nên chỉ cần
-# restart container backend khi đổi giá trị, không cần build lại image.
-GOONG_API_KEY=
 ```
 
 Tạo secret mạnh:
@@ -380,4 +374,4 @@ docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" c
 | Lỗi 526 Invalid SSL certificate | Chứng chỉ origin hết hạn/sai domain → `certbot renew --dry-run` trên droplet |
 | Ảnh chậm/không cache | `curl -sI .../api/storage/xxx.webp \| grep cf-cache-status` — `HIT` là qua CDN; `MISS` liên tục thì kiểm tra header `Cache-Control` từ backend |
 | Compose từ chối chạy (`required variable ... is missing`) | Thiếu biến trong `.env` — cố ý, điền đủ secrets |
-| Gợi ý địa chỉ (Goong) không hiện dù đã set `GOONG_API_KEY` | Kiểm tra backend đã restart với biến mới chưa (`docker compose restart backend`); test trực tiếp `GET /api/shop/address-autocomplete?input=...` qua backend xem có trả `predictions` không |
+| Danh sách tỉnh/phường ở checkout trống | `GET /api/shop/provinces` qua backend xem có lỗi không - phụ thuộc `provinces.open-api.vn` (bên thứ ba, miễn phí, không cần key); kết quả cache 30 ngày trong Redis (`vn_provinces`, `vn_wards:<code>`) |

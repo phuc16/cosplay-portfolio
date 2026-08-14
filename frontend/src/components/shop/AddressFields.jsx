@@ -1,79 +1,115 @@
 import { useEffect, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
-import { fetchAddressAutocomplete } from "../../api/shop"
+import { fetchProvinces, fetchWards } from "../../api/shop"
 
 /**
- * Goong is Vietnam-specific and handles ward/district/province properly.
- * Proxied through our own backend (routes/shop.js) rather than called
- * directly with a bundled API key — see that route's comment for why. When
- * the lookup returns no predictions (backend has no key configured, Goong
- * is down, rate-limited, etc.), this degrades to a plain textarea — a buyer
- * must never be blocked from ordering by a third party.
+ * Province (34) + ward picked from reference data, not a live per-keystroke
+ * autocomplete — replaces the previous Goong-autocomplete design, which
+ * fired a request on nearly every character typed. Data reflects Vietnam's
+ * post-2025 restructuring (34 provinces/cities, no district level), fetched
+ * through our own backend (backend/shop/vnAddress.js), which caches each
+ * response for 30 days — administrative boundaries change rarely, and this
+ * keeps us off a third party's free API almost entirely rather than baking
+ * a copy of the data into this repo to go stale.
+ *
+ * Street/house-number stays a plain text field — no autocomplete — since
+ * province+ward are already exact, and that free-text remainder is short
+ * enough not to need one.
  */
 export default function AddressFields({ value, onChange }) {
   const { t } = useLanguage()
-  const [query, setQuery] = useState(value.address_raw || "")
-  const [suggestions, setSuggestions] = useState([])
+  const [provinces, setProvinces] = useState([])
+  const [wards, setWards] = useState([])
+  const [provinceCode, setProvinceCode] = useState("")
+  const [wardCode, setWardCode] = useState("")
+  const [street, setStreet] = useState(value.address_street || "")
 
-  // The effect never sets state synchronously — only from within the fetch's
-  // .then()/.catch() — so a short/empty query is handled by gating what's
-  // shown below (visibleSuggestions) rather than resetting state here. That
-  // avoids a set-state-in-effect trap where a sync reset followed by an async
-  // setter in the same effect trips react-hooks/set-state-in-effect.
   useEffect(() => {
-    if (query.trim().length < 4) return
+    fetchProvinces()
+      .then(setProvinces)
+      .catch(() => setProvinces([]))
+  }, [])
 
-    const timer = setTimeout(() => {
-      fetchAddressAutocomplete(query)
-        .then((data) => setSuggestions(data.predictions?.slice(0, 5) || []))
-        .catch(() => setSuggestions([])) // silent: the manual field below still works
-    }, 350)
+  useEffect(() => {
+    // No provinceCode means "reset to no wards", already handled by
+    // onProvinceChange (a real event handler, not this effect) clearing
+    // wards synchronously — this effect only ever needs to fetch.
+    if (!provinceCode) return
+    fetchWards(provinceCode)
+      .then(setWards)
+      .catch(() => setWards([]))
+  }, [provinceCode])
 
-    return () => clearTimeout(timer)
-  }, [query])
-
-  const visibleSuggestions = query.trim().length >= 4 ? suggestions : []
-
-  const pick = (s) => {
-    // Structured district/commune/province from Goong's `more_compound`
-    // option, not parsed from free-text secondary_text — that broke on any
-    // formatting variation Goong wasn't contractually bound to keep.
-    const compound = s.compound || {}
+  const emit = (next) => {
+    const provinceName = provinces.find((p) => p.code === next.provinceCode)?.name || ""
+    const wardName = wards.find((w) => w.code === next.wardCode)?.name || ""
+    const parts = [next.street, wardName, provinceName].filter(Boolean)
     onChange({
-      address_raw: s.description,
-      address_street: s.structured_formatting?.main_text || s.description,
-      address_ward: compound.commune || null,
-      address_district: compound.district || null,
-      address_province: compound.province || null,
+      address_raw: parts.join(", "),
+      address_street: next.street,
+      address_ward: wardName || null,
+      // No district level in the current administrative structure — kept
+      // in the schema only because existing pre-2025-merger orders have it.
+      address_district: null,
+      address_province: provinceName || null,
     })
-    setQuery(s.description)
-    setSuggestions([])
   }
 
-  return (
-    <div className="relative">
-      <label className="block text-sm mb-1">{t("checkoutAddress")}</label>
-      <textarea
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value)
-          onChange({ ...value, address_raw: e.target.value })
-        }}
-        rows={2}
-        className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
-      />
+  const onProvinceChange = (code) => {
+    setProvinceCode(code)
+    setWardCode("")
+    setWards([])
+    emit({ provinceCode: code, wardCode: "", street })
+  }
 
-      {visibleSuggestions.length > 0 && (
-        <ul className="absolute z-10 w-full bg-[var(--surface-card)] border border-[var(--border-brand)] rounded-lg mt-1 overflow-hidden">
-          {visibleSuggestions.map((s) => (
-            <li key={s.place_id}>
-              <button type="button" onClick={() => pick(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--brand-soft)]">
-                {s.description}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+  const onWardChange = (code) => {
+    setWardCode(code)
+    emit({ provinceCode, wardCode: code, street })
+  }
+
+  const onStreetChange = (text) => {
+    setStreet(text)
+    emit({ provinceCode, wardCode, street: text })
+  }
+
+  const selectCls = "w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+
+  return (
+    <div>
+      <label className="block text-sm mb-1">{t("checkoutAddress")}</label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm mb-1">{t("checkoutProvince")}</label>
+          <select value={provinceCode} onChange={(e) => onProvinceChange(e.target.value)} className={selectCls}>
+            <option value="">{t("checkoutSelectProvince")}</option>
+            {provinces.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">{t("checkoutWard")}</label>
+          <select
+            value={wardCode}
+            onChange={(e) => onWardChange(e.target.value)}
+            disabled={!provinceCode}
+            className={`${selectCls} disabled:opacity-50`}
+          >
+            <option value="">{t("checkoutSelectWard")}</option>
+            {wards.map((w) => <option key={w.code} value={w.code}>{w.name}</option>)}
+          </select>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="block text-sm mb-1">{t("checkoutStreet")}</label>
+          <input
+            type="text"
+            value={street}
+            onChange={(e) => onStreetChange(e.target.value)}
+            placeholder={t("checkoutStreetPlaceholder")}
+            className={selectCls}
+          />
+        </div>
+      </div>
     </div>
   )
 }

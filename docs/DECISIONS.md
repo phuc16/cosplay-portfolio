@@ -328,7 +328,39 @@ history, just the buyer's simpler single-badge view) via a small pure
 separate-pure-logic-for-testability pattern `OrderTimeline`'s
 `buildTimelineSteps` already uses.
 
-## 2026-08-14 — Goong autocomplete moved server-side: performance params + spam protection
+## 2026-08-14 — Replaced Goong autocomplete with a static province/ward picker, then moved that off local static files onto a cached API
+
+Live testing showed the real cost of the per-keystroke Goong design: typing
+one address fired 6+ requests (network tab: `input=512,` → `input=512,+`
+→ `input=512,+Nguy...` → ...), even after server-side proxying and rate-
+limiting. Replaced the whole live-autocomplete approach with: a Province
+dropdown, a Ward dropdown (populated once a province is picked), and a
+plain-text "house number, street" field — zero live address-lookup API
+calls for the structured part, since province+ward are chosen from a
+fixed list rather than searched for. Vietnam abolished the district level
+in a 2025 administrative merger (63→34 provinces), so there's no district
+picker — confirmed against the actual current dataset (verified via
+direct fetch + `node` parsing, not a summarized fetch, after an initial
+AI-summarized page read undercounted the dataset by 6x).
+
+First cut hardcoded this data into the repo (`frontend/public/data/`,
+sourced from github.com/zuydd/vn-geo, split into one file per province so
+a ward lookup only ever downloads ~100 wards, not all 3,320). Immediately
+revised per feedback: fetch province/ward data from a live API instead of
+maintaining a local copy that would silently go stale if boundaries
+change again. Switched to `provinces.open-api.vn`'s v2 API — free, no key,
+confirmed to already reflect the post-2025 structure — proxied through
+`backend/shop/vnAddress.js` with a 30-day Redis cache (`vn_provinces`,
+`vn_wards:<code>`) per the user's explicit request, rather than fetched
+directly from the browser. This keeps the shop off a third party's free
+service almost entirely (one real request per province per 30 days,
+shared across every visitor) while never needing to hand-update the
+dataset if it changes.
+
+This obsoletes the two immediately preceding entries' Goong-specific
+work: `GOONG_API_KEY` (env var, all docker-compose/DEPLOY.md references),
+`GET /api/shop/address-autocomplete`, and its dedicated rate limiter are
+all removed as dead code — nothing calls Goong from this codebase anymore.
 
 Two follow-up asks on the just-shipped Goong integration: (1) had all of
 Goong's documented v2 performance parameters been applied, and (2) how to

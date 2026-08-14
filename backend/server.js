@@ -131,24 +131,6 @@ const storageLimiter = rateLimit({
   },
 })
 
-// Address autocomplete: 20/phút per IP. Each keystroke-driven lookup costs a
-// real Goong API call billed to the shop owner — this caps worst-case spend
-// from a script hammering the endpoint independent of whatever limit Goong
-// itself allows, since the key never reaches the browser to be extracted and
-// called directly (see routes/shop.js's /address-autocomplete).
-const addressLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: keyGen,
-  store: makeStore("rl:address:"),
-  handler: (req, res) => {
-    console.warn(`[RATE LIMIT] Address IP ${keyGen(req)} bị chặn`)
-    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều yêu cầu. Thử lại sau." })
-  },
-})
-
 // Order creation: 10/hour per IP. Reservation holds stock, so unchecked
 // submissions could exhaust a limited drop before anyone pays.
 const orderLimiter = rateLimit({
@@ -311,9 +293,6 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 })
 
 // ── SHOP: public storefront ──
-// address-autocomplete gets its own stricter limiter ahead of the router's
-// general publicLimiter (both apply; addressLimiter's 20/min binds first).
-app.use(`${API_PREFIX}/shop/address-autocomplete`, addressLimiter)
 app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
 
 // ── ORDERS: public order creation + lookup. Creation gets its own stricter

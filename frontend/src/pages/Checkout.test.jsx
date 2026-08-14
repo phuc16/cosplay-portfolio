@@ -9,13 +9,11 @@ import { readCart } from "../shop/cart"
 const fetchPaymentMethods = vi.fn()
 const createOrder = vi.fn()
 const fetchCollection = vi.fn()
-const fetchAddressAutocomplete = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchPaymentMethods: (...args) => fetchPaymentMethods(...args),
   createOrder: (...args) => createOrder(...args),
   fetchCollection: (...args) => fetchCollection(...args),
-  fetchAddressAutocomplete: (...args) => fetchAddressAutocomplete(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -51,11 +49,9 @@ beforeEach(() => {
   fetchPaymentMethods.mockReset()
   createOrder.mockReset()
   fetchCollection.mockReset()
-  fetchAddressAutocomplete.mockReset()
   // Default: both methods offered, matching this file's existing tests which
   // predate fulfillment filtering and expect the ship/pickup radio pair.
   fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
-  fetchAddressAutocomplete.mockResolvedValue({ predictions: [] })
 })
 
 describe("Checkout payment methods", () => {

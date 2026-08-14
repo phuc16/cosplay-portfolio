@@ -3,17 +3,22 @@ import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { LanguageProvider } from "../../contexts/LanguageContext"
 
-const fetchAddressAutocomplete = vi.fn()
+const fetchProvinces = vi.fn()
+const fetchWards = vi.fn()
 
 vi.mock("../../api/shop", () => ({
-  fetchAddressAutocomplete: (...args) => fetchAddressAutocomplete(...args),
+  fetchProvinces: (...args) => fetchProvinces(...args),
+  fetchWards: (...args) => fetchWards(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: AddressFields } = await import("./AddressFields")
 
-async function renderField(value = { address_raw: "" }, onChange = vi.fn()) {
+const PROVINCES = [{ code: "30", name: "Hồ Chí Minh" }, { code: "01", name: "Hà Nội" }]
+const HCM_WARDS = [{ code: "00002", name: "Dĩ An" }, { code: "00003", name: "Hiệp Bình" }]
+
+async function renderField(value = {}, onChange = vi.fn()) {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -27,80 +32,89 @@ async function renderField(value = { address_raw: "" }, onChange = vi.fn()) {
   return { container, onChange }
 }
 
-function setTextareaValue(el, value) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set
+function setSelectValue(el, value) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
   setter.call(el, value)
   el.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
-async function typeAndFlush(container, text) {
-  const textarea = container.querySelector("textarea")
-  await act(async () => setTextareaValue(textarea, text))
-  // Debounce is 350ms; flush well past it, then let the resolved promise's
-  // state update land.
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 400))
-  })
+function setInputValue(el, value) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+  setter.call(el, value)
+  el.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
 beforeEach(() => {
-  fetchAddressAutocomplete.mockReset()
+  fetchProvinces.mockReset()
+  fetchWards.mockReset()
+  fetchProvinces.mockResolvedValue(PROVINCES)
+  fetchWards.mockResolvedValue(HCM_WARDS)
 })
 
-describe("AddressFields", () => {
-  it("does not call the backend for fewer than 4 characters", async () => {
+describe("AddressFields — province/ward picker (no live per-keystroke autocomplete)", () => {
+  it("loads the province list on mount, through our own backend proxy", async () => {
     const { container } = await renderField()
-    await typeAndFlush(container, "123")
-    expect(fetchAddressAutocomplete).not.toHaveBeenCalled()
+
+    expect(fetchProvinces).toHaveBeenCalled()
+    const provinceOptions = [...container.querySelectorAll("select")[0].querySelectorAll("option")]
+    expect(provinceOptions.map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(["Hồ Chí Minh", "Hà Nội"])
+    )
   })
 
-  it("calls the backend proxy (not Goong directly) once 4+ characters are typed, after the debounce", async () => {
-    fetchAddressAutocomplete.mockResolvedValue({ predictions: [] })
+  it("the ward select starts disabled, and only fetches that province's wards once one is picked", async () => {
     const { container } = await renderField()
-    await typeAndFlush(container, "512 Nguyen Xien")
-    expect(fetchAddressAutocomplete).toHaveBeenCalledWith("512 Nguyen Xien")
+    const [provinceSelect, wardSelect] = container.querySelectorAll("select")
+    expect(wardSelect.disabled).toBe(true)
+    expect(fetchWards).not.toHaveBeenCalled()
+
+    await act(async () => setSelectValue(provinceSelect, "30"))
+
+    expect(fetchWards).toHaveBeenCalledWith("30")
+    expect(wardSelect.disabled).toBe(false)
+    const wardOptions = [...wardSelect.querySelectorAll("option")]
+    expect(wardOptions.map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(["Dĩ An", "Hiệp Bình"])
+    )
   })
 
-  it("renders suggestions returned from the backend", async () => {
-    fetchAddressAutocomplete.mockResolvedValue({
-      predictions: [{ place_id: "1", description: "512 Nguyễn Xiển, Quận 9, Hồ Chí Minh" }],
-    })
-    const { container } = await renderField()
-    await typeAndFlush(container, "512 Nguyen Xien")
-
-    expect(container.textContent).toContain("512 Nguyễn Xiển, Quận 9, Hồ Chí Minh")
-  })
-
-  it("picking a suggestion fills structured fields from Goong's compound object, not a comma-split guess", async () => {
-    fetchAddressAutocomplete.mockResolvedValue({
-      predictions: [{
-        place_id: "1",
-        description: "512 Nguyễn Xiển, Quận 9, Hồ Chí Minh",
-        structured_formatting: { main_text: "512 Nguyễn Xiển" },
-        compound: { commune: "Long Thạnh Mỹ", district: "Thủ Đức", province: "Hồ Chí Minh" },
-      }],
-    })
+  it("composes address_raw and the structured fields from province + ward + street, with district always null (no district level post-2025)", async () => {
     const { container, onChange } = await renderField()
-    await typeAndFlush(container, "512 Nguyen Xien")
+    const [provinceSelect, wardSelect] = container.querySelectorAll("select")
 
-    const suggestionBtn = [...container.querySelectorAll("button")][0]
-    await act(async () => suggestionBtn.click())
+    await act(async () => setSelectValue(provinceSelect, "30"))
+    await act(async () => setSelectValue(wardSelect, "00003"))
+    await act(async () => setInputValue(container.querySelector("input"), "512 Nguyễn Xiển"))
 
-    expect(onChange).toHaveBeenCalledWith({
-      address_raw: "512 Nguyễn Xiển, Quận 9, Hồ Chí Minh",
+    expect(onChange).toHaveBeenLastCalledWith({
+      address_raw: "512 Nguyễn Xiển, Hiệp Bình, Hồ Chí Minh",
       address_street: "512 Nguyễn Xiển",
-      address_ward: "Long Thạnh Mỹ",
-      address_district: "Thủ Đức",
+      address_ward: "Hiệp Bình",
+      address_district: null,
       address_province: "Hồ Chí Minh",
     })
   })
 
-  it("degrades silently to just the textarea when the backend call fails", async () => {
-    fetchAddressAutocomplete.mockRejectedValue(new Error("network error"))
-    const { container } = await renderField()
-    await typeAndFlush(container, "512 Nguyen Xien")
+  it("resets the ward selection when the province changes", async () => {
+    fetchWards.mockImplementation((code) =>
+      Promise.resolve(code === "30" ? HCM_WARDS : [{ code: "00099", name: "Ba Đình" }])
+    )
+    const { container, onChange } = await renderField()
+    const [provinceSelect, wardSelect] = container.querySelectorAll("select")
 
-    expect(container.querySelectorAll("li").length).toBe(0)
-    expect(container.querySelector("textarea")).toBeTruthy()
+    await act(async () => setSelectValue(provinceSelect, "30"))
+    await act(async () => setSelectValue(wardSelect, "00003"))
+    await act(async () => setSelectValue(provinceSelect, "01"))
+
+    expect(wardSelect.value).toBe("")
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ address_ward: null, address_province: "Hà Nội" }))
+  })
+
+  it("degrades to an empty province list rather than crashing when the backend call fails", async () => {
+    fetchProvinces.mockRejectedValue(new Error("network error"))
+    const { container } = await renderField()
+
+    const provinceOptions = [...container.querySelectorAll("select")[0].querySelectorAll("option")]
+    expect(provinceOptions).toHaveLength(1) // just the placeholder
   })
 })
