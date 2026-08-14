@@ -347,7 +347,11 @@ async function listOrders(filter = {}) {
   // computed value, not a column, so an id search only matches the raw
   // numeric id — a buyer quoting their display code would need it decoded
   // first, same as everywhere else order_code isn't the DB key.
-  const search = String(filter.search || "").trim()
+  // Capped rather than left unbounded: buyer_name/phone/email have no index,
+  // so an admin session (or a compromised admin token) pasting in a huge
+  // string would otherwise cost a full-table LIKE scan for no added value —
+  // no real name/phone/email is anywhere close to this long.
+  const search = String(filter.search || "").trim().slice(0, 100)
   if (search) {
     const clauses = ["buyer_name LIKE ?", "phone LIKE ?", "email LIKE ?"]
     const clauseParams = [`%${search}%`, `%${search}%`, `%${search}%`]

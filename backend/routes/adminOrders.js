@@ -16,8 +16,15 @@ const BULK_ACTION_MAX = 100
 const TRANSITION_TARGETS = ["confirmed", "shipped", "completed", "cancelled"]
 function withAllowedTransitions(order) {
   if (!order) return order
+  // order_token is the buyer's bearer credential for their own public,
+  // unauthenticated order page (GET /api/orders/:token) and payment QR —
+  // stripped here rather than never selected, since repo.getOrderById is
+  // also the shared lookup for internal uses that DO need it (e.g. the
+  // email sender building the order URL). This is the only chokepoint
+  // both admin-facing routes (list, detail) serialize an order through.
+  const { order_token, ...rest } = order
   return {
-    ...order,
+    ...rest,
     // Computed here rather than sent as a separate lookup: the admin list/
     // detail views show this instead of the raw id (see AdminOrders.jsx),
     // and it's a pure function of fields the row already has.

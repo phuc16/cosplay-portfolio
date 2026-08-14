@@ -170,6 +170,26 @@ describe("allowed_transitions", () => {
   })
 })
 
+describe("order_token is never exposed to the admin", () => {
+  // order_token is the buyer's bearer credential for their own public,
+  // unauthenticated order page and payment QR — leaking it into the admin
+  // dashboard's network responses would hand out a working credential to
+  // anyone who can read the admin's browser traffic.
+  it("is absent from the list endpoint", async () => {
+    const o = await seedOrder()
+    const res = await authed(request(app).get("/api/admin/orders"))
+    expect(res.body[0]).not.toHaveProperty("order_token")
+    expect(JSON.stringify(res.body)).not.toContain(o.order_token)
+  })
+
+  it("is absent from the single-order detail endpoint", async () => {
+    const o = await seedOrder()
+    const res = await authed(request(app).get(`/api/admin/orders/${o.id}`))
+    expect(res.body).not.toHaveProperty("order_token")
+    expect(JSON.stringify(res.body)).not.toContain(o.order_token)
+  })
+})
+
 describe("POST /api/admin/orders/:id/transition", () => {
   it("confirms a pending order", async () => {
     const o = await seedOrder()

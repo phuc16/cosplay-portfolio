@@ -668,6 +668,18 @@ describe("listOrders search", () => {
     const rows = await repo.listOrders({ search: "   " })
     expect(rows.map((r) => r.id)).toContain(res.id)
   })
+
+  it("caps an excessively long search term instead of running it unbounded", async () => {
+    const { variantId } = await seedVariant(5)
+    const match = await repo.createOrder(order(variantId, 1, {
+      buyer: { ...buyer, buyer_name: "A".repeat(100), phone: "0911222333", email: "long@example.com" },
+    }))
+
+    // A search term over the 100-char cap must still resolve (truncated, not
+    // rejected) rather than erroring or scanning an unbounded LIKE pattern.
+    const rows = await repo.listOrders({ search: "A".repeat(500) })
+    expect(rows.map((r) => r.id)).toEqual([match.id])
+  })
 })
 
 describe("getOrderByToken", () => {
