@@ -11,8 +11,8 @@ export const FAQ_ITEMS = [
       en: "What payment methods are available?",
     },
     answer: {
-      vi: "Chuyển khoản ngân hàng (quét mã VietQR), Momo, PayPal, hoặc thanh toán khi nhận hàng (COD) cho đơn giao hàng. COD không áp dụng cho đơn nhận tại sự kiện — đơn nhận tại sự kiện luôn cần thanh toán trước.",
-      en: "Bank transfer (VietQR), Momo, PayPal, or Cash on Delivery (COD) for shipped orders. COD isn't available for event pickup orders — those always require prepayment.",
+      vi: "Chuyển khoản ngân hàng (quét mã VietQR) hoặc Momo.",
+      en: "Bank transfer (VietQR) or Momo.",
     },
   },
   {
@@ -21,8 +21,8 @@ export const FAQ_ITEMS = [
       en: "How long do I have to pay?",
     },
     answer: {
-      vi: "Với các phương thức chuyển khoản trước (VietQR/Momo/PayPal), bạn cần thanh toán trong thời hạn hiển thị ở trang đặt hàng (thường là 48 giờ). Quá hạn mà chưa có ảnh xác nhận thanh toán, đơn sẽ tự động hủy để nhả lại hàng cho người khác. Đơn COD không có thời hạn này.",
-      en: "For prepay methods (VietQR/Momo/PayPal), pay within the deadline shown on your order page (typically 48 hours). If no payment proof is uploaded by then, the order is automatically cancelled so the stock can go back on sale. COD orders have no such deadline.",
+      vi: "Bạn cần thanh toán trong thời hạn hiển thị ở trang đặt hàng (thường là 48 giờ). Quá hạn mà chưa có ảnh xác nhận thanh toán, đơn sẽ tự động hủy.",
+      en: "Pay within the deadline shown on your order page (typically 48 hours). If no payment proof is uploaded by then, the order is automatically cancelled.",
     },
   },
   {
