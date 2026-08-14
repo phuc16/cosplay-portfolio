@@ -1,3 +1,6 @@
+/* eslint-disable react-refresh/only-export-components -- statusTimestamp is
+   exported alongside the component so its pure status->timestamp logic is
+   directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof } from "../api/shop"
@@ -12,6 +15,20 @@ import { variantForStatus } from "../constants/statusVariant"
 const STATUS_KEY = {
   pending: "orderPending", confirmed: "orderConfirmed", shipped: "orderShipped",
   completed: "orderCompleted", cancelled: "orderCancelled",
+}
+
+// Which timestamp column corresponds to the order's *current* status — the
+// public order response now includes all of these (see routes/orders.js
+// toPublicOrder), same fields the admin's OrderTimeline already reads for
+// its full history. Kept separate from render for the same reason
+// OrderTimeline.buildTimelineSteps is: pure, directly unit-testable logic.
+const STATUS_TIMESTAMP_FIELD = {
+  pending: "created_at", confirmed: "confirmed_at", shipped: "shipped_at",
+  completed: "completed_at", cancelled: "cancelled_at",
+}
+
+export function statusTimestamp(order) {
+  return order[STATUS_TIMESTAMP_FIELD[order.status]] || null
 }
 
 function readFileAsBase64(file) {
@@ -173,6 +190,9 @@ export default function Order() {
               added. */}
           <StatusBadge label={t(STATUS_KEY[order.status] ?? order.status)} variant={variantForStatus(order.status)} />
         </p>
+        {statusTimestamp(order) && (
+          <p className="text-xs opacity-60 mt-1">{new Date(statusTimestamp(order)).toLocaleString("vi-VN")}</p>
+        )}
         {order.tracking_code && <p className="text-sm mt-1">#{order.tracking_code}</p>}
         {/* Deadline is only meaningful while the seller hasn't yet confirmed
             the transfer — expires_at is never cleared on confirm, so this

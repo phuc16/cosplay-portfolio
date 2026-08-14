@@ -286,6 +286,48 @@ accurate. Social links are fetched once per `sendQueued` batch (not once
 per message) since they change rarely and every email in a batch shares
 the same footer.
 
+## 2026-08-14 — Opaque order code shown instead of the raw sequential id
+
+Prompted by a Shopee order-confirmation screenshot ("Đơn hàng
+#2608137A69U181"). A plain "#12" leaks order volume to anyone comparing
+two order numbers and reads as less polished than most storefronts'
+opaque codes. Chose a derived, not stored, value over changing the actual
+primary key (which would touch every FK/join in the schema for a purely
+cosmetic reason) or adding a new column (extra migration + write path for
+something computable from data that already exists): `formatOrderCode(id,
+created_at)` in `backend/shop/orders/domain.js` returns a YYMMDD date
+prefix plus an 8-character suffix hashed from the id (SHA-256, truncated,
+base-36, uppercase) — deterministic so it can never drift from the real
+id and needs no uniqueness bookkeeping, but doesn't read as an
+obviously-zero-padded small number the way a raw base-36 encode of a
+low id would. Matches Shopee's example length (14 chars) per explicit
+follow-up request — an earlier 10-char version (date + 4-char base-36 id)
+was replaced for looking too much like a padded sequential number.
+
+Applied to the email subject placeholder (`{{order_id}}` now resolves to
+the formatted code, not the raw id) and the admin order list/detail
+(`backend/routes/adminOrders.js` attaches `order_code` to every order
+response; `AdminOrders.jsx` displays it in place of the raw id — API
+calls, selection state, and `data-order-id` still use the real numeric
+`id`, since backend routes are keyed by that, not the display code). Not
+applied to the admin's failed-email-queue listing (`AdminEmailTemplates.jsx`),
+which is an internal debug view where the raw id is more useful, not less.
+
+## 2026-08-14 — Order status timestamp added to the buyer's order page
+
+The buyer's order page showed only a bare status badge ("Trạng thái: Đã
+xác nhận") with no indication of when that status was reached — the admin
+side already had this via `OrderTimeline`, which reads
+`confirmed_at`/`shipped_at`/`completed_at`/`cancelled_at`, but those
+columns were never included in the public order response
+(`toPublicOrder` in `backend/routes/orders.js`). Added all four (no new
+migration — the columns already existed for the admin timeline). Frontend
+picks whichever one matches the order's *current* status (not a full
+history, just the buyer's simpler single-badge view) via a small pure
+`statusTimestamp(order)` helper in `Order.jsx`, same
+separate-pure-logic-for-testability pattern `OrderTimeline`'s
+`buildTimelineSteps` already uses.
+
 ## 2026-08-14 — Email footer refined: fewer platforms, real logos, moved below the QR
 
 Follow-up feedback on the entry above, from a screenshot of the actual

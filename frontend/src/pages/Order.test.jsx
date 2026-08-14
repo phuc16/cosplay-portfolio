@@ -17,7 +17,7 @@ vi.mock("../api/shop", () => ({
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: Order } = await import("./Order")
+const { default: Order, statusTimestamp } = await import("./Order")
 
 function baseOrder(over = {}) {
   return {
@@ -325,5 +325,39 @@ describe("Order — payment proof upload styling", () => {
     await act(async () => {})
 
     expect(container.textContent).toContain("Uploaded")
+  })
+})
+
+describe("statusTimestamp", () => {
+  it("picks the timestamp matching the order's current status", () => {
+    expect(statusTimestamp({ status: "confirmed", confirmed_at: "2026-08-14T06:00:00Z" })).toBe("2026-08-14T06:00:00Z")
+    expect(statusTimestamp({ status: "shipped", shipped_at: "2026-08-15T06:00:00Z" })).toBe("2026-08-15T06:00:00Z")
+    expect(statusTimestamp({ status: "completed", completed_at: "2026-08-16T06:00:00Z" })).toBe("2026-08-16T06:00:00Z")
+    expect(statusTimestamp({ status: "cancelled", cancelled_at: "2026-08-17T06:00:00Z" })).toBe("2026-08-17T06:00:00Z")
+    expect(statusTimestamp({ status: "pending", created_at: "2026-08-13T06:00:00Z" })).toBe("2026-08-13T06:00:00Z")
+  })
+
+  it("returns null when the matching timestamp is missing (e.g. a legacy order predating this field)", () => {
+    expect(statusTimestamp({ status: "shipped", shipped_at: null })).toBeNull()
+  })
+})
+
+describe("Order — status timestamp", () => {
+  it("shows the timestamp for the order's current status", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed", confirmed_at: "2026-08-14T06:00:00Z" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain(new Date("2026-08-14T06:00:00Z").toLocaleString("vi-VN"))
+  })
+
+  it("shows nothing extra when the matching timestamp is missing", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "shipped", shipped_at: null }))
+
+    const container = await renderOrder()
+
+    // Just confirms no stray "Invalid Date" text renders — the absence of a
+    // specific timestamp string isn't otherwise assertable here.
+    expect(container.textContent).not.toContain("Invalid Date")
   })
 })

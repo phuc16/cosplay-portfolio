@@ -21,6 +21,12 @@ const bad = (res, message) => res.status(400).json({ error: "invalid_input", mes
 function toPublicOrder(order) {
   const {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
+    // When the current status was reached, so the order page can show a
+    // timestamp next to it (e.g. "Đã xác nhận · 14/08/2026, 13:00") instead
+    // of leaving the buyer to guess how long ago it happened. Same fields
+    // the admin's OrderTimeline already reads — no new data, just exposed
+    // here too.
+    confirmed_at, shipped_at, completed_at, cancelled_at,
     // Spec (Fulfillment): pickup location/note must be shown on the order
     // page, not just the pre-purchase collection browse page. Sourced from
     // the order's own collection (joined in getOrderByToken), same content
@@ -49,6 +55,7 @@ function toPublicOrder(order) {
   const paidPickupCode = ["confirmed", "completed"].includes(status) ? pickup_code : null
   return {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
+    confirmed_at, shipped_at, completed_at, cancelled_at,
     pickup_location, pickup_note, expires_at, pickup_code: paidPickupCode,
     has_payment_proof: Boolean(payment_proof_url),
     payment_proof_url: payment_proof_url || null,
