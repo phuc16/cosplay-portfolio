@@ -256,6 +256,36 @@ change was needed: `catalogRepo.replaceVariants` already derives each
 variant's `sort_order` from its position in the array the frontend sends,
 so reordering `rows` client-side before save is the entire feature.
 
+## 2026-08-14 — Email footer: sign-off, social links, "automated email" notice
+
+Requested with a Shopee email screenshot as reference (social icon row +
+"this is an automated email, don't reply, add us to your contacts"
+notice). Added to the shared `wrap()` footer so it appears on every order
+email (order_placed, payment_confirmed, shipped, cancelled), not just
+one template:
+- A plain "Trân trọng,\n{{shop_name}}" sign-off after each template's own
+  content (an initial "Đội ngũ {{shop_name}}" version was tried first,
+  then simplified to just the name per explicit follow-up feedback).
+- A row of circular color-badge social links ({{social_links}}), built
+  from the same `contact.social` list the main portfolio page's social
+  icons already read from `site_settings` — reused, not duplicated. Badges
+  are plain background-color + text (e.g. "f", "IG"), not inline SVG or
+  hosted images: Outlook's Word-based rendering engine handles that
+  reliably where SVG often silently fails, and it needs no image hosting.
+  Renders nothing if no social links are configured.
+- "Đây là email tự động, vui lòng không trả lời email này. Thêm
+  {{shop_email}} vào danh bạ..." — `shop_email` is `SMTP_FROM` (falling
+  back to `SMTP_USER`), i.e. the literal envelope sender, since the whole
+  point of "add to contacts" is keeping *that exact address* out of spam.
+
+`{{shop_email}}` and `{{social_links}}` are two new placeholders,
+substituted in `buildVars` like every other field; both added to
+`PLACEHOLDERS` (backend) and its frontend mirror in
+`AdminEmailTemplates.jsx` so the admin's "valid placeholders" hint stays
+accurate. Social links are fetched once per `sendQueued` batch (not once
+per message) since they change rarely and every email in a batch shares
+the same footer.
+
 ## 2026-08-14 — Tablet-specific grid/thumbnail breakpoints added across shop + portfolio
 
 A responsive audit found every grid layout in the shop and portfolio

@@ -3,11 +3,39 @@ const db = require("./../../db")
 const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
-  "payment_note", "shop_name",
+  "payment_note", "shop_name", "shop_email", "social_links",
 ]
 
 const SHOP_NAME = process.env.SHOP_NAME || "Shop"
 const SITE_URL = process.env.SITE_URL || ""
+// Same address every send actually comes "from" (sender.js) — the point of
+// showing it is so a buyer's "add to contacts" click keeps future mail out
+// of spam, so it has to be the literal envelope sender, not a display name.
+const SHOP_EMAIL = process.env.SMTP_FROM || process.env.SMTP_USER || ""
+
+// Small circular text badges rather than image icons: no asset hosting
+// needed, and unlike inline SVG (poorly supported in Outlook's Word-based
+// renderer), a plain background-color + text table cell renders everywhere.
+const SOCIAL_BADGE = {
+  facebook: { label: "f", color: "#1877F2" },
+  page: { label: "f", color: "#1877F2" },
+  instagram: { label: "IG", color: "#E4405F" },
+  x: { label: "X", color: "#0f172a" },
+  tiktok: { label: "TT", color: "#0f172a" },
+  discord: { label: "DC", color: "#5865F2" },
+}
+
+/** Renders the shop's configured social links as a row of colored badges, or "" if none. */
+function socialLinksHtml(social = []) {
+  const links = social
+    .map((s) => ({ ...s, badge: SOCIAL_BADGE[s.platform] }))
+    .filter((s) => s.badge && s.url)
+  if (!links.length) return ""
+  const cells = links.map((s) => `
+      <a href="${escapeHtml(s.url)}" style="display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;background:${s.badge.color};color:#fff;text-align:center;text-decoration:none;font-size:12px;font-weight:700;margin:0 4px">${s.badge.label}</a>`).join("")
+  return `<table role="presentation" style="width:100%;margin-top:16px"><tr><td style="text-align:center">${cells}
+    </td></tr></table>`
+}
 
 /** Buyer-controlled values reach an HTML email; escape before substitution. */
 function escapeHtml(value) {
@@ -55,6 +83,8 @@ function buildVars(order) {
     tracking_code: escapeHtml(order.tracking_code || ""),
     payment_note: escapeHtml(order.payment_note || ""),
     shop_name: escapeHtml(SHOP_NAME),
+    shop_email: escapeHtml(SHOP_EMAIL),
+    social_links: socialLinksHtml(order.social),
   }
 }
 
@@ -85,8 +115,14 @@ const wrap = (inner) => `
   </div>
   <div style="padding:24px;border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;color:#222;font-size:14px;line-height:1.6">
     ${inner}
+    <p style="margin:20px 0 0;font-size:14px">Trân trọng,<br/>{{shop_name}}</p>
     <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#999">
       <a href="{{order_url}}" style="color:${BRAND};text-decoration:none;font-weight:600">Xem đơn hàng →</a>
+    </p>
+    {{social_links}}
+    <p style="margin:16px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:11px;color:#999;text-align:center;line-height:1.6">
+      Đây là email tự động, vui lòng không trả lời email này.<br/>
+      Thêm <a href="mailto:{{shop_email}}" style="color:${BRAND};text-decoration:none">{{shop_email}}</a> vào danh bạ để không bỏ lỡ email từ {{shop_name}}.
     </p>
   </div>
 </div>`

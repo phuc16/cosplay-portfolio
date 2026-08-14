@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer")
 const db = require("./../../db")
+const redis = require("./../../redis")
 const queue = require("./queue")
 const templates = require("./templates")
 const orderRepo = require("./../orders/orderRepo")
@@ -10,6 +11,26 @@ let transport = null
 
 function isConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+}
+
+/**
+ * The site's configured social links (contact.social), for the footer badge
+ * row every email gets. Reads the same Redis cache GET /api/settings warms,
+ * so this rarely costs an extra DB round trip; failures here must never
+ * block a send, so any error just yields no social row.
+ */
+async function getSocialLinks() {
+  try {
+    const cached = await redis.get("settings")
+    if (cached) return JSON.parse(cached)?.contact?.social || []
+    const [rows] = await db.query("SELECT config FROM site_settings ORDER BY id LIMIT 1")
+    const config = rows[0]?.config
+      ? (typeof rows[0].config === "string" ? JSON.parse(rows[0].config) : rows[0].config)
+      : {}
+    return config.contact?.social || []
+  } catch {
+    return []
+  }
 }
 
 function getTransport() {
@@ -35,6 +56,9 @@ async function sendQueued(limit = 10) {
   const pending = await queue.claimPending(limit)
   let sent = 0
   let failed = 0
+  // Fetched once per batch, not per message — the same footer social links
+  // apply to every send in this run, and site settings change rarely.
+  const social = await getSocialLinks()
 
   for (const row of pending) {
     try {
@@ -47,7 +71,7 @@ async function sendQueued(limit = 10) {
 
       const rendered = templates.renderTemplate(
         tpl,
-        templates.buildVars({ ...order, payment_note: settings.payment_note })
+        templates.buildVars({ ...order, payment_note: settings.payment_note, social })
       )
 
       // The QR is a link to the order's own status page — useful for any

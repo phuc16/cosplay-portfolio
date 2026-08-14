@@ -13,7 +13,7 @@ const LABELS = {
 const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
-  "payment_note", "shop_name",
+  "payment_note", "shop_name", "shop_email", "social_links",
 ]
 
 // Keyed by tpl.type in the parent, so this mounts fresh (picking up
