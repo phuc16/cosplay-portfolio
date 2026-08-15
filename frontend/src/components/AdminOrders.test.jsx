@@ -8,7 +8,8 @@ const adminBulkCancelOrders = vi.fn()
 const adminBulkCompleteOrders = vi.fn()
 const adminGetOrder = vi.fn()
 const adminTransitionOrder = vi.fn()
-const fetchPaymentInstructions = vi.fn()
+const adminGetOrderPayment = vi.fn()
+const adminFindOrderByToken = vi.fn()
 
 vi.mock("../api/shop", () => ({
   adminListOrders: (...args) => adminListOrders(...args),
@@ -17,7 +18,8 @@ vi.mock("../api/shop", () => ({
   adminBulkCompleteOrders: (...args) => adminBulkCompleteOrders(...args),
   adminGetOrder: (...args) => adminGetOrder(...args),
   adminTransitionOrder: (...args) => adminTransitionOrder(...args),
-  fetchPaymentInstructions: (...args) => fetchPaymentInstructions(...args),
+  adminGetOrderPayment: (...args) => adminGetOrderPayment(...args),
+  adminFindOrderByToken: (...args) => adminFindOrderByToken(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -65,8 +67,10 @@ beforeEach(() => {
   adminBulkCompleteOrders.mockReset()
   adminGetOrder.mockReset()
   adminTransitionOrder.mockReset()
-  fetchPaymentInstructions.mockReset()
+  adminGetOrderPayment.mockReset()
+  adminFindOrderByToken.mockReset()
   adminListCollections.mockResolvedValue([{ id: 7, title: "Fes Drop" }])
+  adminGetOrderPayment.mockResolvedValue(null)
 })
 
 describe("AdminOrders filters", () => {
@@ -408,6 +412,20 @@ describe("AdminOrders — semantic status/action styling (Admin UI plan)", () =>
     await flush()
     expect(container.textContent).not.toContain("a@b.com")
     expect(detailBtn().textContent).toBe("Chi tiết")
+  })
+
+  it("fetches payment instructions by id under admin auth when opening the detail panel, not the buyer's public token route", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, email: "a@b.com", items: [] }))
+    adminGetOrderPayment.mockResolvedValue({ instructions: "Chuyển khoản tới STK 123" })
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(adminGetOrderPayment).toHaveBeenCalledWith(1)
   })
 
   it("shows the Vietnamese payment-method label in the detail panel, not the raw enum", async () => {

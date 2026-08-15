@@ -11,6 +11,18 @@ const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }
 
+// getBookkeepingStats interprets date_from/date_to as Asia/Ho_Chi_Minh
+// (UTC+7) calendar days, not UTC ones (see statsRepo.js's localDayStartUtc)
+// — a plain `new Date().toISOString().slice(0, 10)` is the UTC calendar
+// date, which is a day behind the VN one for the 7 hours a day between
+// UTC 17:00 and 23:59 (VN local 00:00-06:59). An order created "now" during
+// that window would fall outside the "UTC today" range this test computed,
+// intermittently failing depending on wall-clock time. Shift by the same
+// fixed +7h offset the app uses so both sides agree on "today".
+function vnToday() {
+  return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
 async function seed() {
   const cid = await catalog.createCollection({ title: "Drop", status: "active" })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })

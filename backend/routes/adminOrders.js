@@ -1,6 +1,8 @@
 const express = require("express")
 const repo = require("../shop/orders/orderRepo")
 const domain = require("../shop/orders/domain")
+const paymentSettings = require("../shop/payments/settingsRepo")
+const { buildInstructions } = require("../shop/payments/instructions")
 
 const STATUSES = ["pending", "confirmed", "shipped", "completed", "cancelled"]
 
@@ -56,12 +58,40 @@ module.exports = function adminOrderRoutes() {
     } catch (err) { oops(res, err, "Lỗi liệt kê đơn") }
   })
 
+  // Backs the admin QR scanner: it only ever extracts a token from the
+  // buyer's public order URL, so the lookup has to happen server-side here
+  // rather than the admin's browser matching against order_token client-side
+  // (which is why order_token isn't in the list/detail response at all —
+  // see withAllowedTransitions above). Registered before "/orders/:id" so
+  // Express doesn't swallow "by-token" as an :id value.
+  router.get("/orders/by-token/:token", async (req, res) => {
+    try {
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      res.json(withAllowedTransitions(order))
+    } catch (err) { oops(res, err, "Lỗi tra cứu đơn theo mã QR") }
+  })
+
   router.get("/orders/:id", async (req, res) => {
     try {
       const order = await repo.getOrderById(req.params.id)
       if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
       res.json(withAllowedTransitions(order))
     } catch (err) { oops(res, err, "Lỗi lấy đơn") }
+  })
+
+  // Backs the payment-instructions panel in the admin order detail view —
+  // the same buildInstructions() the buyer's own public page uses, but
+  // looked up by numeric id under admin auth rather than the admin's
+  // browser calling the buyer's public /api/orders/:token/payment route
+  // directly (which is why order_token isn't in the admin response either).
+  router.get("/orders/:id/payment", async (req, res) => {
+    try {
+      const order = await repo.getOrderById(req.params.id)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      const settings = await paymentSettings.getSettings()
+      res.json(buildInstructions(order, settings))
+    } catch (err) { oops(res, err, "Lỗi lấy hướng dẫn thanh toán") }
   })
 
   router.post("/orders/:id/transition", async (req, res) => {

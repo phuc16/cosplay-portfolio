@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense, useState } from "react"
 import {
-  adminListOrders, adminTransitionOrder, adminGetOrder, fetchPaymentInstructions,
+  adminListOrders, adminTransitionOrder, adminGetOrder, adminGetOrderPayment, adminFindOrderByToken,
   adminBulkCancelOrders, adminBulkCompleteOrders, adminListCollections,
 } from "../api/shop"
 import { formatVnd } from "../utils/money"
@@ -104,9 +104,7 @@ export default function AdminOrders() {
     const o = await adminGetOrder(id)
     setDetail(o)
     setPaymentInfo(null)
-    if (o.order_token) {
-      fetchPaymentInstructions(o.order_token).then(setPaymentInfo).catch(() => setPaymentInfo(null))
-    }
+    adminGetOrderPayment(id).then(setPaymentInfo).catch(() => setPaymentInfo(null))
   }
 
   const move = async (order, to) => {
@@ -137,16 +135,12 @@ export default function AdminOrders() {
   const onScanToken = async (token) => {
     setScanError("")
     try {
-      // The scanner only extracts a token from the public order URL; looking
-      // it up by order_token and opening the authenticated admin detail view
-      // (rather than the buyer's read-only page) happens here. There is no
-      // admin "get by token" endpoint, so this searches the full order list.
-      const all = await adminListOrders({})
-      const match = all.find((o) => o.order_token === token)
-      if (!match) {
-        setScanError("Không tìm thấy đơn hàng cho mã QR này")
-        return
-      }
+      // The scanner only extracts a token from the public order URL; the
+      // lookup by order_token happens server-side under admin auth (see
+      // adminOrders.js's "/orders/by-token/:token") rather than the admin's
+      // browser matching it client-side against the order list, since
+      // order_token is never sent to the browser in bulk.
+      const match = await adminFindOrderByToken(token)
       setScannerOpen(false)
       await openDetail(match.id)
     } catch {

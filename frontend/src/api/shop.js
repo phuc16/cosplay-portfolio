@@ -68,6 +68,12 @@ export const adminListOrders = (params = {}) =>
 export const adminGetOrder = (id) =>
   api.get(`/api/admin/orders/${id}`).then((r) => r.data)
 
+export const adminFindOrderByToken = (token) =>
+  api.get(`/api/admin/orders/by-token/${token}`).then((r) => r.data)
+
+export const adminGetOrderPayment = (id) =>
+  api.get(`/api/admin/orders/${id}/payment`).then((r) => r.data)
+
 export const adminTransitionOrder = (id, payload) =>
   api.post(`/api/admin/orders/${id}/transition`, payload).then((r) => r.data)
 

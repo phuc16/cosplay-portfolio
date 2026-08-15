@@ -5,6 +5,7 @@ import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
+import settings from "../shop/payments/settingsRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
@@ -187,6 +188,61 @@ describe("order_token is never exposed to the admin", () => {
     const res = await authed(request(app).get(`/api/admin/orders/${o.id}`))
     expect(res.body).not.toHaveProperty("order_token")
     expect(JSON.stringify(res.body)).not.toContain(o.order_token)
+  })
+})
+
+describe("GET /api/admin/orders/by-token/:token", () => {
+  // Backs the admin QR scanner, which only ever extracts a token from the
+  // buyer's public order URL — the lookup has to happen server-side since
+  // order_token is deliberately never sent to the browser in the order list.
+  it("requires a token", async () => {
+    const res = await request(app).get("/api/admin/orders/by-token/anything")
+    expect(res.status).toBe(401)
+  })
+
+  it("finds the order by its order_token", async () => {
+    const o = await seedOrder()
+    const res = await authed(request(app).get(`/api/admin/orders/by-token/${o.order_token}`))
+    expect(res.status).toBe(200)
+    expect(res.body.id).toBe(o.id)
+  })
+
+  it("404s for an unknown token", async () => {
+    const res = await authed(request(app).get("/api/admin/orders/by-token/nonexistent-token"))
+    expect(res.status).toBe(404)
+  })
+
+  it("still never exposes order_token in the response", async () => {
+    const o = await seedOrder()
+    const res = await authed(request(app).get(`/api/admin/orders/by-token/${o.order_token}`))
+    expect(res.body).not.toHaveProperty("order_token")
+  })
+})
+
+describe("GET /api/admin/orders/:id/payment", () => {
+  beforeEach(async () => {
+    await db.query("DELETE FROM payment_settings")
+  })
+
+  it("requires a token", async () => {
+    const res = await request(app).get("/api/admin/orders/1/payment")
+    expect(res.status).toBe(401)
+  })
+
+  it("returns the same payment instructions the buyer's public route would, looked up by numeric id", async () => {
+    await settings.updateSettings({
+      bank_enabled: true, bank_name: "ACB", bank_bin: "970416",
+      bank_account_number: "123456789", bank_account_holder: "NGUYEN VAN A",
+    })
+    const o = await seedOrder({ payment_method: "bank" })
+    const res = await authed(request(app).get(`/api/admin/orders/${o.id}/payment`))
+    expect(res.status).toBe(200)
+    expect(res.body.account_number).toBe("123456789")
+  })
+
+  it("404s for an unknown order id", async () => {
+    const res = await authed(request(app).get("/api/admin/orders/999999/payment"))
+    expect(res.status).toBe(404)
   })
 })
 
