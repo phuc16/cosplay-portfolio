@@ -5,6 +5,41 @@ outside of the formal specs in `docs/superpowers/specs/`. Each entry is a
 decision the user made during live testing or discussion — not a
 implementation detail (those live in code comments/commit messages).
 
+## 2026-08-15 — Order page requires a PIN or admin session, not just the link
+
+A security audit (prompted by "hard check secure") flagged that
+`order_token` in the order-page URL alone was sufficient to view the
+pickup code and upload payment proof — anyone the buyer casually shared
+the link with (a screenshot, a forwarded message) could act on the order,
+including overwriting a real buyer's payment proof with a fake one and
+getting admin to wrongly decline the order.
+
+Decided: every buyer-order route now requires either an admin session
+(the same JWT from admin login — an admin following a buyer's link for
+support never sees a PIN) or a 6-digit PIN emailed to the buyer at order
+creation, verified via a new `/verify-pin` endpoint with a 5-attempt/
+15-minute lockout per order (mirroring the existing admin-login lockout).
+The PIN's plaintext exists only transiently (order creation response +
+the email-queue payload until sent) — only its hash is ever stored.
+
+Follow-up decisions made live during rollout:
+- The admin bypass must work even when the admin opens a buyer's link
+  directly (not via `/admin` first in that tab) — reads `admin_token`
+  from localStorage directly, not just the in-memory axios header.
+- Admin access token extended 8h → 1 day (paired with a new 30-day
+  refresh token) since the bypass raised the cost of an admin session
+  expiring mid-support-conversation.
+- The PIN shown in the confirmation email was moved into the same card
+  as the "Xem đơn hàng" link (was a visually separate block below it) —
+  it's only relevant in the context of that link.
+- The buyer's own browser skips entering the PIN once, immediately after
+  checkout (the browser that just placed the order already proved it's
+  the buyer) — seeded via a session-scoped token, not a persistent
+  bypass; a different device or a fresh session still needs the emailed
+  PIN.
+- FAQ updated: "how do I find my order again" now says the PIN is
+  required too, plus a new entry explaining what the PIN is for.
+
 ## 2026-08-14 — Admin order search: no scope on "statistic" pages, id search doesn't match the display code
 
 Asked for search across order/ship/statistic admin pages, by id, name,
