@@ -221,13 +221,19 @@ async function createOrder(input) {
     const expiresAt = domain.computeExpiry(input.payment_method, new Date(), deadlineHours)
     const isPickup = input.fulfillment_method === "pickup"
     const pickupCode = isPickup ? domain.generatePickupCode() : null
+    // Only the hash is ever persisted (see migration 021) — accessPin itself
+    // is returned once here so the caller can email it, same lifecycle as
+    // order_token except accessPin is never stored in plaintext anywhere.
+    const accessPin = domain.generateAccessPin()
+    const accessPinHash = domain.hashAccessPin(accessPin)
 
     const [res] = await conn.query(
       `INSERT INTO orders
          (order_token, request_key, buyer_name, phone, email, fulfillment_method,
           address_street, address_ward, address_district, address_province, address_raw,
-          note, status, payment_method, total, cod_amount, collection_id, expires_at, pickup_code)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+          note, status, payment_method, total, cod_amount, collection_id, expires_at, pickup_code,
+          access_pin_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
       [
         token,
         input.request_key || null,
@@ -247,6 +253,7 @@ async function createOrder(input) {
         lines[0].collection_id,
         expiresAt,
         pickupCode,
+        accessPinHash,
       ]
     )
 
@@ -262,7 +269,7 @@ async function createOrder(input) {
     }
 
     await conn.commit()
-    return { id: res.insertId, order_token: token, total, reused: false }
+    return { id: res.insertId, order_token: token, access_pin: accessPin, total, reused: false }
   } catch (err) {
     await conn.rollback()
     if (err.code === "ER_DUP_ENTRY" && input.request_key) {

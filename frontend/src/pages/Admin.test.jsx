@@ -92,7 +92,7 @@ describe("Admin — session persistence", () => {
     expect(container.textContent).toContain("Đăng nhập Admin")
   })
 
-  it("logs out automatically when an admin API call comes back 401 (expired session)", async () => {
+  it("logs out automatically when an admin API call comes back 401 (expired session) and there is no refresh token", async () => {
     localStorage.setItem("admin_token", "expired-token")
     const container = await renderAdmin()
     expect(container.querySelector('[data-testid="tab-albums"]')).toBeTruthy()
@@ -108,6 +108,73 @@ describe("Admin — session persistence", () => {
     }
 
     expect(localStorage.getItem("admin_token")).toBeNull()
+    expect(container.textContent).toContain("Đăng nhập Admin")
+  })
+
+  it("saves the refresh_token to localStorage alongside the access token after login", async () => {
+    axios.post.mockResolvedValue({ data: { token: "abc123", refresh_token: "refresh-abc" } })
+    const container = await renderAdmin()
+
+    const userInput = container.querySelector('input[type="text"]')
+    const passInput = container.querySelector('input[type="password"]')
+    userInput.value = "admin"
+    passInput.value = "secret"
+    userInput.dispatchEvent(new Event("input", { bubbles: true }))
+    passInput.dispatchEvent(new Event("input", { bubbles: true }))
+
+    const form = container.querySelector("form")
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+    })
+
+    expect(localStorage.getItem("admin_refresh_token")).toBe("refresh-abc")
+  })
+
+  it("silently refreshes and retries the request on a 401 when a refresh token is saved, instead of logging out", async () => {
+    localStorage.setItem("admin_token", "expired-token")
+    localStorage.setItem("admin_refresh_token", "refresh-abc")
+    axios.post.mockResolvedValue({ data: { token: "new-token", refresh_token: "new-refresh" } })
+    const container = await renderAdmin()
+
+    const originalAdapter = api.defaults.adapter
+    let calls = 0
+    api.defaults.adapter = (config) => {
+      calls += 1
+      if (calls === 1) return Promise.reject({ response: { status: 401 }, isAxiosError: true, config })
+      return Promise.resolve({ data: { ok: true }, status: 200, config, headers: {} })
+    }
+    try {
+      await act(async () => {
+        await api.get("/api/admin/anything")
+      })
+    } finally {
+      api.defaults.adapter = originalAdapter
+    }
+
+    expect(axios.post).toHaveBeenCalledWith("/api/refresh", { refresh_token: "refresh-abc" })
+    expect(localStorage.getItem("admin_token")).toBe("new-token")
+    expect(localStorage.getItem("admin_refresh_token")).toBe("new-refresh")
+    expect(container.textContent).not.toContain("Đăng nhập Admin")
+  })
+
+  it("logs out when the refresh token itself is rejected", async () => {
+    localStorage.setItem("admin_token", "expired-token")
+    localStorage.setItem("admin_refresh_token", "dead-refresh")
+    axios.post.mockRejectedValue({ response: { status: 401 }, isAxiosError: true })
+    const container = await renderAdmin()
+
+    const originalAdapter = api.defaults.adapter
+    api.defaults.adapter = () => Promise.reject({ response: { status: 401 }, isAxiosError: true })
+    try {
+      await act(async () => {
+        await api.get("/api/admin/anything").catch(() => {})
+      })
+    } finally {
+      api.defaults.adapter = originalAdapter
+    }
+
+    expect(localStorage.getItem("admin_token")).toBeNull()
+    expect(localStorage.getItem("admin_refresh_token")).toBeNull()
     expect(container.textContent).toContain("Đăng nhập Admin")
   })
 })

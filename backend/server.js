@@ -302,10 +302,51 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
     await redis.del(attemptKey)
     await redis.del(lockKey)
     const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: "8h" })
+    const refreshToken = await issueRefreshToken()
     console.log(`[LOGIN] Đăng nhập thành công: ${username}`)
-    res.json({ token })
+    res.json({ token, refresh_token: refreshToken })
   } catch (err) {
     console.error("[LOGIN] Lỗi:", err)
+    res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+  }
+})
+
+const REFRESH_TOKEN_DAYS = 30
+
+// Only one admin account exists (env-configured credentials, no user table),
+// so the refresh token needs no owner mapping — its mere presence in Redis
+// with a live TTL is proof it was issued by a real login. 32 random bytes:
+// same entropy floor as order_token, since this is a bearer credential too.
+async function issueRefreshToken() {
+  const refreshToken = crypto.randomBytes(32).toString("hex")
+  await redis.set(`refresh_token:${refreshToken}`, "1", "EX", 60 * 60 * 24 * REFRESH_TOKEN_DAYS)
+  return refreshToken
+}
+
+// Rotates on every use (delete-then-reissue) rather than just checking
+// validity: a stolen refresh token that gets used once is invalidated for
+// its real owner's next refresh too, which at least surfaces the theft as a
+// forced re-login rather than letting both parties ride the same token
+// silently for its whole 30-day life.
+app.post(`${API_PREFIX}/refresh`, async (req, res) => {
+  try {
+    const { refresh_token: refreshToken } = req.body
+    if (!refreshToken || typeof refreshToken !== "string") {
+      return res.status(400).json({ error: "invalid_input", message: "Cần refresh_token" })
+    }
+
+    const key = `refresh_token:${refreshToken}`
+    const exists = await redis.get(key)
+    if (!exists) {
+      return res.status(401).json({ error: "invalid_refresh_token", message: "Phiên đăng nhập hết hạn. Đăng nhập lại." })
+    }
+    await redis.del(key)
+
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: "8h" })
+    const newRefreshToken = await issueRefreshToken()
+    res.json({ token, refresh_token: newRefreshToken })
+  } catch (err) {
+    console.error("[REFRESH] Lỗi:", err)
     res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
   }
 })

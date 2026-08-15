@@ -23,6 +23,40 @@ describe("generatePickupCode", () => {
   })
 })
 
+describe("generateAccessPin", () => {
+  it("is a 6-digit numeric string", () => {
+    expect(d.generateAccessPin()).toMatch(/^\d{6}$/)
+  })
+
+  it("varies across many generations (not a constant)", () => {
+    const pins = new Set(Array.from({ length: 200 }, () => d.generateAccessPin()))
+    expect(pins.size).toBeGreaterThan(1)
+  })
+})
+
+describe("hashAccessPin / verifyAccessPin", () => {
+  it("hashes to a 64-char hex SHA-256 digest, never the plaintext PIN", () => {
+    const hash = d.hashAccessPin("123456")
+    expect(hash).toMatch(/^[0-9a-f]{64}$/)
+    expect(hash).not.toContain("123456")
+  })
+
+  it("verifies the correct PIN against its own hash", () => {
+    const hash = d.hashAccessPin("482913")
+    expect(d.verifyAccessPin("482913", hash)).toBe(true)
+  })
+
+  it("rejects an incorrect PIN", () => {
+    const hash = d.hashAccessPin("482913")
+    expect(d.verifyAccessPin("000000", hash)).toBe(false)
+  })
+
+  it("rejects (rather than throws) against a missing/null stored hash", () => {
+    expect(d.verifyAccessPin("123456", null)).toBe(false)
+    expect(d.verifyAccessPin("123456", undefined)).toBe(false)
+  })
+})
+
 describe("formatOrderCode", () => {
   it("is a YYMMDD date prefix plus an 8-character alphanumeric suffix (14 chars total)", () => {
     const code = d.formatOrderCode(12, "2026-08-14T12:00:00Z")

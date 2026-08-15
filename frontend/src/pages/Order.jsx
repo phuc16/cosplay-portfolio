@@ -3,7 +3,9 @@
    directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof } from "../api/shop"
+import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob } from "../api/shop"
+import { orderAuthHeaders, setOrderSessionToken } from "../utils/orderAuth"
+import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import { formatDeadline, formatVnDateTime } from "../utils/orderDeadline"
@@ -69,7 +71,7 @@ function ProofUpload({ token, existingProofUrl }) {
     setUploading(true)
     try {
       const base64 = await readFileAsBase64(file)
-      const { url } = await uploadPaymentProof(token, base64)
+      const { url } = await uploadPaymentProof(token, base64, orderAuthHeaders(token))
       setUploadedUrl(url)
     } catch (err) {
       setError(err.response?.data?.message || t("proofError"))
@@ -123,28 +125,115 @@ function DeadlineBlock({ expiresAt }) {
   )
 }
 
+// order_token in the URL alone used to be sufficient to view this page —
+// anyone the buyer casually shared the link with could also see the pickup
+// code and upload payment proof (able to overwrite a real buyer's proof
+// with a fake one, causing admin to decline their order). The backend now
+// requires either an admin session (attached automatically — see
+// orderAuthHeaders) or this PIN, emailed to the buyer at order creation.
+function PinGate({ token, onVerified }) {
+  const { t } = useLanguage()
+  const [pin, setPin] = useState("")
+  const [error, setError] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (pin.length !== 6) return
+    setError("")
+    setBusy(true)
+    try {
+      const { access_token: accessToken } = await verifyOrderPin(token, pin)
+      setOrderSessionToken(token, accessToken)
+      onVerified()
+    } catch (err) {
+      setError(
+        err.response?.status === 429
+          ? (err.response?.data?.message || t("orderPinLocked"))
+          : t("orderPinError")
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <ShopHeader />
+      <main className="max-w-md mx-auto px-4 py-10">
+        <h1 className="text-xl font-bold mb-2">{t("orderPinTitle")}</h1>
+        <p className="text-sm opacity-70 mb-6">{t("orderPinSubtitle")}</p>
+        <form onSubmit={submit}>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="000000"
+            className="w-full text-center text-2xl tracking-[0.5em] px-3 py-3 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+          {error && <p className="text-sm text-[var(--text-error)] mt-2">{error}</p>}
+          <button
+            type="submit"
+            disabled={busy || pin.length !== 6}
+            className="mt-4 w-full py-2.5 rounded-lg bg-[var(--brand)] text-white font-medium disabled:opacity-50"
+          >
+            {busy ? t("orderPinVerifying") : t("orderPinSubmit")}
+          </button>
+        </form>
+      </main>
+    </>
+  )
+}
+
 export default function Order() {
   const { token } = useParams()
   const { t } = useLanguage()
   const [order, setOrder] = useState(undefined)
   const [instructions, setInstructions] = useState(null)
+  const [needsPin, setNeedsPin] = useState(false)
+  // Bumped after a successful PIN verification to retrigger the fetch below
+  // with the now-available session token — token/params alone don't change.
+  const [unlockCount, setUnlockCount] = useState(0)
 
   useEffect(() => {
     // Belt and braces with the server's X-Robots-Tag: the order page is
-    // protected only by an unguessable token and must never be indexed.
+    // protected only by an unguessable token (+ PIN/admin session) and must
+    // never be indexed.
     const meta = document.createElement("meta")
     meta.name = "robots"
     meta.content = "noindex, nofollow"
     document.head.appendChild(meta)
 
-    fetchOrder(token).then(setOrder).catch(() => setOrder(null))
+    fetchOrder(token, orderAuthHeaders(token))
+      .then((data) => { setNeedsPin(false); setOrder(data) })
+      .catch((err) => {
+        if (err.response?.status === 401) {
+          setNeedsPin(true)
+        } else {
+          setNeedsPin(false)
+          setOrder(null)
+        }
+      })
     return () => document.head.removeChild(meta)
-  }, [token])
+  }, [token, unlockCount])
 
   useEffect(() => {
     if (order?.status !== "pending") return
-    fetchPaymentInstructions(token).then(setInstructions).catch(() => setInstructions(null))
+    fetchPaymentInstructions(token, orderAuthHeaders(token)).then(setInstructions).catch(() => setInstructions(null))
   }, [order?.status, token])
+
+  const qrSrc = useBlobUrl(
+    () => fetchOrderQrBlob(token, orderAuthHeaders(token)),
+    [token, order],
+    Boolean(order)
+  )
+
+  if (needsPin) {
+    return <PinGate token={token} onVerified={() => setUnlockCount((c) => c + 1)} />
+  }
 
   if (order === undefined) {
     return (
@@ -246,11 +335,13 @@ export default function Order() {
         </div>
       )}
 
-      <div className="mt-6 flex flex-col items-center">
-        <img src={`/api/orders/${token}/qr.svg`} alt={t("orderQrCaption")}
-          className="w-40 h-40 rounded-lg border border-[var(--border-brand)]" />
-        <p className="text-xs opacity-60 mt-2 text-center">{t("orderQrCaption")}</p>
-      </div>
+      {qrSrc && (
+        <div className="mt-6 flex flex-col items-center">
+          <img src={qrSrc} alt={t("orderQrCaption")}
+            className="w-40 h-40 rounded-lg border border-[var(--border-brand)]" />
+          <p className="text-xs opacity-60 mt-2 text-center">{t("orderQrCaption")}</p>
+        </div>
+      )}
       </main>
     </>
   )

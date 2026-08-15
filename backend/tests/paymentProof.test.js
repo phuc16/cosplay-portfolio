@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import request from "supertest"
+import jwt from "jsonwebtoken"
 import sharp from "sharp"
 import db from "../db.js"
 import redis from "../redis.js"
+
+const adminToken = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
+const authed = (req) => req.set("Authorization", `Bearer ${adminToken}`)
 
 vi.mock("../storage", async (importOriginal) => {
   const actual = await importOriginal()
@@ -50,7 +54,7 @@ beforeEach(async () => {
 describe("POST /api/orders/:token/proof", () => {
   it("stores a proof image against the order", async () => {
     const o = await seedOrder()
-    const res = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
 
     expect(res.status).toBe(201)
     expect(res.body.url).toContain("/api/storage/")
@@ -62,12 +66,12 @@ describe("POST /api/orders/:token/proof", () => {
 
   it("rejects a missing image", async () => {
     const o = await seedOrder()
-    expect((await request(app).post(`/api/orders/${o.order_token}/proof`).send({})).status).toBe(400)
+    expect((await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({})).status).toBe(400)
   })
 
   it("rejects a non-image payload", async () => {
     const o = await seedOrder()
-    const res = await request(app).post(`/api/orders/${o.order_token}/proof`)
+    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`))
       .send({ base64: Buffer.from("not an image at all").toString("base64") })
     expect(res.status).toBe(400)
   })
@@ -79,7 +83,7 @@ describe("POST /api/orders/:token/proof", () => {
     oversized[1] = 0xd8
     oversized[2] = 0xff // valid jpeg magic bytes — must fail on size, not type
 
-    const res = await request(app).post(`/api/orders/${o.order_token}/proof`)
+    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`))
       .send({ base64: oversized.toString("base64") })
 
     expect(res.status).toBe(400)
@@ -89,14 +93,14 @@ describe("POST /api/orders/:token/proof", () => {
   })
 
   it("404s an unknown token", async () => {
-    const res = await request(app).post(`/api/orders/${"a".repeat(32)}/proof`).send({ base64: await png() })
+    const res = await authed(request(app).post(`/api/orders/${"a".repeat(32)}/proof`)).send({ base64: await png() })
     expect(res.status).toBe(404)
   })
 
   it("refuses upload once the order is already confirmed", async () => {
     const o = await seedOrder()
     await orders.transitionOrder(o.id, "confirmed")
-    const res = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
     expect(res.status).toBe(409)
   })
 
@@ -104,13 +108,13 @@ describe("POST /api/orders/:token/proof", () => {
     const o = await seedOrder()
 
     // First upload
-    const first = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    const first = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
     expect(first.status).toBe(201)
     const firstUrl = first.body.url
     expect(firstUrl).toBeTruthy()
 
     // Second upload
-    const second = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    const second = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
     expect(second.status).toBe(201)
     const secondUrl = second.body.url
     expect(secondUrl).toBeTruthy()
@@ -130,7 +134,7 @@ describe("POST /api/orders/:token/proof", () => {
   // limiter actually writes to.
   it("rate-limits proof uploads under a separate bucket from order creation", async () => {
     const o = await seedOrder()
-    await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
 
     const proofKeys = await redis.keys("rl:proof:*")
     const orderKeys = await redis.keys("rl:order:*")
@@ -142,16 +146,16 @@ describe("POST /api/orders/:token/proof", () => {
 describe("GET /api/orders/:token — has_payment_proof", () => {
   it("is false before any proof is uploaded", async () => {
     const o = await seedOrder()
-    const res = await request(app).get(`/api/orders/${o.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${o.order_token}`))
     expect(res.body.has_payment_proof).toBe(false)
     expect(res.body.payment_proof_url).toBeNull()
   })
 
   it("is true after a proof is uploaded, surviving what a page refresh would re-fetch", async () => {
     const o = await seedOrder()
-    const uploaded = await request(app).post(`/api/orders/${o.order_token}/proof`).send({ base64: await png() })
+    const uploaded = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
 
-    const res = await request(app).get(`/api/orders/${o.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${o.order_token}`))
     expect(res.body.has_payment_proof).toBe(true)
     // The buyer sees the same image on every visit, not just the upload
     // session — same URL the upload response returned.

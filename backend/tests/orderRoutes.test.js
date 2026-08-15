@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import request from "supertest"
+import jwt from "jsonwebtoken"
 import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
@@ -7,6 +8,13 @@ import orders from "../shop/orders/orderRepo.js"
 import redis from "../redis.js"
 import settings from "../shop/payments/settingsRepo.js"
 import { resetTables } from "./helpers/db.js"
+
+// GET /api/orders/:token now requires either an admin session or a
+// PIN-verified order-access session (see shop/orders/orderAccess.js) — the
+// admin JWT is the simplest bypass for tests that don't care about the PIN
+// flow itself (that's covered separately in orderAccess.test.js).
+const adminToken = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
+const authed = (req) => req.set("Authorization", `Bearer ${adminToken}`)
 
 async function seed(stock = 5, collectionOver = {}) {
   const cid = await catalog.createCollection({ title: "Drop", status: "active", ...collectionOver })
@@ -227,7 +235,7 @@ describe("GET /api/orders/:token", () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.status).toBe(200)
     expect(res.body.total).toBe(35000)
     expect(res.body.items[0].variant_label_snapshot).toBe("A1")
@@ -237,7 +245,7 @@ describe("GET /api/orders/:token", () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(String(res.headers["x-robots-tag"])).toContain("noindex")
   })
 
@@ -246,7 +254,7 @@ describe("GET /api/orders/:token", () => {
     const created = await request(app).post("/api/orders")
       .send(body(v, { request_key: "internal-fields-test" }))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).not.toHaveProperty("request_key")
     expect(res.body).not.toHaveProperty("stock_released_at")
     // Sanity: the fields the order page actually uses are still there.
@@ -262,7 +270,7 @@ describe("GET /api/orders/:token", () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).toHaveProperty("expires_at")
     expect(res.body.expires_at).not.toBeNull()
   })
@@ -271,7 +279,7 @@ describe("GET /api/orders/:token", () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v, { payment_method: "cod" }))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).toHaveProperty("expires_at")
     expect(res.body.expires_at).toBeNull()
   })
@@ -280,7 +288,7 @@ describe("GET /api/orders/:token", () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).toHaveProperty("expires_at")
     // order_token IS present on this response by design (the buyer already
     // holds it — it's in the URL they just requested), but nothing this
@@ -295,7 +303,7 @@ describe("GET /api/orders/:token", () => {
   })
 
   it("404s an unknown token", async () => {
-    const res = await request(app).get(`/api/orders/${"a".repeat(32)}`)
+    const res = await authed(request(app).get(`/api/orders/${"a".repeat(32)}`))
     expect(res.status).toBe(404)
     expect(res.body.error).toBe("not_found")
     expect(String(res.headers["x-robots-tag"])).toContain("noindex")
@@ -309,7 +317,7 @@ describe("GET /api/orders/:token", () => {
     const created = await request(app).post("/api/orders")
       .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.status).toBe(200)
     expect(res.body.pickup_location).toBe("Comic Fest, Booth 12")
     expect(res.body.pickup_note).toBe("9am-6pm, both days")
@@ -319,7 +327,7 @@ describe("GET /api/orders/:token", () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
 
-    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body.pickup_location).toBeNull()
     expect(res.body.pickup_note).toBeNull()
   })
@@ -329,12 +337,12 @@ describe("GET /api/orders/:token", () => {
     const pickup = await request(app).post("/api/orders")
       .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
 
-    const pickupGet = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    const pickupGet = await authed(request(app).get(`/api/orders/${pickup.body.order_token}`))
     expect(pickupGet.body.pickup_code).toBeNull()
 
     const v2 = await seed(5)
     const ship = await request(app).post("/api/orders").send(body(v2))
-    const shipGet = await request(app).get(`/api/orders/${ship.body.order_token}`)
+    const shipGet = await authed(request(app).get(`/api/orders/${ship.body.order_token}`))
     expect(shipGet.body.pickup_code).toBeNull()
   })
 
@@ -346,7 +354,7 @@ describe("GET /api/orders/:token", () => {
     const [[pRow]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [pickup.body.order_token])
     await orders.transitionOrder(pRow.id, "confirmed")
 
-    const res = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${pickup.body.order_token}`))
     expect(res.body.pickup_code).toMatch(/^\d{6}$/)
   })
 
@@ -359,7 +367,7 @@ describe("GET /api/orders/:token", () => {
     await orders.transitionOrder(pRow1.id, "confirmed")
     await orders.transitionOrder(pRow1.id, "cancelled")
 
-    const res = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${pickup.body.order_token}`))
     expect(res.body.pickup_code).toBeNull()
   })
 
@@ -372,7 +380,7 @@ describe("GET /api/orders/:token", () => {
     await orders.transitionOrder(pRow2.id, "confirmed")
     await orders.transitionOrder(pRow2.id, "completed")
 
-    const res = await request(app).get(`/api/orders/${pickup.body.order_token}`)
+    const res = await authed(request(app).get(`/api/orders/${pickup.body.order_token}`))
     expect(res.body.pickup_code).toMatch(/^\d{6}$/)
   })
 })

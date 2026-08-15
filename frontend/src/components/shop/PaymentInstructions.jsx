@@ -2,6 +2,9 @@ import { useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { formatVnd } from "../../utils/money"
 import vietQrLogo from "../../assets/vietqr-logo.svg"
+import { fetchPaymentQrBlob } from "../../api/shop"
+import { orderAuthHeaders } from "../../utils/orderAuth"
+import { useBlobUrl } from "../../hooks/useBlobUrl"
 
 /** Copy-to-clipboard button; silently no-ops where the Clipboard API is unavailable. */
 function CopyButton({ value }) {
@@ -47,6 +50,15 @@ function Row({ label, value, copyable }) {
  */
 export default function PaymentInstructions({ instructions, token }) {
   const { t } = useLanguage()
+  // /payment/qr.svg is behind the same PIN/admin gate as the rest of the
+  // order — a plain <img src="..."> can't carry the Authorization header
+  // that requires, so it's fetched as a blob instead (see useBlobUrl).
+  const showQr = Boolean(instructions?.method === "bank" && instructions?.vietqr_payload)
+  const qrSrc = useBlobUrl(
+    () => fetchPaymentQrBlob(token, orderAuthHeaders(token)),
+    [token, showQr],
+    showQr
+  )
   if (!instructions) return null
 
   const { method, amount, payment_note } = instructions
@@ -72,11 +84,13 @@ export default function PaymentInstructions({ instructions, token }) {
           {instructions.vietqr_payload ? (
             <div className="mt-4 flex flex-col items-center p-4 rounded-lg border border-[var(--border-default)]">
               <img src={vietQrLogo} alt="VietQR" className="h-7 mb-3" />
-              <img
-                src={`/api/orders/${token}/payment/qr.svg`}
-                alt={t("paymentScanQr")}
-                className="w-48 h-48"
-              />
+              {qrSrc && (
+                <img
+                  src={qrSrc}
+                  alt={t("paymentScanQr")}
+                  className="w-48 h-48"
+                />
+              )}
               <p className="text-xs font-semibold tracking-wide opacity-70 mt-3">NAPAS 247</p>
               {instructions.account_holder && (
                 <p className="text-sm font-bold uppercase mt-1 text-center">{instructions.account_holder}</p>

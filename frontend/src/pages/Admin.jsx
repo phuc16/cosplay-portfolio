@@ -12,6 +12,7 @@ import AdminShipping from "../components/AdminShipping"
 import { useTheme } from "../contexts/ThemeContext"
 
 const TOKEN_KEY = "admin_token"
+const REFRESH_KEY = "admin_refresh_token"
 
 export default function Admin() {
   const { theme, toggleTheme } = useTheme()
@@ -33,18 +34,43 @@ export default function Admin() {
     setToken("")
     delete axios.defaults.headers.common["Authorization"]
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(REFRESH_KEY)
+  }
+
+  const applySession = (data) => {
+    axios.defaults.headers.common["Authorization"] = "Bearer " + data.token
+    localStorage.setItem(TOKEN_KEY, data.token)
+    if (data.refresh_token) localStorage.setItem(REFRESH_KEY, data.refresh_token)
+    setToken(data.token)
   }
 
   // A restored or still-active token can still expire mid-session (8h JWT) —
   // when that happens the server answers 401/403 and every admin tab would
-  // otherwise sit there silently failing. Drop back to the login screen
-  // instead of leaving a session that looks alive but isn't.
+  // otherwise sit there silently failing. Try the refresh token first (it
+  // outlives the access token by design, 30 days vs 8h) and retry the
+  // request that triggered this; only drop to the login screen if there is
+  // no refresh token or it's also no longer valid.
   useEffect(() => {
     if (!token) return
     const id = api.interceptors.response.use(
       (res) => res,
-      (err) => {
-        if (err.response?.status === 401 || err.response?.status === 403) logout()
+      async (err) => {
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          const refreshToken = localStorage.getItem(REFRESH_KEY)
+          if (refreshToken && !err.config?._retriedAfterRefresh) {
+            try {
+              const r = await axios.post("/api/refresh", { refresh_token: refreshToken })
+              applySession(r.data)
+              err.config._retriedAfterRefresh = true
+              err.config.headers.Authorization = "Bearer " + r.data.token
+              return api.request(err.config)
+            } catch {
+              logout()
+              return Promise.reject(err)
+            }
+          }
+          logout()
+        }
         return Promise.reject(err)
       }
     )
@@ -56,9 +82,7 @@ export default function Admin() {
     setError("")
     try {
       const r = await axios.post("/api/login", { username, password })
-      axios.defaults.headers.common["Authorization"] = "Bearer " + r.data.token
-      localStorage.setItem(TOKEN_KEY, r.data.token)
-      setToken(r.data.token)
+      applySession(r.data)
     } catch (err) {
       const msg = err.response?.data?.message || "Sai tên đăng nhập hoặc mật khẩu"
       setError(msg)

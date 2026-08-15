@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import request from "supertest"
+import jwt from "jsonwebtoken"
 import app from "../server.js"
 import db from "../db.js"
 import redis from "../redis.js"
@@ -7,6 +8,9 @@ import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import settings from "../shop/payments/settingsRepo.js"
 import { resetTables } from "./helpers/db.js"
+
+const adminToken = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
+const authed = (req) => req.set("Authorization", `Bearer ${adminToken}`)
 
 async function seedOrder(method = "bank") {
   const cid = await catalog.createCollection({ title: "Drop", status: "active" })
@@ -35,7 +39,7 @@ describe("GET /api/orders/:token/payment/qr.svg", () => {
     })
     const o = await seedOrder("bank")
 
-    const res = await request(app).get(`/api/orders/${o.order_token}/payment/qr.svg`)
+    const res = await authed(request(app).get(`/api/orders/${o.order_token}/payment/qr.svg`))
     expect(res.status).toBe(200)
     expect(res.type).toBe("image/svg+xml")
     expect(res.body.toString("utf-8")).toContain("<svg")
@@ -45,7 +49,7 @@ describe("GET /api/orders/:token/payment/qr.svg", () => {
     await settings.updateSettings({ bank_enabled: true })
     const o = await seedOrder("bank")
 
-    const res = await request(app).get(`/api/orders/${o.order_token}/payment/qr.svg`)
+    const res = await authed(request(app).get(`/api/orders/${o.order_token}/payment/qr.svg`))
     expect(res.status).toBe(404)
   })
 
@@ -53,12 +57,12 @@ describe("GET /api/orders/:token/payment/qr.svg", () => {
     await settings.updateSettings({ cod_enabled: true })
     const o = await seedOrder("cod")
 
-    const res = await request(app).get(`/api/orders/${o.order_token}/payment/qr.svg`)
+    const res = await authed(request(app).get(`/api/orders/${o.order_token}/payment/qr.svg`))
     expect(res.status).toBe(404)
   })
 
   it("404s for an unknown token", async () => {
-    const res = await request(app).get("/api/orders/doesnotexist/payment/qr.svg")
+    const res = await authed(request(app).get("/api/orders/doesnotexist/payment/qr.svg"))
     expect(res.status).toBe(404)
   })
 })

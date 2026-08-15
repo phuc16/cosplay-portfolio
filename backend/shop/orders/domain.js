@@ -19,6 +19,35 @@ function generatePickupCode() {
 }
 
 /**
+ * 6-digit numeric PIN gating the public order page (see routes/orders.js's
+ * orderAccess middleware). order_token alone used to be sufficient to view
+ * an order and act on it (upload payment proof, see the pickup code) — this
+ * closes that gap for anyone who only has the order LINK (e.g. a buyer
+ * casually shared it), since the PIN travels through a separate channel
+ * (email) rather than sitting in the same URL. Same shape as pickup_code —
+ * short enough to read from an email and type on a phone.
+ */
+function generateAccessPin() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, "0")
+}
+
+/** SHA-256 hex digest — the only thing ever stored for an access PIN. */
+function hashAccessPin(pin) {
+  return crypto.createHash("sha256").update(String(pin)).digest("hex")
+}
+
+/** Constant-time comparison against the stored hash — same reasoning as
+ * server.js's safeEqual for admin credentials: a PIN is short (6 digits,
+ * 1e6 possibilities) so timing leaks matter more here, not less. */
+function verifyAccessPin(pin, storedHash) {
+  if (!storedHash) return false
+  const candidate = Buffer.from(hashAccessPin(pin), "hex")
+  const stored = Buffer.from(String(storedHash), "hex")
+  if (candidate.length !== stored.length) return false
+  return crypto.timingSafeEqual(candidate, stored)
+}
+
+/**
  * Human-facing order code shown in emails/admin instead of the raw
  * sequential `id` — a plain "#12" both leaks order volume to anyone who
  * compares two numbers and reads as less polished than most storefronts'
@@ -99,6 +128,9 @@ module.exports = {
   RESERVATION_HOURS,
   generateOrderToken,
   generatePickupCode,
+  generateAccessPin,
+  hashAccessPin,
+  verifyAccessPin,
   formatOrderCode,
   computeTotal,
   isReservable,

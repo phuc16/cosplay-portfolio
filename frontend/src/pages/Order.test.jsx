@@ -8,12 +8,20 @@ import { ThemeProvider } from "../contexts/ThemeContext"
 const fetchOrder = vi.fn()
 const fetchPaymentInstructions = vi.fn()
 const uploadPaymentProof = vi.fn()
+const verifyOrderPin = vi.fn()
+const fetchOrderQrBlob = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchOrder: (...args) => fetchOrder(...args),
   fetchPaymentInstructions: (...args) => fetchPaymentInstructions(...args),
   uploadPaymentProof: (...args) => uploadPaymentProof(...args),
+  verifyOrderPin: (...args) => verifyOrderPin(...args),
+  fetchOrderQrBlob: (...args) => fetchOrderQrBlob(...args),
 }))
+
+// jsdom has no createObjectURL/revokeObjectURL; useBlobUrl calls both.
+globalThis.URL.createObjectURL = vi.fn(() => "blob:mock-qr")
+globalThis.URL.revokeObjectURL = vi.fn()
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -54,6 +62,10 @@ beforeEach(() => {
   fetchOrder.mockReset()
   fetchPaymentInstructions.mockReset()
   uploadPaymentProof.mockReset()
+  verifyOrderPin.mockReset()
+  fetchOrderQrBlob.mockReset()
+  fetchOrderQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
+  sessionStorage.clear()
 })
 
 function futureIso(hours) {
@@ -326,6 +338,81 @@ describe("Order — payment proof upload styling", () => {
     await act(async () => {})
 
     expect(container.textContent).toContain("Uploaded")
+  })
+})
+
+describe("Order — PIN gate", () => {
+  function setInputValue(el, value) {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    setter.call(el, value)
+    el.dispatchEvent(new Event("change", { bubbles: true }))
+  }
+
+  it("shows a PIN entry gate, not 'order not found', when the fetch comes back 401", async () => {
+    fetchOrder.mockRejectedValue({ response: { status: 401, data: { error: "pin_required" } } })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Enter your PIN")
+    expect(container.textContent).not.toContain("Order not found")
+  })
+
+  it("still shows 'order not found' for a 404, not the PIN gate", async () => {
+    fetchOrder.mockRejectedValue({ response: { status: 404 } })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Order not found")
+    expect(container.textContent).not.toContain("Enter your PIN")
+  })
+
+  it("unlocks the order after a correct PIN, refetching and rendering it", async () => {
+    fetchOrder
+      .mockRejectedValueOnce({ response: { status: 401, data: { error: "pin_required" } } })
+      .mockResolvedValueOnce(baseOrder({ status: "confirmed" }))
+    verifyOrderPin.mockResolvedValue({ access_token: "session-jwt" })
+
+    const container = await renderOrder()
+    expect(container.textContent).toContain("Enter your PIN")
+
+    const input = container.querySelector('input[inputmode="numeric"]')
+    await act(async () => setInputValue(input, "123456"))
+    const form = container.querySelector("form")
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })))
+
+    expect(verifyOrderPin).toHaveBeenCalledWith("tok123", "123456")
+    expect(sessionStorage.getItem("order_access:tok123")).toBe("session-jwt")
+    expect(container.textContent).not.toContain("Enter your PIN")
+    expect(fetchOrder).toHaveBeenCalledTimes(2)
+  })
+
+  it("shows an error and stays on the gate when the PIN is wrong", async () => {
+    fetchOrder.mockRejectedValue({ response: { status: 401, data: { error: "pin_required" } } })
+    verifyOrderPin.mockRejectedValue({ response: { status: 401, data: { error: "invalid_pin" } } })
+
+    const container = await renderOrder()
+    const input = container.querySelector('input[inputmode="numeric"]')
+    await act(async () => setInputValue(input, "000000"))
+    const form = container.querySelector("form")
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })))
+
+    expect(container.textContent).toContain("Incorrect PIN")
+    expect(sessionStorage.getItem("order_access:tok123")).toBeNull()
+  })
+
+  it("shows a lockout message, not the generic wrong-PIN error, after too many attempts (429)", async () => {
+    fetchOrder.mockRejectedValue({ response: { status: 401, data: { error: "pin_required" } } })
+    verifyOrderPin.mockRejectedValue({
+      response: { status: 429, data: { error: "too_many_attempts", message: "Sai mã PIN quá nhiều lần. Thử lại sau 15 phút." } },
+    })
+
+    const container = await renderOrder()
+    const input = container.querySelector('input[inputmode="numeric"]')
+    await act(async () => setInputValue(input, "000000"))
+    const form = container.querySelector("form")
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })))
+
+    expect(container.textContent).toContain("Thử lại sau 15 phút")
   })
 })
 

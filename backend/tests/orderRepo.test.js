@@ -282,6 +282,36 @@ describe("createOrder", () => {
   })
 })
 
+describe("createOrder: access_pin", () => {
+  it("returns a 6-digit plaintext access_pin, and stores only its hash", async () => {
+    const { variantId } = await seedVariant(5)
+    const created = await repo.createOrder(order(variantId, 1))
+
+    expect(created.access_pin).toMatch(/^\d{6}$/)
+
+    const [[row]] = await db.query("SELECT access_pin_hash FROM orders WHERE id = ?", [created.id])
+    expect(row.access_pin_hash).toMatch(/^[0-9a-f]{64}$/)
+    expect(row.access_pin_hash).not.toContain(created.access_pin)
+  })
+
+  it("the stored hash actually verifies against the returned plaintext PIN", async () => {
+    const { variantId } = await seedVariant(5)
+    const created = await repo.createOrder(order(variantId, 1))
+
+    const [[row]] = await db.query("SELECT access_pin_hash FROM orders WHERE id = ?", [created.id])
+    const domain = (await import("../shop/orders/domain.js")).default
+    expect(domain.verifyAccessPin(created.access_pin, row.access_pin_hash)).toBe(true)
+  })
+
+  it("every order gets its own independent PIN", async () => {
+    const { variantId: v1 } = await seedVariant(5)
+    const { variantId: v2 } = await seedVariant(5)
+    const a = await repo.createOrder(order(v1, 1))
+    const b = await repo.createOrder(order(v2, 1))
+    expect(a.access_pin).not.toBe(b.access_pin)
+  })
+})
+
 describe("createOrder: pickup_code", () => {
   it("sets a 6-digit pickup_code for a pickup order", async () => {
     const { variantId } = await seedVariant(5, { allow_pickup: true })

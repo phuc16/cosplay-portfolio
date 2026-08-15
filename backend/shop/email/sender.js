@@ -65,6 +65,25 @@ async function sendQueued(limit = 10) {
       let html = rendered.html
       const attachments = []
 
+      // Appended rather than a template placeholder (same reasoning as the
+      // cancel_reason/pickup_code blocks below): the plaintext PIN only ever
+      // exists here, in this queue row's payload — orders.access_pin_hash is
+      // one-way, so it can't be re-derived from the order the way every
+      // other template variable can, and a customizable {{access_pin}}
+      // placeholder would silently stop appearing the moment a seller edits
+      // this template, exactly like cancel_reason/pickup_code already are.
+      if (row.type === "order_placed" && row.payload) {
+        let payload
+        try { payload = JSON.parse(row.payload) } catch { payload = null }
+        if (payload?.access_pin) {
+          html += `
+            <p style="font-size:14px;margin-top:12px;padding:10px 14px;background:#f6faf4;border-radius:8px">
+              Mã PIN xác thực đơn hàng: <strong style="color:${templates.BRAND}">${templates.escapeHtml(payload.access_pin)}</strong><br/>
+              <span style="font-size:12px;color:#888">Cần mã này để xem lại đơn hàng qua link nếu trang yêu cầu xác thực.</span>
+            </p>`
+        }
+      }
+
       // Appended rather than a template placeholder: the cancelled template
       // is static and shared by every cancellation, most of which have no
       // reason at all (admin skipped the prompt, or the order predates this

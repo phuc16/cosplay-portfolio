@@ -58,8 +58,11 @@ export const adminUploadImage = (base64, folder) =>
 export const createOrder = (payload) =>
   api.post("/api/orders", payload).then((r) => r.data)
 
-export const fetchOrder = (token) =>
-  api.get(`/api/orders/${token}`).then((r) => r.data)
+export const fetchOrder = (token, headers = {}) =>
+  api.get(`/api/orders/${token}`, { headers }).then((r) => r.data)
+
+export const verifyOrderPin = (token, pin) =>
+  api.post(`/api/orders/${token}/verify-pin`, { pin }).then((r) => r.data)
 
 // ── Admin orders ──
 export const adminListOrders = (params = {}) =>
@@ -87,11 +90,17 @@ export const adminBulkCompleteOrders = (ids) =>
 export const fetchPaymentMethods = () =>
   api.get("/api/shop/payment-methods").then((r) => r.data)
 
-export const fetchPaymentInstructions = (token) =>
-  api.get(`/api/orders/${token}/payment`).then((r) => r.data)
+export const fetchPaymentInstructions = (token, headers = {}) =>
+  api.get(`/api/orders/${token}/payment`, { headers }).then((r) => r.data)
 
-export const uploadPaymentProof = (token, base64) =>
-  api.post(`/api/orders/${token}/proof`, { base64 }).then((r) => r.data)
+export const uploadPaymentProof = (token, base64, headers = {}) =>
+  api.post(`/api/orders/${token}/proof`, { base64 }, { headers }).then((r) => r.data)
+
+export const fetchOrderQrBlob = (token, headers = {}) =>
+  api.get(`/api/orders/${token}/qr.svg`, { headers, responseType: "blob" }).then((r) => r.data)
+
+export const fetchPaymentQrBlob = (token, headers = {}) =>
+  api.get(`/api/orders/${token}/payment/qr.svg`, { headers, responseType: "blob" }).then((r) => r.data)
 
 export const adminGetPaymentSettings = () =>
   api.get("/api/admin/payment-settings").then((r) => r.data)

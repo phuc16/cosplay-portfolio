@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { LanguageProvider } from "../../contexts/LanguageContext"
-import PaymentInstructions from "./PaymentInstructions"
+
+const fetchPaymentQrBlob = vi.fn()
+
+vi.mock("../../api/shop", () => ({
+  fetchPaymentQrBlob: (...args) => fetchPaymentQrBlob(...args),
+}))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+globalThis.URL.createObjectURL = vi.fn(() => "blob:mock-qr")
+globalThis.URL.revokeObjectURL = vi.fn()
+
+const { default: PaymentInstructions } = await import("./PaymentInstructions")
 
 async function renderWith(instructions) {
   const container = document.createElement("div")
@@ -17,10 +26,15 @@ async function renderWith(instructions) {
       </LanguageProvider>
     )
   })
+  await act(async () => {})
   return container
 }
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => {
+  localStorage.clear()
+  fetchPaymentQrBlob.mockReset()
+  fetchPaymentQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
+})
 
 describe("PaymentInstructions", () => {
   it("shows the printed bank details and an unavailable notice, never a blank box, when vietqr_payload is null", async () => {
@@ -44,8 +58,9 @@ describe("PaymentInstructions", () => {
       transfer_note: "DH12345678", vietqr_payload: "0002010102...",
     })
 
-    const img = [...container.querySelectorAll("img")].find((i) => i.src.includes("/api/orders/tok123/payment/qr.svg"))
+    const img = [...container.querySelectorAll("img")].find((i) => i.src.startsWith("blob:"))
     expect(img).toBeTruthy()
+    expect(fetchPaymentQrBlob).toHaveBeenCalledWith("tok123", expect.any(Object))
     expect(container.textContent).not.toContain("unavailable")
   })
 
@@ -58,7 +73,7 @@ describe("PaymentInstructions", () => {
 
     const imgs = [...container.querySelectorAll("img")]
     const badge = imgs.find((i) => i.alt === "VietQR")
-    const qr = imgs.find((i) => i.src.includes("/api/orders/tok123/payment/qr.svg"))
+    const qr = imgs.find((i) => i.src.startsWith("blob:"))
     expect(badge).toBeTruthy()
     expect(imgs.indexOf(badge)).toBeLessThan(imgs.indexOf(qr))
   })

@@ -2,10 +2,10 @@ const db = require("./../../db")
 
 const MAX_ATTEMPTS = 5
 
-async function enqueue(orderId, type, toEmail) {
+async function enqueue(orderId, type, toEmail, payload = null) {
   await db.query(
-    "INSERT INTO email_queue (order_id, type, to_email) VALUES (?, ?, ?)",
-    [orderId, type, toEmail]
+    "INSERT INTO email_queue (order_id, type, to_email, payload) VALUES (?, ?, ?, ?)",
+    [orderId, type, toEmail, payload ? JSON.stringify(payload) : null]
   )
 }
 
@@ -21,7 +21,11 @@ async function claimPending(limit = 10) {
 }
 
 async function markSent(id) {
-  await db.query("UPDATE email_queue SET status = 'sent', sent_at = NOW() WHERE id = ?", [id])
+  // payload cleared here too — once sent, nothing still needs the plaintext
+  // it carried (e.g. the access PIN), so it shouldn't keep sitting in the row.
+  await db.query(
+    "UPDATE email_queue SET status = 'sent', sent_at = NOW(), payload = NULL WHERE id = ?", [id]
+  )
 }
 
 /**

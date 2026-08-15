@@ -61,15 +61,19 @@ describe("order placed", () => {
 
   it("still creates the order if enqueueing fails", async () => {
     const v = await seedVariant()
-    await db.query("DROP TABLE email_queue")
+    // Renamed rather than dropped-and-restored-via-full-migration-rollback:
+    // a full `migrate.rollback(null, true)` unwinds every migration in the
+    // batch in ascending (not reverse) order, so any later migration that
+    // touches email_queue a second time (e.g. adding a column) has its own
+    // rollback fail against an already-dropped table. Renaming sidesteps
+    // migration state entirely — enqueue's INSERT still fails the same way
+    // (unknown table), and undoing it is just renaming back.
+    await db.query("RENAME TABLE email_queue TO email_queue_disabled_for_test")
     try {
       const res = await request(app).post("/api/orders").send(body(v))
       expect(res.status).toBe(201)
     } finally {
-      const knex = (await import("knex")).default((await import("../knexfile.js")).default.development)
-      await knex.migrate.rollback(null, true)
-      await knex.migrate.latest()
-      await knex.destroy()
+      await db.query("RENAME TABLE email_queue_disabled_for_test TO email_queue")
     }
   })
 })

@@ -175,7 +175,7 @@ async function upsertTemplate(type, data) {
 }
 
 module.exports = {
-  PLACEHOLDERS, DEFAULT_TEMPLATES,
+  PLACEHOLDERS, DEFAULT_TEMPLATES, BRAND,
   buildVars, renderTemplate, validatePlaceholders, getTemplate, upsertTemplate, escapeHtml,
   footerHtml,
 }

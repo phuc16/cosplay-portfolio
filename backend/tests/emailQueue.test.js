@@ -38,6 +38,35 @@ describe("enqueue", () => {
   })
 })
 
+describe("enqueue: payload", () => {
+  it("stores the payload as JSON when provided", async () => {
+    const o = await seedOrder()
+    await queue.enqueue(o.id, "order_placed", "a@example.com", { access_pin: "123456" })
+
+    const [[row]] = await db.query("SELECT payload FROM email_queue LIMIT 1")
+    expect(JSON.parse(row.payload)).toEqual({ access_pin: "123456" })
+  })
+
+  it("leaves payload null when omitted, same as before this field existed", async () => {
+    const o = await seedOrder()
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    const [[row]] = await db.query("SELECT payload FROM email_queue LIMIT 1")
+    expect(row.payload).toBeNull()
+  })
+
+  it("clears payload once the message is marked sent, so a secret PIN doesn't linger", async () => {
+    const o = await seedOrder()
+    await queue.enqueue(o.id, "order_placed", "a@example.com", { access_pin: "123456" })
+    const [[row]] = await db.query("SELECT id FROM email_queue LIMIT 1")
+
+    await queue.markSent(row.id)
+
+    const [[after]] = await db.query("SELECT payload FROM email_queue WHERE id = ?", [row.id])
+    expect(after.payload).toBeNull()
+  })
+})
+
 describe("claimPending", () => {
   it("returns pending messages", async () => {
     const o = await seedOrder()

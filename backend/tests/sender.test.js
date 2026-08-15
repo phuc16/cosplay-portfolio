@@ -341,6 +341,40 @@ describe("sendQueued: order QR gating", () => {
   })
 })
 
+describe("sendQueued: access PIN in order_placed", () => {
+  it("appends the plaintext PIN from the queue row's payload, not from the order (which only has the hash)", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com", { access_pin: "482913" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("482913")
+    expect(sentArg.html).toContain("Mã PIN")
+  })
+
+  it("omits the PIN block entirely when the row carries no payload (e.g. the admin's own copy)", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("Mã PIN")
+  })
+
+  it("does not append a PIN block for a non-order_placed email even if somehow enqueued with a payload", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "confirmed")
+    await queue.enqueue(o.id, "payment_confirmed", "a@example.com", { access_pin: "482913" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("482913")
+  })
+})
+
 describe("sendQueued: footer (automated-email notice)", () => {
   it("renders the notice after the QR block, not before it", async () => {
     const o = await seedOrder("ship")

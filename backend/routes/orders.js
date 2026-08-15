@@ -7,6 +7,7 @@ const { processShopImage, storeShopImage, InvalidImageError } = require("../shop
 const emailQueue = require("../shop/email/queue")
 const qr = require("../shop/orders/qr")
 const db = require("../db")
+const { orderAccess, verifyPin } = require("../shop/orders/orderAccess")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 const FULFILLMENT = ["ship", "pickup"]
@@ -123,7 +124,10 @@ module.exports = function orderRoutes() {
         }
 
         try {
-          await emailQueue.enqueue(order.id, "order_placed", req.body.buyer.email)
+          // access_pin only goes to the buyer's own copy — admin already
+          // bypasses the PIN gate via their own login, so their copy has no
+          // use for it and shouldn't carry it into an inbox that doesn't need it.
+          await emailQueue.enqueue(order.id, "order_placed", req.body.buyer.email, { access_pin: order.access_pin })
           if (process.env.ADMIN_EMAIL) {
             await emailQueue.enqueue(order.id, "order_placed", process.env.ADMIN_EMAIL)
           }
@@ -170,7 +174,38 @@ module.exports = function orderRoutes() {
     }
   })
 
-  router.get("/:token", async (req, res) => {
+  // Deliberately NOT behind orderAccess — this is how a buyer earns the
+  // session token orderAccess checks below. 5 wrong PINs locks this specific
+  // order_token for 15 minutes (see orderAccess.js's verifyPin), independent
+  // of the general publicLimiter this router already sits behind.
+  router.post("/:token/verify-pin", async (req, res) => {
+    try {
+      const pin = String(req.body?.pin || "").trim()
+      if (!/^\d{6}$/.test(pin)) {
+        return bad(res, "Mã PIN phải gồm 6 chữ số")
+      }
+
+      const result = await verifyPin(req.params.token, pin)
+      if (result.notFound) {
+        return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      }
+      if (result.locked) {
+        return res.status(429).json({
+          error: "too_many_attempts",
+          message: `Sai mã PIN quá nhiều lần. Thử lại sau ${Math.ceil(result.retryAfterSeconds / 60)} phút.`,
+        })
+      }
+      if (!result.ok) {
+        return res.status(401).json({ error: "invalid_pin", message: "Mã PIN không đúng" })
+      }
+      res.json({ access_token: result.sessionToken })
+    } catch (err) {
+      console.error("[ORDERS] Lỗi xác thực PIN:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.get("/:token", orderAccess, async (req, res) => {
     try {
       // The token is a bearer credential; keep these pages out of search results.
       res.set("X-Robots-Tag", "noindex, nofollow")
@@ -185,7 +220,7 @@ module.exports = function orderRoutes() {
     }
   })
 
-  router.get("/:token/payment", async (req, res) => {
+  router.get("/:token/payment", orderAccess, async (req, res) => {
     try {
       res.set("X-Robots-Tag", "noindex, nofollow")
 
@@ -200,7 +235,7 @@ module.exports = function orderRoutes() {
     }
   })
 
-  router.get("/:token/qr.svg", async (req, res) => {
+  router.get("/:token/qr.svg", orderAccess, async (req, res) => {
     try {
       res.set("X-Robots-Tag", "noindex, nofollow")
 
@@ -220,7 +255,7 @@ module.exports = function orderRoutes() {
   // party image service. 404 when the method isn't bank or the payload
   // could not be built (misconfiguration); the caller falls back to the
   // printed account details in that case.
-  router.get("/:token/payment/qr.svg", async (req, res) => {
+  router.get("/:token/payment/qr.svg", orderAccess, async (req, res) => {
     try {
       res.set("X-Robots-Tag", "noindex, nofollow")
 
@@ -240,7 +275,7 @@ module.exports = function orderRoutes() {
     }
   })
 
-  router.post("/:token/proof", async (req, res) => {
+  router.post("/:token/proof", orderAccess, async (req, res) => {
     try {
       const { base64 } = req.body
       if (!base64) return bad(res, "Cần ảnh chuyển khoản")
