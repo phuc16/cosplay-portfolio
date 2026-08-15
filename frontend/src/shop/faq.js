@@ -41,8 +41,8 @@ export const FAQ_ITEMS = [
       en: "How do I find my order again?",
     },
     answer: {
-      vi: "Ngay sau khi đặt hàng bạn sẽ nhận được một đường link riêng (và mã QR) tới trang đơn hàng — đường link này cũng được gửi qua email, kèm theo mã PIN xác thực. Lưu lại email đó: bạn cần cả link lẫn mã PIN để xem lại đơn hàng.",
-      en: "Right after placing an order you get a personal link (and QR code) to your order page — the same link is emailed to you, along with a verification PIN. Keep that email: you need both the link and the PIN to view your order again.",
+      vi: "Ngay sau khi đặt hàng, bạn sẽ được chuyển thẳng đến trang đơn hàng (chưa cần nhập mã PIN — trình duyệt vừa đặt đơn đã được xác thực sẵn). Đường link riêng (và mã QR) tới trang đó cũng được gửi qua email kèm mã PIN. Lưu lại email đó: nếu bạn mở lại link sau này hoặc từ thiết bị/trình duyệt khác, bạn sẽ cần nhập mã PIN.",
+      en: "Right after placing an order, you're taken straight to your order page — no PIN needed yet, since the browser that just placed the order is already verified. The personal link (and QR code) to that page is also emailed to you, along with a verification PIN. Keep that email: opening the link again later, or from a different device/browser, will ask for the PIN.",
     },
   },
   {
@@ -51,8 +51,8 @@ export const FAQ_ITEMS = [
       en: "What is the order verification PIN for?",
     },
     answer: {
-      vi: "Đây là mã 6 chữ số được gửi qua email khi bạn đặt hàng, dùng để xác nhận chính bạn là người đặt đơn trước khi xem trang đơn hàng — phòng trường hợp đường link bị vô tình chia sẻ cho người khác. Bạn chỉ cần nhập mã này một lần trên mỗi thiết bị/trình duyệt. Nếu nhập sai quá nhiều lần, đơn hàng sẽ tạm khóa xác thực trong 15 phút.",
-      en: "It's a 6-digit code emailed to you when you place an order, used to confirm you're really the buyer before showing your order page — in case the link ever gets shared with someone else by accident. You only need to enter it once per device/browser. Too many wrong attempts temporarily locks verification for that order for 15 minutes.",
+      vi: "Đây là mã 6 chữ số được gửi qua email khi bạn đặt hàng, dùng để xác nhận chính bạn là người đặt đơn trước khi xem trang đơn hàng — phòng trường hợp đường link bị vô tình chia sẻ cho người khác. Bạn không cần nhập mã này ngay sau khi đặt hàng (trình duyệt hiện tại đã được xác thực sẵn); mã chỉ được hỏi khi mở lại link sau này hoặc từ thiết bị/trình duyệt khác, và chỉ cần nhập một lần cho mỗi thiết bị/trình duyệt đó. Nếu nhập sai quá nhiều lần, đơn hàng sẽ tạm khóa xác thực trong 15 phút.",
+      en: "It's a 6-digit code emailed to you when you place an order, used to confirm you're really the buyer before showing your order page — in case the link ever gets shared with someone else by accident. You don't need it right after checkout (that browser is already verified); it's only asked for when reopening the link later or from a different device/browser, and only once per device/browser after that. Too many wrong attempts temporarily locks verification for that order for 15 minutes.",
     },
   },
   {
