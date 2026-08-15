@@ -71,8 +71,8 @@ export const FAQ_ITEMS = [
       en: "How do I fill in the shipping address?",
     },
     answer: {
-      vi: "Chọn Tỉnh/Thành phố rồi Phường/Xã, sau đó nhập số nhà và tên đường. Với chung cư/toà nhà (ví dụ: \"Sảnh chính S3.01, CC Vinhomes Grand Park\"), bấm nút tìm kiếm (biểu tượng kính lúp) bên cạnh ô số nhà, tên đường để chọn đúng địa chỉ đầy đủ thay vì gõ tay.",
-      en: "Pick your Province/City, then Ward/Commune, then type your house number and street name. For apartment complexes/buildings (e.g. \"Sảnh chính S3.01, CC Vinhomes Grand Park\"), tap the search (magnifying glass) button next to the street field to pick the full, exact address instead of typing it out.",
+      vi: "Chọn Tỉnh/Thành phố rồi Phường/Xã, sau đó nhập số nhà và tên đường. Với chung cư/toà nhà (ví dụ: \"66B, Nguyễn Sĩ Sách\"), bấm nút tìm kiếm (biểu tượng kính lúp) bên cạnh ô số nhà, tên đường để chọn đúng địa chỉ đầy đủ thay vì gõ tay.",
+      en: "Pick your Province/City, then Ward/Commune, then type your house number and street name. For apartment complexes/buildings (e.g. \"66B, Nguyễn Sĩ Sách\"), tap the search (magnifying glass) button next to the street field to pick the full, exact address instead of typing it out.",
     },
   },
   {
