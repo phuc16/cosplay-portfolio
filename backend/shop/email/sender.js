@@ -72,15 +72,30 @@ async function sendQueued(limit = 10) {
       // other template variable can, and a customizable {{access_pin}}
       // placeholder would silently stop appearing the moment a seller edits
       // this template, exactly like cancel_reason/pickup_code already are.
+      //
+      // Spliced in right before the card's closing </div> (immediately after
+      // the "Xem đơn hàng →" link every template's wrap() ends with) rather
+      // than appended after the whole rendered HTML — the PIN only matters
+      // in the context of that link, so it needs to read as part of the same
+      // card, not a disconnected block below the QR image.
       if (row.type === "order_placed" && row.payload) {
         let payload
         try { payload = JSON.parse(row.payload) } catch { payload = null }
         if (payload?.access_pin) {
-          html += `
-            <p style="font-size:14px;margin-top:12px;padding:10px 14px;background:#f6faf4;border-radius:8px">
+          const pinBlock = `
+            <p style="margin:12px 0 0;font-size:13px">
               Mã PIN xác thực đơn hàng: <strong style="color:${templates.BRAND}">${templates.escapeHtml(payload.access_pin)}</strong><br/>
               <span style="font-size:12px;color:#888">Cần mã này để xem lại đơn hàng qua link nếu trang yêu cầu xác thực.</span>
             </p>`
+          // The card's OWN closing </div> is the first one after the link —
+          // wrap()'s outer wrapper div closes after it (a second, later
+          // </div>), which lastIndexOf would find instead and land the PIN
+          // outside the padded card entirely.
+          const linkIndex = html.indexOf("Xem đơn hàng")
+          const cardCloseIndex = linkIndex === -1 ? -1 : html.indexOf("</div>", linkIndex)
+          html = cardCloseIndex === -1
+            ? html + pinBlock
+            : html.slice(0, cardCloseIndex) + pinBlock + html.slice(cardCloseIndex)
         }
       }
 

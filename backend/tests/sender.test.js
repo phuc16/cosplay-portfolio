@@ -363,6 +363,23 @@ describe("sendQueued: access PIN in order_placed", () => {
     expect(sentArg.html).not.toContain("Mã PIN")
   })
 
+  it("places the PIN inside the same card as the 'Xem đơn hàng' link, not in a separate block after it", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com", { access_pin: "482913" })
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    const linkIndex = html.indexOf("Xem đơn hàng")
+    const pinIndex = html.indexOf("482913")
+    // The PIN must appear after the link (same reading order as the card)...
+    expect(pinIndex).toBeGreaterThan(linkIndex)
+    // ...but before the card's own closing </div>, i.e. still inside it —
+    // not appended after the whole rendered HTML like the QR/footer blocks.
+    const cardCloseAfterLink = html.indexOf("</div>", linkIndex)
+    expect(pinIndex).toBeLessThan(cardCloseAfterLink)
+  })
+
   it("does not append a PIN block for a non-order_placed email even if somehow enqueued with a payload", async () => {
     const o = await seedOrder("ship")
     await orders.transitionOrder(o.id, "confirmed")
