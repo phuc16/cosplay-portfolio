@@ -301,7 +301,7 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 
     await redis.del(attemptKey)
     await redis.del(lockKey)
-    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY })
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY_SECONDS })
     const refreshToken = await issueRefreshToken()
     console.log(`[LOGIN] Đăng nhập thành công: ${username}`)
     res.json({ token, refresh_token: refreshToken })
@@ -311,8 +311,8 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
   }
 })
 
-const ACCESS_TOKEN_EXPIRY = "1d"
-const REFRESH_TOKEN_DAYS = 30
+const ACCESS_TOKEN_EXPIRY_SECONDS = 24 * 60 * 60
+const REFRESH_TOKEN_EXPIRY_SECONDS = 30 * 24 * 60 * 60
 
 // Only one admin account exists (env-configured credentials, no user table),
 // so the refresh token needs no owner mapping — its mere presence in Redis
@@ -320,7 +320,7 @@ const REFRESH_TOKEN_DAYS = 30
 // same entropy floor as order_token, since this is a bearer credential too.
 async function issueRefreshToken() {
   const refreshToken = crypto.randomBytes(32).toString("hex")
-  await redis.set(`refresh_token:${refreshToken}`, "1", "EX", 60 * 60 * 24 * REFRESH_TOKEN_DAYS)
+  await redis.set(`refresh_token:${refreshToken}`, "1", "EX", REFRESH_TOKEN_EXPIRY_SECONDS)
   return refreshToken
 }
 
@@ -343,7 +343,7 @@ app.post(`${API_PREFIX}/refresh`, async (req, res) => {
     }
     await redis.del(key)
 
-    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY })
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY_SECONDS })
     const newRefreshToken = await issueRefreshToken()
     res.json({ token, refresh_token: newRefreshToken })
   } catch (err) {
