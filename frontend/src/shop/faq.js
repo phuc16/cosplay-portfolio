@@ -41,8 +41,18 @@ export const FAQ_ITEMS = [
       en: "How do I find my order again?",
     },
     answer: {
-      vi: "Ngay sau khi đặt hàng bạn sẽ nhận được một đường link riêng (và mã QR) tới trang đơn hàng — đường link này cũng được gửi qua email. Lưu lại link đó, vì đó là cách duy nhất để xem đơn hàng mà không cần đăng nhập.",
-      en: "Right after placing an order you get a personal link (and QR code) to your order page — the same link is also emailed to you. Keep it, since it's the only way to view your order without logging in.",
+      vi: "Ngay sau khi đặt hàng bạn sẽ nhận được một đường link riêng (và mã QR) tới trang đơn hàng — đường link này cũng được gửi qua email, kèm theo mã PIN xác thực. Lưu lại email đó: bạn cần cả link lẫn mã PIN để xem lại đơn hàng.",
+      en: "Right after placing an order you get a personal link (and QR code) to your order page — the same link is emailed to you, along with a verification PIN. Keep that email: you need both the link and the PIN to view your order again.",
+    },
+  },
+  {
+    question: {
+      vi: "Mã PIN xác thực đơn hàng dùng để làm gì?",
+      en: "What is the order verification PIN for?",
+    },
+    answer: {
+      vi: "Đây là mã 6 chữ số được gửi qua email khi bạn đặt hàng, dùng để xác nhận chính bạn là người đặt đơn trước khi xem trang đơn hàng — phòng trường hợp đường link bị vô tình chia sẻ cho người khác. Bạn chỉ cần nhập mã này một lần trên mỗi thiết bị/trình duyệt. Nếu nhập sai quá nhiều lần, đơn hàng sẽ tạm khóa xác thực trong 15 phút.",
+      en: "It's a 6-digit code emailed to you when you place an order, used to confirm you're really the buyer before showing your order page — in case the link ever gets shared with someone else by accident. You only need to enter it once per device/browser. Too many wrong attempts temporarily locks verification for that order for 15 minutes.",
     },
   },
   {
