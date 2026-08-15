@@ -15,12 +15,30 @@ beforeEach(async () => {
   if (refreshKeys.length) await redis.del(...refreshKeys)
 })
 
+// Loose bounds rather than an exact second count — asserts "about 1 day" /
+// "about 30 days" without being brittle to the few seconds elapsed between
+// jwt.sign()/redis.set() and this assertion running.
+function expiresWithin(expSeconds, expectedSeconds, toleranceSeconds = 60) {
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  const remaining = expSeconds - nowSeconds
+  return Math.abs(remaining - expectedSeconds) <= toleranceSeconds
+}
+
 describe("POST /api/login", () => {
   it("returns both an access token and a refresh_token on success", async () => {
     const res = await request(app).post("/api/login").send(CREDS)
     expect(res.status).toBe(200)
     expect(typeof res.body.token).toBe("string")
     expect(typeof res.body.refresh_token).toBe("string")
+  })
+
+  it("the access token expires in ~1 day, the refresh token TTL is ~30 days", async () => {
+    const res = await request(app).post("/api/login").send(CREDS)
+    const decoded = jwt.decode(res.body.token)
+    expect(expiresWithin(decoded.exp, 24 * 60 * 60)).toBe(true)
+
+    const ttl = await redis.ttl(`refresh_token:${res.body.refresh_token}`)
+    expect(expiresWithin(Math.floor(Date.now() / 1000) + ttl, 30 * 24 * 60 * 60)).toBe(true)
   })
 
   it("the refresh_token is usable at POST /api/refresh", async () => {

@@ -301,7 +301,7 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 
     await redis.del(attemptKey)
     await redis.del(lockKey)
-    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: "8h" })
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY })
     const refreshToken = await issueRefreshToken()
     console.log(`[LOGIN] Đăng nhập thành công: ${username}`)
     res.json({ token, refresh_token: refreshToken })
@@ -311,6 +311,7 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
   }
 })
 
+const ACCESS_TOKEN_EXPIRY = "1d"
 const REFRESH_TOKEN_DAYS = 30
 
 // Only one admin account exists (env-configured credentials, no user table),
@@ -342,7 +343,7 @@ app.post(`${API_PREFIX}/refresh`, async (req, res) => {
     }
     await redis.del(key)
 
-    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: "8h" })
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY })
     const newRefreshToken = await issueRefreshToken()
     res.json({ token, refresh_token: newRefreshToken })
   } catch (err) {
