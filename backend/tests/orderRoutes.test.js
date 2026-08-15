@@ -68,6 +68,30 @@ describe("POST /api/orders", () => {
     expect(res.body.total).toBe(35000)
   })
 
+  // The buyer's own browser skips the PIN gate for the order page it's about
+  // to load, exactly once, right after checkout — see orderAccess.js's
+  // issueOrderSessionToken.
+  it("also returns an access_token that unlocks this order's own page, immediately", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    expect(typeof created.body.access_token).toBe("string")
+
+    const res = await request(app).get(`/api/orders/${created.body.order_token}`)
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+    expect(res.status).toBe(200)
+  })
+
+  it("the access_token is scoped to THIS order — it does not unlock a different one", async () => {
+    const v1 = await seed()
+    const v2 = await seed()
+    const first = await request(app).post("/api/orders").send(body(v1))
+    const second = await request(app).post("/api/orders").send(body(v2))
+
+    const res = await request(app).get(`/api/orders/${second.body.order_token}`)
+      .set("Authorization", `Bearer ${first.body.access_token}`)
+    expect(res.status).toBe(401)
+  })
+
   it("ignores a client-supplied total", async () => {
     const v = await seed()
     const res = await request(app).post("/api/orders").send(body(v, { total: 1 }))

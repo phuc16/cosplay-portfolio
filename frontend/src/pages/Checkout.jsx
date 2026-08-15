@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { readCart, cartTotal, clearCart, removeFromCart } from "../shop/cart"
 import { generateRequestKey } from "../shop/requestKey"
 import { createOrder, fetchCollection, fetchPaymentMethods } from "../api/shop"
+import { setOrderSessionToken } from "../utils/orderAuth"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import AddressFields from "../components/shop/AddressFields"
@@ -150,6 +151,12 @@ export default function Checkout() {
         request_key: requestKey,
       })
       clearCart()
+      // Skips the PIN gate for this one browser session — this is the exact
+      // browser that just placed the order, so re-proving identity with a
+      // PIN they haven't even opened the confirmation email for yet would be
+      // pure friction. Any other session (a different device, or this one
+      // after the tab closes) still needs the real PIN from that email.
+      if (res.access_token) setOrderSessionToken(res.order_token, res.access_token)
       navigate(`/order/${res.order_token}`)
     } catch (e) {
       // An astronomically unlikely UUIDv4 collision, but if it ever happens the

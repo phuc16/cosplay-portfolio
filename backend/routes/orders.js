@@ -7,7 +7,7 @@ const { processShopImage, storeShopImage, InvalidImageError } = require("../shop
 const emailQueue = require("../shop/email/queue")
 const qr = require("../shop/orders/qr")
 const db = require("../db")
-const { orderAccess, verifyPin } = require("../shop/orders/orderAccess")
+const { orderAccess, verifyPin, issueOrderSessionToken } = require("../shop/orders/orderAccess")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 const FULFILLMENT = ["ship", "pickup"]
@@ -136,7 +136,15 @@ module.exports = function orderRoutes() {
         }
       }
 
-      res.status(201).json({ order_token: order.order_token, total: order.total })
+      // Lets the buyer's own browser skip the PIN gate for the order page it's
+      // about to navigate straight to — see orderAccess.js's
+      // issueOrderSessionToken for why this is safe (same request/browser
+      // that just placed the order, not a link being opened by someone else).
+      res.status(201).json({
+        order_token: order.order_token,
+        total: order.total,
+        access_token: issueOrderSessionToken(order.order_token),
+      })
     } catch (err) {
       if (err instanceof repo.EmptyCartError) return bad(res, err.message)
       if (err instanceof repo.FulfillmentNotOfferedError) return bad(res, err.message)

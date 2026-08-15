@@ -54,6 +54,7 @@ async function renderCheckout() {
 
 beforeEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
   fetchPaymentMethods.mockReset()
   createOrder.mockReset()
   fetchCollection.mockReset()
@@ -220,6 +221,32 @@ describe("Checkout — COD restricted to ship orders (Event Pickup Verification 
     const container = await renderCheckout()
     const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
     expect(options).toEqual(["Bank transfer", "Cash on delivery"])
+  })
+})
+
+describe("Checkout — order-page PIN bypass for this session", () => {
+  it("seeds the order session token from the create-order response before navigating, so the PIN gate is skipped this once", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 35000, access_token: "session-jwt" })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(sessionStorage.getItem("order_access:tok123")).toBe("session-jwt")
+  })
+
+  it("does not blow up if the response has no access_token (e.g. an older server)", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 35000 })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(sessionStorage.getItem("order_access:tok123")).toBeNull()
   })
 })
 

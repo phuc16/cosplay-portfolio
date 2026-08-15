@@ -79,12 +79,23 @@ async function verifyPin(orderToken, pin) {
 
   await redis.del(attemptKey)
   await redis.del(lockKey)
-  const sessionToken = jwt.sign(
+  return { ok: true, sessionToken: issueOrderSessionToken(orderToken) }
+}
+
+/**
+ * Issues the same order-access session JWT verifyPin() does, without
+ * requiring the PIN — used exactly once, right after checkout: the buyer
+ * who just submitted the order IS the buyer, in that same request/browser,
+ * so re-proving it with a PIN they haven't even received the email for yet
+ * would be pure friction with no real security benefit. Never called from
+ * anywhere a buyer isn't already mid-checkout.
+ */
+function issueOrderSessionToken(orderToken) {
+  return jwt.sign(
     { order_access: orderToken },
     process.env.JWT_SECRET,
     { algorithm: "HS256", expiresIn: `${ORDER_SESSION_HOURS}h` }
   )
-  return { ok: true, sessionToken }
 }
 
-module.exports = { orderAccess, verifyPin, PIN_MAX_ATTEMPTS, PIN_LOCKOUT_MINUTES }
+module.exports = { orderAccess, verifyPin, issueOrderSessionToken, PIN_MAX_ATTEMPTS, PIN_LOCKOUT_MINUTES }
