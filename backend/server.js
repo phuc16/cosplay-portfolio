@@ -131,14 +131,15 @@ const storageLimiter = rateLimit({
   },
 })
 
-// On-demand street search: 20/phút per IP. Only fires on an explicit
-// search-button click (not per keystroke), but still capped independent of
-// whatever limit Goong itself allows, in case a script bypasses the button
-// and hits the endpoint directly — the key never reaches the browser to be
-// extracted and called that way, but the route itself is still public.
+// Street search: debounced (~1 request per typing pause, not per
+// keystroke) from AddressFields.jsx, only once ward+province are picked.
+// 30/phút per IP is generous headroom for a buyer typing/correcting one
+// address, capped independent of whatever limit Goong itself allows in
+// case a script hits the endpoint directly — the key never reaches the
+// browser to be extracted and called that way, but the route is public.
 const addressLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: keyGen,

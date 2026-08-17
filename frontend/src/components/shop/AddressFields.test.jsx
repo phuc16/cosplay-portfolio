@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { LanguageProvider } from "../../contexts/LanguageContext"
@@ -136,46 +136,98 @@ describe("AddressFields — province/ward picker (no live per-keystroke autocomp
   })
 })
 
-describe("AddressFields — on-demand street search (not per-keystroke)", () => {
-  it("never calls searchAddress just from typing in the street field", async () => {
+describe("AddressFields — street field requires province + ward first", () => {
+  it("starts disabled, with a hint placeholder, before province/ward are picked", async () => {
     const { container } = await renderField()
-    await act(async () => setInputValue(container.querySelector("input[type='text']"), "66B Nguyen Si Sach"))
-
-    expect(searchAddress).not.toHaveBeenCalled()
+    const streetInput = container.querySelector("input[type='text']")
+    expect(streetInput.disabled).toBe(true)
+    expect(streetInput.placeholder).toBe("Select province/city and ward/commune first")
   })
 
-  it("disables the search button until at least 3 characters are typed", async () => {
+  it("stays disabled with only province picked (ward still missing)", async () => {
     const { container } = await renderField()
-    const searchBtn = container.querySelector('button[aria-label="Search address"]')
-    expect(searchBtn.disabled).toBe(true)
-
-    await act(async () => setInputValue(container.querySelector("input[type='text']"), "66"))
-    expect(searchBtn.disabled).toBe(true)
-
-    await act(async () => setInputValue(container.querySelector("input[type='text']"), "66B"))
-    expect(searchBtn.disabled).toBe(false)
+    await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
+    expect(container.querySelector("input[type='text']").disabled).toBe(true)
   })
 
-  it("clicking the search button calls searchAddress with the street text plus the picked ward/province", async () => {
+  it("becomes enabled, with the real placeholder, once both are picked", async () => {
     const { container } = await renderField()
     await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
     await pickOption(container, wardTrigger(container), "Hiệp Bình")
+
+    const streetInput = container.querySelector("input[type='text']")
+    expect(streetInput.disabled).toBe(false)
+    expect(streetInput.placeholder).toBe("e.g. 66B Nguyen Si Sach")
+  })
+
+  it("disables again if the province changes (ward resets, so streetEnabled goes false)", async () => {
+    fetchWards.mockImplementation((code) =>
+      Promise.resolve(code === "30" ? HCM_WARDS : [{ code: "00099", name: "Ba Đình" }])
+    )
+    const { container } = await renderField()
+    await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
+    await pickOption(container, wardTrigger(container), "Hiệp Bình")
+    await pickOption(container, provinceTrigger(container), "Hà Nội")
+
+    expect(container.querySelector("input[type='text']").disabled).toBe(true)
+  })
+})
+
+describe("AddressFields — debounced auto-search (not per-keystroke, not button-gated)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("never calls searchAddress before province + ward are both picked, no matter what's typed", async () => {
+    await renderField()
+    // The input is disabled at this point (see the describe block above);
+    // this just confirms the debounce effect itself never fires either.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(searchAddress).not.toHaveBeenCalled()
+  })
+
+  it("does not call searchAddress immediately on keystroke — only after the debounce settles", async () => {
+    const { container } = await renderField()
+    await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
+    await pickOption(container, wardTrigger(container), "Hiệp Bình")
+
     await act(async () => setInputValue(container.querySelector("input[type='text']"), "66B Nguyen Si Sach"))
+    expect(searchAddress).not.toHaveBeenCalled()
 
-    const searchBtn = container.querySelector('button[aria-label="Search address"]')
-    await act(async () => searchBtn.click())
-
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
     expect(searchAddress).toHaveBeenCalledWith("66B Nguyen Si Sach", "Hiệp Bình", "Hồ Chí Minh")
   })
 
-  it("pressing Enter in the street field also triggers the search", async () => {
+  it("restarts the debounce on every keystroke — a fast typing burst fires only once, for the final text", async () => {
     const { container } = await renderField()
-    const streetInput = container.querySelector("input[type='text']")
-    await act(async () => setInputValue(streetInput, "66B Nguyen Si Sach"))
+    await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
+    await pickOption(container, wardTrigger(container), "Hiệp Bình")
 
-    await act(async () => streetInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })))
+    const input = container.querySelector("input[type='text']")
+    await act(async () => setInputValue(input, "66"))
+    await act(async () => { await vi.advanceTimersByTimeAsync(200) })
+    await act(async () => setInputValue(input, "66B"))
+    await act(async () => { await vi.advanceTimersByTimeAsync(200) })
+    await act(async () => setInputValue(input, "66B Nguyen Si Sach"))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
 
-    expect(searchAddress).toHaveBeenCalledWith("66B Nguyen Si Sach", "", "")
+    expect(searchAddress).toHaveBeenCalledTimes(1)
+    expect(searchAddress).toHaveBeenCalledWith("66B Nguyen Si Sach", "Hiệp Bình", "Hồ Chí Minh")
+  })
+
+  it("does not search for fewer than 3 characters", async () => {
+    const { container } = await renderField()
+    await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
+    await pickOption(container, wardTrigger(container), "Hiệp Bình")
+
+    await act(async () => setInputValue(container.querySelector("input[type='text']"), "66"))
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+
+    expect(searchAddress).not.toHaveBeenCalled()
   })
 
   it("picking a search result fills the street field with the full description (not the too-short main_text), stripping the already-known ward/province suffix", async () => {
@@ -192,7 +244,7 @@ describe("AddressFields — on-demand street search (not per-keystroke)", () => 
     await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
     await pickOption(container, wardTrigger(container), "Hiệp Bình")
     await act(async () => setInputValue(container.querySelector("input[type='text']"), "Sanh chinh S3.01"))
-    await act(async () => container.querySelector('button[aria-label="Search address"]').click())
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
 
     const suggestionBtn = [...container.querySelectorAll("li button")][0]
     await act(async () => suggestionBtn.click())

@@ -65,14 +65,17 @@ module.exports = function shopRoutes() {
     }
   })
 
-  // On-demand street/house-number search, gated behind an explicit
-  // search-button click in AddressFields.jsx (not fired per keystroke —
-  // that per-character design was tried and dropped for calling Goong far
-  // too often). ward/province scope the query text so a short, ambiguous
-  // street name resolves to the right province instead of a same-named
-  // street elsewhere in the country. Proxied server-side (key never reaches
-  // the browser) with its own addressLimiter (server.js) as defense in
-  // depth against a script bypassing the button and hitting this directly.
+  // Street/house-number search, debounced (not per-keystroke) from
+  // AddressFields.jsx, and only once the buyer has picked both ward and
+  // province — an earlier design fired this per character with NO
+  // ward/province scoping at all (a nationwide search space), which called
+  // Goong far too often; requiring ward/province first keeps every query
+  // scoped and cheap enough to run per typing pause instead of needing an
+  // explicit search-button click. ward/province also resolve a short,
+  // ambiguous street name to the right area instead of a same-named street
+  // elsewhere in the country. Proxied server-side (key never reaches the
+  // browser) with its own addressLimiter (server.js) as defense in depth
+  // against a script hitting this directly instead of through the debounce.
   router.get("/address-search", async (req, res) => {
     const goongApiKey = process.env.GOONG_API_KEY || ""
     const input = String(req.query.input || "").trim()

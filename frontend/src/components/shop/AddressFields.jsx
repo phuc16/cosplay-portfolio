@@ -3,29 +3,26 @@ import { useLanguage } from "../../contexts/LanguageContext"
 import { fetchProvinces, fetchWards, searchAddress } from "../../api/shop"
 import SearchableSelect from "./SearchableSelect"
 
-const searchIcon = (
-  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <circle cx="11" cy="11" r="7" strokeWidth="2" />
-    <path strokeLinecap="round" strokeWidth="2" d="M21 21l-4.35-4.35" />
-  </svg>
-)
+// Fires this long after the buyer stops typing, not on every keystroke — a
+// fast typist still costs one Goong call per pause, not one per character.
+const STREET_SEARCH_DEBOUNCE_MS = 400
 
 /**
  * Province (34) + ward picked from reference data, not a live per-keystroke
- * autocomplete — replaces the previous Goong-autocomplete design, which
- * fired a request on nearly every character typed. Data reflects Vietnam's
- * post-2025 restructuring (34 provinces/cities, no district level), fetched
- * through our own backend (backend/shop/vnAddress.js), which caches each
- * response for 30 days — administrative boundaries change rarely, and this
- * keeps us off a third party's free API almost entirely rather than baking
- * a copy of the data into this repo to go stale.
+ * autocomplete — replaces the original Goong-autocomplete design, which
+ * fired a request on nearly every character typed with NO ward/province
+ * scoping at all (the whole country was the search space). Data reflects
+ * Vietnam's post-2025 restructuring (34 provinces/cities, no district
+ * level), fetched through our own backend (backend/shop/vnAddress.js),
+ * which caches each response for 30 days.
  *
- * Street/house-number is a plain text field with an optional on-demand
- * search: a button, not per-keystroke autocomplete, so a buyer chooses when
- * to spend a lookup rather than firing one on every character typed. The
- * already-picked ward/province scope the search query, which resolves a
- * short, ambiguous street name to the right area instead of a same-named
- * street elsewhere in the country.
+ * Street/house-number search auto-fires (debounced, see
+ * STREET_SEARCH_DEBOUNCE_MS) once BOTH province and ward are picked — the
+ * street field itself is disabled until then. Unlike the original
+ * nationwide autocomplete, every query here is scoped to one ward, cheap
+ * enough to run per typing pause rather than requiring an explicit
+ * search-button click (the design this replaces, from when the query was
+ * unscoped and thus much more expensive per keystroke).
  */
 export default function AddressFields({ value, onChange }) {
   const { t } = useLanguage()
@@ -36,6 +33,7 @@ export default function AddressFields({ value, onChange }) {
   const [street, setStreet] = useState(value.address_street || "")
   const [streetSuggestions, setStreetSuggestions] = useState([])
   const [searching, setSearching] = useState(false)
+  const streetEnabled = Boolean(provinceCode && wardCode)
 
   useEffect(() => {
     fetchProvinces()
@@ -85,20 +83,29 @@ export default function AddressFields({ value, onChange }) {
 
   const onStreetChange = (text) => {
     setStreet(text)
-    setStreetSuggestions([])
     emit({ provinceCode, wardCode, street: text })
   }
 
-  // Explicit click only — never wired to onChange/an effect, so this never
-  // fires per keystroke the way the original Goong design did.
-  const onSearchStreet = () => {
-    if (street.trim().length < 3 || searching) return
-    setSearching(true)
-    searchAddress(street, wardNameFor(wardCode), provinceNameFor(provinceCode))
-      .then((data) => setStreetSuggestions(data.predictions?.slice(0, 5) || []))
-      .catch(() => setStreetSuggestions([]))
-      .finally(() => setSearching(false))
-  }
+  // Debounced auto-search: restarts on every keystroke (street/wardCode/
+  // provinceCode all in the dependency array) so only the LAST pause in a
+  // burst of typing actually fires a request. Never runs before both
+  // province and ward are picked (streetEnabled) — that's what keeps each
+  // query scoped and cheap, unlike the original nationwide design.
+  useEffect(() => {
+    if (!streetEnabled || street.trim().length < 3) {
+      setStreetSuggestions([])
+      return
+    }
+    const timer = setTimeout(() => {
+      setSearching(true)
+      searchAddress(street, wardNameFor(wardCode), provinceNameFor(provinceCode))
+        .then((data) => setStreetSuggestions(data.predictions?.slice(0, 5) || []))
+        .catch(() => setStreetSuggestions([]))
+        .finally(() => setSearching(false))
+    }, STREET_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [street, streetEnabled, wardCode, provinceCode])
 
   const pickStreetSuggestion = (s) => {
     // s.structured_formatting.main_text is too short for anything Goong
@@ -148,31 +155,21 @@ export default function AddressFields({ value, onChange }) {
 
         <div className="sm:col-span-2 relative">
           <label className="block text-sm mb-1">{t("checkoutStreet")}</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={street}
-              onChange={(e) => onStreetChange(e.target.value)}
-              onKeyDown={(e) => {
-                // This field lives inside the checkout form — without
-                // preventDefault, Enter would submit the whole order instead
-                // of just running the search.
-                if (e.key === "Enter") { e.preventDefault(); onSearchStreet() }
-              }}
-              placeholder={t("checkoutStreetPlaceholder")}
-              className={selectCls}
-            />
-            <button
-              type="button"
-              onClick={onSearchStreet}
-              disabled={street.trim().length < 3 || searching}
-              aria-label={t("checkoutStreetSearch")}
-              title={t("checkoutStreetSearch")}
-              className="shrink-0 px-3 rounded-lg border border-[var(--border-brand)] disabled:opacity-40"
-            >
-              {searchIcon}
-            </button>
-          </div>
+          <input
+            type="text"
+            value={street}
+            onChange={(e) => onStreetChange(e.target.value)}
+            onKeyDown={(e) => {
+              // This field lives inside the checkout form — without
+              // preventDefault, Enter would submit the whole order instead
+              // of just continuing to type.
+              if (e.key === "Enter") e.preventDefault()
+            }}
+            disabled={!streetEnabled}
+            placeholder={streetEnabled ? t("checkoutStreetPlaceholder") : t("checkoutStreetNeedsProvinceWard")}
+            className={selectCls + " disabled:opacity-50"}
+          />
+          {searching && <p className="text-xs opacity-60 mt-1">{t("checkoutStreetSearching")}</p>}
 
           {streetSuggestions.length > 0 && (
             <ul className="absolute z-10 w-full bg-[var(--surface-card)] border border-[var(--border-brand)] rounded-lg mt-1 overflow-hidden">
