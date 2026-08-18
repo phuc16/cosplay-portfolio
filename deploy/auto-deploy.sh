@@ -1,30 +1,50 @@
 #!/usr/bin/env bash
-# Automates DEPLOY.md's Bước 4–10 end to end: Docker install → clone → .env
-# with generated secrets → pull/up prebuilt images → migrate → host Nginx
-# reverse proxy → Let's Encrypt TLS → firewall. Run as root on a fresh
-# Ubuntu 22.04 droplet (Bước 1–3 — creating the droplet, pointing DNS at it,
-# and SSHing in — are manual/external and stay that way; this script starts
-# from "you're now root on the box").
+# Automates DEPLOY.md's Bước 4–10 end to end: Docker install → fetch deploy
+# config → .env with generated secrets → pull/up prebuilt images → migrate
+# → host Nginx reverse proxy → Let's Encrypt TLS → firewall. Run as root on
+# a fresh Ubuntu 22.04 droplet (Bước 1–3 — creating the droplet, pointing
+# DNS at it, and SSHing in — are manual/external and stay that way; this
+# script starts from "you're now root on the box").
 #
-# Idempotent: safe to re-run. Skips steps already done (Docker installed,
-# repo already cloned, .env already present) rather than clobbering a live
-# deployment's secrets or state.
+# Does NOT git-clone the repo. DEPLOY.md's whole design is "prebuilt images,
+# nothing built on the server" — the server only ever needs docker-compose.
+# pull.yml (to know what to run) and the deploy/ scripts (operational
+# tooling), never the application source. Fetches just those few files
+# directly from GitHub instead, which also sidesteps needing git installed
+# or git credentials at all — a full clone of a private repo would
+# otherwise prompt for a username/password it has no way to answer
+# non-interactively.
+#
+# Idempotent: safe to re-run. .env is only ever created, never overwritten
+# (regenerating its secrets against an already-initialized mysql/minio
+# volume would lock the app out of its own data) — everything else (the
+# fetched config files, Docker installs, Nginx/TLS config) is cheap to
+# refresh on every run.
 #
 # Usage:
 #   ./deploy/auto-deploy.sh --domain shop.example.com --email you@example.com
 #
 # Optional flags:
-#   --repo URL          Git repo to clone (default: this project's origin)
-#   --dir PATH           Install directory (default: /opt/cosplay-portfolio)
-#   --admin-email EMAIL  Seller's own address, cc'd on every new order
-#   --shop-name NAME     Shown in email subjects/templates (default: Shop)
-#   --skip-tls           Stop after Bước 8 (migrations) — no host Nginx/certbot/
-#                         firewall. Use when DNS isn't pointed at this droplet
-#                         yet, or you're testing the app-layer steps only.
-#   --skip-firewall      Configure TLS but leave ufw alone (e.g. a managed
+#   --repo URL           GitHub repo (default: this project's origin) —
+#                         only used to derive owner/name, never cloned
+#   --branch NAME         Branch to fetch files from (default: main)
+#   --github-token TOKEN  Needed only if --repo is private (or set the
+#                          GITHUB_TOKEN env var instead of passing this on
+#                          the command line, so it doesn't end up in shell
+#                          history). A fine-grained PAT with read-only
+#                          "Contents" access to just this repo is enough.
+#   --dir PATH            Install directory (default: /opt/cosplay-portfolio)
+#   --admin-email EMAIL   Seller's own address, cc'd on every new order
+#   --shop-name NAME      Shown in email subjects/templates (default: Shop)
+#   --skip-tls            Stop after Bước 8 (migrations) — no host Nginx/certbot/
+#                          firewall. Use when DNS isn't pointed at this droplet
+#                          yet, or you're testing the app-layer steps only.
+#   --skip-firewall       Configure TLS but leave ufw alone (e.g. a managed
 #                         firewall already handles this at the provider level).
 #
-# Remote one-liner (curl the raw script instead of cloning first):
+# Remote one-liner (curl the raw script instead of fetching it first) —
+# only works if THIS script itself is reachable unauthenticated, i.e. the
+# repo is public, or you fetched this one file out-of-band already:
 #   curl -fsSL https://raw.githubusercontent.com/<you>/<repo>/main/deploy/auto-deploy.sh \
 #     | bash -s -- --domain shop.example.com --email you@example.com
 #
@@ -42,6 +62,8 @@ set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/phuc16/cosplay-portfolio.git"
+BRANCH="main"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 INSTALL_DIR="/opt/cosplay-portfolio"
 DOMAIN=""
 CERTBOT_EMAIL=""
@@ -59,13 +81,15 @@ while [ $# -gt 0 ]; do
     --domain) DOMAIN="$2"; shift 2 ;;
     --email) CERTBOT_EMAIL="$2"; shift 2 ;;
     --repo) REPO_URL="$2"; shift 2 ;;
+    --branch) BRANCH="$2"; shift 2 ;;
+    --github-token) GITHUB_TOKEN="$2"; shift 2 ;;
     --dir) INSTALL_DIR="$2"; shift 2 ;;
     --admin-email) ADMIN_EMAIL="$2"; shift 2 ;;
     --shop-name) SHOP_NAME="$2"; shift 2 ;;
     --skip-tls) SKIP_TLS=1; shift ;;
     --skip-firewall) SKIP_FIREWALL=1; shift ;;
     -h|--help)
-      sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,60p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) die "Unknown argument: $1 (see --help)" ;;
@@ -78,20 +102,19 @@ if [ "$SKIP_TLS" -eq 0 ]; then
   [ -n "$CERTBOT_EMAIL" ] || die "--email is required for Let's Encrypt registration (or pass --skip-tls)."
 fi
 
-# ── Bước 4: Docker (+ the other prerequisites a stock cloud image may or
-# may not already have — git and openssl, specifically. curl itself is the
-# one thing that CAN'T be bootstrapped this way: it's what fetches this
-# script in the one-liner form, so it must already exist for that path to
-# even start. Nearly every stock Ubuntu 22.04 cloud image ships it, but if
-# yours doesn't, `apt install -y curl` once, manually, first.) ────────────
-apt update -y
+# github.com/OWNER/NAME(.git) -> OWNER/NAME, for raw.githubusercontent.com URLs.
+REPO_SLUG="${REPO_URL#https://github.com/}"
+REPO_SLUG="${REPO_SLUG%.git}"
 
-if ! command -v git >/dev/null 2>&1; then
-  log "Installing git..."
-  apt install -y git
-else
-  log "git already installed ($(git --version)), skipping."
-fi
+# ── Bước 4: Docker (+ openssl, the one other prerequisite a stock cloud
+# image may or may not already have. No git needed — see the file header:
+# this script fetches individual files over HTTPS, never clones. curl
+# itself is the one thing that CAN'T be bootstrapped this way: it's what
+# fetches this script in the one-liner form, so it must already exist for
+# that path to even start. Nearly every stock Ubuntu 22.04 cloud image
+# ships it, but if yours doesn't, `apt install -y curl` once, manually,
+# first.) ───────────────────────────────────────────────────────────────
+apt update -y
 
 if ! command -v openssl >/dev/null 2>&1; then
   log "Installing openssl..."
@@ -115,18 +138,27 @@ else
   log "Docker Compose plugin already installed ($(docker compose version)), skipping."
 fi
 
-# ── Bước 5: Clone repo ────────────────────────────────────────────────────
-if [ -d "$INSTALL_DIR/.git" ]; then
-  log "Repo already present at $INSTALL_DIR, pulling latest..."
-  git -C "$INSTALL_DIR" pull --ff-only
-else
-  log "Cloning $REPO_URL into $INSTALL_DIR..."
-  mkdir -p "$(dirname "$INSTALL_DIR")"
-  git clone "$REPO_URL" "$INSTALL_DIR"
-fi
+# ── Bước 5: Fetch just the deploy-time files (no git clone — see header) ─
+mkdir -p "$INSTALL_DIR/deploy"
 cd "$INSTALL_DIR"
 
-[ -f docker-compose.pull.yml ] || die "docker-compose.pull.yml not found in $INSTALL_DIR — wrong --repo/--dir?"
+fetch_file() {
+  # $1 = path within the repo, relative to its root
+  local url="https://raw.githubusercontent.com/${REPO_SLUG}/${BRANCH}/$1"
+  local auth_header=()
+  [ -n "$GITHUB_TOKEN" ] && auth_header=(-H "Authorization: token ${GITHUB_TOKEN}")
+  curl -fsSL "${auth_header[@]}" "$url" -o "$1" \
+    || die "Could not fetch $1 from $REPO_SLUG@$BRANCH. If this repo is private, pass --github-token (or set \$GITHUB_TOKEN) with a read-only PAT."
+}
+
+log "Fetching deploy config from $REPO_SLUG@$BRANCH (docker-compose.pull.yml + deploy/*.sh)..."
+fetch_file docker-compose.pull.yml
+fetch_file deploy/backup.sh
+fetch_file deploy/restore.sh
+fetch_file deploy/migrate-data.sh
+chmod +x deploy/*.sh
+
+[ -f docker-compose.pull.yml ] || die "docker-compose.pull.yml not found in $INSTALL_DIR after fetch — wrong --repo/--branch?"
 
 # ── Bước 6: .env with generated secrets ──────────────────────────────────
 # Only ever created, never overwritten — regenerating DB_PASS/MinIO creds
