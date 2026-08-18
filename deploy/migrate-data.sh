@@ -113,6 +113,14 @@ log "Cloning this server's current schema into scratch DB 'cosplay_migrate_test'
 cd "$NEW_DIR"
 docker compose -f docker-compose.pull.yml exec -T mysql mysqldump \
   -uroot -p"$NEW_DB_PASS" --no-data --routines --triggers cosplay > "$WORK/schema.sql"
+
+# A live 'cosplay' DB with no tables (migrations never run here yet) would
+# otherwise fail silently at this step — mysqldump --no-data against an
+# empty database exits 0 with an essentially empty file, and the real
+# error wouldn't surface until several steps later as a confusing
+# "table doesn't exist" from an unrelated-looking SELECT.
+grep -qi "CREATE TABLE" "$WORK/schema.sql" || die "This server's 'cosplay' database has no tables — migrations haven't run here yet. Fix: docker compose -f docker-compose.pull.yml exec backend npm run migrate — then re-run this script."
+
 docker compose -f docker-compose.pull.yml exec -T mysql mysql -uroot -p"$NEW_DB_PASS" \
   -e "DROP DATABASE IF EXISTS cosplay_migrate_test; CREATE DATABASE cosplay_migrate_test;"
 docker compose -f docker-compose.pull.yml exec -T mysql mysql -uroot -p"$NEW_DB_PASS" \
