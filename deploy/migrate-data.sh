@@ -44,8 +44,19 @@ die() { echo "[MIGRATE] ERROR: $*" >&2; exit 1; }
 [ -f "$NEW_DIR/docker-compose.pull.yml" ] || die "Run this from the new server's cosplay-portfolio checkout (docker-compose.pull.yml not found under $NEW_DIR)."
 command -v ssh >/dev/null 2>&1 || die "ssh not found."
 
+# accept-new: auto-trusts a host key this box has never seen before (exactly
+# the "yes/no, are you sure" prompt a normal first-time ssh would ask) —
+# without it, BatchMode=yes below refuses that prompt outright and just
+# fails instead of defaulting either way. Still REJECTS a host key that
+# changed since a previous connection (the actual MITM protection), so this
+# isn't a blanket StrictHostKeyChecking=no. Applied consistently to every
+# ssh call in this script via SSH_OPTS, not just the first check, so a
+# single successful check doesn't leave later calls depending on ordering.
+SSH_OPTS="-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+
 log "Checking SSH access to $OLD_HOST..."
-ssh -o BatchMode=yes -o ConnectTimeout=10 "$OLD_HOST" true \
+# shellcheck disable=SC2086
+ssh $SSH_OPTS "$OLD_HOST" true \
   || die "Cannot SSH to $OLD_HOST non-interactively. Copy an SSH key there first (ssh-copy-id $OLD_HOST) — this script never prompts for a password."
 
 # Resolves the actual (project-name-prefixed) Docker volume behind a
@@ -78,11 +89,11 @@ trap 'rm -rf "$WORK"' EXIT
 # rows into a table with EXTRA (nullable) columns the old server never had
 # just leaves those columns NULL for migrated rows — correct, not an error.
 log "Reading DB_PASS from $OLD_HOST:$OLD_DIR/.env..."
-OLD_DB_PASS="$(ssh "$OLD_HOST" "grep -m1 '^DB_PASS=' '$OLD_DIR/.env' | cut -d= -f2-")"
+OLD_DB_PASS="$(ssh $SSH_OPTS "$OLD_HOST" "grep -m1 '^DB_PASS=' '$OLD_DIR/.env' | cut -d= -f2-")"
 [ -n "$OLD_DB_PASS" ] || die "Could not read DB_PASS from $OLD_HOST:$OLD_DIR/.env"
 
 log "Dumping MySQL data (schema-agnostic) from $OLD_HOST (--single-transaction, no downtime there)..."
-ssh "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml exec -T mysql \
+ssh $SSH_OPTS "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml exec -T mysql \
   mysqldump -uroot -p'$OLD_DB_PASS' --single-transaction --quick --no-create-info --complete-insert cosplay" \
   | gzip > "$WORK/cosplay-data.sql.gz"
 
@@ -138,18 +149,18 @@ log "buyers) for migrated orders — this script does not do that for you."
 log ""
 
 # ── 3. MinIO: stop on old (consistency), tar the volume, stream over ────
-OLD_MINIO_VOLUME="$(remote_volume_name "ssh $OLD_HOST" minio /data "$OLD_DIR")"
+OLD_MINIO_VOLUME="$(remote_volume_name "ssh $SSH_OPTS $OLD_HOST" minio /data "$OLD_DIR")"
 [ -n "$OLD_MINIO_VOLUME" ] || die "Could not find the MinIO volume on $OLD_HOST — is its 'minio' service running?"
 log "Old server's MinIO volume: $OLD_MINIO_VOLUME"
 
 log "Stopping MinIO on $OLD_HOST for a consistent copy (images/uploads there will 404 until it restarts)..."
-ssh "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml stop minio"
+ssh $SSH_OPTS "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml stop minio"
 
 log "Streaming MinIO data from $OLD_HOST..."
-ssh "$OLD_HOST" "docker run --rm -v '$OLD_MINIO_VOLUME':/from alpine tar czf - -C /from ." > "$WORK/minio-data.tar.gz"
+ssh $SSH_OPTS "$OLD_HOST" "docker run --rm -v '$OLD_MINIO_VOLUME':/from alpine tar czf - -C /from ." > "$WORK/minio-data.tar.gz"
 
 log "Restarting MinIO on $OLD_HOST..."
-ssh "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml start minio"
+ssh $SSH_OPTS "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml start minio"
 
 [ -s "$WORK/minio-data.tar.gz" ] || die "MinIO tar is empty — aborting before touching anything on this server."
 log "MinIO archive OK ($(du -h "$WORK/minio-data.tar.gz" | cut -f1))."
