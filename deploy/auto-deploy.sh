@@ -17,9 +17,13 @@
 #
 # Idempotent: safe to re-run. .env is only ever created, never overwritten
 # (regenerating its secrets against an already-initialized mysql/minio
-# volume would lock the app out of its own data) — everything else (the
-# fetched config files, Docker installs, Nginx/TLS config) is cheap to
-# refresh on every run.
+# volume would lock the app out of its own data). The fetched config files
+# (docker-compose.pull.yml, deploy/*.sh) are only fetched if missing too —
+# lets you scp them over yourself instead of dealing with a GitHub token
+# for a private repo, and means re-running this script never clobbers a
+# local edit to one of them. Delete a file first to have this pull a fresh
+# copy. Docker installs and Nginx/TLS config are the only steps that
+# always re-run/re-check on every invocation.
 #
 # Usage:
 #   ./deploy/auto-deploy.sh --domain shop.example.com --email you@example.com
@@ -89,7 +93,7 @@ while [ $# -gt 0 ]; do
     --skip-tls) SKIP_TLS=1; shift ;;
     --skip-firewall) SKIP_FIREWALL=1; shift ;;
     -h|--help)
-      sed -n '2,60p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,64p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) die "Unknown argument: $1 (see --help)" ;;
@@ -143,12 +147,20 @@ mkdir -p "$INSTALL_DIR/deploy"
 cd "$INSTALL_DIR"
 
 fetch_file() {
-  # $1 = path within the repo, relative to its root
+  # $1 = path within the repo, relative to its root. Skips anything already
+  # present — lets you sidestep GitHub entirely for a private repo by
+  # scp'ing docker-compose.pull.yml + deploy/*.sh over yourself first (no
+  # --github-token needed then). Delete a file first if you want this run
+  # to pull a fresh copy instead of keeping what's already there.
+  if [ -f "$1" ]; then
+    log "  $1 already present, keeping it as-is (delete it first to re-fetch)."
+    return
+  fi
   local url="https://raw.githubusercontent.com/${REPO_SLUG}/${BRANCH}/$1"
   local auth_header=()
   [ -n "$GITHUB_TOKEN" ] && auth_header=(-H "Authorization: token ${GITHUB_TOKEN}")
   curl -fsSL "${auth_header[@]}" "$url" -o "$1" \
-    || die "Could not fetch $1 from $REPO_SLUG@$BRANCH. If this repo is private, pass --github-token (or set \$GITHUB_TOKEN) with a read-only PAT."
+    || die "Could not fetch $1 from $REPO_SLUG@$BRANCH. If this repo is private, pass --github-token (or set \$GITHUB_TOKEN) with a read-only PAT — or scp $1 to $INSTALL_DIR/$1 yourself and re-run."
 }
 
 log "Fetching deploy config from $REPO_SLUG@$BRANCH (docker-compose.pull.yml + deploy/*.sh)..."
