@@ -78,10 +78,30 @@ if [ "$SKIP_TLS" -eq 0 ]; then
   [ -n "$CERTBOT_EMAIL" ] || die "--email is required for Let's Encrypt registration (or pass --skip-tls)."
 fi
 
-# ── Bước 4: Docker ────────────────────────────────────────────────────────
+# ── Bước 4: Docker (+ the other prerequisites a stock cloud image may or
+# may not already have — git and openssl, specifically. curl itself is the
+# one thing that CAN'T be bootstrapped this way: it's what fetches this
+# script in the one-liner form, so it must already exist for that path to
+# even start. Nearly every stock Ubuntu 22.04 cloud image ships it, but if
+# yours doesn't, `apt install -y curl` once, manually, first.) ────────────
+apt update -y
+
+if ! command -v git >/dev/null 2>&1; then
+  log "Installing git..."
+  apt install -y git
+else
+  log "git already installed ($(git --version)), skipping."
+fi
+
+if ! command -v openssl >/dev/null 2>&1; then
+  log "Installing openssl..."
+  apt install -y openssl
+else
+  log "openssl already installed, skipping."
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   log "Installing Docker..."
-  apt update -y
   apt upgrade -y
   curl -fsSL https://get.docker.com | sh
 else
