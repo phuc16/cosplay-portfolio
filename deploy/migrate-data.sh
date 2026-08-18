@@ -92,6 +92,17 @@ log "Reading DB_PASS from $OLD_HOST:$OLD_DIR/.env..."
 OLD_DB_PASS="$(ssh $SSH_OPTS "$OLD_HOST" "grep -m1 '^DB_PASS=' '$OLD_DIR/.env' | cut -d= -f2-")"
 [ -n "$OLD_DB_PASS" ] || die "Could not read DB_PASS from $OLD_HOST:$OLD_DIR/.env"
 
+# Confirmed separately from the .env check above: they can live in
+# different directories on a server set up by hand rather than by
+# auto-deploy.sh (observed live — .env existed at OLD_DIR, but
+# docker-compose.pull.yml didn't, so 'docker compose -f
+# docker-compose.pull.yml exec' failed there with no output at all, and
+# the ONLY symptom locally was a misleadingly non-empty gzip file — gzip's
+# own header is a few bytes even wrapping zero real input, so a plain
+# "is the file empty" check never catches this).
+ssh $SSH_OPTS "$OLD_HOST" "[ -f '$OLD_DIR/docker-compose.pull.yml' ]" \
+  || die "$OLD_HOST:$OLD_DIR/docker-compose.pull.yml not found. Pass the real directory as the 2nd argument: $0 $OLD_HOST /actual/path"
+
 log "Dumping MySQL data (schema-agnostic) from $OLD_HOST (--single-transaction, no downtime there)..."
 ssh $SSH_OPTS "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml exec -T mysql \
   mysqldump -uroot -p'$OLD_DB_PASS' --single-transaction --quick --no-create-info --complete-insert cosplay" \
@@ -99,6 +110,12 @@ ssh $SSH_OPTS "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pul
 
 [ -s "$WORK/cosplay-data.sql.gz" ] || die "Dump is empty — aborting before touching anything on this server."
 gzip -t "$WORK/cosplay-data.sql.gz" || die "Dump is corrupt — aborting."
+# gzip's own header is non-zero even wrapping a totally failed/empty
+# mysqldump (e.g. the remote command errored and produced no stdout at
+# all) — a plain non-empty-file check doesn't catch that, so also confirm
+# the decompressed content actually looks like a dump.
+gunzip -c "$WORK/cosplay-data.sql.gz" | grep -qi "INSERT INTO\|-- MySQL dump" \
+  || die "Dump has no recognizable SQL content — the remote mysqldump likely failed silently. Check: ssh $OLD_HOST \"cd $OLD_DIR && docker compose -f docker-compose.pull.yml ps\""
 log "Dump OK ($(du -h "$WORK/cosplay-data.sql.gz" | cut -f1))."
 
 # ── 2. Restore into a scratch DB here first — verify before committing ──
