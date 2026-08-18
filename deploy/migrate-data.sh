@@ -89,7 +89,14 @@ trap 'rm -rf "$WORK"' EXIT
 # rows into a table with EXTRA (nullable) columns the old server never had
 # just leaves those columns NULL for migrated rows — correct, not an error.
 log "Reading DB_PASS from $OLD_HOST:$OLD_DIR/.env..."
-OLD_DB_PASS="$(ssh $SSH_OPTS "$OLD_HOST" "grep -m1 '^DB_PASS=' '$OLD_DIR/.env' | cut -d= -f2-")"
+# tr -d '\r' matters: command substitution strips a trailing newline but NOT
+# a lone trailing carriage return, so a CRLF-terminated .env line (common if
+# it was ever created/edited through a Windows tool or a web-based VPS file
+# editor) would otherwise leave one invisible \r stuck on the end of the
+# extracted password — visually identical, but a different string to MySQL.
+# Confirmed live: this exact bug caused "Access denied" even though the
+# password itself, tested directly on the server, was correct.
+OLD_DB_PASS="$(ssh $SSH_OPTS "$OLD_HOST" "grep -m1 '^DB_PASS=' '$OLD_DIR/.env' | cut -d= -f2-" | tr -d '\r')"
 [ -n "$OLD_DB_PASS" ] || die "Could not read DB_PASS from $OLD_HOST:$OLD_DIR/.env"
 
 # Confirmed separately from the .env check above: they can live in
@@ -104,18 +111,28 @@ ssh $SSH_OPTS "$OLD_HOST" "[ -f '$OLD_DIR/docker-compose.pull.yml' ]" \
   || die "$OLD_HOST:$OLD_DIR/docker-compose.pull.yml not found. Pass the real directory as the 2nd argument: $0 $OLD_HOST /actual/path"
 
 log "Dumping MySQL data (schema-agnostic) from $OLD_HOST (--single-transaction, no downtime there)..."
+# Written to a plain file first, deliberately NOT piped straight into gzip:
+# this shell has no `pipefail` (POSIX sh/dash), so `ssh ... | gzip > file`
+# reports gzip's exit code, not ssh's — mysqldump erroring out on the
+# remote end (wrong password, container down, whatever) would exit ssh
+# non-zero while gzip still happily compresses the empty/error-free stdout
+# it got and reports success. Checking ssh's own exit code directly catches
+# that immediately, with mysqldump's real error already visible above
+# (it goes to stderr, which passes through ssh to this terminal either way).
 ssh $SSH_OPTS "$OLD_HOST" "cd '$OLD_DIR' && docker compose -f docker-compose.pull.yml exec -T mysql \
   mysqldump -uroot -p'$OLD_DB_PASS' --single-transaction --quick --no-create-info --complete-insert cosplay" \
-  | gzip > "$WORK/cosplay-data.sql.gz"
+  > "$WORK/cosplay-data.sql" \
+  || die "mysqldump failed on $OLD_HOST (see the error above this line). A common cause: DB_PASS in $OLD_DIR/.env doesn't match what MySQL was actually initialized with (e.g. .env was edited after the mysql container/volume was first created — changing .env alone never changes the live database's root password)."
+gzip "$WORK/cosplay-data.sql"
 
 [ -s "$WORK/cosplay-data.sql.gz" ] || die "Dump is empty — aborting before touching anything on this server."
 gzip -t "$WORK/cosplay-data.sql.gz" || die "Dump is corrupt — aborting."
-# gzip's own header is non-zero even wrapping a totally failed/empty
-# mysqldump (e.g. the remote command errored and produced no stdout at
-# all) — a plain non-empty-file check doesn't catch that, so also confirm
-# the decompressed content actually looks like a dump.
+# Belt and braces beyond the exit-code check above: catches a remote
+# command that exits 0 but still produced no real dump content for some
+# other reason (gzip's own header is non-zero even wrapping zero real
+# input, so a plain non-empty-file check alone wouldn't catch this).
 gunzip -c "$WORK/cosplay-data.sql.gz" | grep -qi "INSERT INTO\|-- MySQL dump" \
-  || die "Dump has no recognizable SQL content — the remote mysqldump likely failed silently. Check: ssh $OLD_HOST \"cd $OLD_DIR && docker compose -f docker-compose.pull.yml ps\""
+  || die "Dump has no recognizable SQL content despite mysqldump reporting success — inspect it: gunzip -c $WORK/cosplay-data.sql.gz | head"
 log "Dump OK ($(du -h "$WORK/cosplay-data.sql.gz" | cut -f1))."
 
 # ── 2. Restore into a scratch DB here first — verify before committing ──
@@ -123,7 +140,7 @@ log "Dump OK ($(du -h "$WORK/cosplay-data.sql.gz" | cut -f1))."
 # the data-only dump can load into it — cloned from the live 'cosplay' DB's
 # structure (auto-deploy.sh already ran every migration against it), not
 # from the old dump, which carries no schema at all anymore.
-NEW_DB_PASS="$(grep -m1 '^DB_PASS=' "$NEW_DIR/.env" | cut -d= -f2-)"
+NEW_DB_PASS="$(grep -m1 '^DB_PASS=' "$NEW_DIR/.env" | cut -d= -f2- | tr -d '\r')"
 [ -n "$NEW_DB_PASS" ] || die "Could not read DB_PASS from $NEW_DIR/.env — run this after auto-deploy.sh has created it."
 
 log "Cloning this server's current schema into scratch DB 'cosplay_migrate_test'..."
