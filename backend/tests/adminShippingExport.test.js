@@ -168,6 +168,7 @@ describe("POST /api/admin/shipping/export", () => {
 
   it("generates a base64 xlsx containing the requested order", async () => {
     const id = await seed()
+    const stored = await orders.getOrderById(id)
     const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id], batch }))
     expect(res.status).toBe(200)
     expect(res.body.exported_count).toBe(1)
@@ -177,7 +178,7 @@ describe("POST /api/admin/shipping/export", () => {
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer)
     const row = wb.getWorksheet("Danh sách").getRow(8)
-    expect(row.getCell("B").value).toBe(`DH${id}`)
+    expect(row.getCell("B").value).toBe(formatOrderCode(id, stored.created_at))
   })
 
   it("does not leak order_token into the generated file", async () => {
@@ -273,6 +274,7 @@ describe("POST /api/admin/shipping/export", () => {
 
   it("dedupes a repeated order_id, writing exactly one row in the xlsx for it", async () => {
     const id = await seed()
+    const stored = await orders.getOrderById(id)
     const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id, id], batch }))
     expect(res.status).toBe(200)
     expect(res.body.exported_count).toBe(1)
@@ -285,7 +287,7 @@ describe("POST /api/admin/shipping/export", () => {
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer)
     const sheet = wb.getWorksheet("Danh sách")
-    expect(sheet.getRow(8).getCell("B").value).toBe(`DH${id}`)
+    expect(sheet.getRow(8).getCell("B").value).toBe(formatOrderCode(id, stored.created_at))
     expect(sheet.getRow(9).getCell("B").value).toBeNull()
   })
 

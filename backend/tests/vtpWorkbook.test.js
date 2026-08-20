@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest"
 import ExcelJS from "exceljs"
 import { buildExportWorkbook, DATA_SHEET_NAME, DATA_START_ROW } from "../shop/shipping/vtpWorkbook.js"
+import { formatOrderCode } from "../shop/orders/domain.js"
+
+const CREATED_AT = "2026-08-14T00:00:00Z"
 
 function order(over = {}) {
   return {
-    id: 1, buyer_name: "Nguyễn Thị Bích", phone: "0901234567",
+    id: 1, created_at: CREATED_AT, buyer_name: "Nguyễn Thị Bích", phone: "0901234567",
     address_street: "12 Lý Tự Trọng", address_ward: "Bến Nghé",
     address_district: "Quận 1", address_province: "Hồ Chí Minh", address_raw: null,
     total: 120000, payment_method: "bank", cod_amount: null,
@@ -65,7 +68,7 @@ describe("buildExportWorkbook", () => {
     const sheet = wb.getWorksheet(DATA_SHEET_NAME)
     const row = sheet.getRow(DATA_START_ROW)
     expect(row.getCell("A").value).toBe(1)
-    expect(row.getCell("B").value).toBe("DH1")
+    expect(row.getCell("B").value).toBe(formatOrderCode(1, CREATED_AT))
     expect(row.getCell("C").value).toBe("Nguyễn Thị Bích")
   })
 
@@ -114,7 +117,7 @@ describe("buildExportWorkbook", () => {
     })
     const { buffer, exported, excluded } = await buildExportWorkbook([bad], batch)
     expect(exported).toEqual([])
-    expect(excluded).toEqual([{ order_id: 9, reason: "no_address", message: expect.stringContaining("DH9") }])
+    expect(excluded).toEqual([{ order_id: 9, reason: "no_address", message: expect.stringContaining(formatOrderCode(9, CREATED_AT)) }])
 
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer)

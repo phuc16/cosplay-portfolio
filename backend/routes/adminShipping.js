@@ -43,7 +43,8 @@ async function sheetToRows2D(buffer) {
   if (!sheet) return []
   const rows = []
   sheet.eachRow({ includeEmpty: false }, (row) => {
-    const values = row.values.slice(1).map(cellToText)
+    // row.values can be sparse (holes, not undefined) at empty cells; Array.from densifies before .map, since .map skips holes
+    const values = Array.from(row.values).slice(1).map(cellToText)
     rows.push(values)
   })
   return rows
@@ -212,16 +213,26 @@ module.exports = function adminShippingRoutes() {
         })
       }
 
-      const orderIds = [...new Set(
-        rows.map((r) => trackingImport.parseOrderCode(r.order_code)).filter((id) => id !== null)
+      // order_code's suffix is a one-way hash, so resolve by fetching orders near the embedded date and computing+comparing, not by parsing an id
+      const codes = [...new Set(
+        rows.map((r) => trackingImport.parseOrderCode(r.order_code)).filter((c) => c !== null)
       )]
-      const ordersById = new Map()
-      for (const id of orderIds) {
-        const order = await orders.getOrderById(id)
-        if (order) ordersById.set(id, order)
+      const ordersByCode = new Map()
+      if (codes.length > 0) {
+        const codeDates = codes.map((c) => domain.parseOrderCodeDate(c)).filter(Boolean)
+          .map((d) => Date.UTC(d.year, d.month - 1, d.day))
+        const minDate = new Date(Math.min(...codeDates) - 24 * 60 * 60 * 1000)
+        const maxDate = new Date(Math.max(...codeDates) + 24 * 60 * 60 * 1000)
+        const candidates = await orders.listOrders({
+          date_from: minDate.toISOString().slice(0, 10),
+          date_to: maxDate.toISOString().slice(0, 10),
+        })
+        for (const order of candidates) {
+          ordersByCode.set(domain.formatOrderCode(order.id, order.created_at), order)
+        }
       }
 
-      res.json(trackingImport.resolvePreview(rows, ordersById))
+      res.json(trackingImport.resolvePreview(rows, ordersByCode))
     } catch (err) { oops(res, err, "Lỗi xem trước nhập mã vận đơn") }
   })
 
@@ -268,6 +279,8 @@ module.exports = function adminShippingRoutes() {
       const results = []
       for (const r of rows) {
         const orderId = Number(r.order_id)
+        // Falls back to orderCode(id) if the caller omitted order_code, so a direct/malformed API call still gets a readable message
+        const code = typeof r.order_code === "string" && r.order_code ? r.order_code : orderCode(orderId)
         if (!Number.isInteger(orderId) || orderId <= 0) {
           console.warn(`[ADMIN/SHIPPING] invalid_order_id trong yêu cầu nhập mã vận đơn: ${JSON.stringify(r.order_id)}`)
           results.push({ order_id: r.order_id, ok: false, reason: "invalid_order_id", message: "order_id không hợp lệ" })
@@ -275,7 +288,7 @@ module.exports = function adminShippingRoutes() {
         }
         if (seenOrderIds.has(orderId)) {
           console.warn(
-            `[ADMIN/SHIPPING] duplicate_in_request: ${orderCode(orderId)} xuất hiện nhiều lần trong yêu cầu nhập mã vận đơn, chỉ xử lý lần đầu`
+            `[ADMIN/SHIPPING] duplicate_in_request: ${code} xuất hiện nhiều lần trong yêu cầu nhập mã vận đơn, chỉ xử lý lần đầu`
           )
           continue
         }
@@ -285,11 +298,11 @@ module.exports = function adminShippingRoutes() {
         if (!trackingCode) {
           results.push({
             order_id: orderId, ok: false, reason: "missing_tracking_code",
-            message: `${orderCode(orderId)}: thiếu mã vận đơn`,
+            message: `${code}: thiếu mã vận đơn`,
           })
           continue
         }
-        dedupedRows.push({ order_id: orderId, tracking_code: trackingCode })
+        dedupedRows.push({ order_id: orderId, order_code: code, tracking_code: trackingCode })
       }
 
       for (const r of dedupedRows) {
@@ -300,10 +313,10 @@ module.exports = function adminShippingRoutes() {
             expectedFromStatus: "confirmed",
           })
           results.push(ok
-            ? { order_id: orderId, ok: true, message: `Đã cập nhật mã vận đơn cho ${orderCode(orderId)}` }
+            ? { order_id: orderId, ok: true, message: `Đã cập nhật mã vận đơn cho ${r.order_code}` }
             : {
                 order_id: orderId, ok: false, reason: "not_confirmed",
-                message: `${orderCode(orderId)} không còn ở trạng thái "confirmed" (đã xử lý trước đó hoặc bị thay đổi)`,
+                message: `${r.order_code} không còn ở trạng thái "confirmed" (đã xử lý trước đó hoặc bị thay đổi)`,
               })
         } catch (err) {
           console.error(`[ADMIN/SHIPPING] Lỗi cập nhật mã vận đơn cho đơn ${orderId}:`, err)

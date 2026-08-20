@@ -71,6 +71,19 @@ function formatOrderCode(id, createdAt) {
   return `${y}${m}${day}${suffix}`
 }
 
+const ORDER_CODE_RE = /^(\d{2})(\d{2})(\d{2})[0-9A-Z]{8}$/
+
+/** Recovers the YYMMDD date embedded in a formatOrderCode() output — the suffix is a one-way hash, so this is the only part that's recoverable. */
+function parseOrderCodeDate(code) {
+  const m = ORDER_CODE_RE.exec(String(code || "").trim().toUpperCase())
+  if (!m) return null
+  const [, yy, mm, dd] = m
+  const month = Number(mm)
+  const day = Number(dd)
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  return { year: 2000 + Number(yy), month, day }
+}
+
 /**
  * Sum the order. Throws rather than coercing, because a non-integer price or a
  * negative quantity reaching this point means something upstream is broken and
@@ -132,6 +145,7 @@ module.exports = {
   hashAccessPin,
   verifyAccessPin,
   formatOrderCode,
+  parseOrderCodeDate,
   computeTotal,
   isReservable,
   computeExpiry,

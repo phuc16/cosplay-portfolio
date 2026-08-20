@@ -3,10 +3,14 @@ import {
   resolveCod, selectPayer, mapOrderToRow, PAYER_BUYER, PAYER_SELLER,
   SERVICE_INTRA_HCM, SERVICE_INTER_PROVINCE, LOAI_HANG_HOA_VALUES,
 } from "../shop/shipping/vtpMapping.js"
+import { formatOrderCode } from "../shop/orders/domain.js"
+
+const CREATED_AT = "2026-08-14T00:00:00Z"
 
 function baseOrder(over = {}) {
   return {
     id: 42,
+    created_at: CREATED_AT,
     buyer_name: "Nguyễn Văn A",
     phone: "0901 234 567",
     address_street: "123 Lê Lợi", address_ward: "Bến Thành",
@@ -77,7 +81,7 @@ describe("mapOrderToRow — success paths", () => {
     expect(result.ok).toBe(true)
     expect(result.order_id).toBe(42)
     expect(result.row).toEqual({
-      B: "DH42",
+      B: formatOrderCode(42, CREATED_AT),
       C: "Nguyễn Văn A",
       D: "0901234567",
       E: "123 Lê Lợi, Bến Thành, Quận 1, Hồ Chí Minh",
@@ -94,7 +98,7 @@ describe("mapOrderToRow — success paths", () => {
     }))
     expect(result.ok).toBe(true)
     expect(result.row).toEqual({
-      B: "DH42",
+      B: formatOrderCode(42, CREATED_AT),
       C: "Nguyễn Văn A",
       D: "0901234567",
       E: "123 Lê Lợi, Bến Thành, Quận 1, Hà Nội",

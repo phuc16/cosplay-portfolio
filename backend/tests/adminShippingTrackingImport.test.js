@@ -6,6 +6,7 @@ import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
+import { formatOrderCode } from "../shop/orders/domain.js"
 import { resetTables } from "./helpers/db.js"
 
 async function buildXlsxBase64(headerRow, dataRows) {
@@ -33,6 +34,11 @@ async function seedConfirmedOrder() {
   return o.id
 }
 
+async function codeFor(id) {
+  const o = await orders.getOrderById(id)
+  return formatOrderCode(o.id, o.created_at)
+}
+
 beforeEach(async () => {
   await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections")
 })
@@ -47,17 +53,19 @@ describe("auth", () => {
 describe("POST /api/admin/shipping/tracking-import/preview", () => {
   it("previews a pasted row for a confirmed order as ready to apply", async () => {
     const id = await seedConfirmedOrder()
+    const code = await codeFor(id)
     const res = await authed(
-      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `DH${id}\tVTP-XYZ` })
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `${code}\tVTP-XYZ` })
     )
     expect(res.status).toBe(200)
-    expect(res.body.toApply).toEqual([{ order_id: id, order_code: `DH${id}`, tracking_code: "VTP-XYZ" }])
+    expect(res.body.toApply).toEqual([{ order_id: id, order_code: code, tracking_code: "VTP-XYZ" }])
     expect(res.body.skipped).toEqual([])
   })
 
   it("reports an unmatched order code as skipped, not applied", async () => {
+    const unmatchedCode = formatOrderCode(999999, "2026-08-14T00:00:00Z")
     const res = await authed(
-      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: "DH999999\tVTP-XYZ" })
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `${unmatchedCode}\tVTP-XYZ` })
     )
     expect(res.body.toApply).toEqual([])
     expect(res.body.skipped[0].reason).toBe("not_found")
@@ -98,28 +106,48 @@ describe("POST /api/admin/shipping/tracking-import/preview", () => {
 
   it("resolves an uploaded VTP result file (file_base64) the same way as an equivalent paste", async () => {
     const id = await seedConfirmedOrder()
+    const code = await codeFor(id)
     const b64 = await buildXlsxBase64(
       ["STT", "Mã đơn hàng", "Mã vận đơn"],
-      [[1, `DH${id}`, "VTP-XYZ"]]
+      [[1, code, "VTP-XYZ"]]
     )
     const fileRes = await authed(
       request(app).post("/api/admin/shipping/tracking-import/preview").send({ file_base64: b64 })
     )
     const pasteRes = await authed(
-      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `DH${id}\tVTP-XYZ` })
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `${code}\tVTP-XYZ` })
     )
     expect(fileRes.status).toBe(200)
-    expect(fileRes.body.toApply).toEqual([{ order_id: id, order_code: `DH${id}`, tracking_code: "VTP-XYZ" }])
+    expect(fileRes.body.toApply).toEqual([{ order_id: id, order_code: code, tracking_code: "VTP-XYZ" }])
     expect(fileRes.body).toEqual(pasteRes.body)
+  })
+
+  it("handles an uploaded sheet whose first column was never written (real VTP files leave it blank, producing a sparse row.values)", async () => {
+    const id = await seedConfirmedOrder()
+    const code = await codeFor(id)
+    const wb = new ExcelJS.Workbook()
+    const sheet = wb.addWorksheet("Sheet1")
+    sheet.getRow(1).getCell(2).value = "Mã đơn hàng"
+    sheet.getRow(1).getCell(3).value = "Mã vận đơn"
+    sheet.getRow(2).getCell(2).value = code
+    sheet.getRow(2).getCell(3).value = "VTP-XYZ"
+    const buffer = await wb.xlsx.writeBuffer()
+    const b64 = Buffer.from(buffer).toString("base64")
+
+    const res = await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ file_base64: b64 }))
+
+    expect(res.status).toBe(200)
+    expect(res.body.toApply).toEqual([{ order_id: id, order_code: code, tracking_code: "VTP-XYZ" }])
   })
 
   it("normalises a rich-text cell value from the uploaded sheet to plain text", async () => {
     const id = await seedConfirmedOrder()
+    const code = await codeFor(id)
     const wb = new ExcelJS.Workbook()
     const sheet = wb.addWorksheet("Sheet1")
     sheet.addRow(["Mã đơn hàng", "Mã vận đơn"])
     const dataRow = sheet.addRow([])
-    dataRow.getCell(1).value = { richText: [{ text: `DH${id}` }] }
+    dataRow.getCell(1).value = { richText: [{ text: code }] }
     dataRow.getCell(2).value = { richText: [{ text: "VTP-" }, { text: "RICH" }] }
     dataRow.commit()
     const buffer = await wb.xlsx.writeBuffer()
@@ -127,18 +155,19 @@ describe("POST /api/admin/shipping/tracking-import/preview", () => {
 
     const res = await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ file_base64: b64 }))
     expect(res.status).toBe(200)
-    expect(res.body.toApply).toEqual([{ order_id: id, order_code: `DH${id}`, tracking_code: "VTP-RICH" }])
+    expect(res.body.toApply).toEqual([{ order_id: id, order_code: code, tracking_code: "VTP-RICH" }])
   })
 
   it("idempotency: previewing the same rows again after a successful import shows nothing to apply", async () => {
     const id = await seedConfirmedOrder()
-    await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `DH${id}\tVTP-XYZ` }))
+    const code = await codeFor(id)
+    await authed(request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `${code}\tVTP-XYZ` }))
     await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({
-      rows: [{ order_id: id, order_code: `DH${id}`, tracking_code: "VTP-XYZ" }],
+      rows: [{ order_id: id, order_code: code, tracking_code: "VTP-XYZ" }],
     }))
 
     const res = await authed(
-      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `DH${id}\tVTP-XYZ` })
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `${code}\tVTP-XYZ` })
     )
     expect(res.body.toApply).toEqual([])
     expect(res.body.skipped[0].reason).toBe("already_shipped")
@@ -148,11 +177,12 @@ describe("POST /api/admin/shipping/tracking-import/preview", () => {
 describe("POST /api/admin/shipping/tracking-import/confirm", () => {
   it("moves a confirmed order to shipped with the tracking code, via transitionOrder's state machine", async () => {
     const id = await seedConfirmedOrder()
+    const code = await codeFor(id)
     const res = await authed(request(app).post("/api/admin/shipping/tracking-import/confirm").send({
-      rows: [{ order_id: id, order_code: `DH${id}`, tracking_code: "VTP-ABC" }],
+      rows: [{ order_id: id, order_code: code, tracking_code: "VTP-ABC" }],
     }))
     expect(res.status).toBe(200)
-    expect(res.body.results).toEqual([{ order_id: id, ok: true, message: expect.any(String) }])
+    expect(res.body.results).toEqual([{ order_id: id, ok: true, message: expect.stringContaining(code) }])
 
     const [[row]] = await db.query("SELECT status, tracking_code FROM orders WHERE id = ?", [id])
     expect(row.status).toBe("shipped")
@@ -282,13 +312,14 @@ describe("pickup orders in tracking import", () => {
 
   it("skips a confirmed pickup order in preview with an honest not_shippable reason, not not_confirmed", async () => {
     const id = await seedConfirmedPickupOrder()
+    const code = await codeFor(id)
     const res = await authed(
-      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `DH${id}\tVTP-XYZ` })
+      request(app).post("/api/admin/shipping/tracking-import/preview").send({ rows_text: `${code}\tVTP-XYZ` })
     )
     expect(res.status).toBe(200)
     expect(res.body.toApply).toEqual([])
     expect(res.body.skipped).toEqual([
-      { order_code: `DH${id}`, tracking_code: "VTP-XYZ", reason: "not_shippable", message: expect.any(String) },
+      { order_code: code, tracking_code: "VTP-XYZ", reason: "not_shippable", message: expect.any(String) },
     ])
   })
 })

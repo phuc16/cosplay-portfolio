@@ -1,13 +1,12 @@
-const { ORDER_CODE_PREFIX } = require("./vtpMapping")
-
 const MAX_IMPORT_ROWS = 200
 
-const ORDER_CODE_RE = new RegExp(`^${ORDER_CODE_PREFIX}(\\d+)$`, "i")
+// Matches domain.formatOrderCode's shape (YYMMDD + 8-char hash suffix)
+const ORDER_CODE_RE = /^\d{6}[0-9A-Z]{8}$/
 
 function parseOrderCode(raw) {
   if (typeof raw !== "string") return null
-  const m = raw.trim().match(ORDER_CODE_RE)
-  return m ? Number(m[1]) : null
+  const normalized = raw.trim().toUpperCase()
+  return ORDER_CODE_RE.test(normalized) ? normalized : null
 }
 
 function parsePastedText(text) {
@@ -27,17 +26,25 @@ function parsePastedText(text) {
  * route layer does the exceljs reading, this function stays pure. Finds the
  * order-code and tracking-code columns by matching header text rather than
  * a fixed position, so a result file with reordered or renamed-but-similar
- * columns still resolves correctly.
+ * columns still resolves correctly. The header row itself is also found by
+ * scanning, not assumed to be row 0 — VTP's own "Danh sách vận đơn" export
+ * has several rows of company letterhead/title block above its real header.
  */
 function extractPairsFromSheetRows(rows2D) {
-  if (!Array.isArray(rows2D) || rows2D.length < 2) return []
-  const header = rows2D[0].map((h) => String(h || "").toLowerCase())
+  if (!Array.isArray(rows2D)) return []
+  const headerRowIndex = rows2D.findIndex((row) => {
+    const header = row.map((h) => String(h || "").toLowerCase())
+    return header.some((h) => h.includes("đơn hàng") || h.includes("don hang"))
+      && header.some((h) => h.includes("vận đơn") || h.includes("van don"))
+  })
+  if (headerRowIndex === -1) return []
+
+  const header = rows2D[headerRowIndex].map((h) => String(h || "").toLowerCase())
   const orderCodeCol = header.findIndex((h) => h.includes("đơn hàng") || h.includes("don hang"))
   const trackingCol = header.findIndex((h) => h.includes("vận đơn") || h.includes("van don"))
-  if (orderCodeCol === -1 || trackingCol === -1) return []
 
   return rows2D
-    .slice(1)
+    .slice(headerRowIndex + 1)
     .filter((row) => (row[orderCodeCol] ?? "") !== "" || (row[trackingCol] ?? "") !== "")
     .map((row) => ({
       order_code: String(row[orderCodeCol] ?? "").trim(),
@@ -77,26 +84,26 @@ function extractPairsFromSheetRows(rows2D) {
  *    comes from orderRepo.getOrderById()'s `SELECT *`, so fulfillment_method
  *    is already present without any extra plumbing.
  */
-function resolvePreview(rows, ordersById) {
+function resolvePreview(rows, ordersByCode) {
   const trackingCodeCounts = new Map()
   for (const r of rows) {
     if (!r.tracking_code) continue
     trackingCodeCounts.set(r.tracking_code, (trackingCodeCounts.get(r.tracking_code) || 0) + 1)
   }
 
-  const orderIdCounts = new Map()
+  const orderCodeCounts = new Map()
   for (const r of rows) {
-    const oid = parseOrderCode(r.order_code)
-    if (oid === null) continue
-    orderIdCounts.set(oid, (orderIdCounts.get(oid) || 0) + 1)
+    const code = parseOrderCode(r.order_code)
+    if (code === null) continue
+    orderCodeCounts.set(code, (orderCodeCounts.get(code) || 0) + 1)
   }
 
   const toApply = []
   const skipped = []
 
   for (const r of rows) {
-    const orderId = parseOrderCode(r.order_code)
-    if (orderId === null) {
+    const code = parseOrderCode(r.order_code)
+    if (code === null) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
         reason: "invalid_code", message: `Mã đơn "${r.order_code}" không hợp lệ`,
@@ -106,7 +113,7 @@ function resolvePreview(rows, ordersById) {
     if (!r.tracking_code) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
-        reason: "missing_tracking_code", message: `${ORDER_CODE_PREFIX}${orderId}: thiếu mã vận đơn`,
+        reason: "missing_tracking_code", message: `${r.order_code}: thiếu mã vận đơn`,
       })
       continue
     }
@@ -118,20 +125,20 @@ function resolvePreview(rows, ordersById) {
       })
       continue
     }
-    if (orderIdCounts.get(orderId) > 1) {
+    if (orderCodeCounts.get(code) > 1) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
         reason: "duplicate_order_code",
-        message: `Đơn ${ORDER_CODE_PREFIX}${orderId} xuất hiện nhiều lần trong file, không rõ mã vận đơn nào là đúng`,
+        message: `Đơn ${r.order_code} xuất hiện nhiều lần trong file, không rõ mã vận đơn nào là đúng`,
       })
       continue
     }
 
-    const order = ordersById.get(orderId)
+    const order = ordersByCode.get(code)
     if (!order) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
-        reason: "not_found", message: `Không tìm thấy đơn ${ORDER_CODE_PREFIX}${orderId}`,
+        reason: "not_found", message: `Không tìm thấy đơn ${r.order_code}`,
       })
       continue
     }
@@ -139,7 +146,7 @@ function resolvePreview(rows, ordersById) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
         reason: "not_shippable",
-        message: `Đơn ${ORDER_CODE_PREFIX}${orderId} là đơn nhận tại chỗ (pickup), không áp dụng mã vận đơn`,
+        message: `Đơn ${r.order_code} là đơn nhận tại chỗ (pickup), không áp dụng mã vận đơn`,
       })
       continue
     }
@@ -147,7 +154,7 @@ function resolvePreview(rows, ordersById) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
         reason: "already_shipped",
-        message: `Đơn ${ORDER_CODE_PREFIX}${orderId} đã ở trạng thái "${order.status}", bỏ qua`,
+        message: `Đơn ${r.order_code} đã ở trạng thái "${order.status}", bỏ qua`,
       })
       continue
     }
@@ -155,12 +162,12 @@ function resolvePreview(rows, ordersById) {
       skipped.push({
         order_code: r.order_code, tracking_code: r.tracking_code,
         reason: "not_confirmed",
-        message: `Đơn ${ORDER_CODE_PREFIX}${orderId} đang ở trạng thái "${order.status}", không thể nhập mã vận đơn`,
+        message: `Đơn ${r.order_code} đang ở trạng thái "${order.status}", không thể nhập mã vận đơn`,
       })
       continue
     }
 
-    toApply.push({ order_id: orderId, order_code: r.order_code, tracking_code: r.tracking_code })
+    toApply.push({ order_id: order.id, order_code: r.order_code, tracking_code: r.tracking_code })
   }
 
   return { toApply, skipped }

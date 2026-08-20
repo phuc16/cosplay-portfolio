@@ -2,23 +2,29 @@ import { describe, it, expect } from "vitest"
 import {
   parseOrderCode, parsePastedText, extractPairsFromSheetRows, resolvePreview, MAX_IMPORT_ROWS,
 } from "../shop/shipping/trackingImport.js"
+import { formatOrderCode } from "../shop/orders/domain.js"
 
 describe("parseOrderCode", () => {
-  it("parses a well-formed DH-prefixed code", () => {
-    expect(parseOrderCode("DH482")).toBe(482)
+  it("parses a well-formed 14-char code (6-digit date prefix + 8-char suffix)", () => {
+    const code = formatOrderCode(1, "2026-08-14T00:00:00Z")
+    expect(code).toHaveLength(14)
+    expect(parseOrderCode(code)).toBe(code)
+    expect(parseOrderCode(`${code}X`)).toBeNull() // 15 chars, too long
   })
 
-  it("is case-insensitive on the prefix", () => {
-    expect(parseOrderCode("dh482")).toBe(482)
+  it("is case-insensitive, normalising to uppercase", () => {
+    const code = formatOrderCode(1, "2026-08-14T00:00:00Z")
+    expect(parseOrderCode(code.toLowerCase())).toBe(code)
   })
 
   it("tolerates surrounding whitespace", () => {
-    expect(parseOrderCode("  DH482  ")).toBe(482)
+    const code = formatOrderCode(1, "2026-08-14T00:00:00Z")
+    expect(parseOrderCode(`  ${code}  `)).toBe(code)
   })
 
-  it("returns null for a code with no DH prefix, extra text, or non-numeric id", () => {
+  it("returns null for the old DH-prefixed shape, wrong-length strings, or non-code text", () => {
+    expect(parseOrderCode("DH482")).toBeNull()
     expect(parseOrderCode("482")).toBeNull()
-    expect(parseOrderCode("DH482x")).toBeNull()
     expect(parseOrderCode("COD 1")).toBeNull()
     expect(parseOrderCode("")).toBeNull()
     expect(parseOrderCode(null)).toBeNull()
@@ -66,6 +72,18 @@ describe("extractPairsFromSheetRows", () => {
     expect(extractPairsFromSheetRows([["A", "B"], [1, 2]])).toEqual([])
   })
 
+  it("finds the header row even when it isn't row 0 — VTP's own export has letterhead rows above it", () => {
+    const rows2D = [
+      [null, null, "TẬP ĐOÀN CÔNG NGHIỆP - VIỄN THÔNG QUÂN ĐỘI"],
+      [null, null, null, " DANH SÁCH ĐƠN HÀNG"],
+      [null, "STT", "Mã Vận Đơn", "Mã đơn hàng", "Người nhận"],
+      [null, 1, "150035258518", "DH5", "A"],
+    ]
+    expect(extractPairsFromSheetRows(rows2D)).toEqual([
+      { order_code: "DH5", tracking_code: "150035258518" },
+    ])
+  })
+
   it("returns an empty array for fewer than 2 rows (header only, or empty sheet)", () => {
     expect(extractPairsFromSheetRows([["Mã đơn hàng", "Mã vận đơn"]])).toEqual([])
     expect(extractPairsFromSheetRows([])).toEqual([])
@@ -78,40 +96,45 @@ describe("extractPairsFromSheetRows", () => {
 })
 
 describe("resolvePreview", () => {
-  const confirmedOrder = { id: 1, status: "confirmed", fulfillment_method: "ship" }
-  const shippedOrder = { id: 2, status: "shipped", fulfillment_method: "ship" }
-  const completedOrder = { id: 3, status: "completed", fulfillment_method: "ship" }
-  const pendingOrder = { id: 4, status: "pending", fulfillment_method: "ship" }
-  const cancelledOrder = { id: 5, status: "cancelled", fulfillment_method: "ship" }
+  const CREATED_AT = "2026-08-14T00:00:00Z"
+  const confirmedOrder = { id: 1, status: "confirmed", fulfillment_method: "ship", created_at: CREATED_AT }
+  const shippedOrder = { id: 2, status: "shipped", fulfillment_method: "ship", created_at: CREATED_AT }
+  const completedOrder = { id: 3, status: "completed", fulfillment_method: "ship", created_at: CREATED_AT }
+  const pendingOrder = { id: 4, status: "pending", fulfillment_method: "ship", created_at: CREATED_AT }
+  const cancelledOrder = { id: 5, status: "cancelled", fulfillment_method: "ship", created_at: CREATED_AT }
 
-  function byId(...orders) {
-    return new Map(orders.map((o) => [o.id, o]))
+  const codeOf = (order) => formatOrderCode(order.id, order.created_at)
+
+  function byCode(...orders) {
+    return new Map(orders.map((o) => [codeOf(o), o]))
   }
 
   it("applies a well-formed row for a confirmed order", () => {
+    const code = codeOf(confirmedOrder)
     const { toApply, skipped } = resolvePreview(
-      [{ order_code: "DH1", tracking_code: "VTP001" }], byId(confirmedOrder)
+      [{ order_code: code, tracking_code: "VTP001" }], byCode(confirmedOrder)
     )
-    expect(toApply).toEqual([{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }])
+    expect(toApply).toEqual([{ order_id: 1, order_code: code, tracking_code: "VTP001" }])
     expect(skipped).toEqual([])
   })
 
   it("skips an unparsable order code, never guessing a nearby order", () => {
     const { toApply, skipped } = resolvePreview(
-      [{ order_code: "not-a-code", tracking_code: "VTP001" }], byId(confirmedOrder)
+      [{ order_code: "not-a-code", tracking_code: "VTP001" }], byCode(confirmedOrder)
     )
     expect(toApply).toEqual([])
     expect(skipped).toEqual([{ order_code: "not-a-code", tracking_code: "VTP001", reason: "invalid_code", message: expect.any(String) }])
   })
 
   it("skips a row with no tracking code", () => {
-    const { skipped } = resolvePreview([{ order_code: "DH1", tracking_code: "" }], byId(confirmedOrder))
+    const { skipped } = resolvePreview([{ order_code: codeOf(confirmedOrder), tracking_code: "" }], byCode(confirmedOrder))
     expect(skipped[0].reason).toBe("missing_tracking_code")
   })
 
   it("skips an order code matching no order, never applying it to a nearby order", () => {
+    const unmatchedCode = formatOrderCode(999, CREATED_AT)
     const { toApply, skipped } = resolvePreview(
-      [{ order_code: "DH999", tracking_code: "VTP001" }], byId(confirmedOrder)
+      [{ order_code: unmatchedCode, tracking_code: "VTP001" }], byCode(confirmedOrder)
     )
     expect(toApply).toEqual([])
     expect(skipped[0].reason).toBe("not_found")
@@ -120,10 +143,10 @@ describe("resolvePreview", () => {
   it("skips an already-shipped order distinctly from other non-confirmed statuses", () => {
     const { skipped } = resolvePreview(
       [
-        { order_code: "DH2", tracking_code: "VTP001" },
-        { order_code: "DH3", tracking_code: "VTP002" },
+        { order_code: codeOf(shippedOrder), tracking_code: "VTP001" },
+        { order_code: codeOf(completedOrder), tracking_code: "VTP002" },
       ],
-      byId(shippedOrder, completedOrder)
+      byCode(shippedOrder, completedOrder)
     )
     expect(skipped[0].reason).toBe("already_shipped")
     expect(skipped[1].reason).toBe("already_shipped")
@@ -132,22 +155,23 @@ describe("resolvePreview", () => {
   it("skips a pending or cancelled order as not_confirmed", () => {
     const { skipped } = resolvePreview(
       [
-        { order_code: "DH4", tracking_code: "VTP001" },
-        { order_code: "DH5", tracking_code: "VTP002" },
+        { order_code: codeOf(pendingOrder), tracking_code: "VTP001" },
+        { order_code: codeOf(cancelledOrder), tracking_code: "VTP002" },
       ],
-      byId(pendingOrder, cancelledOrder)
+      byCode(pendingOrder, cancelledOrder)
     )
     expect(skipped[0].reason).toBe("not_confirmed")
     expect(skipped[1].reason).toBe("not_confirmed")
   })
 
   it("rejects duplicate tracking codes within the same file — neither row is applied", () => {
+    const other = { id: 2, status: "confirmed", fulfillment_method: "ship", created_at: CREATED_AT }
     const { toApply, skipped } = resolvePreview(
       [
-        { order_code: "DH1", tracking_code: "SAME" },
-        { order_code: "DH2", tracking_code: "SAME" },
+        { order_code: codeOf(confirmedOrder), tracking_code: "SAME" },
+        { order_code: codeOf(other), tracking_code: "SAME" },
       ],
-      byId(confirmedOrder, { id: 2, status: "confirmed", fulfillment_method: "ship" })
+      byCode(confirmedOrder, other)
     )
     expect(toApply).toEqual([])
     expect(skipped).toHaveLength(2)
@@ -155,12 +179,13 @@ describe("resolvePreview", () => {
   })
 
   it("rejects duplicate order codes with different tracking codes — neither row is applied", () => {
+    const order12 = { id: 12, status: "confirmed", fulfillment_method: "ship", created_at: CREATED_AT }
     const { toApply, skipped } = resolvePreview(
       [
-        { order_code: "DH12", tracking_code: "V1" },
-        { order_code: "DH12", tracking_code: "V2" },
+        { order_code: codeOf(order12), tracking_code: "V1" },
+        { order_code: codeOf(order12), tracking_code: "V2" },
       ],
-      byId({ id: 12, status: "confirmed", fulfillment_method: "ship" })
+      byCode(order12)
     )
     expect(toApply).toEqual([])
     expect(skipped).toHaveLength(2)
@@ -168,12 +193,13 @@ describe("resolvePreview", () => {
   })
 
   it("rejects duplicate order codes even when the tracking code is also the same (still ambiguous)", () => {
+    const order12 = { id: 12, status: "confirmed", fulfillment_method: "ship", created_at: CREATED_AT }
     const { toApply, skipped } = resolvePreview(
       [
-        { order_code: "DH12", tracking_code: "V1" },
-        { order_code: "DH12", tracking_code: "V1" },
+        { order_code: codeOf(order12), tracking_code: "V1" },
+        { order_code: codeOf(order12), tracking_code: "V1" },
       ],
-      byId({ id: 12, status: "confirmed", fulfillment_method: "ship" })
+      byCode(order12)
     )
     expect(toApply).toEqual([])
     expect(skipped).toHaveLength(2)
@@ -181,15 +207,17 @@ describe("resolvePreview", () => {
   })
 
   it("isolates a duplicated order code from an unrelated clean row, which still applies", () => {
+    const order12 = { id: 12, status: "confirmed", fulfillment_method: "ship", created_at: CREATED_AT }
+    const cleanCode = codeOf(confirmedOrder)
     const { toApply, skipped } = resolvePreview(
       [
-        { order_code: "DH12", tracking_code: "V1" },
-        { order_code: "DH12", tracking_code: "V2" },
-        { order_code: "DH1", tracking_code: "VTP001" },
+        { order_code: codeOf(order12), tracking_code: "V1" },
+        { order_code: codeOf(order12), tracking_code: "V2" },
+        { order_code: cleanCode, tracking_code: "VTP001" },
       ],
-      byId({ id: 12, status: "confirmed", fulfillment_method: "ship" }, confirmedOrder)
+      byCode(order12, confirmedOrder)
     )
-    expect(toApply).toEqual([{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }])
+    expect(toApply).toEqual([{ order_id: 1, order_code: cleanCode, tracking_code: "VTP001" }])
     expect(skipped).toHaveLength(2)
     expect(skipped.every((s) => s.reason === "duplicate_order_code")).toBe(true)
   })
@@ -198,30 +226,32 @@ describe("resolvePreview", () => {
     // Simulates re-uploading the same file after a successful import: every
     // order is now 'shipped', so every row is skipped as already_shipped,
     // and toApply is empty — a second confirm would send no new emails.
-    const rows = [{ order_code: "DH2", tracking_code: "VTP001" }]
-    const { toApply, skipped } = resolvePreview(rows, byId(shippedOrder))
+    const rows = [{ order_code: codeOf(shippedOrder), tracking_code: "VTP001" }]
+    const { toApply, skipped } = resolvePreview(rows, byCode(shippedOrder))
     expect(toApply).toEqual([])
     expect(skipped[0].reason).toBe("already_shipped")
   })
 
   it("skips a confirmed pickup order as not_shippable, not not_confirmed", () => {
-    const pickupOrder = { id: 6, status: "confirmed", fulfillment_method: "pickup" }
+    const pickupOrder = { id: 6, status: "confirmed", fulfillment_method: "pickup", created_at: CREATED_AT }
+    const code = codeOf(pickupOrder)
     const { toApply, skipped } = resolvePreview(
-      [{ order_code: "DH6", tracking_code: "VTP001" }], byId(pickupOrder)
+      [{ order_code: code, tracking_code: "VTP001" }], byCode(pickupOrder)
     )
     expect(toApply).toEqual([])
-    expect(skipped).toEqual([{ order_code: "DH6", tracking_code: "VTP001", reason: "not_shippable", message: expect.any(String) }])
+    expect(skipped).toEqual([{ order_code: code, tracking_code: "VTP001", reason: "not_shippable", message: expect.any(String) }])
   })
 
   it("processes multiple valid rows independently — one bad row does not affect a good one", () => {
+    const code = codeOf(confirmedOrder)
     const { toApply, skipped } = resolvePreview(
       [
-        { order_code: "DH1", tracking_code: "VTP001" },
-        { order_code: "DHnope", tracking_code: "VTP002" },
+        { order_code: code, tracking_code: "VTP001" },
+        { order_code: "not-a-code", tracking_code: "VTP002" },
       ],
-      byId(confirmedOrder)
+      byCode(confirmedOrder)
     )
-    expect(toApply).toEqual([{ order_id: 1, order_code: "DH1", tracking_code: "VTP001" }])
+    expect(toApply).toEqual([{ order_id: 1, order_code: code, tracking_code: "VTP001" }])
     expect(skipped).toHaveLength(1)
   })
 })

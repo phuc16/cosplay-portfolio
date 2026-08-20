@@ -1,3 +1,5 @@
+const domain = require("../orders/domain")
+
 const ORDER_CODE_PREFIX = "DH"
 
 /** Column B (Mã đơn hàng). Never order_token — see this plan's Global
@@ -112,26 +114,28 @@ function selectPayer(order) {
  * plan's Global Constraints.
  */
 function mapOrderToRow(order) {
+  const code = domain.formatOrderCode(order.id, order.created_at)
+
   const address = assembleAddress(order)
   if (!address) {
     return {
       ok: false,
       order_id: order.id,
       reason: "no_address",
-      message: `${orderCode(order.id)}: không có địa chỉ nhận hàng hợp lệ`,
+      message: `${code}: không có địa chỉ nhận hàng hợp lệ`,
     }
   }
 
   const cod = resolveCod(order)
   if (!cod.ok) {
-    return { ok: false, order_id: order.id, reason: cod.reason, message: `${orderCode(order.id)}: ${cod.message}` }
+    return { ok: false, order_id: order.id, reason: cod.reason, message: `${code}: ${cod.message}` }
   }
 
   return {
     ok: true,
     order_id: order.id,
     row: {
-      B: orderCode(order.id),
+      B: code,
       C: order.buyer_name,
       D: String(order.phone || "").replace(/\s+/g, ""),
       E: address,
