@@ -42,7 +42,7 @@ services:
     logging: *logging
 
   backend:
-    image: phuc16/cosplay-backend:latest
+    image: phuc16/cosplay-backend:dev
     build: ./backend
     restart: unless-stopped
     ports:
@@ -81,7 +81,7 @@ services:
     logging: *logging
 
   worker:
-    image: phuc16/cosplay-backend:latest
+    image: phuc16/cosplay-backend:dev
     build: ./backend
     restart: unless-stopped
     command: node worker.js
@@ -114,7 +114,7 @@ services:
     logging: *logging
 
   frontend:
-    image: phuc16/cosplay-frontend:latest
+    image: phuc16/cosplay-frontend:dev
     build: ./frontend
     restart: unless-stopped
     ports:
