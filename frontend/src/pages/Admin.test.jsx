@@ -157,6 +157,27 @@ describe("Admin — session persistence", () => {
     expect(container.textContent).not.toContain("Đăng nhập Admin")
   })
 
+  it("silently redeems the refresh token on mount when the access token is missing, skipping the login screen", async () => {
+    localStorage.setItem("admin_refresh_token", "refresh-abc")
+    axios.post.mockResolvedValue({ data: { token: "new-token", refresh_token: "new-refresh" } })
+
+    const container = await renderAdmin()
+
+    expect(axios.post).toHaveBeenCalledWith("/api/refresh", { refresh_token: "refresh-abc" })
+    expect(localStorage.getItem("admin_token")).toBe("new-token")
+    expect(container.textContent).not.toContain("Đăng nhập Admin")
+  })
+
+  it("falls back to the login screen when the refresh token on mount is rejected, and clears it", async () => {
+    localStorage.setItem("admin_refresh_token", "dead-refresh")
+    axios.post.mockRejectedValue({ response: { status: 401 }, isAxiosError: true })
+
+    const container = await renderAdmin()
+
+    expect(localStorage.getItem("admin_refresh_token")).toBeNull()
+    expect(container.textContent).toContain("Đăng nhập Admin")
+  })
+
   it("logs out when the refresh token itself is rejected", async () => {
     localStorage.setItem("admin_token", "expired-token")
     localStorage.setItem("admin_refresh_token", "dead-refresh")

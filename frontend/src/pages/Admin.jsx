@@ -29,6 +29,7 @@ export default function Admin() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [checkingSession, setCheckingSession] = useState(() => !token && !!localStorage.getItem(REFRESH_KEY))
 
   const logout = () => {
     setToken("")
@@ -43,6 +44,30 @@ export default function Admin() {
     if (data.refresh_token) localStorage.setItem(REFRESH_KEY, data.refresh_token)
     setToken(data.token)
   }
+
+  // Access token can be entirely missing on mount while the refresh token is still good — redeem it before showing login
+  useEffect(() => {
+    if (token) return
+    const refreshToken = localStorage.getItem(REFRESH_KEY)
+    if (!refreshToken) return
+    let cancelled = false
+    axios
+      .post("/api/refresh", { refresh_token: refreshToken })
+      .then((r) => {
+        if (!cancelled) applySession(r.data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          localStorage.removeItem(REFRESH_KEY)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingSession(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // A restored or still-active token can still expire mid-session (8h JWT) —
   // when that happens the server answers 401/403 and every admin tab would
@@ -176,6 +201,10 @@ export default function Admin() {
         {tab === "shipping" && <AdminShipping />}
       </div>
     )
+  }
+
+  if (checkingSession) {
+    return <div className="min-h-screen bg-gray-100 dark:bg-cosplay-dark" />
   }
 
   return (
