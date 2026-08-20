@@ -1,0 +1,126 @@
+# Acceptance-test stack — same shape as docker-compose.pull.yml, but:
+#   - images pulled by the `staging` tag (build+push via
+#     ./scripts/build-push.sh staging from the branch under test), never
+#     `latest`, so this never overlaps with what prod is running
+#   - frontend published on all interfaces (not 127.0.0.1-only) since this
+#     is meant to be reached directly by IP for testing, with no Nginx/TLS
+#     in front of it
+# Run as its own compose project (-p cosplay-staging) in its own directory
+# with its own .env, so container/volume names and DB/MinIO data never
+# collide with the prod stack running on the same box.
+services:
+  mysql:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:?set DB_PASS in .env}
+      MYSQL_DATABASE: ${DB_NAME:-cosplay}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *logging
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    logging: *logging
+
+  backend:
+    image: phuc16/cosplay-backend:staging
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME:-cosplay}
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?set ADMIN_USERNAME in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      NODE_ENV: production
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      GOONG_API_KEY: ${GOONG_API_KEY:-}
+    logging: *logging
+
+  worker:
+    image: phuc16/cosplay-backend:staging
+    restart: unless-stopped
+    command: node worker.js
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      minio:
+        condition: service_started
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME:-cosplay}
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    logging: *logging
+
+  frontend:
+    image: phuc16/cosplay-frontend:staging
+    restart: unless-stopped
+    ports:
+      - "${STAGING_PORT:-5174}:80"
+    depends_on:
+      - backend
+    logging: *logging
+
+volumes:
+  mysql_data:
+  minio_data:
