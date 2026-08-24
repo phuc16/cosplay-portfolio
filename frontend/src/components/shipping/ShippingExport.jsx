@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import {
-  adminListShippingExportOrders, adminSetShippingPayer, adminGenerateShippingExport,
+  adminListShippingExportOrders, adminSetShippingPayer, adminGenerateShippingExport, adminGetOrder,
 } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 
@@ -77,6 +77,8 @@ export default function ShippingExport() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const requestIdRef = useRef(0)
+  const [expandedId, setExpandedId] = useState(null)
+  const [itemsByOrderId, setItemsByOrderId] = useState({})
 
   useEffect(() => {
     const requestId = requestIdRef.current + 1
@@ -109,6 +111,21 @@ export default function ShippingExport() {
       }
     } catch {
       setError("Không cập nhật được người trả cước")
+    }
+  }
+
+  const toggleExpanded = async (id) => {
+    if (expandedId === id) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(id)
+    if (itemsByOrderId[id]) return
+    try {
+      const detail = await adminGetOrder(id)
+      setItemsByOrderId((prev) => ({ ...prev, [id]: detail.items }))
+    } catch {
+      setItemsByOrderId((prev) => ({ ...prev, [id]: null }))
     }
   }
 
@@ -165,33 +182,63 @@ export default function ShippingExport() {
                     <th className="pr-2">SĐT</th>
                     <th className="pr-2">Tỉnh/Thành</th>
                     <th className="pr-2">Giá trị</th>
-                    <th>Miễn phí ship</th>
+                    <th className="pr-2">Miễn phí ship</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleOrders.map((o) => (
-                    <tr key={o.id} className="border-t border-[var(--border-brand)]">
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(o.id)}
-                          onChange={() => toggleSelected(o.id)}
-                        />
-                      </td>
-                      <td className="pr-2 py-1">{o.order_code}</td>
-                      <td className="pr-2 py-1">{o.buyer_name}</td>
-                      <td className="pr-2 py-1">{o.phone}</td>
-                      <td className="pr-2 py-1">{o.address_province || "—"}</td>
-                      <td className="pr-2 py-1">{formatVnd(o.total)}</td>
-                      <td className="py-1">
-                        <input
-                          type="checkbox"
-                          data-testid={`freeship-${o.id}`}
-                          checked={o.shipping_payer === "seller"}
-                          onChange={() => toggleFreeship(o)}
-                        />
-                      </td>
-                    </tr>
+                    <Fragment key={o.id}>
+                      <tr className="border-t border-[var(--border-brand)]">
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(o.id)}
+                            onChange={() => toggleSelected(o.id)}
+                          />
+                        </td>
+                        <td className="pr-2 py-1">{o.order_code}</td>
+                        <td className="pr-2 py-1">{o.buyer_name}</td>
+                        <td className="pr-2 py-1">{o.phone}</td>
+                        <td className="pr-2 py-1">{o.address_province || "—"}</td>
+                        <td className="pr-2 py-1">{formatVnd(o.total)}</td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="checkbox"
+                            data-testid={`freeship-${o.id}`}
+                            checked={o.shipping_payer === "seller"}
+                            onChange={() => toggleFreeship(o)}
+                          />
+                        </td>
+                        <td className="py-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(o.id)}
+                            className="px-2 py-0.5 text-xs border rounded-lg border-[var(--border-brand)]"
+                          >
+                            {expandedId === o.id ? "Ẩn" : "Cần đóng gói"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedId === o.id && (
+                        <tr className="border-t border-[var(--border-brand)]">
+                          <td></td>
+                          <td colSpan={6} className="py-2 text-sm">
+                            {itemsByOrderId[o.id] === undefined && <p className="opacity-60">Đang tải...</p>}
+                            {itemsByOrderId[o.id] === null && <p className="text-red-500">Không tải được sản phẩm.</p>}
+                            {Array.isArray(itemsByOrderId[o.id]) && (
+                              <ul className="list-disc pl-4">
+                                {itemsByOrderId[o.id].map((i) => (
+                                  <li key={i.id}>
+                                    {i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

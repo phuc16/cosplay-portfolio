@@ -5,11 +5,13 @@ import { act } from "react"
 const adminListShippingExportOrders = vi.fn()
 const adminSetShippingPayer = vi.fn()
 const adminGenerateShippingExport = vi.fn()
+const adminGetOrder = vi.fn()
 
 vi.mock("../../api/shop", () => ({
   adminListShippingExportOrders: (...args) => adminListShippingExportOrders(...args),
   adminSetShippingPayer: (...args) => adminSetShippingPayer(...args),
   adminGenerateShippingExport: (...args) => adminGenerateShippingExport(...args),
+  adminGetOrder: (...args) => adminGetOrder(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -70,6 +72,7 @@ beforeEach(() => {
   adminListShippingExportOrders.mockReset()
   adminSetShippingPayer.mockReset()
   adminGenerateShippingExport.mockReset()
+  adminGetOrder.mockReset()
   lastAnchorDownload = null
 })
 
@@ -218,6 +221,60 @@ describe("ShippingExport", () => {
     await flush()
 
     expect(container.textContent).toContain("Không xuất được file")
+  })
+
+  it("lazily loads and shows an order's items when 'Cần đóng gói' is clicked, so the seller knows what to pack", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockResolvedValue({
+      id: 1,
+      items: [{ id: 11, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 2 }],
+    })
+    const container = await renderShippingExport()
+    await flush()
+    expect(adminGetOrder).not.toHaveBeenCalled()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Cần đóng gói")
+    await click(toggleButton)
+    await flush()
+
+    expect(adminGetOrder).toHaveBeenCalledWith(1)
+    expect(container.textContent).toContain("Card")
+    expect(container.textContent).toContain("A1")
+    expect(container.textContent).toContain("2")
+  })
+
+  it("collapses the items panel on a second click without re-fetching (cached)", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockResolvedValue({ id: 1, items: [{ id: 11, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1 }] })
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggle = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "Cần đóng gói" || b.textContent === "Ẩn")
+    await click(toggle())
+    await flush()
+    expect(container.textContent).toContain("Card")
+
+    await click(toggle())
+    await flush()
+    expect(container.textContent).not.toContain("Card")
+
+    await click(toggle())
+    await flush()
+    expect(container.textContent).toContain("Card")
+    expect(adminGetOrder).toHaveBeenCalledTimes(1)
+  })
+
+  it("shows an error, not a crash, when loading an order's items fails", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockRejectedValue(new Error("network down"))
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Cần đóng gói")
+    await click(toggleButton)
+    await flush()
+
+    expect(container.textContent).toContain("Không tải được sản phẩm")
   })
 
   it("renders a readable Vietnamese explanation for every known exclusion reason, never blank or snake_case", async () => {
