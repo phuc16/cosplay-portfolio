@@ -67,9 +67,10 @@ beforeEach(async () => {
 })
 
 describe("auth", () => {
-  it("requires a token on all three export routes", async () => {
+  it("requires a token on all export routes", async () => {
     expect((await request(app).get("/api/admin/shipping/export/orders")).status).toBe(401)
     expect((await request(app).patch("/api/admin/shipping/export/orders/1/payer").send({ shipping_payer: "seller" })).status).toBe(401)
+    expect((await request(app).patch("/api/admin/shipping/export/orders/1/prepared").send({ prepared: true })).status).toBe(401)
     expect((await request(app).post("/api/admin/shipping/export").send({ order_ids: [1], batch: {} })).status).toBe(401)
   })
 })
@@ -158,6 +159,50 @@ describe("PATCH /api/admin/shipping/export/orders/:id/payer", () => {
   it("does not mutate orders.status", async () => {
     const id = await seed()
     await authed(request(app).patch(`/api/admin/shipping/export/orders/${id}/payer`).send({ shipping_payer: "seller" }))
+    const [[row]] = await db.query("SELECT status FROM orders WHERE id = ?", [id])
+    expect(row.status).toBe("confirmed")
+  })
+})
+
+describe("PATCH /api/admin/shipping/export/orders/:id/prepared", () => {
+  it("defaults to not prepared in the listing", async () => {
+    const id = await seed()
+    const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    expect(res.body.find((o) => o.id === id).prepared).toBe(false)
+  })
+
+  it("marks an order prepared, and reflects it back in the listing", async () => {
+    const id = await seed()
+    const res = await authed(request(app).patch(`/api/admin/shipping/export/orders/${id}/prepared`).send({ prepared: true }))
+    expect(res.status).toBe(200)
+
+    const listing = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    expect(listing.body.find((o) => o.id === id).prepared).toBe(true)
+  })
+
+  it("unmarks an order back to not prepared", async () => {
+    const id = await seed()
+    await authed(request(app).patch(`/api/admin/shipping/export/orders/${id}/prepared`).send({ prepared: true }))
+    await authed(request(app).patch(`/api/admin/shipping/export/orders/${id}/prepared`).send({ prepared: false }))
+
+    const [[row]] = await db.query("SELECT prepared FROM orders WHERE id = ?", [id])
+    expect(Boolean(row.prepared)).toBe(false)
+  })
+
+  it("400s on a non-boolean prepared value", async () => {
+    const id = await seed()
+    const res = await authed(request(app).patch(`/api/admin/shipping/export/orders/${id}/prepared`).send({ prepared: "yes" }))
+    expect(res.status).toBe(400)
+  })
+
+  it("404s for an unknown order id", async () => {
+    const res = await authed(request(app).patch("/api/admin/shipping/export/orders/999999/prepared").send({ prepared: true }))
+    expect(res.status).toBe(404)
+  })
+
+  it("does not mutate orders.status", async () => {
+    const id = await seed()
+    await authed(request(app).patch(`/api/admin/shipping/export/orders/${id}/prepared`).send({ prepared: true }))
     const [[row]] = await db.query("SELECT status FROM orders WHERE id = ?", [id])
     expect(row.status).toBe("confirmed")
   })

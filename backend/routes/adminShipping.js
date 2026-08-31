@@ -73,6 +73,7 @@ module.exports = function adminShippingRoutes() {
         cod_amount: o.cod_amount,
         payment_method: o.payment_method,
         shipping_payer: o.shipping_payer,
+        prepared: Boolean(o.prepared),
       })))
     } catch (err) { oops(res, err, "Lỗi liệt kê đơn cần xuất") }
   })
@@ -95,6 +96,27 @@ module.exports = function adminShippingRoutes() {
       }
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi cập nhật người trả cước") }
+  })
+
+  // Purely informational "have I packed this" checkbox — never gates export/tracking.
+  router.patch("/shipping/export/orders/:id/prepared", async (req, res) => {
+    try {
+      const { prepared } = req.body
+      if (typeof prepared !== "boolean") {
+        return res.status(400).json({ error: "invalid_input", message: "prepared phải là boolean" })
+      }
+      const id = Number(req.params.id)
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      }
+      const [result] = await db.query(
+        "UPDATE orders SET prepared = ? WHERE id = ?", [prepared, id]
+      )
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      }
+      res.json({ ok: true })
+    } catch (err) { oops(res, err, "Lỗi cập nhật trạng thái chuẩn bị hàng") }
   })
 
   router.post("/shipping/export", async (req, res) => {

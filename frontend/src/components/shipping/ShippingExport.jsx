@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react"
 import {
-  adminListShippingExportOrders, adminSetShippingPayer, adminGenerateShippingExport, adminGetOrder,
+  adminListShippingExportOrders, adminSetShippingPayer, adminSetOrderPrepared, adminGenerateShippingExport, adminGetOrder,
 } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 
@@ -114,6 +114,20 @@ export default function ShippingExport() {
     }
   }
 
+  // Purely informational — never gates export/tracking, just lets a seller
+  // tick off orders they've already packed while working through the queue.
+  const togglePrepared = async (order) => {
+    const next = !order.prepared
+    try {
+      const res = await adminSetOrderPrepared(order.id, next)
+      if (res?.ok) {
+        setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, prepared: next } : o)))
+      }
+    } catch {
+      setError("Không cập nhật được trạng thái chuẩn bị hàng")
+    }
+  }
+
   const toggleExpanded = async (id) => {
     if (expandedId === id) {
       setExpandedId(null)
@@ -183,6 +197,7 @@ export default function ShippingExport() {
                     <th className="pr-2">Tỉnh/Thành</th>
                     <th className="pr-2">Giá trị</th>
                     <th className="pr-2">Miễn phí ship</th>
+                    <th className="pr-2">Đã chuẩn bị</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -210,6 +225,14 @@ export default function ShippingExport() {
                             onChange={() => toggleFreeship(o)}
                           />
                         </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="checkbox"
+                            data-testid={`prepared-${o.id}`}
+                            checked={Boolean(o.prepared)}
+                            onChange={() => togglePrepared(o)}
+                          />
+                        </td>
                         <td className="py-1">
                           <button
                             type="button"
@@ -223,7 +246,7 @@ export default function ShippingExport() {
                       {expandedId === o.id && (
                         <tr className="border-t border-[var(--border-brand)]">
                           <td></td>
-                          <td colSpan={6} className="py-2 text-sm">
+                          <td colSpan={7} className="py-2 text-sm">
                             {itemsByOrderId[o.id] === undefined && <p className="opacity-60">Đang tải...</p>}
                             {itemsByOrderId[o.id] === null && <p className="text-red-500">Không tải được sản phẩm.</p>}
                             {Array.isArray(itemsByOrderId[o.id]) && (

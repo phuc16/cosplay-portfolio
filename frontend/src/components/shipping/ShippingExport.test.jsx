@@ -4,12 +4,14 @@ import { act } from "react"
 
 const adminListShippingExportOrders = vi.fn()
 const adminSetShippingPayer = vi.fn()
+const adminSetOrderPrepared = vi.fn()
 const adminGenerateShippingExport = vi.fn()
 const adminGetOrder = vi.fn()
 
 vi.mock("../../api/shop", () => ({
   adminListShippingExportOrders: (...args) => adminListShippingExportOrders(...args),
   adminSetShippingPayer: (...args) => adminSetShippingPayer(...args),
+  adminSetOrderPrepared: (...args) => adminSetOrderPrepared(...args),
   adminGenerateShippingExport: (...args) => adminGenerateShippingExport(...args),
   adminGetOrder: (...args) => adminGetOrder(...args),
 }))
@@ -33,7 +35,7 @@ function order(over = {}) {
   return {
     id: 1, order_code: "DH1", buyer_name: "Nguyễn Văn A", phone: "0901234567",
     address_province: "Hồ Chí Minh", total: 120000, cod_amount: null,
-    payment_method: "bank", shipping_payer: "buyer", ...over,
+    payment_method: "bank", shipping_payer: "buyer", prepared: false, ...over,
   }
 }
 
@@ -71,6 +73,7 @@ async function selectOrderAndFillBatch(container) {
 beforeEach(() => {
   adminListShippingExportOrders.mockReset()
   adminSetShippingPayer.mockReset()
+  adminSetOrderPrepared.mockReset()
   adminGenerateShippingExport.mockReset()
   adminGetOrder.mockReset()
   lastAnchorDownload = null
@@ -88,7 +91,7 @@ describe("ShippingExport", () => {
     adminListShippingExportOrders.mockResolvedValue([order(), order({ id: 2, order_code: "DH2" })])
     const container = await renderShippingExport()
     await flush()
-    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(4)
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(6)
     expect(container.textContent).toContain("DH1")
     expect(container.textContent).toContain("DH2")
   })
@@ -150,6 +153,30 @@ describe("ShippingExport", () => {
     await click(freeshipToggle)
 
     expect(freeshipToggle.checked).toBe(true)
+  })
+
+  it("toggles prepared via adminSetOrderPrepared when the prepared checkbox is clicked", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminSetOrderPrepared.mockResolvedValue({ ok: true })
+    const container = await renderShippingExport()
+    await flush()
+
+    const preparedToggle = container.querySelector('[data-testid="prepared-1"]')
+    await click(preparedToggle)
+
+    expect(adminSetOrderPrepared).toHaveBeenCalledWith(1, true)
+  })
+
+  it("reflects the server's response for the prepared toggle instead of assuming success", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminSetOrderPrepared.mockResolvedValue({ ok: true })
+    const container = await renderShippingExport()
+    await flush()
+
+    const preparedToggle = container.querySelector('[data-testid="prepared-1"]')
+    await click(preparedToggle)
+
+    expect(preparedToggle.checked).toBe(true)
   })
 
   it("generates and triggers download of the export with the selected order and batch fields", async () => {

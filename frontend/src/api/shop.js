@@ -147,6 +147,9 @@ export const adminListShippingExportOrders = () =>
 export const adminSetShippingPayer = (id, shippingPayer) =>
   api.patch(`/api/admin/shipping/export/orders/${id}/payer`, { shipping_payer: shippingPayer }).then((r) => r.data)
 
+export const adminSetOrderPrepared = (id, prepared) =>
+  api.patch(`/api/admin/shipping/export/orders/${id}/prepared`, { prepared }).then((r) => r.data)
+
 export const adminGenerateShippingExport = (orderIds, batch) =>
   api.post("/api/admin/shipping/export", { order_ids: orderIds, batch }).then((r) => r.data)
 
