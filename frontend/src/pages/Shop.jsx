@@ -41,7 +41,7 @@ export default function Shop() {
             )}
             <div className="p-4">
               <h2 className="font-semibold">{c.title}</h2>
-              <p className="text-sm opacity-70">{t("photosCount", { n: c.product_count })}</p>
+              <p className="text-sm opacity-70">{t("productsCount", { n: c.product_count })}</p>
               {c.status === "closed" && (
                 <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopClosed")}</p>
               )}

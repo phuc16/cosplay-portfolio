@@ -4,7 +4,7 @@ import { act } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
-import { addToCart } from "../shop/cart"
+import { addToCart, readCart } from "../shop/cart"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -57,5 +57,46 @@ describe("Cart — clicking an item goes to its product", () => {
     const link = [...container.querySelectorAll("a")].find((a) => a.textContent.includes("Legacy Item"))
     expect(link).toBeUndefined()
     expect(container.textContent).toContain("Legacy Item")
+  })
+})
+
+describe("Cart — removing an item", () => {
+  it("shows a confirm popup naming the item, and keeps it when Cancel is clicked", async () => {
+    addToCart({
+      variant_id: 3, qty: 1, product_name: "Poster A4", variant_label: "Std",
+      price: 90000, image_url: null, collection_slug: "drop",
+    })
+    const container = await renderCart()
+
+    const removeBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "✕")
+    await act(async () => { removeBtn.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog).toBeTruthy()
+    expect(dialog.textContent).toContain("Poster A4 · Std")
+
+    const cancelBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Cancel")
+    await act(async () => { cancelBtn.click() })
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(readCart()).toHaveLength(1)
+  })
+
+  it("removes the item once Remove is clicked in the popup", async () => {
+    addToCart({
+      variant_id: 4, qty: 1, product_name: "Poster A4", variant_label: "Std",
+      price: 90000, image_url: null, collection_slug: "drop",
+    })
+    const container = await renderCart()
+
+    const removeBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "✕")
+    await act(async () => { removeBtn.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const confirmBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Remove")
+    await act(async () => { confirmBtn.click() })
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(readCart()).toEqual([])
   })
 })

@@ -40,6 +40,8 @@ export const translations = {
     // Cart & Checkout
     cart: "Cart", cartEmpty: "Your cart is empty.", cartTotal: "Total",
     cartCheckout: "Checkout", cartRemove: "Remove", cartQty: "Qty",
+    cartRemoveConfirm: "Remove {item} from your cart?",
+    cancel: "Cancel",
     addToCart: "Add to cart", added: "Added",
     checkout: "Checkout", checkoutName: "Full name", checkoutPhone: "Phone",
     checkoutEmail: "Email", checkoutNote: "Note (optional)",
@@ -107,6 +109,7 @@ export const translations = {
     noImagesInAlbum: "No images in album. Add images via Admin.",
     showMoreAlbums: "Show more {n} albums",
     photosCount: "{n} photos",
+    productsCount: "{n} products",
 
     // Upcoming Events
     upcomingEventsTitle: "Upcoming Events",
@@ -182,6 +185,8 @@ export const translations = {
     // Cart & Checkout
     cart: "Giỏ hàng", cartEmpty: "Giỏ hàng của bạn đang trống.", cartTotal: "Tổng cộng",
     cartCheckout: "Thanh toán", cartRemove: "Xóa", cartQty: "SL",
+    cartRemoveConfirm: "Xóa {item} khỏi giỏ hàng?",
+    cancel: "Hủy",
     addToCart: "Thêm vào giỏ", added: "Đã thêm",
     checkout: "Thanh toán", checkoutName: "Họ và tên", checkoutPhone: "Số điện thoại",
     checkoutEmail: "Email", checkoutNote: "Ghi chú (không bắt buộc)",
@@ -249,6 +254,7 @@ export const translations = {
     noImagesInAlbum: "Chưa có ảnh trong bộ ảnh. Thêm ảnh qua Admin.",
     showMoreAlbums: "Xem thêm {n} bộ ảnh",
     photosCount: "{n} ảnh",
+    productsCount: "{n} sản phẩm",
 
     // Upcoming Events
     upcomingEventsTitle: "Sự kiện sắp tới",

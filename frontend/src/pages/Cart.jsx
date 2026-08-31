@@ -9,9 +9,13 @@ export default function Cart() {
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [cart, setCart] = useState(readCart())
+  const [pendingRemove, setPendingRemove] = useState(null)
 
   const change = (variantId, qty) => setCart(updateQty(variantId, qty))
-  const drop = (variantId) => setCart(removeFromCart(variantId))
+  const confirmRemove = () => {
+    setCart(removeFromCart(pendingRemove.variantId))
+    setPendingRemove(null)
+  }
 
   if (!cart.length) {
     return (
@@ -30,6 +34,7 @@ export default function Cart() {
     <>
       <ShopHeader />
       <main className="max-w-3xl mx-auto px-4 py-10">
+      <Link to="/merchandise" className="inline-block mb-4 text-sm text-[var(--text-link)]">← {t("shopBack")}</Link>
       <h1 className="text-2xl font-bold mb-6">{t("cart")}</h1>
 
       {cart.map((c) => (
@@ -51,12 +56,38 @@ export default function Cart() {
               </div>
             </>
           )}
-          <input
-            type="number" min="1" value={c.qty}
-            onChange={(e) => change(c.variant_id, Number(e.target.value))}
-            className="w-16 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          />
-          <button type="button" onClick={() => drop(c.variant_id)} className="px-2 opacity-70">✕</button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => change(c.variant_id, c.qty - 1)}
+              disabled={c.qty <= 1}
+              aria-label={t("shopQtyDecrease")}
+              className="w-8 h-8 rounded-lg border border-[var(--border-brand)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              −
+            </button>
+            <input
+              type="number" min="1" value={c.qty}
+              onChange={(e) => change(c.variant_id, Number(e.target.value))}
+              aria-label={t("cartQty")}
+              className="w-14 text-center px-1 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => change(c.variant_id, c.qty + 1)}
+              aria-label={t("shopQtyIncrease")}
+              className="w-8 h-8 rounded-lg border border-[var(--border-brand)]"
+            >
+              +
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPendingRemove({ variantId: c.variant_id, item: `${c.product_name} · ${c.variant_label}` })}
+            className="px-2 opacity-70"
+          >
+            ✕
+          </button>
         </div>
       ))}
 
@@ -74,6 +105,38 @@ export default function Cart() {
         </button>
       </div>
       </main>
+
+      {pendingRemove && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setPendingRemove(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="mb-4">{t("cartRemoveConfirm", { item: pendingRemove.item })}</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingRemove(null)}
+                className="px-3 py-2 rounded-xl border border-[var(--border-brand)] text-sm"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={confirmRemove}
+                className="px-3 py-2 rounded-xl bg-[var(--brand)] text-white text-sm"
+              >
+                {t("cartRemove")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
