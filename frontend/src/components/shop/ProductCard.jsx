@@ -13,6 +13,12 @@ function stockLabel(variant, t) {
 
 const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 
+/** Most variants carry a single photo (image_url); a few carry a gallery (images). */
+function variantImages(v) {
+  if (v.images?.length) return v.images
+  return v.image_url ? [v.image_url] : []
+}
+
 /** null/undefined stock_qty means unlimited — clamp only when a real ceiling exists. */
 const clampQty = (n, v) => {
   const max = v.stock_qty === null || v.stock_qty === undefined ? Infinity : v.stock_qty
@@ -23,31 +29,36 @@ const clampQty = (n, v) => {
  * Column count scales with how many variants there are to show — a 2-code
  * product stretched across 8 columns leaves the thumbnails huge and the
  * layout mostly empty, while a 40+ code photocard sheet needs every column
- * it can get. Every class here must appear literally (not built from a
- * template string) so Tailwind's content scanner generates it.
+ * it can get. A real grid (not CSS columns) so cells fill left-to-right
+ * then top-to-bottom and every cell is the same size. Every class here
+ * must appear literally (not built from a template string) so Tailwind's
+ * content scanner generates it.
  */
-function galleryColumnClasses(count) {
-  if (count <= 2) return "columns-2"
-  if (count <= 4) return "columns-2 sm:columns-3 md:columns-4"
-  if (count <= 8) return "columns-2 sm:columns-3 md:columns-4 lg:columns-5"
-  if (count <= 16) return "columns-3 sm:columns-4 md:columns-5 lg:columns-6"
-  return "columns-3 sm:columns-5 md:columns-6 lg:columns-8"
+function galleryGridClasses(count) {
+  if (count <= 2) return "grid-cols-2"
+  if (count <= 4) return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+  if (count <= 8) return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+  if (count <= 16) return "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
+  return "grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8"
 }
 
 export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
   const { t } = useLanguage()
-  const cover = product.images?.[0] || product.variants?.find((v) => v.image_url)?.image_url
+  const cover = product.images?.[0] || variantImages(product.variants?.find((v) => variantImages(v).length) || {})[0]
   const hasVariants = product.variants?.length > 0
   // null = closed, "grid" = full variant gallery, an object = single-variant detail.
   const [view, setView] = useState(null)
   const [qty, setQty] = useState(1)
+  const [activeImage, setActiveImage] = useState(0)
   const detail = view && typeof view === "object" ? view : null
+  const detailImages = detail ? variantImages(detail) : []
 
   // Every path that opens a variant's detail goes through this, so quantity
-  // never carries over stale from a previously viewed (or the same,
-  // reselected) variant.
+  // (and which photo is shown) never carries over stale from a previously
+  // viewed (or the same, reselected) variant.
   const openDetail = (v) => {
     setQty(1)
+    setActiveImage(0)
     setView(v)
   }
 
@@ -58,7 +69,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
       product_name: product.name,
       variant_label: v.label,
       price: product.price,
-      image_url: v.image_url || product.images?.[0] || null,
+      image_url: variantImages(v)[0] || product.images?.[0] || null,
       collection_slug: collectionSlug,
     })
     onAdded?.(v.label)
@@ -103,27 +114,6 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
         </div>
       </div>
 
-      {hasVariants && (
-        <ul className="px-4 pb-4 -mt-2 flex flex-wrap gap-2">
-          {product.variants.map((v) => (
-            <li key={v.id} title={stockLabel(v, t)}>
-              <button
-                type="button"
-                disabled={!orderable}
-                onClick={() => openDetail(v)}
-                className={
-                  "px-2 py-1 rounded-lg text-xs border transition " +
-                  (isSoldOut(v) ? "opacity-40 line-through border-current cursor-not-allowed"
-                                : "border-[var(--border-brand)] hover:bg-[var(--brand-soft)]")
-                }
-              >
-                {v.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
       {view === "grid" && (
         <div
           role="dialog"
@@ -147,21 +137,18 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
               </button>
             </div>
 
-            {/* CSS columns (not a grid), so each thumbnail keeps its own
-                landscape/portrait aspect ratio instead of being cropped
-                into a forced square. */}
-            <div className={galleryColumnClasses(product.variants.length) + " gap-3"}>
+            <div className={"grid " + galleryGridClasses(product.variants.length) + " gap-3"}>
               {product.variants.map((v) => {
-                const img = v.image_url || cover
+                const img = variantImages(v)[0] || cover
                 return (
                   <button
                     key={v.id}
                     type="button"
                     onClick={() => openDetail(v)}
                     title={stockLabel(v, t)}
-                    className="group relative block w-full mb-3 break-inside-avoid rounded-xl overflow-hidden border border-[var(--border-brand)] transition hover:border-[var(--brand)] hover:shadow-lg"
+                    className="group relative block w-full rounded-xl overflow-hidden border border-[var(--border-brand)] transition hover:border-[var(--brand)] hover:shadow-lg"
                   >
-                    {img && <img src={img} alt={v.label} className="w-full h-auto block" />}
+                    {img && <img src={img} alt={v.label} className="w-full aspect-square object-cover block" />}
                     <div className="absolute inset-x-0 bottom-0 pt-4 pb-1.5 px-1.5 bg-gradient-to-t from-black/80 to-transparent">
                       <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[var(--brand)] text-white shadow-sm">
                         {v.label}
@@ -191,12 +178,30 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
             className="w-full max-w-sm max-h-[85vh] overflow-x-hidden overflow-y-auto rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)]"
             onClick={(e) => e.stopPropagation()}
           >
-            {(detail.image_url || cover) && (
+            {(detailImages[activeImage] || cover) && (
               <img
-                src={detail.image_url || cover}
+                src={detailImages[activeImage] || cover}
                 alt={`${product.name} — ${detail.label}`}
                 className="w-full h-auto block"
               />
+            )}
+            {detailImages.length > 1 && (
+              <div className="flex gap-2 px-4 pt-3 overflow-x-auto">
+                {detailImages.map((url, idx) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setActiveImage(idx)}
+                    aria-label={`Ảnh ${idx + 1}`}
+                    className={
+                      "shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition " +
+                      (idx === activeImage ? "border-[var(--brand)]" : "border-transparent opacity-70 hover:opacity-100")
+                    }
+                  >
+                    <img src={url} alt="" className="w-full h-full object-cover block" />
+                  </button>
+                ))}
+              </div>
             )}
             <div className="p-4 flex flex-col gap-2">
               <div className="flex items-center justify-between">

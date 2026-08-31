@@ -60,8 +60,9 @@ describe("Collection — add-to-cart toast", () => {
     fetchCollection.mockResolvedValue(baseCollection())
     const container = await renderCollection()
 
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    // Single-variant product: clicking the card opens its detail directly (no pill list, no gallery).
+    const card = container.querySelector('[role="button"]')
+    await act(async () => { card.click() })
     const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
     await act(async () => { addBtn.click() })
 
@@ -75,8 +76,9 @@ describe("Collection — add-to-cart toast", () => {
     fetchCollection.mockResolvedValue(baseCollection())
     const container = await renderCollection()
 
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    // Single-variant product: clicking the card opens its detail directly (no pill list, no gallery).
+    const card = container.querySelector('[role="button"]')
+    await act(async () => { card.click() })
     const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
     await act(async () => { addBtn.click() })
     expect(container.querySelector('a[role="status"]')).toBeTruthy()

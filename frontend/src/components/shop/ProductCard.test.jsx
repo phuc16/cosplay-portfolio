@@ -39,11 +39,22 @@ beforeEach(() => {
   localStorage.clear()
 })
 
+// The per-card pill list was removed — opening any variant's detail now goes
+// through the "click the card -> full gallery -> pick a thumbnail" flow. A
+// single-variant product skips the gallery and lands on the detail modal
+// directly from the card click, so there is no thumbnail to click there.
+async function openVariantDetail(container, label) {
+  const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+  await act(async () => { cover.click() })
+  const dialog = container.querySelector('[role="dialog"]')
+  const thumb = [...dialog.querySelectorAll("button")].find((b) => b.textContent.includes(label))
+  if (thumb) await act(async () => { thumb.click() })
+}
+
 describe("ProductCard — variant detail modal", () => {
-  it("opens the detail modal showing the variant's own photo when a chip is clicked", async () => {
+  it("opens the detail modal showing the variant's own photo when picked from the gallery", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     const dialog = container.querySelector('[role="dialog"]')
     expect(dialog).toBeTruthy()
@@ -51,18 +62,16 @@ describe("ProductCard — variant detail modal", () => {
     expect(dialog.textContent).toContain("A1")
   })
 
-  it("does not add to cart just from clicking the chip", async () => {
+  it("does not add to cart just from opening the detail modal", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     expect(readCart()).toEqual([])
   })
 
   it("adds to cart and closes the modal when the modal's add button is clicked", async () => {
     const { container, onAdded } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     const addBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Add to cart")
     await act(async () => { addBtn.click() })
@@ -75,8 +84,7 @@ describe("ProductCard — variant detail modal", () => {
 
   it("closes without adding when Close is clicked", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     const closeBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Close")
     await act(async () => { closeBtn.click() })
@@ -87,8 +95,7 @@ describe("ProductCard — variant detail modal", () => {
 
   it("disables the add button in the modal for a sold-out variant, but still shows details", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "B2")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "B2")
 
     const dialog = container.querySelector('[role="dialog"]')
     expect(dialog).toBeTruthy()
@@ -100,8 +107,7 @@ describe("ProductCard — variant detail modal", () => {
 describe("ProductCard — quantity in the detail modal", () => {
   it("defaults to qty 1 and adds that quantity to cart", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     const dialog = container.querySelector('[role="dialog"]')
     const qtyInput = dialog.querySelector('input[type="number"]')
@@ -115,8 +121,7 @@ describe("ProductCard — quantity in the detail modal", () => {
 
   it("increments and decrements via the +/- buttons", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     let dialog = container.querySelector('[role="dialog"]')
     const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
@@ -140,8 +145,7 @@ describe("ProductCard — quantity in the detail modal", () => {
     const { container } = await renderCard({
       product: baseProduct({ variants: [{ id: 3, label: "A1", stock_qty: 2, image_url: null }] }),
     })
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     let dialog = container.querySelector('[role="dialog"]')
     const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
@@ -159,8 +163,7 @@ describe("ProductCard — quantity in the detail modal", () => {
     const { container } = await renderCard({
       product: baseProduct({ variants: [{ id: 4, label: "A1", stock_qty: null, image_url: null }] }),
     })
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     const dialog = container.querySelector('[role="dialog"]')
     const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
@@ -172,8 +175,7 @@ describe("ProductCard — quantity in the detail modal", () => {
 
   it("resets quantity back to 1 when switching to a different variant via the gallery", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     let dialog = container.querySelector('[role="dialog"]')
     const plus = dialog.querySelector('button[aria-label="Increase quantity"]')
@@ -223,8 +225,7 @@ describe("ProductCard — full variant gallery", () => {
 
   it("the detail modal has a link back to the full gallery", async () => {
     const { container } = await renderCard()
-    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "A1")
-    await act(async () => { chip.click() })
+    await openVariantDetail(container, "A1")
 
     const viewAllBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "View all")
     await act(async () => { viewAllBtn.click() })
@@ -260,9 +261,9 @@ describe("ProductCard — full variant gallery", () => {
     const cover = container.querySelector('img[src="https://x/cover.jpg"]')
     await act(async () => { cover.click() })
 
-    const grid = container.querySelector('[role="dialog"] .columns-2')
+    const grid = container.querySelector('[role="dialog"] .grid-cols-2')
     expect(grid).toBeTruthy()
-    expect(grid.className).not.toContain("columns-8")
+    expect(grid.className).not.toContain("grid-cols-8")
   })
 
   it("uses a wide column layout for a large photocard-style sheet", async () => {
@@ -273,8 +274,8 @@ describe("ProductCard — full variant gallery", () => {
     const cover = container.querySelector('img[src="https://x/cover.jpg"]')
     await act(async () => { cover.click() })
 
-    const grid = container.querySelector('[role="dialog"] [class*="columns-3"]')
+    const grid = container.querySelector('[role="dialog"] [class*="grid-cols-3"]')
     expect(grid).toBeTruthy()
-    expect(grid.className).toContain("lg:columns-8")
+    expect(grid.className).toContain("lg:grid-cols-8")
   })
 })

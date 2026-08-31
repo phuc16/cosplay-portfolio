@@ -5,9 +5,13 @@ import { adminSaveVariants, adminUploadImage } from "../api/shop"
  * Variants are edited as a whole list and saved in one request, because a
  * photocard sheet is 40-odd codes entered at once.
  */
+// Older variants only ever had a single image_url; normalize every row to
+// an `images` array so the rest of the component has one shape to work with.
+const withImages = (v) => ({ ...v, images: v.images?.length ? v.images : (v.image_url ? [v.image_url] : []) })
+
 export default function AdminVariants({ product, onSaved }) {
   const [rows, setRows] = useState(
-    product.variants?.length ? product.variants : [{ label: "", stock_qty: "" }]
+    product.variants?.length ? product.variants.map(withImages) : [{ label: "", stock_qty: "", images: [] }]
   )
   const [bulk, setBulk] = useState("")
   const [error, setError] = useState("")
@@ -27,13 +31,13 @@ export default function AdminVariants({ product, onSaved }) {
   useEffect(() => {
     if (!awaitingResync.current) return
     awaitingResync.current = false
-    setRows(product.variants?.length ? product.variants : [{ label: "", stock_qty: "" }])
+    setRows(product.variants?.length ? product.variants.map(withImages) : [{ label: "", stock_qty: "", images: [] }])
   }, [product.variants])
 
   const update = (i, field, value) =>
     setRows(rows.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)))
 
-  const addRow = () => setRows([...rows, { label: "", stock_qty: "" }])
+  const addRow = () => setRows([...rows, { label: "", stock_qty: "", images: [] }])
   const removeRow = (i) => setRows(rows.filter((_, idx) => idx !== i))
 
   // Row order IS sort_order — save() sends `rows` in array order and
@@ -69,7 +73,7 @@ export default function AdminVariants({ product, onSaved }) {
             reader.readAsDataURL(file)
           })
           const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
-          uploaded.push({ label: stripExt(file.name), stock_qty: "", image_url: url })
+          uploaded.push({ label: stripExt(file.name), stock_qty: "", images: [url] })
         } catch (e) {
           setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
         }
@@ -83,28 +87,40 @@ export default function AdminVariants({ product, onSaved }) {
   // Each row's photo is uploaded on pick (same pattern as AdminProducts),
   // rather than deferred to save time — a photocard sheet is entered one
   // row at a time and the seller needs to see each thumbnail land before
-  // moving to the next code.
-  const pickImage = async (i, file) => {
+  // moving to the next code. Most rows carry exactly one photo, but a row
+  // can hold several (e.g. a preview sheet plus a close-up) — new uploads
+  // append to that row's gallery instead of replacing it.
+  const pickImages = async (i, files) => {
     setError("")
-    try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result).split(",")[1])
-        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-        reader.readAsDataURL(file)
-      })
-      const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
-      update(i, "image_url", url)
-    } catch (e) {
-      setError(e.response?.data?.message || e.message || "Tải ảnh lên thất bại")
+    for (const file of files) {
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result).split(",")[1])
+          reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
+          reader.readAsDataURL(file)
+        })
+        const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
+        setRows((prev) => prev.map((r, idx) => (
+          idx === i ? { ...r, images: [...(r.images || []), url] } : r
+        )))
+      } catch (e) {
+        setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
+      }
     }
+  }
+
+  const removeImage = (i, url) => {
+    setRows((prev) => prev.map((r, idx) => (
+      idx === i ? { ...r, images: (r.images || []).filter((u) => u !== url) } : r
+    )))
   }
 
   // "A1, A2, B1" or one code per line -> one row each.
   const applyBulk = () => {
     const labels = bulk.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
     if (!labels.length) return
-    setRows([...rows.filter((r) => r.label.trim()), ...labels.map((label) => ({ label, stock_qty: "" }))])
+    setRows([...rows.filter((r) => r.label.trim()), ...labels.map((label) => ({ label, stock_qty: "", images: [] }))])
     setBulk("")
   }
 
@@ -117,7 +133,7 @@ export default function AdminVariants({ product, onSaved }) {
         .map((r) => ({
           id: r.id,
           label: String(r.label).trim(),
-          image_url: r.image_url || null,
+          images: r.images || [],
           // Empty means unlimited, which the API expects as null rather than 0.
           stock_qty: r.stock_qty === "" || r.stock_qty === null ? null : Number(r.stock_qty),
         }))
@@ -172,51 +188,78 @@ export default function AdminVariants({ product, onSaved }) {
       </div>
 
       {rows.map((r, i) => (
-        <div key={r.id || i} className="flex gap-2 mb-2 items-center">
-          {r.image_url && (
-            <img src={r.image_url} alt="" className="w-9 h-9 object-cover rounded-lg shrink-0" />
-          )}
-          <div className="flex flex-col shrink-0">
-            <button
-              type="button"
-              onClick={() => moveRow(i, -1)}
-              disabled={i === 0}
-              aria-label={`Đưa lên trên: ${r.label || `dòng ${i + 1}`}`}
-              className="px-1 leading-none disabled:opacity-30"
-            >
-              ▲
-            </button>
-            <button
-              type="button"
-              onClick={() => moveRow(i, 1)}
-              disabled={i === rows.length - 1}
-              aria-label={`Đưa xuống dưới: ${r.label || `dòng ${i + 1}`}`}
-              className="px-1 leading-none disabled:opacity-30"
-            >
-              ▼
-            </button>
+        <div key={r.id || i} className="mb-2">
+          <div className="flex gap-2 items-center">
+            <div className="w-9 h-9 shrink-0">
+              {r.images?.[0] && (
+                <img src={r.images[0]} alt="" className="w-9 h-9 object-cover rounded-lg" />
+              )}
+            </div>
+            <div className="flex flex-col shrink-0">
+              <button
+                type="button"
+                onClick={() => moveRow(i, -1)}
+                disabled={i === 0}
+                aria-label={`Đưa lên trên: ${r.label || `dòng ${i + 1}`}`}
+                className="px-1 leading-none disabled:opacity-30"
+              >
+                ▲
+              </button>
+              <button
+                type="button"
+                onClick={() => moveRow(i, 1)}
+                disabled={i === rows.length - 1}
+                aria-label={`Đưa xuống dưới: ${r.label || `dòng ${i + 1}`}`}
+                className="px-1 leading-none disabled:opacity-30"
+              >
+                ▼
+              </button>
+            </div>
+            <input
+              value={r.label}
+              onChange={(e) => update(i, "label", e.target.value)}
+              placeholder="Mã (A1) hoặc size (M)"
+              className="flex-1 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <input
+              value={r.stock_qty ?? ""}
+              onChange={(e) => update(i, "stock_qty", e.target.value)}
+              placeholder="SL (trống = không giới hạn)"
+              inputMode="numeric"
+              className="w-48 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              aria-label={`Ảnh cho ${r.label || `dòng ${i + 1}`}`}
+              onChange={(e) => {
+                const files = [...(e.target.files || [])]
+                e.target.value = ""
+                if (files.length) pickImages(i, files)
+              }}
+              className="w-28 text-xs shrink-0"
+            />
+            <button type="button" onClick={() => removeRow(i)} className="px-2 opacity-70">✕</button>
           </div>
-          <input
-            value={r.label}
-            onChange={(e) => update(i, "label", e.target.value)}
-            placeholder="Mã (A1) hoặc size (M)"
-            className="flex-1 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          />
-          <input
-            value={r.stock_qty ?? ""}
-            onChange={(e) => update(i, "stock_qty", e.target.value)}
-            placeholder="SL (trống = không giới hạn)"
-            inputMode="numeric"
-            className="w-48 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          />
-          <input
-            type="file"
-            accept="image/*"
-            aria-label={`Ảnh cho ${r.label || `dòng ${i + 1}`}`}
-            onChange={(e) => e.target.files?.[0] && pickImage(i, e.target.files[0])}
-            className="w-28 text-xs shrink-0"
-          />
-          <button type="button" onClick={() => removeRow(i)} className="px-2 opacity-70">✕</button>
+
+          {r.images?.length > 1 && (
+            <div className="flex gap-2 flex-wrap mt-1 ml-8">
+              {r.images.map((url) => (
+                <div key={url} className="relative">
+                  <img src={url} alt="" className="w-9 h-9 object-cover rounded-lg" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i, url)}
+                    aria-label="Xóa ảnh"
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-black/70 text-white text-[10px] leading-none"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 

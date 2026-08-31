@@ -55,7 +55,7 @@ describe("AdminVariants — per-row image upload", () => {
     expect(img).toBeTruthy()
   })
 
-  it("includes the row's image_url when saving", async () => {
+  it("includes the row's images when saving", async () => {
     adminSaveVariants.mockResolvedValue({})
     const onSaved = vi.fn()
     const container = await renderVariants(
@@ -67,7 +67,7 @@ describe("AdminVariants — per-row image upload", () => {
     await act(async () => saveBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 
     expect(adminSaveVariants).toHaveBeenCalledWith(1, [
-      { id: 10, label: "A1", image_url: "https://x/a1.jpg", stock_qty: 12 },
+      { id: 10, label: "A1", images: ["https://x/a1.jpg"], stock_qty: 12 },
     ])
     expect(onSaved).toHaveBeenCalled()
   })
@@ -163,8 +163,8 @@ describe("AdminVariants — reordering rows", () => {
     await act(async () => saveBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 
     expect(adminSaveVariants).toHaveBeenCalledWith(1, [
-      { id: 11, label: "A2", image_url: null, stock_qty: 1 },
-      { id: 10, label: "A1", image_url: null, stock_qty: 1 },
+      { id: 11, label: "A2", images: [], stock_qty: 1 },
+      { id: 10, label: "A1", images: [], stock_qty: 1 },
     ])
   })
 
