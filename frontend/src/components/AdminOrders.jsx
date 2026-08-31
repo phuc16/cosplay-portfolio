@@ -79,6 +79,7 @@ export default function AdminOrders() {
   const [error, setError] = useState("")
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scanError, setScanError] = useState("")
+  const [refreshing, setRefreshing] = useState(false)
 
   const [selected, setSelected] = useState(() => new Set())
   const [bulkResults, setBulkResults] = useState(null)
@@ -87,6 +88,16 @@ export default function AdminOrders() {
 
   const filters = { status: filter, collectionId, dateFrom, dateTo, search }
   const reload = () => adminListOrders(buildFilterParams(filters)).then(setOrders)
+  const refresh = async () => {
+    setRefreshing(true)
+    try {
+      await reload()
+    } catch {
+      setOrders([])
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   useEffect(() => {
     adminListCollections().then(setCollections).catch(() => setCollections([]))
@@ -259,6 +270,11 @@ export default function AdminOrders() {
           className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">
           Quét QR
         </button>
+
+        <button type="button" onClick={refresh} disabled={refreshing}
+          className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)] disabled:opacity-50">
+          {refreshing ? "Đang tải..." : "Làm mới"}
+        </button>
       </div>
 
       {orders.length > 0 && (
@@ -350,6 +366,9 @@ export default function AdminOrders() {
               <p className="opacity-70">{detail.email}</p>
               {detail.fulfillment_method === "ship" && <p className="opacity-70">{detail.address_raw}</p>}
               {detail.note && <p className="mt-1 italic opacity-70">“{detail.note}”</p>}
+              {detail.status === "cancelled" && detail.cancel_reason && (
+                <p className="mt-1 text-red-500">Lý do hủy: {detail.cancel_reason}</p>
+              )}
 
               <p className="mt-2">
                 Thanh toán: <strong>{labelFor(PAYMENT_METHOD_LABELS, detail.payment_method)}</strong>

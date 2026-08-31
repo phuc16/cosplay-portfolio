@@ -444,6 +444,51 @@ describe("AdminOrders — semantic status/action styling (Admin UI plan)", () =>
     expect(container.textContent).toContain("Thanh toán:")
   })
 
+  it("shows the cancel reason in the detail panel for a cancelled order", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, status: "cancelled", allowed_transitions: [] })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, status: "cancelled", allowed_transitions: [], email: "a@b.com", items: [],
+      cancel_reason: "Hết hàng thực tế",
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("Lý do hủy: Hết hàng thực tế")
+  })
+
+  it("does not show a cancel-reason line for a cancelled order with none recorded", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, status: "cancelled", allowed_transitions: [] })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, status: "cancelled", allowed_transitions: [], email: "a@b.com", items: [], cancel_reason: null,
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).not.toContain("Lý do hủy")
+  })
+
+  it("refetches the order list when 'Làm mới' is clicked", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(adminListOrders).toHaveBeenCalledTimes(1)
+
+    const refreshBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Làm mới")
+    await act(async () => { refreshBtn.click() })
+    await flush()
+
+    expect(adminListOrders).toHaveBeenCalledTimes(2)
+  })
+
   it("renders the status filter options with Vietnamese text but raw-enum values", async () => {
     adminListOrders.mockResolvedValue([order()])
     const { container } = await renderAdminOrders()
