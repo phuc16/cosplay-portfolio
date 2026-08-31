@@ -194,7 +194,7 @@ module.exports = function adminCatalogRoutes() {
     // message rather than leaking internals.
     let processed
     try {
-      processed = await processShopImage(buffer)
+      processed = await processShopImage(buffer, { watermark: true })
     } catch (err) {
       return bad(res, err instanceof InvalidImageError ? err.message : "Ảnh không hợp lệ")
     }
