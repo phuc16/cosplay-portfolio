@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import {
   adminGetCollection, adminCreateProduct, adminUpdateProduct, adminDeleteProduct, adminUploadImage,
+  adminReorderProducts,
 } from "../api/shop"
 import AdminVariants from "./AdminVariants"
 import { formatVnd } from "../utils/money"
@@ -13,6 +14,8 @@ export default function AdminProducts({ collection }) {
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState("")
   const [expandedProductId, setExpandedProductId] = useState(null)
+  const [draggedId, setDraggedId] = useState(null)
+  const [reorderPending, setReorderPending] = useState(false)
 
   // Admin-scoped route: no status filter, so draft/archived collections'
   // products are reachable here too (unlike the public storefront route).
@@ -75,6 +78,55 @@ export default function AdminProducts({ collection }) {
     } catch (e) {
       setError(e.response?.data?.message || "Xóa sản phẩm thất bại")
     }
+  }
+
+  const handleDragStart = (e, p) => {
+    setDraggedId(p.id)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", String(p.id))
+    const row = e.target.closest("[data-product-row]")
+    if (row) row.classList.add("opacity-50", "ring-2", "ring-[var(--brand)]")
+  }
+
+  const handleDragEnd = (e) => {
+    const row = e.target.closest("[data-product-row]")
+    if (row) row.classList.remove("opacity-50", "ring-2", "ring-[var(--brand)]")
+    setDraggedId(null)
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = "move"
+  }
+
+  const handleDragEnter = (e, p) => {
+    if (draggedId && p.id !== draggedId) e.currentTarget.classList.add("ring-2", "ring-[var(--brand)]")
+  }
+
+  const handleDragLeave = (e) => {
+    e.currentTarget.classList.remove("ring-2", "ring-[var(--brand)]")
+  }
+
+  const handleDrop = (e, target) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.currentTarget.classList.remove("ring-2", "ring-[var(--brand)]")
+    const fromId = draggedId
+    setDraggedId(null)
+    if (fromId == null || fromId === target.id) return
+    const fromIdx = products.findIndex((x) => x.id === fromId)
+    const toIdx = products.findIndex((x) => x.id === target.id)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    const next = [...products]
+    const [moved] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    setProducts(next)
+    setReorderPending(true)
+    adminReorderProducts(collection.id, next.map((x) => x.id))
+      .catch(() => reload())
+      .finally(() => setReorderPending(false))
   }
 
   const form = (
@@ -149,12 +201,33 @@ export default function AdminProducts({ collection }) {
         <p className="text-sm opacity-70 mb-3">Chưa có sản phẩm nào.</p>
       )}
 
+      {products.length > 1 && (
+        <p className="text-xs opacity-60 mb-2">Kéo thả sản phẩm để đổi thứ tự.{reorderPending ? " Đang lưu thứ tự..." : ""}</p>
+      )}
+
       {products.map((p) => (
-        <div key={p.id} className="mb-4 p-3 rounded-xl border border-[var(--border-brand)]">
+        <div
+          key={p.id}
+          data-product-row
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, p)}
+          onDragEnter={(e) => handleDragEnter(e, p)}
+          onDragLeave={handleDragLeave}
+          className="mb-4 p-3 rounded-xl border border-[var(--border-brand)]"
+        >
           <div className="flex justify-between items-start gap-2">
-            <div>
-              <p className="font-medium">{p.name}</p>
-              <p className="text-sm opacity-70">{formatVnd(p.price)}</p>
+            <div
+              draggable
+              onDragStart={(e) => handleDragStart(e, p)}
+              onDragEnd={handleDragEnd}
+              className="flex items-start gap-2 min-w-0 cursor-grab active:cursor-grabbing"
+              title="Kéo để đổi thứ tự"
+            >
+              <span className="shrink-0 opacity-50 select-none leading-6" aria-hidden="true">⋮⋮</span>
+              <div>
+                <p className="font-medium">{p.name}</p>
+                <p className="text-sm opacity-70">{formatVnd(p.price)}</p>
+              </div>
             </div>
             <div className="flex gap-2 shrink-0">
               <button

@@ -294,6 +294,49 @@ describe("products and variants", () => {
   })
 })
 
+describe("PUT /api/admin/collections/:id/products/reorder", () => {
+  it("persists the new product order", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const p1 = await repo.createProduct({ collection_id: cid, name: "A", price: 1000 })
+    const p2 = await repo.createProduct({ collection_id: cid, name: "B", price: 1000 })
+    const p3 = await repo.createProduct({ collection_id: cid, name: "C", price: 1000 })
+
+    const res = await authed(request(app).put(`/api/admin/collections/${cid}/products/reorder`))
+      .send({ product_ids: [p3, p1, p2] })
+
+    expect(res.status).toBe(200)
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.map((p) => p.id)).toEqual([p3, p1, p2])
+  })
+
+  it("does not let a reorder request touch another collection's products", async () => {
+    const cid1 = await repo.createCollection({ title: "Drop 1", status: "active" })
+    const cid2 = await repo.createCollection({ title: "Drop 2", status: "active" })
+    const p1 = await repo.createProduct({ collection_id: cid1, name: "A", price: 1000 })
+    const foreign = await repo.createProduct({ collection_id: cid2, name: "Foreign", price: 1000 })
+
+    const res = await authed(request(app).put(`/api/admin/collections/${cid1}/products/reorder`))
+      .send({ product_ids: [foreign, p1] })
+
+    expect(res.status).toBe(200)
+    const detail2 = await repo.getCollectionDetailById(cid2)
+    expect(detail2.products.map((p) => p.id)).toEqual([foreign])
+  })
+
+  it("400s on a missing or empty product_ids", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).put(`/api/admin/collections/${cid}/products/reorder`)).send({})
+    expect(res.status).toBe(400)
+  })
+
+  it("400s on a non-integer id in product_ids", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).put(`/api/admin/collections/${cid}/products/reorder`))
+      .send({ product_ids: ["not-a-number"] })
+    expect(res.status).toBe(400)
+  })
+})
+
 describe("PUT /api/admin/products/:id", () => {
   it("updates a product and persists the change", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })

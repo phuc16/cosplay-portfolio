@@ -17,6 +17,7 @@ export default function AdminVariants({ product, onSaved }) {
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [batchUploading, setBatchUploading] = useState(false)
+  const [draggedIdx, setDraggedIdx] = useState(null)
 
   // This component is keyed by the parent on the stable product.id, so it is
   // NOT remounted after a save -- `rows` would otherwise keep holding
@@ -49,6 +50,32 @@ export default function AdminVariants({ product, onSaved }) {
     const next = [...rows]
     ;[next[i], next[j]] = [next[j], next[i]]
     setRows(next)
+  }
+
+  // Drag-and-drop reorders `rows` by index, same as moveRow — nothing is
+  // persisted until "Lưu phân loại" is pressed, matching the up/down arrows.
+  const handleDragStart = (e, i) => {
+    setDraggedIdx(i)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", String(i))
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+  }
+
+  const handleDrop = (e, targetIdx) => {
+    e.preventDefault()
+    const fromIdx = draggedIdx
+    setDraggedIdx(null)
+    if (fromIdx == null || fromIdx === targetIdx) return
+    setRows((prev) => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(targetIdx, 0, moved)
+      return next
+    })
   }
 
   const stripExt = (filename) => filename.replace(/\.[^./\\]+$/, "").trim()
@@ -188,8 +215,22 @@ export default function AdminVariants({ product, onSaved }) {
       </div>
 
       {rows.map((r, i) => (
-        <div key={r.id || i} className="mb-2">
+        <div
+          key={r.id || i}
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, i)}
+          className="mb-2"
+        >
           <div className="flex gap-2 items-center">
+            <span
+              draggable
+              onDragStart={(e) => handleDragStart(e, i)}
+              className="shrink-0 opacity-50 select-none cursor-grab active:cursor-grabbing px-0.5"
+              title="Kéo để đổi thứ tự"
+              aria-hidden="true"
+            >
+              ⋮⋮
+            </span>
             <div className="w-9 h-9 shrink-0">
               {r.images?.[0] && (
                 <img src={r.images[0]} alt="" className="w-9 h-9 object-cover rounded-lg" />
@@ -244,7 +285,7 @@ export default function AdminVariants({ product, onSaved }) {
           </div>
 
           {r.images?.length > 1 && (
-            <div className="flex gap-2 flex-wrap mt-1 ml-8">
+            <div className="flex gap-2 flex-wrap mt-1 ml-12">
               {r.images.map((url) => (
                 <div key={url} className="relative">
                   <img src={url} alt="" className="w-9 h-9 object-cover rounded-lg" />

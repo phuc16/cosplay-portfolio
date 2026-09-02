@@ -48,6 +48,9 @@ export const adminUpdateProduct = (id, data) =>
 export const adminDeleteProduct = (id) =>
   api.delete(`/api/admin/products/${id}`).then((r) => r.data)
 
+export const adminReorderProducts = (collectionId, productIds) =>
+  api.put(`/api/admin/collections/${collectionId}/products/reorder`, { product_ids: productIds }).then((r) => r.data)
+
 export const adminSaveVariants = (productId, variants) =>
   api.put(`/api/admin/products/${productId}/variants`, { variants }).then((r) => r.data)
 

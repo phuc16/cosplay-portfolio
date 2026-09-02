@@ -168,6 +168,33 @@ describe("AdminVariants — reordering rows", () => {
     ])
   })
 
+  it("reorders rows by dragging the drag handle onto another row", async () => {
+    const container = await renderVariants(
+      baseProduct({
+        variants: [
+          { id: 10, label: "A1", stock_qty: 1, image_url: null },
+          { id: 11, label: "A2", stock_qty: 1, image_url: null },
+          { id: 12, label: "A3", stock_qty: 1, image_url: null },
+        ],
+      })
+    )
+
+    const handles = [...container.querySelectorAll('[draggable="true"]')]
+    const rows = [...container.querySelectorAll('input[placeholder="Mã (A1) hoặc size (M)"]')]
+      .map((input) => input.closest(".mb-2"))
+
+    const dt = { setData: () => {}, getData: () => {} }
+    await act(async () => {
+      handles[0].dispatchEvent(Object.assign(new Event("dragstart", { bubbles: true }), { dataTransfer: dt }))
+    })
+    await act(async () => {
+      rows[2].dispatchEvent(Object.assign(new Event("drop", { bubbles: true, cancelable: true }), { dataTransfer: dt }))
+    })
+
+    const labelInputs = [...container.querySelectorAll('input[placeholder="Mã (A1) hoặc size (M)"]')]
+    expect(labelInputs.map((i) => i.value)).toEqual(["A2", "A3", "A1"])
+  })
+
   it("disables the up arrow on the first row and the down arrow on the last row", async () => {
     const container = await renderVariants(
       baseProduct({

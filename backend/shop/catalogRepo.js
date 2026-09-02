@@ -300,6 +300,21 @@ async function deleteProduct(id) {
 }
 
 /**
+ * Persist a drag-and-drop reorder of a collection's products. Scoped by
+ * `collection_id` in the WHERE (not just `id IN (...)`) so a stale/forged
+ * id list can never touch another collection's rows.
+ */
+async function reorderProducts(collectionId, productIds) {
+  const cases = productIds.map(() => "WHEN ? THEN ?").join(" ")
+  const caseParams = productIds.flatMap((id, index) => [id, index])
+  const idPlaceholders = productIds.map(() => "?").join(",")
+  await db.query(
+    `UPDATE products SET sort_order = CASE id ${cases} END WHERE collection_id = ? AND id IN (${idPlaceholders})`,
+    [...caseParams, collectionId, ...productIds]
+  )
+}
+
+/**
  * Make the product's variants match `variants` exactly: update those carrying
  * an id, insert those without, delete any existing row not in the list.
  * stock_qty === null is preserved as NULL (unlimited), not coerced to 0.
@@ -406,6 +421,7 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  reorderProducts,
   replaceVariants,
   VariantInUseError,
   variantsWithLiveOrders,

@@ -138,6 +138,21 @@ module.exports = function adminCatalogRoutes() {
     } catch (err) { oops(res, err, "Lỗi tạo sản phẩm") }
   })
 
+  router.put("/collections/:id/products/reorder", async (req, res) => {
+    try {
+      const { product_ids: productIds } = req.body
+      if (!Array.isArray(productIds) || productIds.length === 0) {
+        return bad(res, "Cần mảng product_ids khác rỗng")
+      }
+      if (productIds.some((id) => !Number.isInteger(id))) {
+        return bad(res, "product_ids phải là mảng số nguyên")
+      }
+      await repo.reorderProducts(Number(req.params.id), productIds)
+      await cache.invalidate()
+      res.json({ ok: true })
+    } catch (err) { oops(res, err, "Lỗi đổi thứ tự sản phẩm") }
+  })
+
   router.put("/products/:id", async (req, res) => {
     try {
       const invalid = validateProduct(req.body)
