@@ -1,18 +1,30 @@
 import { useEffect, useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import axios from "axios"
 import { fetchCollections } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
+import { getLocalized } from "../utils/localize"
 import ShopHeader from "../components/shop/ShopHeader"
 
 export default function Shop() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
+  const navigate = useNavigate()
   const [collections, setCollections] = useState(null)
+  // Same brand name shown in the portfolio page's own footer — fetched
+  // here too since the shop is a separate page tree with no shared layout.
+  const [artistName, setArtistName] = useState("")
 
   useEffect(() => {
     fetchCollections()
       .then(setCollections)
       .catch(() => setCollections([]))
   }, [])
+
+  useEffect(() => {
+    axios.get("/api/settings")
+      .then((r) => setArtistName(getLocalized(r.data?.artistName, lang)))
+      .catch(() => {})
+  }, [lang])
 
   return (
     <>
@@ -50,6 +62,17 @@ export default function Shop() {
         ))}
       </div>
       </main>
+
+      <footer className="border-t border-[var(--border-brand)] mt-10">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center text-sm opacity-70">
+          <span>© {new Date().getFullYear()} {artistName}. {lang === "vi" ? "Bảo lưu mọi quyền." : "All rights reserved."}</span>
+          <span className="flex items-center gap-3">
+            <span className="whitespace-nowrap">Made with ♥</span>
+            <span aria-hidden="true">·</span>
+            <button type="button" onClick={() => navigate("/admin")} className="hover:text-[var(--text-link)]">Admin</button>
+          </span>
+        </div>
+      </footer>
     </>
   )
 }
