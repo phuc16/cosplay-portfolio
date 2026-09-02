@@ -123,45 +123,47 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
           onClick={() => setView(null)}
         >
           <div
-            className="w-full max-w-4xl max-h-[85vh] overflow-y-auto rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] p-4 sm:p-5"
+            className="w-full max-w-4xl max-h-[85vh] rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-[var(--border-brand)] shrink-0">
               <h3 className="font-semibold text-lg">{product.name}</h3>
               <button
                 type="button"
                 onClick={() => setView(null)}
-                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] text-xs"
+                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] text-xs shrink-0"
               >
                 {t("shopVariantClose")}
               </button>
             </div>
 
-            <div className={"grid " + galleryGridClasses(product.variants.length) + " gap-3"}>
-              {product.variants.map((v) => {
-                const img = variantImages(v)[0] || cover
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => openDetail(v)}
-                    title={stockLabel(v, t)}
-                    className="group relative block w-full rounded-xl overflow-hidden border border-[var(--border-brand)] transition hover:border-[var(--brand)] hover:shadow-lg"
-                  >
-                    {img && <img src={img} alt={v.label} className="w-full aspect-square object-cover block" />}
-                    <div className="absolute inset-x-0 bottom-0 pt-4 pb-1.5 px-1.5 bg-gradient-to-t from-black/80 to-transparent">
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[var(--brand)] text-white shadow-sm">
-                        {v.label}
-                      </span>
-                    </div>
-                    {isSoldOut(v) && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] text-white">
-                        {t("shopSoldOut")}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+            <div className="overflow-y-auto p-4 sm:p-5 pt-3">
+              <div className={"grid " + galleryGridClasses(product.variants.length) + " gap-3"}>
+                {product.variants.map((v) => {
+                  const img = variantImages(v)[0] || cover
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => openDetail(v)}
+                      title={stockLabel(v, t)}
+                      className="group relative block w-full rounded-xl overflow-hidden border border-[var(--border-brand)] transition hover:border-[var(--brand)] hover:shadow-lg"
+                    >
+                      {img && <img src={img} alt={v.label} className="w-full aspect-square object-cover block" />}
+                      <div className="absolute inset-x-0 bottom-0 pt-4 pb-1.5 px-1.5 bg-gradient-to-t from-black/80 to-transparent">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[var(--brand)] text-white shadow-sm">
+                          {v.label}
+                        </span>
+                      </div>
+                      {isSoldOut(v) && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] text-white">
+                          {t("shopSoldOut")}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
