@@ -4,7 +4,7 @@ const { formatOrderCode } = require("./../orders/domain")
 const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
-  "payment_note", "shop_name",
+  "payment_note", "shop_name", "receiver_info",
 ]
 
 const SHOP_NAME = process.env.SHOP_NAME || "Shop"
@@ -46,6 +46,31 @@ const formatVnd = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`
 // Matches --brand in frontend/src/index.css, so mail visually matches the site.
 const BRAND = "#6BBF59"
 
+/**
+ * "Thông tin nhận hàng" block (name/phone/address), same pattern as
+ * Shopee's order confirmation — lets the buyer catch a typo'd phone or
+ * address right away instead of only finding out when it fails to deliver.
+ * Address is omitted for a pickup order (orderRepo nulls address_raw for
+ * those regardless of what was submitted).
+ */
+function receiverInfoHtml(order) {
+  const rows = [
+    ["Tên người nhận", order.buyer_name],
+    ["Số điện thoại", order.phone],
+  ]
+  if (order.fulfillment_method === "ship" && order.address_raw) {
+    rows.push(["Địa chỉ nhận hàng", order.address_raw])
+  }
+  const cells = rows.map(([label, value]) => `
+    <tr>
+      <td style="padding:4px 12px 4px 0;font-size:13px;color:#888;white-space:nowrap;vertical-align:top">${escapeHtml(label)}</td>
+      <td style="padding:4px 0;font-size:14px">${escapeHtml(value)}</td>
+    </tr>`).join("")
+  return `
+    <p style="font-weight:700;font-size:14px;margin:16px 0 6px">Thông tin nhận hàng</p>
+    <table style="width:100%;border-collapse:collapse">${cells}</table>`
+}
+
 function itemsHtml(items = []) {
   const rows = items.map((i) => `
     <tr>
@@ -80,6 +105,7 @@ function buildVars(order) {
     tracking_code: escapeHtml(order.tracking_code || ""),
     payment_note: escapeHtml(order.payment_note || ""),
     shop_name: escapeHtml(SHOP_NAME),
+    receiver_info: receiverInfoHtml(order),
   }
 }
 
@@ -103,12 +129,16 @@ function validatePlaceholders(text) {
 
 // Header bar + card, with the "view order" link as a footer — same shape
 // for every email so the seller's mail always reads as one consistent brand.
+// The order code line lives here (not per-template) so every lifecycle
+// email — order placed, payment confirmed, shipped, cancelled, and any
+// future one — shows it the same way without each template repeating it.
 const wrap = (inner) => `
 <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#fff">
   <div style="background:${BRAND};padding:18px 24px;border-radius:12px 12px 0 0">
     <span style="color:#fff;font-size:17px;font-weight:700">{{shop_name}}</span>
   </div>
   <div style="padding:24px;border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;color:#222;font-size:14px;line-height:1.6">
+    <p style="margin:0 0 14px;font-size:13px;color:#888">Mã đơn hàng: <strong style="color:#222">{{order_id}}</strong></p>
     ${inner}
     <p style="margin:20px 0 0;font-size:14px">Trân trọng,<br/>{{shop_name}}</p>
     <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#999">
@@ -119,13 +149,15 @@ const wrap = (inner) => `
 
 const DEFAULT_TEMPLATES = {
   order_placed: {
-    subject: "Đã nhận đơn hàng #{{order_id}}",
+    subject: "Đơn #{{order_id}} đang chờ thanh toán",
     body_html: wrap(`
-      <p style="margin:0 0 12px">Cảm ơn <strong>{{buyer_name}}</strong> đã đặt hàng! Vui lòng chuyển khoản và tải ảnh chuyển khoản lên trang đơn hàng để mình xác nhận nhé.</p>
+      <p style="margin:0 0 12px">Cảm ơn <strong>{{buyer_name}}</strong> đã đặt hàng! <strong>Đơn hàng đang chờ thanh toán</strong>.</p>
+      <p style="margin:0 0 12px">Vui lòng chuyển khoản rồi tải ảnh chuyển khoản lên trang đơn hàng — đơn sẽ chuyển sang <strong>Chờ xác nhận</strong> ngay khi bạn gửi ảnh. Gửi nhầm ảnh cũng không sao, bạn có thể thay ảnh khác sau đó.</p>
       {{items}}
       ${TOTAL_ROW}
       <p style="font-size:12px;color:#888;margin:12px 0 0">Phí ship trả cho shipper khi nhận hàng.</p>
-      <p style="font-size:13px;margin:8px 0 0">{{payment_note}}</p>`),
+      <p style="font-size:13px;margin:8px 0 0">{{payment_note}}</p>
+      {{receiver_info}}`),
   },
   payment_confirmed: {
     subject: "Đã xác nhận thanh toán đơn #{{order_id}}",

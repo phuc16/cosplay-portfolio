@@ -7,6 +7,7 @@ import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import redis from "../redis.js"
 import settings from "../shop/payments/settingsRepo.js"
+import { formatOrderCode } from "../shop/orders/domain.js"
 import { resetTables } from "./helpers/db.js"
 
 // GET /api/orders/:token now requires either an admin session or a
@@ -308,22 +309,48 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.expires_at).toBeNull()
   })
 
-  it("allowlist regression: expires_at is now present and order_token, request_key, stock_released_at are still absent or as before", async () => {
+  it("allowlist regression: expires_at, buyer_name, phone, address_raw are present; order_token stays as before; request_key/stock_released_at/note/email still never appear", async () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
 
     const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).toHaveProperty("expires_at")
     // order_token IS present on this response by design (the buyer already
-    // holds it — it's in the URL they just requested), but nothing this
-    // phase adds may widen that: these fields must still never appear.
+    // holds it — it's in the URL they just requested).
+    // buyer_name/phone/address_raw were deliberately kept off this response
+    // by an earlier privacy default; showing a "Thông tin nhận hàng" block
+    // (matching Shopee's order confirmation) is a later, explicit decision
+    // to trade some of that safety for letting a buyer catch a typo'd
+    // address/phone — this is not a regression.
+    expect(res.body.buyer_name).toBe("Nguyễn Văn A")
+    expect(res.body.phone).toBe("0900000000")
+    expect(res.body.address_raw).toBe("1 ABC, Q1, TP.HCM")
+    // email is still never exposed here — the buyer already has it (they
+    // typed it at checkout), so there's nothing for this page to confirm,
+    // only more PII to leak if the link is ever forwarded.
     expect(res.body).not.toHaveProperty("request_key")
     expect(res.body).not.toHaveProperty("stock_released_at")
     expect(res.body).not.toHaveProperty("note")
-    expect(res.body).not.toHaveProperty("buyer_name")
-    expect(res.body).not.toHaveProperty("phone")
     expect(res.body).not.toHaveProperty("email")
-    expect(res.body).not.toHaveProperty("address_raw")
+  })
+
+  it("includes the human-readable order_code shown everywhere else (admin, emails)", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
+    const stored = await orders.getOrderById(res.body.id)
+    expect(res.body.order_code).toBe(formatOrderCode(stored.id, stored.created_at))
+  })
+
+  it("returns a null address_raw for a pickup order (no shipping address to show)", async () => {
+    const v = await seed(5, { allow_pickup: true })
+    const created = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", payment_method: "bank" }))
+    expect(created.status).toBe(201)
+
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
+    expect(res.body.address_raw).toBeNull()
   })
 
   it("404s an unknown token", async () => {

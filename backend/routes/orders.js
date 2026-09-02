@@ -8,6 +8,7 @@ const emailQueue = require("../shop/email/queue")
 const qr = require("../shop/orders/qr")
 const db = require("../db")
 const { orderAccess, verifyPin, issueOrderSessionToken } = require("../shop/orders/orderAccess")
+const { formatOrderCode } = require("../shop/orders/domain")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 const FULFILLMENT = ["ship", "pickup"]
@@ -47,6 +48,14 @@ function toPublicOrder(order) {
     // boundary as the rest of this response, which already requires the
     // order_token to reach.
     payment_proof_url,
+    // Receiver info, so the buyer can double-check who/where this ships to
+    // (same "Thông tin nhận hàng" pattern as Shopee's order confirmation) —
+    // an earlier phase deliberately kept these off this response as a
+    // privacy default; showing them is now an explicit, later decision, not
+    // an oversight. The order page's only protection is still the
+    // unguessable token in the URL, so this does trade some safety for a
+    // buyer being able to catch a typo'd address/phone before it ships.
+    buyer_name, phone, address_raw,
   } = order
   // The code is only meaningful once the order is actually paid for — an
   // unpaid pending order (or one that got cancelled after confirming) has
@@ -60,6 +69,11 @@ function toPublicOrder(order) {
     pickup_location, pickup_note, expires_at, pickup_code: paidPickupCode,
     has_payment_proof: Boolean(payment_proof_url),
     payment_proof_url: payment_proof_url || null,
+    buyer_name, phone, address_raw: address_raw || null,
+    // The human-readable code shown everywhere else (admin, emails) — the
+    // order page never surfaced it before, leaving a buyer with no code to
+    // reference when contacting support, only the opaque URL token.
+    order_code: formatOrderCode(id, created_at),
   }
 }
 

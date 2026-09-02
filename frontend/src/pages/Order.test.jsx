@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
+import axios from "axios"
 import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
 
@@ -19,6 +20,11 @@ vi.mock("../api/shop", () => ({
   fetchOrderQrBlob: (...args) => fetchOrderQrBlob(...args),
 }))
 
+vi.mock("axios", async (importOriginal) => {
+  const actual = await importOriginal()
+  return { default: { ...actual.default, post: vi.fn() } }
+})
+
 // jsdom has no createObjectURL/revokeObjectURL; useBlobUrl calls both.
 globalThis.URL.createObjectURL = vi.fn(() => "blob:mock-qr")
 globalThis.URL.revokeObjectURL = vi.fn()
@@ -34,6 +40,8 @@ function baseOrder(over = {}) {
     fulfillment_method: "ship", tracking_code: null, created_at: new Date().toISOString(),
     items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1 }],
     pickup_location: null, pickup_note: null, has_payment_proof: false, payment_proof_url: null,
+    buyer_name: "Nguyễn Văn A", phone: "0900000000", address_raw: "1 ABC, Q1, TP.HCM",
+    order_code: "2608145VR0F1LR",
     ...over,
   }
 }
@@ -65,7 +73,9 @@ beforeEach(() => {
   verifyOrderPin.mockReset()
   fetchOrderQrBlob.mockReset()
   fetchOrderQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
+  axios.post.mockReset()
   sessionStorage.clear()
+  localStorage.clear()
 })
 
 function futureIso(hours) {
@@ -75,6 +85,62 @@ function futureIso(hours) {
 function pastIso(hours) {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
 }
+
+describe("Order — order code", () => {
+  it("shows the human-readable order code near the top of the page", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ order_code: "2609015VR0F1LR" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Order code")
+    expect(container.textContent).toContain("2609015VR0F1LR")
+  })
+})
+
+describe("Order — tracking code", () => {
+  it("labels the tracking code as a ViettelPost code, not just a bare number", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "shipped", tracking_code: "151045353461" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("ViettelPost tracking code")
+    expect(container.textContent).toContain("#151045353461")
+  })
+
+  it("shows no tracking label when there is no tracking code yet", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed", tracking_code: null }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("ViettelPost tracking code")
+  })
+})
+
+describe("Order — receiver info", () => {
+  it("shows the buyer's name, phone, and address for a ship order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      fulfillment_method: "ship", buyer_name: "Trần Thị B", phone: "0909999999", address_raw: "10 Điện Biên Phủ, Q1",
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Trần Thị B")
+    expect(container.textContent).toContain("0909999999")
+    expect(container.textContent).toContain("10 Điện Biên Phủ, Q1")
+  })
+
+  it("shows name and phone but no address line for a pickup order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      fulfillment_method: "pickup", buyer_name: "Trần Thị B", phone: "0909999999", address_raw: null,
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Trần Thị B")
+    expect(container.textContent).toContain("0909999999")
+    expect(container.textContent).not.toContain("Address:")
+  })
+})
 
 describe("Order pickup info", () => {
   it("shows pickup location and note for a pickup order", async () => {
@@ -215,6 +281,71 @@ describe("Order — payment deadline (Phase 6)", () => {
   })
 })
 
+describe("Order — payment instructions/deadline are only for the pre-proof phase", () => {
+  it("shows the deadline and bank/QR instructions before proof is submitted", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3), has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Payment deadline:")
+    expect(container.querySelector('input[type="file"]')).toBeTruthy()
+  })
+
+  it("hides the deadline and bank/QR instructions once proof has been submitted, even with a future expires_at", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", expires_at: futureIso(3), has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Payment deadline:")
+    expect(container.textContent).not.toContain("Payments are checked manually by the seller")
+  })
+
+  it("shows a note that the deadline no longer applies once awaiting confirmation", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", expires_at: futureIso(3), has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("We've received your payment screenshot")
+  })
+
+  it("never shows the awaiting-confirmation note for a COD order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "cod", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("We've received your payment screenshot")
+  })
+
+  it("lets the buyer re-open the bank/QR details on demand while awaiting confirmation, without reviving the deadline", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", expires_at: futureIso(3), has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+    expect(container.textContent).not.toContain("Bank transfer")
+
+    const showBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Need to pay again? View payment details")
+    await act(async () => showBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(container.textContent).toContain("Bank transfer")
+    expect(container.textContent).not.toContain("Payment deadline:")
+    const hideBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Hide payment details")
+    expect(hideBtn).toBeTruthy()
+
+    await act(async () => hideBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    expect([...container.querySelectorAll("button")].find((b) => b.textContent === "Need to pay again? View payment details")).toBeTruthy()
+  })
+})
+
 describe("Order — Vietnamese countdown copy", () => {
   afterEach(() => {
     localStorage.removeItem("lang")
@@ -266,6 +397,123 @@ describe("Order — semantic status colour (Admin UI plan)", () => {
   })
 })
 
+describe("Order — awaiting-payment vs awaiting-confirmation status text", () => {
+  it("shows 'awaiting your payment' for a pending prepaid order with no proof yet", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Awaiting payment")
+    expect(container.textContent).not.toContain("Awaiting confirmation")
+  })
+
+  it("shows 'awaiting payment confirmation' once proof has been submitted, from has_payment_proof", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Awaiting confirmation")
+    expect(container.textContent).not.toContain("Awaiting payment")
+  })
+
+  it("switches from 'awaiting your payment' to 'awaiting payment confirmation' right after a successful submit, with no refetch", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    uploadPaymentProof.mockResolvedValue({ url: "https://x/proof.jpg" })
+
+    const container = await renderOrder()
+    expect(container.textContent).toContain("Awaiting payment")
+    fetchOrder.mockClear()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["x"], "proof.jpg", { type: "image/jpeg" })
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+    const submitBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Submit")
+    await act(async () => submitBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Awaiting confirmation")
+    expect(fetchOrder).not.toHaveBeenCalled()
+  })
+
+  it("never shows 'awaiting your payment' for a COD order (no payment step to wait on)", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "cod", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Awaiting payment")
+  })
+})
+
+describe("Order — page heading reserves 'Order placed' for a confirmed order", () => {
+  it("shows 'Your order is awaiting payment' while pending with no proof yet, on a prepaid order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.querySelector("h1").textContent).toBe("Your order is awaiting payment")
+  })
+
+  it("shows 'Order received' (not 'Order placed' or the awaiting-payment title) once proof has been submitted", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.querySelector("h1").textContent).toBe("Order received, awaiting confirmation")
+  })
+
+  it("shows 'Order received' (not the awaiting-payment title) for a pending COD order, which has no payment step", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "cod", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.querySelector("h1").textContent).toBe("Order received, awaiting confirmation")
+  })
+
+  it("shows 'Order placed' once the seller has confirmed it", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+
+    const container = await renderOrder()
+
+    expect(container.querySelector("h1").textContent).toBe("Order placed successfully")
+  })
+
+  it("shows a distinct title once the order has shipped", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "shipped" }))
+
+    const container = await renderOrder()
+
+    expect(container.querySelector("h1").textContent).toBe("Your order is on its way")
+  })
+
+  it("shows a distinct title once the order is completed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "completed" }))
+
+    const container = await renderOrder()
+
+    expect(container.querySelector("h1").textContent).toBe("Order completed")
+  })
+
+  it("shows a distinct title, not 'Order placed successfully', for a cancelled order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "cancelled" }))
+
+    const container = await renderOrder()
+
+    expect(container.querySelector("h1").textContent).toBe("Order cancelled")
+  })
+})
+
 describe("Order — payment proof upload styling", () => {
   it("renders the file input inside a styled, button-looking label, not a bare native input", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
@@ -282,7 +530,7 @@ describe("Order — payment proof upload styling", () => {
     expect(label.className).toContain("rounded-lg")
   })
 
-  it("still uploads correctly through the restyled input", async () => {
+  it("stages the picked file without uploading until Submit is pressed", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
     uploadPaymentProof.mockResolvedValue({ url: "https://x/proof.jpg" })
@@ -293,6 +541,44 @@ describe("Order — payment proof upload styling", () => {
     const file = new File(["x"], "proof.jpg", { type: "image/jpeg" })
     Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
     await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+
+    expect(uploadPaymentProof).not.toHaveBeenCalled()
+    const submitBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Submit")
+    expect(submitBtn).toBeTruthy()
+  })
+
+  it("discards the staged file without uploading when Cancel is pressed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["x"], "proof.jpg", { type: "image/jpeg" })
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+
+    const cancelBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Cancel")
+    await act(async () => cancelBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(uploadPaymentProof).not.toHaveBeenCalled()
+    expect([...container.querySelectorAll("button")].find((b) => b.textContent === "Submit")).toBeUndefined()
+    expect(container.querySelector('input[type="file"]')).toBeTruthy()
+  })
+
+  it("still uploads correctly through the restyled input once Submit is pressed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    uploadPaymentProof.mockResolvedValue({ url: "https://x/proof.jpg" })
+
+    const container = await renderOrder()
+
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["x"], "proof.jpg", { type: "image/jpeg" })
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+    const submitBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Submit")
+    await act(async () => submitBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
     await act(async () => {})
 
     expect(uploadPaymentProof).toHaveBeenCalled()
@@ -315,6 +601,32 @@ describe("Order — payment proof upload styling", () => {
     expect(img.src).toBe("https://x/proof.jpg")
   })
 
+  it("tells the buyer they can still replace an already-submitted proof", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("You can still replace it below")
+  })
+
+  it("hides the replace hint while a new pick is staged but not yet submitted", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      status: "pending", has_payment_proof: true, payment_proof_url: "https://x/proof.jpg",
+    }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(["x"], "proof2.jpg", { type: "image/jpeg" })
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
+    await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+
+    expect(container.textContent).not.toContain("You can still replace it below")
+  })
+
   it("does not show the success message when no proof is on file", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
@@ -335,6 +647,8 @@ describe("Order — payment proof upload styling", () => {
     const file = new File(["x"], "proof.jpg", { type: "image/jpeg" })
     Object.defineProperty(fileInput, "files", { value: [file], configurable: true })
     await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
+    const submitBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Submit")
+    await act(async () => submitBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
     await act(async () => {})
 
     expect(container.textContent).toContain("Uploaded")
@@ -355,6 +669,34 @@ describe("Order — PIN gate", () => {
 
     expect(container.textContent).toContain("Enter your PIN")
     expect(container.textContent).not.toContain("Order not found")
+  })
+
+  it("redeems a stale admin_token via admin_refresh_token and shows the order, not the PIN gate", async () => {
+    localStorage.setItem("admin_token", "stale-jwt")
+    localStorage.setItem("admin_refresh_token", "still-good-refresh-token")
+    fetchOrder
+      .mockRejectedValueOnce({ response: { status: 401, data: { error: "pin_required" } } })
+      .mockResolvedValueOnce(baseOrder({ status: "confirmed" }))
+    axios.post.mockResolvedValue({ data: { token: "fresh-jwt", refresh_token: "new-refresh-token" } })
+
+    const container = await renderOrder()
+
+    expect(axios.post).toHaveBeenCalledWith("/api/refresh", { refresh_token: "still-good-refresh-token" })
+    expect(localStorage.getItem("admin_token")).toBe("fresh-jwt")
+    expect(container.textContent).not.toContain("Enter your PIN")
+    expect(fetchOrder).toHaveBeenCalledTimes(2)
+  })
+
+  it("falls back to the PIN gate when the refresh token is also invalid", async () => {
+    localStorage.setItem("admin_token", "stale-jwt")
+    localStorage.setItem("admin_refresh_token", "expired-refresh-token")
+    fetchOrder.mockRejectedValue({ response: { status: 401, data: { error: "pin_required" } } })
+    axios.post.mockRejectedValue({ response: { status: 401 } })
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Enter your PIN")
+    expect(localStorage.getItem("admin_refresh_token")).toBeNull()
   })
 
   it("still shows 'order not found' for a 404, not the PIN gate", async () => {

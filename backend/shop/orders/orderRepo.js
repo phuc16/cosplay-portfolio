@@ -420,7 +420,7 @@ async function transitionOrder(id, toStatus, extra = {}) {
     await conn.beginTransaction()
 
     const [[order]] = await conn.query(
-      `SELECT id, status, fulfillment_method, stock_released_at, expires_at, email
+      `SELECT id, status, fulfillment_method, stock_released_at, expires_at, email, payment_proof_url
          FROM orders WHERE id = ? FOR UPDATE`,
       [id]
     )
@@ -444,6 +444,15 @@ async function transitionOrder(id, toStatus, extra = {}) {
         await conn.rollback()
         return false
       }
+    }
+
+    // Same class of race on proof-of-payment: a buyer who uploads their
+    // screenshot between the sweep's unlocked read and this locked check
+    // must not be auto-cancelled — they'd done their part before the sweep
+    // actually acted, even if not before it merely queued the row.
+    if (extra.requireNoProof && order.payment_proof_url) {
+      await conn.rollback()
+      return false
     }
 
     if (!domain.canTransition(order.status, toStatus, order.fulfillment_method)) {
@@ -529,22 +538,30 @@ async function transitionOrder(id, toStatus, extra = {}) {
 /**
  * Cancel pending prepaid orders past their deadline. COD orders have a NULL
  * expires_at and are excluded by the query itself, not by a code path that
- * could be forgotten.
+ * could be forgotten. An order that already has a payment_proof_url is also
+ * excluded — the buyer already did their part (paid and uploaded proof) and
+ * is now only waiting on the seller to confirm, so the payment deadline no
+ * longer applies to them; auto-cancelling here would punish the buyer for
+ * the seller's own delay.
  */
 async function releaseExpiredOrders(now = new Date()) {
   const [due] = await db.query(
-    "SELECT id FROM orders WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at <= ?",
+    `SELECT id FROM orders
+      WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at <= ?
+        AND payment_proof_url IS NULL`,
     [now]
   )
 
   // The rows above were read on the pool with no lock held, so each one may
-  // have moved on before we get to it. expectedFromStatus/expiredBefore make
-  // the cancel conditional on the row still being what the query selected.
+  // have moved on before we get to it. expectedFromStatus/expiredBefore/
+  // requireNoProof make the cancel conditional on the row still being what
+  // the query selected.
   let released = 0
   for (const row of due) {
     const cancelled = await transitionOrder(row.id, "cancelled", {
       expectedFromStatus: "pending",
       expiredBefore: now,
+      requireNoProof: true,
       cancel_reason: "Đơn hàng tự động hủy do quá hạn chuyển khoản.",
     })
     if (cancelled) released += 1

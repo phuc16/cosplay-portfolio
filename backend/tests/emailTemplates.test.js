@@ -89,4 +89,13 @@ describe("DEFAULT_TEMPLATES", () => {
       expect(() => t.renderTemplate(tpl, vars)).not.toThrow()
     }
   })
+
+  it("shows the order code in the body of every lifecycle email, not just order_placed", () => {
+    const vars = t.buildVars(order)
+    for (const [type, tpl] of Object.entries(t.DEFAULT_TEMPLATES)) {
+      const out = t.renderTemplate(tpl, vars)
+      expect(out.html, type).toContain("Mã đơn hàng")
+      expect(out.html, type).toContain("2608145VR0F1LR")
+    }
+  })
 })

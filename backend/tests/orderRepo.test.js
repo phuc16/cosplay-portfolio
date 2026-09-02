@@ -624,6 +624,19 @@ describe("releaseExpiredOrders", () => {
     await repo.createOrder(order(variantId, 2))
     expect(await repo.releaseExpiredOrders(new Date())).toBe(0)
   })
+
+  it("does not cancel an overdue order that already has a submitted payment proof", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 2))
+    await db.query(
+      "UPDATE orders SET expires_at = ?, payment_proof_url = ? WHERE id = ?",
+      [new Date(Date.now() - 1000), "https://x/proof.jpg", res.id]
+    )
+
+    expect(await repo.releaseExpiredOrders(new Date())).toBe(0)
+    const [[o]] = await db.query("SELECT status FROM orders WHERE id = ?", [res.id])
+    expect(o.status).toBe("pending")
+  })
 })
 
 describe("listOrders date filter", () => {

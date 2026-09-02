@@ -14,6 +14,32 @@ const SESSION_KEY_PREFIX = "order_access:"
 // was caught live: devtools showed admin_token present, PIN gate still
 // showed. Reading localStorage directly here fixes that.
 const ADMIN_TOKEN_KEY = "admin_token"
+// Must match pages/Admin.jsx's own REFRESH_KEY constant, duplicated for the
+// same circular-import reason as ADMIN_TOKEN_KEY above.
+const ADMIN_REFRESH_KEY = "admin_refresh_token"
+
+/**
+ * Redeem a stale admin_token (24h JWT) using admin_refresh_token (30 days) —
+ * mirrors Admin.jsx's own refresh-and-retry interceptor, which only exists
+ * while Admin.jsx itself is mounted. An admin opening a buyer's order link
+ * directly never mounts Admin.jsx, so without this, a merely-expired access
+ * token (not a missing one) fell straight through to the PIN gate even
+ * though a valid refresh token was sitting right next to it in storage.
+ * Returns true if a fresh admin_token was obtained and written to storage.
+ */
+export async function refreshAdminSession() {
+  const refreshToken = localStorage.getItem(ADMIN_REFRESH_KEY)
+  if (!refreshToken) return false
+  try {
+    const { data } = await axios.post("/api/refresh", { refresh_token: refreshToken })
+    localStorage.setItem(ADMIN_TOKEN_KEY, data.token)
+    if (data.refresh_token) localStorage.setItem(ADMIN_REFRESH_KEY, data.refresh_token)
+    return true
+  } catch {
+    localStorage.removeItem(ADMIN_REFRESH_KEY)
+    return false
+  }
+}
 
 export function hasAdminSession() {
   return Boolean(axios.defaults.headers.common["Authorization"]) || Boolean(localStorage.getItem(ADMIN_TOKEN_KEY))

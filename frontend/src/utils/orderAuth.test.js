@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import axios from "axios"
 import {
-  hasAdminSession, orderAuthHeaders,
+  hasAdminSession, orderAuthHeaders, refreshAdminSession,
   getOrderSessionToken, setOrderSessionToken, clearOrderSessionToken,
 } from "./orderAuth"
 
@@ -9,6 +9,7 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   delete axios.defaults.headers.common["Authorization"]
+  vi.restoreAllMocks()
 })
 
 describe("hasAdminSession", () => {
@@ -55,6 +56,32 @@ describe("orderAuthHeaders", () => {
 
   it("returns no header when nothing is available (triggers the PIN gate)", () => {
     expect(orderAuthHeaders("tok123")).toEqual({})
+  })
+})
+
+describe("refreshAdminSession", () => {
+  it("returns false immediately, with no network call, when there is no refresh token", async () => {
+    const spy = vi.spyOn(axios, "post")
+    expect(await refreshAdminSession()).toBe(false)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it("redeems the refresh token, writes the fresh admin_token/refresh_token, and returns true", async () => {
+    localStorage.setItem("admin_refresh_token", "still-good")
+    vi.spyOn(axios, "post").mockResolvedValue({ data: { token: "fresh-jwt", refresh_token: "new-refresh" } })
+
+    expect(await refreshAdminSession()).toBe(true)
+    expect(axios.post).toHaveBeenCalledWith("/api/refresh", { refresh_token: "still-good" })
+    expect(localStorage.getItem("admin_token")).toBe("fresh-jwt")
+    expect(localStorage.getItem("admin_refresh_token")).toBe("new-refresh")
+  })
+
+  it("clears the dead refresh token and returns false when the server rejects it", async () => {
+    localStorage.setItem("admin_refresh_token", "expired")
+    vi.spyOn(axios, "post").mockRejectedValue({ response: { status: 401 } })
+
+    expect(await refreshAdminSession()).toBe(false)
+    expect(localStorage.getItem("admin_refresh_token")).toBeNull()
   })
 })
 
