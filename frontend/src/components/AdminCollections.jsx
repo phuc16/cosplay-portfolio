@@ -12,6 +12,30 @@ const STATUSES = [
   { value: "archived", label: "Lưu trữ (ẩn hẳn)" },
 ]
 
+const SORTS = [
+  { value: "default", label: "Mặc định" },
+  { value: "title_asc", label: "Tên A-Z" },
+  { value: "title_desc", label: "Tên Z-A" },
+  { value: "newest", label: "Mới tạo trước" },
+  { value: "oldest", label: "Cũ nhất trước" },
+]
+
+function sortCollections(list, sortBy) {
+  const sorted = [...list]
+  if (sortBy === "title_asc") sorted.sort((a, b) => a.title.localeCompare(b.title, "vi"))
+  else if (sortBy === "title_desc") sorted.sort((a, b) => b.title.localeCompare(a.title, "vi"))
+  else if (sortBy === "newest") sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  else if (sortBy === "oldest") sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  return sorted
+}
+
+function matchesCollectionSearch(c, term) {
+  if (!term) return true
+  const needle = term.trim().toLowerCase()
+  if (!needle) return true
+  return [c.title, c.slug].some((f) => String(f || "").toLowerCase().includes(needle))
+}
+
 const blank = {
   title: "", description: "", status: "draft",
   allow_ship: true, allow_pickup: false,
@@ -26,6 +50,9 @@ export default function AdminCollections() {
   const [editingId, setEditingId] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   const [error, setError] = useState("")
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [sortBy, setSortBy] = useState("default")
   const formRef = useRef(null)
 
   const reload = () => adminListCollections().then(setCollections)
@@ -99,11 +126,46 @@ export default function AdminCollections() {
     }
   }
 
+  const visibleCollections = sortCollections(
+    collections.filter((c) => matchesCollectionSearch(c, search) && (!statusFilter || c.status === statusFilter)),
+    sortBy
+  )
+
   return (
     <div>
       <h3 className="text-xl font-semibold mb-4">Bộ sưu tập</h3>
 
-      {collections.map((c) => (
+      {collections.length > 0 && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm theo tên hoặc đường dẫn..."
+            className="flex-1 min-w-[180px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          >
+            <option value="">Tất cả trạng thái</option>
+            {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          >
+            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+      )}
+
+      {collections.length > 0 && visibleCollections.length === 0 && (
+        <p className="opacity-60 mb-4">Không tìm thấy bộ sưu tập nào khớp.</p>
+      )}
+
+      {visibleCollections.map((c) => (
         <div key={c.id} className="mb-4 p-4 rounded-2xl border border-[var(--border-brand)]">
           <div className="flex justify-between items-start gap-3">
             <div>

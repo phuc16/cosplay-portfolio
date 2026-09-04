@@ -137,3 +137,80 @@ describe("AdminProducts — reordering via drag and drop", () => {
     expect(adminReorderProducts).not.toHaveBeenCalled()
   })
 })
+
+describe("AdminProducts — search, filter, sort", () => {
+  it("filters the list by name, case-insensitively", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Photocard" }), product({ id: 2, name: "Poster" })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Tìm theo tên..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "poster")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Poster")
+    expect(container.textContent).not.toContain("Photocard")
+  })
+
+  it("filters by stock status", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [
+        product({ id: 1, name: "In Stock", variants: [{ id: 1, label: "A1", stock_qty: 5 }] }),
+        product({ id: 2, name: "Sold Out", variants: [{ id: 2, label: "A1", stock_qty: 0 }] }),
+      ],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const stockSelect = [...container.querySelectorAll("select")][0]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(stockSelect, "sold_out")
+      stockSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Sold Out")
+    expect(container.textContent).not.toContain("In Stock")
+  })
+
+  it("sorts by price low-high, and disables drag reordering while sorted", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Expensive", price: 90000 }), product({ id: 2, name: "Cheap", price: 10000 })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const sortSelect = [...container.querySelectorAll("select")][1]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(sortSelect, "price_asc")
+      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const names = [...container.querySelectorAll("[data-product-row] p.font-medium")].map((p) => p.textContent)
+    expect(names).toEqual(["Cheap", "Expensive"])
+    expect(container.querySelectorAll('[draggable="true"]')).toHaveLength(0)
+  })
+
+  it("shows a no-match message when the search matches nothing", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Photocard" }), product({ id: 2, name: "Poster" })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Tìm theo tên..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "nobody")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Không tìm thấy sản phẩm nào khớp")
+  })
+})

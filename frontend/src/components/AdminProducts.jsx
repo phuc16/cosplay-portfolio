@@ -8,6 +8,28 @@ import { formatVnd } from "../utils/money"
 
 const blank = { name: "", description: "", price: "", images: [] }
 
+const SORTS = [
+  { value: "default", label: "Thứ tự kéo thả" },
+  { value: "name_asc", label: "Tên A-Z" },
+  { value: "name_desc", label: "Tên Z-A" },
+  { value: "price_asc", label: "Giá thấp-cao" },
+  { value: "price_desc", label: "Giá cao-thấp" },
+]
+
+// A product with no variants isn't a purchasable stock item, so it's never "sold out".
+const isProductSoldOut = (p) => p.variants?.length > 0 && p.variants.every(
+  (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
+)
+
+function sortProducts(list, sortBy) {
+  const sorted = [...list]
+  if (sortBy === "name_asc") sorted.sort((a, b) => a.name.localeCompare(b.name, "vi"))
+  else if (sortBy === "name_desc") sorted.sort((a, b) => b.name.localeCompare(a.name, "vi"))
+  else if (sortBy === "price_asc") sorted.sort((a, b) => a.price - b.price)
+  else if (sortBy === "price_desc") sorted.sort((a, b) => b.price - a.price)
+  return sorted
+}
+
 export default function AdminProducts({ collection }) {
   const [products, setProducts] = useState([])
   const [draft, setDraft] = useState(blank)
@@ -16,6 +38,9 @@ export default function AdminProducts({ collection }) {
   const [expandedProductId, setExpandedProductId] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
   const [reorderPending, setReorderPending] = useState(false)
+  const [search, setSearch] = useState("")
+  const [stockFilter, setStockFilter] = useState("")
+  const [sortBy, setSortBy] = useState("default")
 
   // Admin-scoped route: no status filter, so draft/archived collections'
   // products are reachable here too (unlike the public storefront route).
@@ -193,6 +218,17 @@ export default function AdminProducts({ collection }) {
     </div>
   )
 
+  const isDefaultView = sortBy === "default" && !search.trim() && !stockFilter
+  const visibleProducts = sortProducts(
+    products.filter((p) => {
+      if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
+      if (stockFilter === "in_stock" && isProductSoldOut(p)) return false
+      if (stockFilter === "sold_out" && !isProductSoldOut(p)) return false
+      return true
+    }),
+    sortBy
+  )
+
   return (
     <div className="mt-4 pl-4 border-l border-[var(--border-brand)]">
       <h4 className="font-semibold mb-2">Sản phẩm</h4>
@@ -202,26 +238,59 @@ export default function AdminProducts({ collection }) {
       )}
 
       {products.length > 1 && (
-        <p className="text-xs opacity-60 mb-2">Kéo thả sản phẩm để đổi thứ tự.{reorderPending ? " Đang lưu thứ tự..." : ""}</p>
+        <div className="flex gap-2 mb-3 flex-wrap">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm theo tên..."
+            className="flex-1 min-w-[160px] px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value)}
+            className="px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
+          >
+            <option value="">Tất cả</option>
+            <option value="in_stock">Còn hàng</option>
+            <option value="sold_out">Hết hàng</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
+          >
+            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
       )}
 
-      {products.map((p) => (
+      {products.length > 1 && (
+        isDefaultView
+          ? <p className="text-xs opacity-60 mb-2">Kéo thả sản phẩm để đổi thứ tự.{reorderPending ? " Đang lưu thứ tự..." : ""}</p>
+          : <p className="text-xs opacity-60 mb-2">Đang lọc/sắp xếp — kéo thả để đổi thứ tự chỉ khả dụng ở chế độ mặc định.</p>
+      )}
+
+      {products.length > 0 && visibleProducts.length === 0 && (
+        <p className="text-sm opacity-70 mb-3">Không tìm thấy sản phẩm nào khớp.</p>
+      )}
+
+      {visibleProducts.map((p) => (
         <div
           key={p.id}
           data-product-row
-          onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, p)}
-          onDragEnter={(e) => handleDragEnter(e, p)}
-          onDragLeave={handleDragLeave}
+          onDragOver={isDefaultView ? handleDragOver : undefined}
+          onDrop={isDefaultView ? (e) => handleDrop(e, p) : undefined}
+          onDragEnter={isDefaultView ? (e) => handleDragEnter(e, p) : undefined}
+          onDragLeave={isDefaultView ? handleDragLeave : undefined}
           className="mb-4 p-3 rounded-xl border border-[var(--border-brand)]"
         >
           <div className="flex justify-between items-start gap-2">
             <div
-              draggable
-              onDragStart={(e) => handleDragStart(e, p)}
-              onDragEnd={handleDragEnd}
-              className="flex items-start gap-2 min-w-0 cursor-grab active:cursor-grabbing"
-              title="Kéo để đổi thứ tự"
+              draggable={isDefaultView}
+              onDragStart={isDefaultView ? (e) => handleDragStart(e, p) : undefined}
+              onDragEnd={isDefaultView ? handleDragEnd : undefined}
+              className={"flex items-start gap-2 min-w-0" + (isDefaultView ? " cursor-grab active:cursor-grabbing" : "")}
+              title={isDefaultView ? "Kéo để đổi thứ tự" : undefined}
             >
               <span className="shrink-0 opacity-50 select-none leading-6" aria-hidden="true">⋮⋮</span>
               <div>

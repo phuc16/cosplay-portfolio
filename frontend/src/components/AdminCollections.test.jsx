@@ -91,3 +91,77 @@ describe("AdminCollections — edit", () => {
     expect(titleInput.value).toBe("Second")
   })
 })
+
+describe("AdminCollections — search, filter, sort", () => {
+  it("filters the list by title or slug, case-insensitively", async () => {
+    adminListCollections.mockResolvedValue([
+      collection({ id: 1, title: "Hobby Horizon", slug: "hobby-horizon" }),
+      collection({ id: 2, title: "Winter Fest", slug: "winter-fest" }),
+    ])
+    const container = await renderCollections()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Tìm theo tên hoặc đường dẫn..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "winter")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Winter Fest")
+    expect(container.textContent).not.toContain("Hobby Horizon")
+  })
+
+  it("filters the list by status", async () => {
+    adminListCollections.mockResolvedValue([
+      collection({ id: 1, title: "Active One", status: "active" }),
+      collection({ id: 2, title: "Closed One", status: "closed" }),
+    ])
+    const container = await renderCollections()
+    await flush()
+
+    const statusSelect = [...container.querySelectorAll("select")][0]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(statusSelect, "closed")
+      statusSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Closed One")
+    expect(container.textContent).not.toContain("Active One")
+  })
+
+  it("sorts the list by title A-Z", async () => {
+    adminListCollections.mockResolvedValue([
+      collection({ id: 1, title: "Zebra Drop" }),
+      collection({ id: 2, title: "Apple Drop" }),
+    ])
+    const container = await renderCollections()
+    await flush()
+
+    const sortSelect = [...container.querySelectorAll("select")][1]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(sortSelect, "title_asc")
+      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const titles = [...container.querySelectorAll("p.font-semibold")].map((p) => p.textContent)
+    expect(titles).toEqual(["Apple Drop", "Zebra Drop"])
+  })
+
+  it("shows a no-match message when the search matches nothing", async () => {
+    adminListCollections.mockResolvedValue([collection({ id: 1, title: "Hobby Horizon" })])
+    const container = await renderCollections()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Tìm theo tên hoặc đường dẫn..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "nobody")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Không tìm thấy bộ sưu tập nào khớp")
+  })
+})
