@@ -51,6 +51,68 @@ async function openVariantDetail(container, label) {
   if (thumb) await act(async () => { thumb.click() })
 }
 
+describe("ProductCard — variant description", () => {
+  it("renders a variant's own markdown description in its detail modal", async () => {
+    const product = baseProduct({
+      variants: [{ id: 1, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg", description: "**Size chart** here" }],
+    })
+    const { container } = await renderCard({ product })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector("strong")?.textContent).toBe("Size chart")
+    expect(dialog.textContent).toContain("here")
+  })
+
+  it("shows nothing extra when the variant has no description", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector(".prose")).toBeNull()
+  })
+})
+
+describe("ProductCard — variant thumbnail_image", () => {
+  it("uses a variant's own thumbnail_image as its gallery-grid cover, not its own photo", async () => {
+    const product = baseProduct({
+      variants: [
+        { id: 1, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg", thumbnail_image: "https://x/a1-thumb.jpg" },
+        { id: 2, label: "B2", stock_qty: 5, image_url: "https://x/b2.jpg" },
+      ],
+    })
+    const { container } = await renderCard({ product })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('img[src="https://x/a1-thumb.jpg"]')).toBeTruthy()
+    expect(dialog.querySelector('img[alt="A1"][src="https://x/a1.jpg"]')).toBeNull()
+  })
+
+  it("falls back to the variant's own photo when it has no thumbnail_image", async () => {
+    const { container } = await renderCard()
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('img[src="https://x/a1.jpg"]')).toBeTruthy()
+  })
+
+  it("is never used as the detail modal's own picture — only variantImages (images/image_url) appear there", async () => {
+    const product = baseProduct({
+      variants: [{ id: 1, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg", thumbnail_image: "https://x/a1-thumb.jpg" }],
+    })
+    const { container } = await renderCard({ product })
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('img[src="https://x/a1.jpg"]')).toBeTruthy()
+    expect(dialog.querySelector('img[src="https://x/a1-thumb.jpg"]')).toBeNull()
+  })
+})
+
 describe("ProductCard — variant detail modal", () => {
   it("opens the detail modal showing the variant's own photo when picked from the gallery", async () => {
     const { container } = await renderCard()

@@ -44,9 +44,11 @@ describe("catalog schema", () => {
     const c = await columns("product_variants")
     expect(Object.keys(c)).toEqual(
       expect.arrayContaining([
-        "id", "product_id", "label", "image_url", "stock_qty", "sort_order", "created_at",
+        "id", "product_id", "label", "image_url", "thumbnail_image", "description", "stock_qty", "sort_order", "created_at",
       ])
     )
     expect(c.stock_qty.IS_NULLABLE).toBe("YES")
+    expect(c.thumbnail_image.IS_NULLABLE).toBe("YES")
+    expect(c.description.IS_NULLABLE).toBe("YES")
   })
 })

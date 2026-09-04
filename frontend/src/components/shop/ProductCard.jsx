@@ -22,6 +22,11 @@ function variantImages(v) {
   return v.image_url ? [v.image_url] : []
 }
 
+/** A variant's own thumbnail_image wins as its grid cover — it's never part of variantImages() above (the detail carousel). */
+function variantCover(v) {
+  return v.thumbnail_image || variantImages(v)[0]
+}
+
 /** null/undefined stock_qty means unlimited — clamp only when a real ceiling exists. */
 const clampQty = (n, v) => {
   const max = v.stock_qty === null || v.stock_qty === undefined ? Infinity : v.stock_qty
@@ -47,7 +52,7 @@ function galleryGridClasses(count) {
 
 export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
   const { t } = useLanguage()
-  const cover = product.images?.[0] || variantImages(product.variants?.find((v) => variantImages(v).length) || {})[0]
+  const cover = product.images?.[0] || variantCover(product.variants?.find((v) => variantCover(v)) || {})
   const hasVariants = product.variants?.length > 0
   // null = closed, "grid" = full variant gallery, an object = single-variant detail.
   const [view, setView] = useState(null)
@@ -70,7 +75,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
       product_name: product.name,
       variant_label: v.label,
       price: product.price,
-      image_url: variantImages(v)[0] || product.images?.[0] || null,
+      image_url: variantCover(v) || product.images?.[0] || null,
       collection_slug: collectionSlug,
     })
     onAdded?.(v.label)
@@ -149,7 +154,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
                 {/* Stable sort: sold-out variants sink after in-stock ones,
                     without disturbing relative order within each group. */}
                 {[...product.variants].sort((a, b) => Number(isSoldOut(a)) - Number(isSoldOut(b))).map((v) => {
-                  const img = variantImages(v)[0] || cover
+                  const img = variantCover(v) || cover
                   return (
                     <button
                       key={v.id}
@@ -229,6 +234,13 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
               </div>
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
               <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : t("shopClosed")}</p>
+
+              {detail.description && (
+                <div
+                  className="prose prose-sm max-w-none opacity-80"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(detail.description) }}
+                />
+              )}
 
               {!isSoldOut(detail) && orderable && (
                 <div className="flex items-center gap-2">

@@ -143,6 +143,28 @@ export default function AdminVariants({ product, onSaved }) {
     )))
   }
 
+  // Separate from `images` (the variant's own photo gallery) — never shown
+  // as one of the variant's pictures, only as the cover in the picker grid.
+  const pickThumbnail = async (i, file) => {
+    setError("")
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(",")[1])
+        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
+        reader.readAsDataURL(file)
+      })
+      const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
+      setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, thumbnail_image: url } : r)))
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
+    }
+  }
+
+  const removeThumbnail = (i) => {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, thumbnail_image: "" } : r)))
+  }
+
   // "A1, A2, B1" or one code per line -> one row each.
   const applyBulk = () => {
     const labels = bulk.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
@@ -161,6 +183,8 @@ export default function AdminVariants({ product, onSaved }) {
           id: r.id,
           label: String(r.label).trim(),
           images: r.images || [],
+          thumbnail_image: r.thumbnail_image || "",
+          description: r.description || "",
           // Empty means unlimited, which the API expects as null rather than 0.
           stock_qty: r.stock_qty === "" || r.stock_qty === null ? null : Number(r.stock_qty),
         }))
@@ -219,88 +243,150 @@ export default function AdminVariants({ product, onSaved }) {
           key={r.id || i}
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, i)}
-          className="mb-2"
+          className="mb-3 p-3 rounded-xl border border-[var(--border-brand)]"
         >
-          <div className="flex gap-2 items-center">
-            <span
-              draggable
-              onDragStart={(e) => handleDragStart(e, i)}
-              className="shrink-0 opacity-50 select-none cursor-grab active:cursor-grabbing px-0.5"
-              title="Kéo để đổi thứ tự"
-              aria-hidden="true"
-            >
-              ⋮⋮
-            </span>
-            <div className="w-9 h-9 shrink-0">
-              {r.images?.[0] && (
-                <img src={r.images[0]} alt="" className="w-9 h-9 object-cover rounded-lg" />
+          <div className="flex gap-3 items-start">
+            <div className="flex flex-col items-center gap-1 shrink-0 pt-1">
+              <span
+                draggable
+                onDragStart={(e) => handleDragStart(e, i)}
+                className="opacity-50 select-none cursor-grab active:cursor-grabbing leading-none"
+                title="Kéo để đổi thứ tự"
+                aria-hidden="true"
+              >
+                ⋮⋮
+              </span>
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => moveRow(i, -1)}
+                  disabled={i === 0}
+                  aria-label={`Đưa lên trên: ${r.label || `dòng ${i + 1}`}`}
+                  className="px-1 leading-none disabled:opacity-30"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveRow(i, 1)}
+                  disabled={i === rows.length - 1}
+                  aria-label={`Đưa xuống dưới: ${r.label || `dòng ${i + 1}`}`}
+                  className="px-1 leading-none disabled:opacity-30"
+                >
+                  ▼
+                </button>
+              </div>
+            </div>
+
+            <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden border border-[var(--border-brand)] bg-[var(--surface-neutral)]">
+              {(r.thumbnail_image || r.images?.[0]) && (
+                <img src={r.thumbnail_image || r.images[0]} alt="" className="w-14 h-14 object-cover" />
               )}
             </div>
-            <div className="flex flex-col shrink-0">
-              <button
-                type="button"
-                onClick={() => moveRow(i, -1)}
-                disabled={i === 0}
-                aria-label={`Đưa lên trên: ${r.label || `dòng ${i + 1}`}`}
-                className="px-1 leading-none disabled:opacity-30"
-              >
-                ▲
-              </button>
-              <button
-                type="button"
-                onClick={() => moveRow(i, 1)}
-                disabled={i === rows.length - 1}
-                aria-label={`Đưa xuống dưới: ${r.label || `dòng ${i + 1}`}`}
-                className="px-1 leading-none disabled:opacity-30"
-              >
-                ▼
-              </button>
-            </div>
-            <input
-              value={r.label}
-              onChange={(e) => update(i, "label", e.target.value)}
-              placeholder="Mã (A1) hoặc size (M)"
-              className="flex-1 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-            />
-            <input
-              value={r.stock_qty ?? ""}
-              onChange={(e) => update(i, "stock_qty", e.target.value)}
-              placeholder="SL (trống = không giới hạn)"
-              inputMode="numeric"
-              className="w-48 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-            />
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              aria-label={`Ảnh cho ${r.label || `dòng ${i + 1}`}`}
-              onChange={(e) => {
-                const files = [...(e.target.files || [])]
-                e.target.value = ""
-                if (files.length) pickImages(i, files)
-              }}
-              className="w-28 text-xs shrink-0"
-            />
-            <button type="button" onClick={() => removeRow(i)} className="px-2 opacity-70">✕</button>
-          </div>
 
-          {r.images?.length > 1 && (
-            <div className="flex gap-2 flex-wrap mt-1 ml-12">
-              {r.images.map((url) => (
-                <div key={url} className="relative">
-                  <img src={url} alt="" className="w-9 h-9 object-cover rounded-lg" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i, url)}
-                    aria-label="Xóa ảnh"
-                    className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-black/70 text-white text-[10px] leading-none"
-                  >
-                    ✕
-                  </button>
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              <div className="flex gap-2 flex-wrap items-center">
+                <input
+                  value={r.label}
+                  onChange={(e) => update(i, "label", e.target.value)}
+                  placeholder="Mã (A1) hoặc size (M)"
+                  className="flex-1 min-w-[140px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                />
+                <input
+                  value={r.stock_qty ?? ""}
+                  onChange={(e) => update(i, "stock_qty", e.target.value)}
+                  placeholder="SL (trống = không giới hạn)"
+                  inputMode="numeric"
+                  className="w-44 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  aria-label={`Xóa dòng: ${r.label || `dòng ${i + 1}`}`}
+                  className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--border-danger)] text-[var(--text-danger)] opacity-80 hover:opacity-100"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 text-xs">
+                <label className="inline-block px-2.5 py-1 rounded-lg border border-[var(--border-brand)] cursor-pointer">
+                  Ảnh sản phẩm
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    aria-label={`Ảnh cho ${r.label || `dòng ${i + 1}`}`}
+                    onChange={(e) => {
+                      const files = [...(e.target.files || [])]
+                      e.target.value = ""
+                      if (files.length) pickImages(i, files)
+                    }}
+                    className="hidden"
+                  />
+                </label>
+                <label className="inline-block px-2.5 py-1 rounded-lg border border-[var(--border-brand)] cursor-pointer">
+                  Ảnh thumbnail riêng
+                  <input
+                    type="file"
+                    accept="image/*"
+                    aria-label={`Ảnh thumbnail cho ${r.label || `dòng ${i + 1}`}`}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ""
+                      if (file) pickThumbnail(i, file)
+                    }}
+                    className="hidden"
+                  />
+                </label>
+                <span className="self-center opacity-50">
+                  (Thumbnail tuỳ chọn — nếu bỏ trống, dùng ảnh sản phẩm đầu tiên)
+                </span>
+              </div>
+
+              {(r.images?.length > 0 || r.thumbnail_image) && (
+                <div className="flex gap-2 flex-wrap">
+                  {r.images?.map((url) => (
+                    <div key={url} className="relative">
+                      <img src={url} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border-brand)]" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(i, url)}
+                        aria-label="Xóa ảnh"
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-black/70 text-white text-[10px] leading-none"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {r.thumbnail_image && (
+                    <div className="relative">
+                      <img src={r.thumbnail_image} alt="" className="w-10 h-10 object-cover rounded-lg border-2 border-[var(--brand)]" />
+                      <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1 rounded-full bg-[var(--brand)] text-white text-[9px] leading-tight whitespace-nowrap">
+                        thumb
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeThumbnail(i)}
+                        aria-label={`Xóa ảnh thumbnail: ${r.label || `dòng ${i + 1}`}`}
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-black/70 text-white text-[10px] leading-none"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
+
+              <textarea
+                value={r.description || ""}
+                onChange={(e) => update(i, "description", e.target.value)}
+                placeholder="Mô tả riêng cho phân loại này (markdown, tùy chọn — ví dụ: bảng size)"
+                rows={2}
+                className="w-full px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
+              />
             </div>
-          )}
+          </div>
         </div>
       ))}
 

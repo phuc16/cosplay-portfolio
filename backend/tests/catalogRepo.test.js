@@ -15,6 +15,87 @@ afterAll(async () => {
   await closeDb()
 })
 
+describe("variant thumbnail_image", () => {
+  it("is never included in images — separate cover, not part of the gallery", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [
+      { label: "A1", images: ["https://x/a.jpg", "https://x/b.jpg"], thumbnail_image: "https://x/thumb.jpg", stock_qty: 5 },
+    ])
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const variant = detail.products[0].variants[0]
+    expect(variant.thumbnail_image).toBe("https://x/thumb.jpg")
+    expect(variant.images).toEqual(["https://x/a.jpg", "https://x/b.jpg"])
+  })
+
+  it("defaults to null when not submitted, so callers fall back to images[0]/image_url", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", images: ["https://x/a.jpg"], stock_qty: 5 }])
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].variants[0].thumbnail_image).toBeNull()
+  })
+
+  it("can be set and cleared on an existing variant via replaceVariants", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    let detail = await repo.getCollectionDetailById(cid)
+    const variantId = detail.products[0].variants[0].id
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", thumbnail_image: "https://x/thumb.jpg", stock_qty: 5 }])
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].variants[0].thumbnail_image).toBe("https://x/thumb.jpg")
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", thumbnail_image: "", stock_qty: 5 }])
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].variants[0].thumbnail_image).toBeNull()
+  })
+})
+
+describe("variant description", () => {
+  it("saves and returns a variant's own markdown description, independent of the product's", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Áo Tài", price: 319000, description: "Product-level description",
+    })
+    await repo.replaceVariants(pid, [
+      { label: "Size khác", description: "**Bảng size**\n\n| SIZE | XL |\n| --- | --- |", stock_qty: 5 },
+    ])
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].description).toBe("Product-level description")
+    expect(detail.products[0].variants[0].description).toBe("**Bảng size**\n\n| SIZE | XL |\n| --- | --- |")
+  })
+
+  it("defaults to null when not submitted", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].variants[0].description).toBeNull()
+  })
+
+  it("can be set and cleared on an existing variant via replaceVariants", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    let detail = await repo.getCollectionDetailById(cid)
+    const variantId = detail.products[0].variants[0].id
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", description: "Size chart here", stock_qty: 5 }])
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].variants[0].description).toBe("Size chart here")
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", description: "", stock_qty: 5 }])
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].variants[0].description).toBeNull()
+  })
+})
+
 describe("createCollection", () => {
   it("generates a slug from the Vietnamese title", async () => {
     const id = await repo.createCollection({ title: "Bộ sưu tập Hè", status: "active" })
@@ -286,7 +367,7 @@ describe("copyCollection", () => {
       collection_id: cid, name: "Photocard", description: "d", price: 35000, images: ["https://x/p.jpg"],
     })
     await repo.replaceVariants(pid, [
-      { label: "A1", image_url: "https://x/a1.jpg", stock_qty: 12 },
+      { label: "A1", image_url: "https://x/a1.jpg", thumbnail_image: "https://x/a1-thumb.jpg", stock_qty: 12 },
       { label: "B2", image_url: null, stock_qty: null },
     ])
 
@@ -301,6 +382,7 @@ describe("copyCollection", () => {
     expect(labels).toEqual(["A1", "B2"])
     const a1 = copy.products[0].variants.find((v) => v.label === "A1")
     expect(a1.image_url).toBe("https://x/a1.jpg")
+    expect(a1.thumbnail_image).toBe("https://x/a1-thumb.jpg")
     expect(a1.stock_qty).toBe(12)
     const b2 = copy.products[0].variants.find((v) => v.label === "B2")
     expect(b2.stock_qty).toBeNull()

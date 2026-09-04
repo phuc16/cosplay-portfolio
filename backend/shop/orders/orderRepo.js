@@ -312,19 +312,21 @@ function firstImage(value) {
 
 async function attachItems(order) {
   if (!order) return null
-  // pv.image_url is kept in sync with the variant's own gallery by catalogRepo;
-  // fall back to the product's images when the variant has none of its own.
+  // The variant's own thumbnail_image wins (same cover shown in the picker
+  // grid); pv.image_url (kept in sync with the variant's gallery by
+  // catalogRepo) is next; the product's images are the last resort, for a
+  // variant with no photo of its own at all.
   const [rows] = await db.query(
-    `SELECT oi.*, pv.image_url AS variant_image_url, p.images AS product_images
+    `SELECT oi.*, pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
        FROM order_items oi
        LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
        LEFT JOIN products p ON p.id = pv.product_id
       WHERE oi.order_id = ? ORDER BY oi.id ASC`,
     [order.id]
   )
-  const items = rows.map(({ variant_image_url, product_images, ...item }) => ({
+  const items = rows.map(({ variant_thumbnail, variant_image_url, product_images, ...item }) => ({
     ...item,
-    image_url: variant_image_url || firstImage(product_images),
+    image_url: variant_thumbnail || variant_image_url || firstImage(product_images),
   }))
   return { ...order, items }
 }

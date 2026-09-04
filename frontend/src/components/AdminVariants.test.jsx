@@ -34,10 +34,10 @@ beforeEach(() => {
 })
 
 describe("AdminVariants — per-row image upload", () => {
-  it("renders a file input for each row, plus the batch-upload input", async () => {
+  it("renders images + thumbnail file inputs for each row, plus the batch-upload input", async () => {
     const container = await renderVariants()
     const fileInputs = container.querySelectorAll('input[type="file"]')
-    expect(fileInputs.length).toBe(2)
+    expect(fileInputs.length).toBe(3)
   })
 
   it("uploads the picked file to the product's variants folder and shows a thumbnail", async () => {
@@ -67,9 +67,47 @@ describe("AdminVariants — per-row image upload", () => {
     await act(async () => saveBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 
     expect(adminSaveVariants).toHaveBeenCalledWith(1, [
-      { id: 10, label: "A1", images: ["https://x/a1.jpg"], stock_qty: 12 },
+      { id: 10, label: "A1", images: ["https://x/a1.jpg"], thumbnail_image: "", description: "", stock_qty: 12 },
     ])
     expect(onSaved).toHaveBeenCalled()
+  })
+})
+
+describe("AdminVariants — per-row thumbnail upload", () => {
+  it("uploads the picked file to the row's own thumbnail_image, separate from images", async () => {
+    adminUploadImage.mockResolvedValue({ url: "https://x/thumb.jpg" })
+    const container = await renderVariants(baseProduct({
+      variants: [{ id: 10, label: "A1", stock_qty: 12, images: ["https://x/a1.jpg", "https://x/a1b.jpg"] }],
+    }))
+
+    const thumbInput = container.querySelector('input[aria-label="Ảnh thumbnail cho A1"]')
+    const file = new File(["x"], "thumb.jpg", { type: "image/jpeg" })
+    Object.defineProperty(thumbInput, "files", { value: [file], configurable: true })
+    await act(async () => thumbInput.dispatchEvent(new Event("change", { bubbles: true })))
+    await act(async () => {})
+
+    expect(adminUploadImage).toHaveBeenCalledWith(expect.any(String), "products/1/variants")
+    expect(container.querySelector('img[src="https://x/thumb.jpg"]')).toBeTruthy()
+    // Still there, untouched — the thumbnail is separate from the gallery.
+    expect(container.querySelector('img[src="https://x/a1.jpg"]')).toBeTruthy()
+    expect(container.querySelector('img[src="https://x/a1b.jpg"]')).toBeTruthy()
+  })
+
+  it("includes thumbnail_image when saving, and clears it via the remove button", async () => {
+    adminSaveVariants.mockResolvedValue({})
+    const container = await renderVariants(
+      baseProduct({ variants: [{ id: 10, label: "A1", stock_qty: 12, images: [], thumbnail_image: "https://x/thumb.jpg" }] })
+    )
+
+    const removeBtn = container.querySelector('button[aria-label="Xóa ảnh thumbnail: A1"]')
+    await act(async () => removeBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    const saveBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Lưu phân loại")
+    await act(async () => saveBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(adminSaveVariants).toHaveBeenCalledWith(1, [
+      { id: 10, label: "A1", images: [], thumbnail_image: "", description: "", stock_qty: 12 },
+    ])
   })
 })
 
@@ -163,8 +201,8 @@ describe("AdminVariants — reordering rows", () => {
     await act(async () => saveBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 
     expect(adminSaveVariants).toHaveBeenCalledWith(1, [
-      { id: 11, label: "A2", images: [], stock_qty: 1 },
-      { id: 10, label: "A1", images: [], stock_qty: 1 },
+      { id: 11, label: "A2", images: [], thumbnail_image: "", description: "", stock_qty: 1 },
+      { id: 10, label: "A1", images: [], thumbnail_image: "", description: "", stock_qty: 1 },
     ])
   })
 
@@ -181,7 +219,7 @@ describe("AdminVariants — reordering rows", () => {
 
     const handles = [...container.querySelectorAll('[draggable="true"]')]
     const rows = [...container.querySelectorAll('input[placeholder="Mã (A1) hoặc size (M)"]')]
-      .map((input) => input.closest(".mb-2"))
+      .map((input) => input.closest(".mb-3"))
 
     const dt = { setData: () => {}, getData: () => {} }
     await act(async () => {

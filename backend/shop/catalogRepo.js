@@ -256,7 +256,10 @@ async function copyCollection(id) {
     if (p.variants.length) {
       await replaceVariants(
         newProductId,
-        p.variants.map((v) => ({ label: v.label, image_url: v.image_url, images: v.images, stock_qty: v.stock_qty }))
+        p.variants.map((v) => ({
+          label: v.label, image_url: v.image_url, images: v.images,
+          thumbnail_image: v.thumbnail_image, description: v.description, stock_qty: v.stock_qty,
+        }))
       )
     }
   }
@@ -389,13 +392,13 @@ async function replaceVariants(productId, variants) {
         // not rely on this update succeeding without checking product ownership
         // themselves.
         await conn.query(
-          "UPDATE product_variants SET label = ?, image_url = ?, images = ?, stock_qty = ?, sort_order = ? WHERE id = ? AND product_id = ?",
-          [v.label, imageUrl, JSON.stringify(images), stock, index, v.id, productId]
+          "UPDATE product_variants SET label = ?, image_url = ?, images = ?, thumbnail_image = ?, description = ?, stock_qty = ?, sort_order = ? WHERE id = ? AND product_id = ?",
+          [v.label, imageUrl, JSON.stringify(images), v.thumbnail_image || null, v.description || null, stock, index, v.id, productId]
         )
       } else {
         await conn.query(
-          "INSERT INTO product_variants (product_id, label, image_url, images, stock_qty, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
-          [productId, v.label, imageUrl, JSON.stringify(images), stock, index]
+          "INSERT INTO product_variants (product_id, label, image_url, images, thumbnail_image, description, stock_qty, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [productId, v.label, imageUrl, JSON.stringify(images), v.thumbnail_image || null, v.description || null, stock, index]
         )
       }
     }
