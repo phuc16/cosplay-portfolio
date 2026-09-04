@@ -5,12 +5,28 @@ import { useLanguage } from "../contexts/LanguageContext"
 import { renderMarkdown } from "../utils/markdown"
 import ProductCard, { isProductSoldOut } from "../components/shop/ProductCard"
 import ShopHeader from "../components/shop/ShopHeader"
+import ShopFooter from "../components/shop/ShopFooter"
+
+function sortProducts(list, sortBy) {
+  const sorted = [...list]
+  if (sortBy === "name_asc") sorted.sort((a, b) => a.name.localeCompare(b.name, "vi"))
+  else if (sortBy === "name_desc") sorted.sort((a, b) => b.name.localeCompare(a.name, "vi"))
+  else if (sortBy === "price_asc") sorted.sort((a, b) => a.price - b.price)
+  else if (sortBy === "price_desc") sorted.sort((a, b) => b.price - a.price)
+  // Default: stable sort, sold-out products sink after available ones,
+  // without disturbing relative order within each group.
+  else sorted.sort((a, b) => Number(isProductSoldOut(a)) - Number(isProductSoldOut(b)))
+  return sorted
+}
 
 export default function Collection() {
   const { slug } = useParams()
   const { t } = useLanguage()
   const [result, setResult] = useState({ slug: null, collection: undefined })
   const [addedMsg, setAddedMsg] = useState(null)
+  const [search, setSearch] = useState("")
+  const [stockFilter, setStockFilter] = useState("")
+  const [sortBy, setSortBy] = useState("default")
 
   // Brief inline confirmation, matching this codebase's no-toast-library style —
   // cleared automatically a couple seconds after each add.
@@ -42,6 +58,7 @@ export default function Collection() {
       <>
         <ShopHeader />
         <main className="max-w-5xl mx-auto px-4 py-10 opacity-60">{t("shopLoading")}</main>
+        <ShopFooter />
       </>
     )
   }
@@ -54,11 +71,21 @@ export default function Collection() {
           <p className="opacity-70 mb-4">{t("shopNotFound")}</p>
           <Link to="/merchandise" className="text-[var(--text-link)]">{t("shopBack")}</Link>
         </main>
+        <ShopFooter />
       </>
     )
   }
 
   const closed = collection.status === "closed"
+  const visibleProducts = sortProducts(
+    collection.products.filter((p) => {
+      if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
+      if (stockFilter === "in_stock" && isProductSoldOut(p)) return false
+      if (stockFilter === "sold_out" && !isProductSoldOut(p)) return false
+      return true
+    }),
+    sortBy
+  )
 
   return (
     <>
@@ -113,19 +140,54 @@ export default function Collection() {
       {collection.products.length === 0 ? (
         <p className="opacity-60">{t("shopNoProducts")}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          {/* Stable sort: sold-out products sink after available ones, without
-              disturbing relative order within each group. */}
-          {[...collection.products].sort((a, b) => Number(isProductSoldOut(a)) - Number(isProductSoldOut(b))).map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              collectionSlug={collection.slug}
-              orderable={!closed}
-              onAdded={handleAdded}
-            />
-          ))}
-        </div>
+        <>
+          {collection.products.length > 1 && (
+            <div className="flex gap-2 mb-5 flex-wrap">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("shopSearchProducts")}
+                className="flex-1 min-w-[160px] px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+              />
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+                className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+              >
+                <option value="">{t("shopFilterAllStock")}</option>
+                <option value="in_stock">{t("shopFilterInStock")}</option>
+                <option value="sold_out">{t("shopFilterSoldOut")}</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+              >
+                <option value="default">{t("shopSortDefault")}</option>
+                <option value="name_asc">{t("shopSortNameAsc")}</option>
+                <option value="name_desc">{t("shopSortNameDesc")}</option>
+                <option value="price_asc">{t("shopSortPriceAsc")}</option>
+                <option value="price_desc">{t("shopSortPriceDesc")}</option>
+              </select>
+            </div>
+          )}
+
+          {visibleProducts.length === 0 ? (
+            <p className="opacity-60">{t("shopNoProductsMatch")}</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+              {visibleProducts.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  collectionSlug={collection.slug}
+                  orderable={!closed}
+                  onAdded={handleAdded}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {addedMsg && (
@@ -139,6 +201,7 @@ export default function Collection() {
         </Link>
       )}
       </main>
+      <ShopFooter />
     </>
   )
 }

@@ -11,6 +11,13 @@ vi.mock("../api/shop", () => ({
   fetchCollection: (...args) => fetchCollection(...args),
 }))
 
+// ShopFooter (rendered on every shop page) fetches /api/settings — mocked
+// here so tests don't attempt a real network call.
+vi.mock("axios", async (importOriginal) => {
+  const actual = await importOriginal()
+  return { default: { ...actual.default, get: vi.fn().mockResolvedValue({ data: {} }) } }
+})
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: Collection } = await import("./Collection")
@@ -69,6 +76,79 @@ describe("Collection — product ordering", () => {
 
     const names = [...container.querySelectorAll("h3")].map((h) => h.textContent)
     expect(names).toEqual(["Avail A", "Avail B", "Sold A", "Sold B"])
+  })
+})
+
+describe("Collection — search, filter, sort", () => {
+  function twoProducts(over1 = {}, over2 = {}) {
+    return baseCollection({
+      products: [
+        { id: 1, name: "Photocard", price: 35000, description: null, images: [], variants: [{ id: 1, label: "A1", stock_qty: 5 }], ...over1 },
+        { id: 2, name: "Poster", price: 90000, description: null, images: [], variants: [{ id: 2, label: "A1", stock_qty: 5 }], ...over2 },
+      ],
+    })
+  }
+
+  it("filters products by name, case-insensitively", async () => {
+    fetchCollection.mockResolvedValue(twoProducts())
+    const container = await renderCollection()
+
+    const searchInput = container.querySelector('input[placeholder="Search by name..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "poster")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Poster")
+    expect(container.textContent).not.toContain("Photocard")
+  })
+
+  it("filters by stock status", async () => {
+    fetchCollection.mockResolvedValue(twoProducts(
+      {},
+      { variants: [{ id: 2, label: "A1", stock_qty: 0 }] }
+    ))
+    const container = await renderCollection()
+
+    const stockSelect = [...container.querySelectorAll("select")][0]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(stockSelect, "sold_out")
+      stockSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Poster")
+    expect(container.textContent).not.toContain("Photocard")
+  })
+
+  it("sorts by price low-high", async () => {
+    fetchCollection.mockResolvedValue(twoProducts())
+    const container = await renderCollection()
+
+    const sortSelect = [...container.querySelectorAll("select")][1]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(sortSelect, "price_asc")
+      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent)
+    expect(names).toEqual(["Photocard", "Poster"])
+  })
+
+  it("shows a no-match message when the search matches nothing", async () => {
+    fetchCollection.mockResolvedValue(twoProducts())
+    const container = await renderCollection()
+
+    const searchInput = container.querySelector('input[placeholder="Search by name..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "nobody")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("No products match your search.")
   })
 })
 

@@ -66,6 +66,90 @@ describe("Shop — collection ordering", () => {
   })
 })
 
+describe("Shop — search, filter, sort", () => {
+  it("filters collections by title, case-insensitively", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "hobby", title: "Hobby Horizon", status: "active", product_count: 1 },
+      { id: 2, slug: "winter", title: "Winter Fest", status: "active", product_count: 1 },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Search by name..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "winter")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Winter Fest")
+    expect(container.textContent).not.toContain("Hobby Horizon")
+  })
+
+  it("filters by status", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Active One", status: "active", product_count: 1 },
+      { id: 2, slug: "b", title: "Ended One", status: "closed", product_count: 1 },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const statusSelect = [...container.querySelectorAll("select")][0]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(statusSelect, "active")
+      statusSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Active One")
+    expect(container.textContent).not.toContain("Ended One")
+  })
+
+  it("sorts by name A-Z", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "z", title: "Zebra Drop", status: "active", product_count: 1 },
+      { id: 2, slug: "a", title: "Apple Drop", status: "active", product_count: 1 },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const sortSelect = [...container.querySelectorAll("select")][1]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(sortSelect, "name_asc")
+      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    expect(titles).toEqual(["Apple Drop", "Zebra Drop"])
+  })
+
+  it("shows a no-match message when the search matches nothing", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "hobby", title: "Hobby Horizon", status: "active", product_count: 1 },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Search by name..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "nobody")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("No collections match your search.")
+  })
+})
+
 describe("Shop — closed drop overlay", () => {
   it("shows a 'this drop has ended' overlay on the thumbnail for a closed collection", async () => {
     fetchCollections.mockResolvedValue([
@@ -97,24 +181,11 @@ describe("Shop — closed drop overlay", () => {
 })
 
 describe("Shop — footer", () => {
-  it("shows the brand name (from /api/settings), copyright, and an Admin link", async () => {
+  // Full footer content/behavior is covered by ShopFooter.test.jsx — this
+  // just confirms Shop.jsx actually renders it.
+  it("renders the shared ShopFooter", async () => {
     fetchCollections.mockResolvedValue([])
-    axios.get.mockResolvedValue({ data: { artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" } } })
-
-    const container = await renderShop()
-    await flush()
-
-    const footer = container.querySelector("footer")
-    expect(footer).toBeTruthy()
-    expect(footer.textContent).toContain("Kamidayhehe")
-    expect(footer.textContent).toContain("Made with ♥")
-    const adminBtn = [...footer.querySelectorAll("button")].find((b) => b.textContent === "Admin")
-    expect(adminBtn).toBeTruthy()
-  })
-
-  it("still renders a footer without crashing when /api/settings fails", async () => {
-    fetchCollections.mockResolvedValue([])
-    axios.get.mockRejectedValue(new Error("network down"))
+    axios.get.mockResolvedValue({ data: {} })
 
     const container = await renderShop()
     await flush()

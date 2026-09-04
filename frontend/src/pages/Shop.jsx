@@ -1,18 +1,28 @@
 import { useEffect, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import axios from "axios"
+import { Link } from "react-router-dom"
 import { fetchCollections } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
-import { getLocalized } from "../utils/localize"
 import ShopHeader from "../components/shop/ShopHeader"
+import ShopFooter from "../components/shop/ShopFooter"
+
+function sortCollections(list, sortBy) {
+  const sorted = [...list]
+  if (sortBy === "name_asc") sorted.sort((a, b) => a.title.localeCompare(b.title, "vi"))
+  else if (sortBy === "name_desc") sorted.sort((a, b) => b.title.localeCompare(a.title, "vi"))
+  else if (sortBy === "newest") sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  else if (sortBy === "oldest") sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  // Default: stable sort, closed (ended) drops sink after active ones,
+  // without disturbing relative order within each group.
+  else sorted.sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
+  return sorted
+}
 
 export default function Shop() {
-  const { t, lang } = useLanguage()
-  const navigate = useNavigate()
+  const { t } = useLanguage()
   const [collections, setCollections] = useState(null)
-  // Same brand name shown in the portfolio page's own footer — fetched
-  // here too since the shop is a separate page tree with no shared layout.
-  const [artistName, setArtistName] = useState("")
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [sortBy, setSortBy] = useState("default")
 
   useEffect(() => {
     fetchCollections()
@@ -20,11 +30,14 @@ export default function Shop() {
       .catch(() => setCollections([]))
   }, [])
 
-  useEffect(() => {
-    axios.get("/api/settings")
-      .then((r) => setArtistName(getLocalized(r.data?.artistName, lang)))
-      .catch(() => {})
-  }, [lang])
+  const visibleCollections = sortCollections(
+    (collections || []).filter((c) => {
+      if (search.trim() && !c.title.toLowerCase().includes(search.trim().toLowerCase())) return false
+      if (statusFilter && c.status !== statusFilter) return false
+      return true
+    }),
+    sortBy
+  )
 
   return (
     <>
@@ -36,10 +49,43 @@ export default function Shop() {
       {collections === null && <p className="opacity-60">{t("shopLoading")}</p>}
       {collections?.length === 0 && <p className="opacity-60">{t("shopEmpty")}</p>}
 
+      {collections?.length > 0 && (
+        <div className="flex gap-2 mb-6 flex-wrap">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("shopSearchCollections")}
+            className="flex-1 min-w-[180px] px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          >
+            <option value="">{t("shopFilterAllStatus")}</option>
+            <option value="active">{t("shopFilterActive")}</option>
+            <option value="closed">{t("shopFilterEnded")}</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          >
+            <option value="default">{t("shopSortDefault")}</option>
+            <option value="name_asc">{t("shopSortNameAsc")}</option>
+            <option value="name_desc">{t("shopSortNameDesc")}</option>
+            <option value="newest">{t("shopSortNewest")}</option>
+            <option value="oldest">{t("shopSortOldest")}</option>
+          </select>
+        </div>
+      )}
+
+      {collections?.length > 0 && visibleCollections.length === 0 && (
+        <p className="opacity-60 mb-6">{t("shopNoCollectionsMatch")}</p>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-        {/* Stable sort: closed (ended) drops sink after active ones, without
-            disturbing relative order within each group. */}
-        {[...(collections || [])].sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed")).map((c) => (
+        {visibleCollections.map((c) => (
           <Link
             key={c.id}
             to={`/merchandise/${c.slug}`}
@@ -72,16 +118,7 @@ export default function Shop() {
       </div>
       </main>
 
-      <footer className="border-t border-[var(--border-brand)] mt-10">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center text-sm opacity-70">
-          <span>© {new Date().getFullYear()} {artistName}. {lang === "vi" ? "Bảo lưu mọi quyền." : "All rights reserved."}</span>
-          <span className="flex items-center gap-3">
-            <span className="whitespace-nowrap">Made with ♥</span>
-            <span aria-hidden="true">·</span>
-            <button type="button" onClick={() => navigate("/admin")} className="hover:text-[var(--text-link)]">Admin</button>
-          </span>
-        </div>
-      </footer>
+      <ShopFooter />
     </>
   )
 }
