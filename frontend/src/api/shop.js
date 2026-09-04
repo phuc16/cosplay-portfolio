@@ -144,8 +144,10 @@ export const adminDownloadBookkeepingCsv = (params) =>
   api.get("/api/admin/stats/bookkeeping/export.csv", { params, responseType: "blob" }).then((r) => r.data)
 
 // ── Shipping ──
-export const adminListShippingExportOrders = () =>
-  api.get("/api/admin/shipping/export/orders").then((r) => r.data)
+export const adminListShippingExportOrders = (collectionId) =>
+  api.get("/api/admin/shipping/export/orders", {
+    params: collectionId ? { collection_id: collectionId } : {},
+  }).then((r) => r.data)
 
 export const adminSetShippingPayer = (id, shippingPayer) =>
   api.patch(`/api/admin/shipping/export/orders/${id}/payer`, { shipping_payer: shippingPayer }).then((r) => r.data)

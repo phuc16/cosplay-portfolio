@@ -45,9 +45,11 @@ function buildRoster(orders) {
         product_name: i.product_name_snapshot,
         variant_label: i.variant_label_snapshot,
         qty: i.qty,
+        image_url: i.image_url || null,
       })),
       paid,
       amount_due: amountDue,
+      prepared: Boolean(order.prepared),
     })
   }
 

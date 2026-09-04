@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react"
 import {
   adminListShippingExportOrders, adminSetShippingPayer, adminSetOrderPrepared, adminGenerateShippingExport, adminGetOrder,
+  adminListCollections,
 } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 
@@ -53,10 +54,9 @@ function downloadBase64(base64, filename) {
   URL.revokeObjectURL(url)
 }
 
-// Client-side, not a backend param: this list is already fetched in full
-// (every ship order still awaiting a tracking code — never large enough to
-// paginate), so filtering what's already in memory is simpler than adding
-// a search param to a route with no other filters today.
+// Client-side, not a backend param: within one collection's worth of orders
+// (never large enough to paginate), filtering what's already in memory is
+// simpler than adding a search param alongside the collection filter.
 function matchesSearch(o, term) {
   if (!term) return true
   const needle = term.trim().toLowerCase()
@@ -66,6 +66,8 @@ function matchesSearch(o, term) {
 }
 
 export default function ShippingExport() {
+  const [collections, setCollections] = useState([])
+  const [collectionId, setCollectionId] = useState("")
   const [orders, setOrders] = useState([])
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState(new Set())
@@ -81,9 +83,13 @@ export default function ShippingExport() {
   const [itemsByOrderId, setItemsByOrderId] = useState({})
 
   useEffect(() => {
+    adminListCollections().then(setCollections).catch(() => setCollections([]))
+  }, [])
+
+  useEffect(() => {
     const requestId = requestIdRef.current + 1
     requestIdRef.current = requestId
-    adminListShippingExportOrders()
+    adminListShippingExportOrders(collectionId || undefined)
       .then((data) => {
         if (requestIdRef.current !== requestId) return
         setOrders(data)
@@ -92,7 +98,12 @@ export default function ShippingExport() {
         if (requestIdRef.current !== requestId) return
         setOrders([])
       })
-  }, [])
+  }, [collectionId])
+
+  const selectCollection = (value) => {
+    setSelected(new Set())
+    setCollectionId(value)
+  }
 
   const toggleSelected = (id) => {
     setSelected((prev) => {
@@ -168,6 +179,18 @@ export default function ShippingExport() {
 
   return (
     <div>
+      <label className="flex flex-col text-xs gap-1 mb-3 max-w-xs">
+        Bộ sưu tập
+        <select
+          value={collectionId}
+          onChange={(e) => selectCollection(e.target.value)}
+          className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+        >
+          <option value="">— Tất cả bộ sưu tập —</option>
+          {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+        </select>
+      </label>
+
       {orders.length === 0 && <p className="opacity-60">Không có đơn nào cần xuất.</p>}
 
       {orders.length > 0 && (
@@ -197,8 +220,8 @@ export default function ShippingExport() {
                     <th className="pr-2">Tỉnh/Thành</th>
                     <th className="pr-2">Giá trị</th>
                     <th className="pr-2">Miễn phí ship</th>
-                    <th className="pr-2">Đã chuẩn bị</th>
-                    <th></th>
+                    <th className="pr-2">Sản phẩm</th>
+                    <th>Chuẩn bị</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -226,20 +249,26 @@ export default function ShippingExport() {
                           />
                         </td>
                         <td className="pr-2 py-1">
-                          <input
-                            type="checkbox"
-                            data-testid={`prepared-${o.id}`}
-                            checked={Boolean(o.prepared)}
-                            onChange={() => togglePrepared(o)}
-                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(o.id)}
+                            className="text-xs underline"
+                          >
+                            {expandedId === o.id ? "Ẩn" : "Sản phẩm"}
+                          </button>
                         </td>
                         <td className="py-1">
                           <button
                             type="button"
-                            onClick={() => toggleExpanded(o.id)}
-                            className="px-2 py-0.5 text-xs border rounded-lg border-[var(--border-brand)]"
+                            data-testid={`prepared-${o.id}`}
+                            onClick={() => togglePrepared(o)}
+                            className={`px-2.5 py-1 text-xs rounded-full border font-medium whitespace-nowrap ${
+                              o.prepared
+                                ? "bg-[var(--surface-success)] border-[var(--border-success)] text-[var(--text-success)]"
+                                : "bg-[var(--surface-warning)] border-[var(--border-warning)] text-[var(--text-warning)]"
+                            }`}
                           >
-                            {expandedId === o.id ? "Ẩn" : "Cần đóng gói"}
+                            {o.prepared ? "Đã đóng gói" : "Cần đóng gói"}
                           </button>
                         </td>
                       </tr>
@@ -250,9 +279,12 @@ export default function ShippingExport() {
                             {itemsByOrderId[o.id] === undefined && <p className="opacity-60">Đang tải...</p>}
                             {itemsByOrderId[o.id] === null && <p className="text-red-500">Không tải được sản phẩm.</p>}
                             {Array.isArray(itemsByOrderId[o.id]) && (
-                              <ul className="list-disc pl-4">
+                              <ul className="pl-0">
                                 {itemsByOrderId[o.id].map((i) => (
-                                  <li key={i.id}>
+                                  <li key={i.id} className="flex items-center gap-1.5 py-0.5">
+                                    {i.image_url
+                                      ? <img src={i.image_url} alt="" className="w-6 h-6 object-cover rounded" />
+                                      : <span className="w-6 h-6 rounded bg-[var(--surface-neutral)]" />}
                                     {i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty}
                                   </li>
                                 ))}

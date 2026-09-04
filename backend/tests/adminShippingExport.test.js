@@ -62,6 +62,18 @@ async function seed() {
   return o.id
 }
 
+async function seedInCollection(collectionId) {
+  const pid = await catalog.createProduct({ collection_id: collectionId, name: "Card", price: 120000 })
+  await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+  const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+  const o = await orders.createOrder({
+    items: [{ variant_id: v.id, qty: 1 }],
+    buyer, fulfillment_method: "ship", payment_method: "bank",
+  })
+  await orders.transitionOrder(o.id, "confirmed")
+  return o.id
+}
+
 beforeEach(async () => {
   await resetTables("order_items", "orders", "product_variants", "products", "collections")
 })
@@ -113,6 +125,21 @@ describe("GET /api/admin/shipping/export/orders", () => {
 
     const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
     expect(res.body.find((x) => x.id === o.id)).toBeUndefined()
+  })
+
+  it("filters to a single collection when collection_id is given, and lists across all when omitted", async () => {
+    const cidA = await catalog.createCollection({ title: "Drop A", status: "active" })
+    const cidB = await catalog.createCollection({ title: "Drop B", status: "active" })
+    const idA = await seedInCollection(cidA)
+    const idB = await seedInCollection(cidB)
+
+    const filtered = await authed(request(app).get("/api/admin/shipping/export/orders").query({ collection_id: cidA }))
+    expect(filtered.body.map((o) => o.id)).toEqual([idA])
+
+    const all = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    const allIds = all.body.map((o) => o.id)
+    expect(allIds).toContain(idA)
+    expect(allIds).toContain(idB)
   })
 
   it("never includes order_token in the listing response", async () => {

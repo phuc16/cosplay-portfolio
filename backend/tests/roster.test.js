@@ -68,16 +68,16 @@ describe("buildRoster — paid vs collect-at-handover", () => {
 })
 
 describe("buildRoster — items", () => {
-  it("maps each order's item snapshots to product_name/variant_label/qty", () => {
+  it("maps each order's item snapshots to product_name/variant_label/qty/image_url", () => {
     const { rows } = buildRoster([order({
       items: [
-        { product_name_snapshot: "Photocard", variant_label_snapshot: "A1", qty: 2 },
+        { product_name_snapshot: "Photocard", variant_label_snapshot: "A1", qty: 2, image_url: "/api/storage/shop/a.webp" },
         { product_name_snapshot: "Poster", variant_label_snapshot: "Std", qty: 1 },
       ],
     })])
     expect(rows[0].items).toEqual([
-      { product_name: "Photocard", variant_label: "A1", qty: 2 },
-      { product_name: "Poster", variant_label: "Std", qty: 1 },
+      { product_name: "Photocard", variant_label: "A1", qty: 2, image_url: "/api/storage/shop/a.webp" },
+      { product_name: "Poster", variant_label: "Std", qty: 1, image_url: null },
     ])
   })
 
@@ -102,6 +102,18 @@ describe("buildRoster — pickup_code", () => {
   it("includes pickup_code on every row", () => {
     const { rows } = buildRoster([order({ pickup_code: "482913" })])
     expect(rows[0].pickup_code).toBe("482913")
+  })
+})
+
+describe("buildRoster — prepared", () => {
+  it("includes prepared, coerced to a boolean, on every row", () => {
+    const { rows } = buildRoster([order({ id: 1, prepared: 1 }), order({ id: 2, prepared: 0 })])
+    expect(rows.map((r) => r.prepared)).toEqual([true, false])
+  })
+
+  it("defaults prepared to false when the column is absent", () => {
+    const { rows } = buildRoster([order()])
+    expect(rows[0].prepared).toBe(false)
   })
 })
 

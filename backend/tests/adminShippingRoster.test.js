@@ -182,6 +182,38 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(poster.qty).toBe(2)
   })
 
+  it("defaults prepared to false, and reflects the shared prepared toggle used by the shipping queue", async () => {
+    const { collectionId, orderId } = await seedPickupOrder()
+    const before = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
+    expect(before.body.rows.find((r) => r.order_id === orderId).prepared).toBe(false)
+
+    await authed(request(app).patch(`/api/admin/shipping/export/orders/${orderId}/prepared`).send({ prepared: true }))
+
+    const after = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
+    expect(after.body.rows.find((r) => r.order_id === orderId).prepared).toBe(true)
+  })
+
+  it("includes each item's variant photo, falling back to the product's photo when the variant has none", async () => {
+    const cid = await catalog.createCollection({ title: "Photo Drop", status: "active", allow_pickup: true })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 40000, images: ["/api/storage/shop/products/p1.webp"] })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5, image_url: "/api/storage/shop/variants/a1.webp" }, { label: "B1", stock_qty: 5 }])
+    const [variants] = await db.query("SELECT id, label FROM product_variants WHERE product_id = ? ORDER BY label", [pid])
+    const vA1 = variants.find((v) => v.label === "A1")
+    const vB1 = variants.find((v) => v.label === "B1")
+    const o = await orders.createOrder({
+      items: [{ variant_id: vA1.id, qty: 1 }, { variant_id: vB1.id, qty: 1 }],
+      buyer, fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${cid}`))
+    const row = res.body.rows.find((r) => r.order_id === o.id)
+    const itemA1 = row.items.find((i) => i.variant_label === "A1")
+    const itemB1 = row.items.find((i) => i.variant_label === "B1")
+    expect(itemA1.image_url).toBe("/api/storage/shop/variants/a1.webp")
+    expect(itemB1.image_url).toBe("/api/storage/shop/products/p1.webp")
+  })
+
   it("includes pickup_code in the roster row", async () => {
     const { collectionId, orderId } = await seedPickupOrder()
     const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))

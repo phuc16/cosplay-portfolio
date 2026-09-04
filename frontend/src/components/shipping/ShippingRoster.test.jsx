@@ -4,10 +4,12 @@ import { act } from "react"
 
 const adminListCollections = vi.fn()
 const adminGetPickupRoster = vi.fn()
+const adminSetOrderPrepared = vi.fn()
 
 vi.mock("../../api/shop", () => ({
   adminListCollections: (...args) => adminListCollections(...args),
   adminGetPickupRoster: (...args) => adminGetPickupRoster(...args),
+  adminSetOrderPrepared: (...args) => adminSetOrderPrepared(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -42,6 +44,7 @@ async function flush() { await act(async () => {}) }
 beforeEach(() => {
   adminListCollections.mockReset()
   adminGetPickupRoster.mockReset()
+  adminSetOrderPrepared.mockReset()
   adminListCollections.mockResolvedValue([{ id: 1, title: "Drop" }, { id: 2, title: "Drop 2" }])
 })
 
@@ -72,7 +75,7 @@ describe("ShippingRoster", () => {
     await setSelectValue(container.querySelector("select"), "1")
     await flush()
 
-    const rows = container.querySelectorAll("tbody tr")
+    const rows = container.querySelectorAll('[data-testid^="order-row-"]')
     expect(rows).toHaveLength(2)
     expect(rows[0].textContent).toContain("Ánh Dương")
     expect(rows[0].textContent).toContain("Đã thanh toán")
@@ -98,7 +101,7 @@ describe("ShippingRoster", () => {
     await setSelectValue(container.querySelector("select"), "1")
     await flush()
 
-    const rows = container.querySelectorAll("tbody tr")
+    const rows = container.querySelectorAll('[data-testid^="order-row-"]')
     const paidRow = rows[0]
     const codRow = rows[1]
     expect(paidRow.textContent).toContain("Đã thanh toán")
@@ -127,13 +130,98 @@ describe("ShippingRoster", () => {
     await setSelectValue(container.querySelector("select"), "1")
     await flush()
 
-    const row = container.querySelector("tbody tr")
-    expect(row.textContent).toContain("Photocard")
-    expect(row.textContent).toContain("A1")
-    expect(row.textContent).toContain("x2")
-    expect(row.textContent).toContain("Keychain")
-    expect(row.textContent).toContain("B2")
-    expect(row.textContent).toContain("x3")
+    const detail = container.querySelector('[data-testid="order-detail-1"]')
+    expect(detail.textContent).toContain("Photocard")
+    expect(detail.textContent).toContain("A1")
+    expect(detail.textContent).toContain("× 2")
+    expect(detail.textContent).toContain("Keychain")
+    expect(detail.textContent).toContain("B2")
+    expect(detail.textContent).toContain("× 3")
+  })
+
+  it("collapses the item list on screen behind a toggle, but always renders it in full for print", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [
+            { product_name: "Photocard", variant_label: "A1", qty: 2 },
+            { product_name: "Keychain", variant_label: "B2", qty: 3 },
+          ],
+          paid: true, amount_due: 0,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const detail = container.querySelector('[data-testid="order-detail-1"]')
+    // Its own full-width row below the order row, not crammed into the
+    // narrow "Sản phẩm" cell — collapsed by default on screen, but the print
+    // override keeps it in the DOM and visible when the page is printed.
+    expect(detail.className).toContain("hidden")
+    expect(detail.className).toContain("print:table-row")
+    expect(detail.textContent).toContain("Photocard")
+
+    const toggle = container.querySelector('[data-testid="order-row-1"] button')
+    expect(toggle.textContent).toBe("2 sản phẩm")
+
+    await act(async () => toggle.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(container.querySelector('[data-testid="order-detail-1"]').className).not.toContain("hidden")
+    expect(container.querySelector('[data-testid="order-row-1"] button').textContent).toBe("Ẩn")
+  })
+
+  it("shows a variant photo per item when the row has one, and a placeholder when it doesn't", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [
+            { product_name: "Photocard", variant_label: "A1", qty: 2, image_url: "/api/storage/shop/a.webp" },
+            { product_name: "Keychain", variant_label: "B2", qty: 3, image_url: null },
+          ],
+          paid: true, amount_due: 0,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    expect(container.querySelector('img[src="/api/storage/shop/a.webp"]')).not.toBeNull()
+  })
+
+  it("shows a prepared pill defaulting to 'Cần đóng gói', toggling it via adminSetOrderPrepared", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+          prepared: false,
+        },
+      ],
+      excluded: [],
+    })
+    adminSetOrderPrepared.mockResolvedValue({ ok: true })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const toggle = container.querySelector('[data-testid="prepared-1"]')
+    expect(toggle.textContent).toBe("Cần đóng gói")
+
+    await act(async () => toggle.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await flush()
+
+    expect(adminSetOrderPrepared).toHaveBeenCalledWith(1, true)
+    expect(container.querySelector('[data-testid="prepared-1"]').textContent).toBe("Đã đóng gói")
   })
 
   it("shows excluded orders with their reason", async () => {
@@ -250,11 +338,17 @@ describe("ShippingRoster", () => {
     const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT, mã nhận..."]')
     await setInputValue(searchInput, "trần")
 
-    const rows = container.querySelectorAll("tbody tr")
+    const rows = container.querySelectorAll('[data-testid^="order-row-"]')
     expect(rows).toHaveLength(2)
     expect(rows[0].className).toContain("hidden")
     expect(rows[0].className).toContain("print:table-row")
     expect(rows[1].className).not.toContain("hidden")
+
+    // The non-matching order's detail row must also stay print-visible, so a
+    // quick on-screen lookup can never shrink what actually gets printed.
+    const details = container.querySelectorAll('[data-testid^="order-detail-"]')
+    expect(details[0].className).toContain("hidden")
+    expect(details[0].className).toContain("print:table-row")
     expect(adminGetPickupRoster).not.toHaveBeenCalled()
   })
 

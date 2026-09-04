@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react"
-import { adminListCollections, adminGetPickupRoster } from "../../api/shop"
+import { Fragment, useEffect, useRef, useState } from "react"
+import { adminListCollections, adminGetPickupRoster, adminSetOrderPrepared } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 
 // Hides a non-matching row on screen (className "hidden") but forces it back
@@ -20,7 +20,34 @@ export default function ShippingRoster() {
   const [roster, setRoster] = useState(null)
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
+  const [expandedIds, setExpandedIds] = useState(() => new Set())
   const requestIdRef = useRef(0)
+
+  const toggleExpanded = (orderId) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(orderId)) next.delete(orderId); else next.add(orderId)
+      return next
+    })
+  }
+
+  // Purely informational — never gates handover, just lets a seller tick off
+  // orders they've already packed while working through the roster. Same
+  // toggle/endpoint as the shipping queue's "Đã chuẩn bị" checkbox.
+  const togglePrepared = async (row) => {
+    const next = !row.prepared
+    try {
+      const res = await adminSetOrderPrepared(row.order_id, next)
+      if (res?.ok) {
+        setRoster((prev) => ({
+          ...prev,
+          rows: prev.rows.map((r) => (r.order_id === row.order_id ? { ...r, prepared: next } : r)),
+        }))
+      }
+    } catch {
+      setError("Không cập nhật được trạng thái chuẩn bị hàng")
+    }
+  }
 
   useEffect(() => {
     adminListCollections().then(setCollections).catch(() => setCollections([]))
@@ -115,35 +142,81 @@ export default function ShippingRoster() {
                       <th className="pr-2">SĐT</th>
                       <th className="pr-2">Sản phẩm</th>
                       <th className="pr-2">Thanh toán</th>
-                      <th>Số tiền cần thu</th>
+                      <th className="pr-2">Số tiền cần thu</th>
+                      <th className="print:hidden">Chuẩn bị</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {roster.rows.map((r) => (
-                      <tr
-                        key={r.order_id}
-                        className={`border-t border-[var(--border-brand)] ${matchesSearch(r, search) ? "" : "hidden print:table-row"}`}
-                      >
-                        <td className="pr-2 py-1">☐</td>
-                        <td className="pr-2 py-1">{r.order_code}</td>
-                        <td className="pr-2 py-1">{r.pickup_code}</td>
-                        <td className="pr-2 py-1">{r.buyer_name}</td>
-                        <td className="pr-2 py-1">{r.phone}</td>
-                        <td className="pr-2 py-1">
-                          <ul className="list-disc pl-4">
-                            {r.items.map((i, idx) => (
-                              <li key={idx}>{i.product_name} ({i.variant_label}) x{i.qty}</li>
-                            ))}
-                          </ul>
-                        </td>
-                        <td className="pr-2 py-1 font-semibold">
-                          {r.paid ? "Đã thanh toán" : "Thu khi giao"}
-                        </td>
-                        <td className="py-1 font-bold text-base">
-                          {r.paid ? "—" : formatVnd(r.amount_due)}
-                        </td>
-                      </tr>
-                    ))}
+                    {roster.rows.map((r) => {
+                      const rowVisible = matchesSearch(r, search)
+                      const detailVisible = rowVisible && expandedIds.has(r.order_id)
+                      return (
+                        <Fragment key={r.order_id}>
+                          <tr
+                            data-testid={`order-row-${r.order_id}`}
+                            className={`border-t border-[var(--border-brand)] ${rowVisible ? "" : "hidden print:table-row"}`}
+                          >
+                            <td className="pr-2 py-1">☐</td>
+                            <td className="pr-2 py-1">{r.order_code}</td>
+                            <td className="pr-2 py-1">{r.pickup_code}</td>
+                            <td className="pr-2 py-1">{r.buyer_name}</td>
+                            <td className="pr-2 py-1">{r.phone}</td>
+                            <td className="pr-2 py-1 align-top">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(r.order_id)}
+                                className="text-xs underline print:hidden"
+                              >
+                                {expandedIds.has(r.order_id) ? "Ẩn" : `${r.items.length} sản phẩm`}
+                              </button>
+                            </td>
+                            <td className="pr-2 py-1 font-semibold">
+                              {r.paid ? "Đã thanh toán" : "Thu khi giao"}
+                            </td>
+                            <td className="pr-2 py-1 font-bold text-base">
+                              {r.paid ? "—" : formatVnd(r.amount_due)}
+                            </td>
+                            <td className="py-1 print:hidden">
+                              <button
+                                type="button"
+                                data-testid={`prepared-${r.order_id}`}
+                                onClick={() => togglePrepared(r)}
+                                className={`px-2.5 py-1 text-xs rounded-full border font-medium whitespace-nowrap ${
+                                  r.prepared
+                                    ? "bg-[var(--surface-success)] border-[var(--border-success)] text-[var(--text-success)]"
+                                    : "bg-[var(--surface-warning)] border-[var(--border-warning)] text-[var(--text-warning)]"
+                                }`}
+                              >
+                                {r.prepared ? "Đã đóng gói" : "Cần đóng gói"}
+                              </button>
+                            </td>
+                          </tr>
+                          {/* Own full-width row rather than crammed into the narrow
+                              "Sản phẩm" cell — collapsed by default on screen so a long
+                              cart doesn't blow out the row, but always shown in full
+                              when printed, since this is the physical checklist staff
+                              hand items off against at the door. */}
+                          <tr
+                            data-testid={`order-detail-${r.order_id}`}
+                            className={`border-t border-[var(--border-brand)] ${detailVisible ? "" : "hidden"} print:table-row`}
+                          >
+                            <td></td>
+                            <td colSpan={8} className="pb-2">
+                              <ul className="pl-0">
+                                {r.items.map((i, idx) => (
+                                  <li key={idx} className="flex items-center gap-1.5 py-0.5">
+                                    {i.image_url
+                                      ? <img src={i.image_url} alt="" className="w-6 h-6 object-cover rounded print:hidden" />
+                                      : <span className="w-6 h-6 rounded bg-[var(--surface-neutral)] print:hidden" />}
+                                    {i.product_name} · {i.variant_label} × {i.qty}
+                                  </li>
+                                ))}
+                              </ul>
+                            </td>
+                          </tr>
+                        </Fragment>
+                      )
+                    })}
                   </tbody>
                 </table>
                 </div>

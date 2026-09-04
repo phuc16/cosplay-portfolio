@@ -7,6 +7,7 @@ const adminSetShippingPayer = vi.fn()
 const adminSetOrderPrepared = vi.fn()
 const adminGenerateShippingExport = vi.fn()
 const adminGetOrder = vi.fn()
+const adminListCollections = vi.fn()
 
 vi.mock("../../api/shop", () => ({
   adminListShippingExportOrders: (...args) => adminListShippingExportOrders(...args),
@@ -14,6 +15,7 @@ vi.mock("../../api/shop", () => ({
   adminSetOrderPrepared: (...args) => adminSetOrderPrepared(...args),
   adminGenerateShippingExport: (...args) => adminGenerateShippingExport(...args),
   adminGetOrder: (...args) => adminGetOrder(...args),
+  adminListCollections: (...args) => adminListCollections(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -76,6 +78,8 @@ beforeEach(() => {
   adminSetOrderPrepared.mockReset()
   adminGenerateShippingExport.mockReset()
   adminGetOrder.mockReset()
+  adminListCollections.mockReset()
+  adminListCollections.mockResolvedValue([{ id: 1, title: "Drop" }, { id: 2, title: "Drop 2" }])
   lastAnchorDownload = null
 })
 
@@ -87,11 +91,35 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("Không có đơn nào cần xuất")
   })
 
+  it("lists orders across all collections by default", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    await renderShippingExport()
+    await flush()
+    expect(adminListShippingExportOrders).toHaveBeenCalledWith(undefined)
+  })
+
+  it("refetches filtered by collection_id when a collection is chosen, and clears the current selection", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    const container = await renderShippingExport()
+    await flush()
+
+    const orderCheckbox = container.querySelector('input[type="checkbox"]')
+    await click(orderCheckbox)
+    expect(orderCheckbox.checked).toBe(true)
+
+    const collectionSelect = container.querySelector("select")
+    await act(async () => setSelectValue(collectionSelect, "2"))
+    await flush()
+
+    expect(adminListShippingExportOrders).toHaveBeenLastCalledWith("2")
+    expect(container.querySelector('input[type="checkbox"]').checked).toBe(false)
+  })
+
   it("lists eligible orders with a checkbox each", async () => {
     adminListShippingExportOrders.mockResolvedValue([order(), order({ id: 2, order_code: "DH2" })])
     const container = await renderShippingExport()
     await flush()
-    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(6)
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(4)
     expect(container.textContent).toContain("DH1")
     expect(container.textContent).toContain("DH2")
   })
@@ -155,13 +183,14 @@ describe("ShippingExport", () => {
     expect(freeshipToggle.checked).toBe(true)
   })
 
-  it("toggles prepared via adminSetOrderPrepared when the prepared checkbox is clicked", async () => {
+  it("toggles prepared via adminSetOrderPrepared when the prepared pill is clicked", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminSetOrderPrepared.mockResolvedValue({ ok: true })
     const container = await renderShippingExport()
     await flush()
 
     const preparedToggle = container.querySelector('[data-testid="prepared-1"]')
+    expect(preparedToggle.textContent).toBe("Cần đóng gói")
     await click(preparedToggle)
 
     expect(adminSetOrderPrepared).toHaveBeenCalledWith(1, true)
@@ -176,7 +205,7 @@ describe("ShippingExport", () => {
     const preparedToggle = container.querySelector('[data-testid="prepared-1"]')
     await click(preparedToggle)
 
-    expect(preparedToggle.checked).toBe(true)
+    expect(container.querySelector('[data-testid="prepared-1"]').textContent).toBe("Đã đóng gói")
   })
 
   it("generates and triggers download of the export with the selected order and batch fields", async () => {
@@ -250,7 +279,7 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("Không xuất được file")
   })
 
-  it("lazily loads and shows an order's items when 'Cần đóng gói' is clicked, so the seller knows what to pack", async () => {
+  it("lazily loads and shows an order's items when 'Sản phẩm' is clicked, so the seller knows what to pack", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminGetOrder.mockResolvedValue({
       id: 1,
@@ -260,7 +289,7 @@ describe("ShippingExport", () => {
     await flush()
     expect(adminGetOrder).not.toHaveBeenCalled()
 
-    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Cần đóng gói")
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
     await click(toggleButton)
     await flush()
 
@@ -270,13 +299,29 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("2")
   })
 
+  it("shows a variant photo per item when the order has one", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockResolvedValue({
+      id: 1,
+      items: [{ id: 11, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 2, image_url: "/api/storage/shop/a.webp" }],
+    })
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
+    await click(toggleButton)
+    await flush()
+
+    expect(container.querySelector('img[src="/api/storage/shop/a.webp"]')).not.toBeNull()
+  })
+
   it("collapses the items panel on a second click without re-fetching (cached)", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminGetOrder.mockResolvedValue({ id: 1, items: [{ id: 11, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1 }] })
     const container = await renderShippingExport()
     await flush()
 
-    const toggle = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "Cần đóng gói" || b.textContent === "Ẩn")
+    const toggle = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm" || b.textContent === "Ẩn")
     await click(toggle())
     await flush()
     expect(container.textContent).toContain("Card")
@@ -297,7 +342,7 @@ describe("ShippingExport", () => {
     const container = await renderShippingExport()
     await flush()
 
-    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Cần đóng gói")
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
     await click(toggleButton)
     await flush()
 

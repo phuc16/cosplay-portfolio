@@ -36,6 +36,12 @@ function cellToText(value) {
   return String(value)
 }
 
+/** products.images is a JSON column; mysql2 may hand back a string or an array. */
+function firstImage(value) {
+  const arr = Array.isArray(value) ? value : (typeof value === "string" && value.trim() ? JSON.parse(value) : [])
+  return Array.isArray(arr) ? arr[0] || null : null
+}
+
 async function sheetToRows2D(buffer) {
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buffer)
@@ -59,9 +65,14 @@ module.exports = function adminShippingRoutes() {
   }
 
   // Ship orders ready to book: confirmed, ship fulfillment, no tracking code yet.
+  // collection_id is optional — omitted, this still lists every eligible ship
+  // order across collections, same as before this filter existed.
   router.get("/shipping/export/orders", async (req, res) => {
     try {
-      const rows = await orders.listOrders({ status: "confirmed" })
+      const collectionId = Number(req.query.collection_id)
+      const filter = { status: "confirmed" }
+      if (Number.isInteger(collectionId) && collectionId > 0) filter.collection_id = collectionId
+      const rows = await orders.listOrders(filter)
       const eligible = rows.filter((o) => o.fulfillment_method === "ship" && !o.tracking_code)
       res.json(eligible.map((o) => ({
         id: o.id,
@@ -365,7 +376,7 @@ module.exports = function adminShippingRoutes() {
       }
 
       const [orderRows] = await db.query(
-        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code, created_at
+        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code, created_at, prepared
            FROM orders
           WHERE collection_id = ? AND status = 'confirmed' AND fulfillment_method = 'pickup'`,
         [collectionId]
@@ -373,17 +384,24 @@ module.exports = function adminShippingRoutes() {
 
       let itemRows = []
       if (orderRows.length > 0) {
+        // Same variant-photo-with-product-fallback join as orderRepo.attachItems
+        // — staff packing at the roster need to see the item, not just its name.
         [itemRows] = await db.query(
-          `SELECT order_id, product_name_snapshot, variant_label_snapshot, qty
-             FROM order_items WHERE order_id IN (?)`,
+          `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty,
+                  pv.image_url AS variant_image_url, p.images AS product_images
+             FROM order_items oi
+             LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
+             LEFT JOIN products p ON p.id = pv.product_id
+            WHERE oi.order_id IN (?)`,
           [orderRows.map((o) => o.id)]
         )
       }
 
       const itemsByOrder = new Map()
-      for (const item of itemRows) {
+      for (const { variant_image_url, product_images, ...item } of itemRows) {
+        const withImage = { ...item, image_url: variant_image_url || firstImage(product_images) }
         if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, [])
-        itemsByOrder.get(item.order_id).push(item)
+        itemsByOrder.get(item.order_id).push(withImage)
       }
       const withItems = orderRows.map((o) => ({ ...o, items: itemsByOrder.get(o.id) || [] }))
 
