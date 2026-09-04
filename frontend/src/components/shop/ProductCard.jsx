@@ -13,6 +13,9 @@ function stockLabel(variant, t) {
 
 const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 
+/** A product with no variants isn't a purchasable stock item, so it's never "sold out". */
+export const isProductSoldOut = (p) => p.variants?.length > 0 && p.variants.every(isSoldOut)
+
 /** Most variants carry a single photo (image_url); a few carry a gallery (images). */
 function variantImages(v) {
   if (v.images?.length) return v.images
@@ -53,9 +56,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
   const detail = view && typeof view === "object" ? view : null
   const detailImages = detail ? variantImages(detail) : []
 
-  // Every path that opens a variant's detail goes through this, so quantity
-  // (and which photo is shown) never carries over stale from a previously
-  // viewed (or the same, reselected) variant.
+  // Every path to a variant's detail goes through this, so qty/photo never carry over stale from a prior variant.
   const openDetail = (v) => {
     setQty(1)
     setActiveImage(0)
@@ -73,11 +74,17 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
       collection_slug: collectionSlug,
     })
     onAdded?.(v.label)
-    setView(null)
+    // A multi-variant product's buyer is often picking up several codes in
+    // one visit — dropping them back into the picker grid lets them add the
+    // next one immediately, instead of re-opening the whole product from
+    // the collection page for every single code.
+    setView(product.variants.length > 1 ? "grid" : null)
   }
 
   const openPicker = () => {
-    if (!orderable || !hasVariants) return
+    if (!hasVariants) return
+    // A closed collection still lets a buyer browse what was in it — only
+    // adding to cart is blocked (see the "Add to cart" button below).
     // A single-variant product has nothing to "browse" — go straight to its detail.
     if (product.variants.length === 1) openDetail(product.variants[0])
     else setView("grid")
@@ -139,7 +146,9 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
 
             <div className="overflow-y-auto p-4 sm:p-5 pt-3">
               <div className={"grid " + galleryGridClasses(product.variants.length) + " gap-3"}>
-                {product.variants.map((v) => {
+                {/* Stable sort: sold-out variants sink after in-stock ones,
+                    without disturbing relative order within each group. */}
+                {[...product.variants].sort((a, b) => Number(isSoldOut(a)) - Number(isSoldOut(b))).map((v) => {
                   const img = variantImages(v)[0] || cover
                   return (
                     <button
@@ -219,9 +228,9 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
                 )}
               </div>
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
-              <p className="text-sm opacity-70">{stockLabel(detail, t)}</p>
+              <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : t("shopClosed")}</p>
 
-              {!isSoldOut(detail) && (
+              {!isSoldOut(detail) && orderable && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -260,7 +269,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
               <div className="flex gap-2 mt-2">
                 <button
                   type="button"
-                  disabled={isSoldOut(detail)}
+                  disabled={isSoldOut(detail) || !orderable}
                   onClick={() => commitAdd(detail)}
                   className="flex-1 px-3 py-2 rounded-xl bg-[var(--brand)] text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >

@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom"
 import { fetchCollection } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { renderMarkdown } from "../utils/markdown"
-import ProductCard from "../components/shop/ProductCard"
+import ProductCard, { isProductSoldOut } from "../components/shop/ProductCard"
 import ShopHeader from "../components/shop/ShopHeader"
 
 export default function Collection() {
@@ -114,7 +114,9 @@ export default function Collection() {
         <p className="opacity-60">{t("shopNoProducts")}</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          {collection.products.map((p) => (
+          {/* Stable sort: sold-out products sink after available ones, without
+              disturbing relative order within each group. */}
+          {[...collection.products].sort((a, b) => Number(isProductSoldOut(a)) - Number(isProductSoldOut(b))).map((p) => (
             <ProductCard
               key={p.id}
               product={p}
@@ -130,7 +132,7 @@ export default function Collection() {
         <Link
           to="/cart"
           role="status"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm shadow-lg hover:opacity-90"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm shadow-lg hover:opacity-90"
         >
           {addedMsg}
           <span className="underline">{t("cart")}</span>

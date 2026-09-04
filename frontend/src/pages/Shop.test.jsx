@@ -48,6 +48,54 @@ beforeEach(() => {
   axios.get.mockReset()
 })
 
+describe("Shop — collection ordering", () => {
+  it("sinks closed (ended) collections after active ones, without reordering within each group", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "ended-a", title: "Ended A", status: "closed", product_count: 0 },
+      { id: 2, slug: "active-a", title: "Active A", status: "active", product_count: 1 },
+      { id: 3, slug: "ended-b", title: "Ended B", status: "closed", product_count: 0 },
+      { id: 4, slug: "active-b", title: "Active B", status: "active", product_count: 2 },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    expect(titles).toEqual(["Active A", "Active B", "Ended A", "Ended B"])
+  })
+})
+
+describe("Shop — closed drop overlay", () => {
+  it("shows a 'this drop has ended' overlay on the thumbnail for a closed collection", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "ended", title: "Ended", status: "closed", product_count: 0, cover_image: "https://x/cover.jpg" },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const img = container.querySelector('img[src="https://x/cover.jpg"]')
+    const overlay = img.parentElement.querySelector("span")
+    expect(overlay).toBeTruthy()
+    expect(overlay.textContent).toBe("This drop has ended")
+  })
+
+  it("shows no overlay for an active collection's thumbnail", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "active", title: "Active", status: "active", product_count: 1, cover_image: "https://x/cover.jpg" },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const img = container.querySelector('img[src="https://x/cover.jpg"]')
+    expect(img.parentElement.querySelector("span")).toBeNull()
+  })
+})
+
 describe("Shop — footer", () => {
   it("shows the brand name (from /api/settings), copyright, and an Admin link", async () => {
     fetchCollections.mockResolvedValue([])

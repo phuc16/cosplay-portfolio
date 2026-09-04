@@ -55,6 +55,23 @@ beforeEach(() => {
   fetchCollection.mockReset()
 })
 
+describe("Collection — product ordering", () => {
+  it("sinks fully sold-out products after available ones, without reordering within each group", async () => {
+    fetchCollection.mockResolvedValue(baseCollection({
+      products: [
+        { id: 1, name: "Sold A", price: 1000, description: null, images: [], variants: [{ id: 1, label: "A1", stock_qty: 0 }] },
+        { id: 2, name: "Avail A", price: 1000, description: null, images: [], variants: [{ id: 2, label: "A1", stock_qty: 5 }] },
+        { id: 3, name: "Sold B", price: 1000, description: null, images: [], variants: [{ id: 3, label: "A1", stock_qty: 0 }, { id: 4, label: "B1", stock_qty: 0 }] },
+        { id: 4, name: "Avail B", price: 1000, description: null, images: [], variants: [{ id: 5, label: "A1", stock_qty: 0 }, { id: 6, label: "B1", stock_qty: 2 }] },
+      ],
+    }))
+    const container = await renderCollection()
+
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent)
+    expect(names).toEqual(["Avail A", "Avail B", "Sold A", "Sold B"])
+  })
+})
+
 describe("Collection — add-to-cart toast", () => {
   it("shows a toast linking to /cart after adding an item", async () => {
     fetchCollection.mockResolvedValue(baseCollection())

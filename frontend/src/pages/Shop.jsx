@@ -37,19 +37,28 @@ export default function Shop() {
       {collections?.length === 0 && <p className="opacity-60">{t("shopEmpty")}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-        {collections?.map((c) => (
+        {/* Stable sort: closed (ended) drops sink after active ones, without
+            disturbing relative order within each group. */}
+        {[...(collections || [])].sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed")).map((c) => (
           <Link
             key={c.id}
             to={`/merchandise/${c.slug}`}
             className="rounded-2xl border border-[var(--border-brand)] overflow-hidden hover:shadow-[var(--shadow-pink-hover)] transition"
           >
             {(c.thumbnail_image || c.cover_image) && (
-              <img
-                src={c.thumbnail_image || c.cover_image}
-                alt={c.title}
-                loading="lazy"
-                className="w-full aspect-[4/3] object-cover"
-              />
+              <div className="relative">
+                <img
+                  src={c.thumbnail_image || c.cover_image}
+                  alt={c.title}
+                  loading="lazy"
+                  className="w-full aspect-[4/3] object-cover"
+                />
+                {c.status === "closed" && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-white font-semibold">
+                    {t("shopClosed")}
+                  </span>
+                )}
+              </div>
             )}
             <div className="p-4">
               <h2 className="font-semibold">{c.title}</h2>

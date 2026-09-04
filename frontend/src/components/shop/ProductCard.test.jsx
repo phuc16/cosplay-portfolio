@@ -69,7 +69,7 @@ describe("ProductCard — variant detail modal", () => {
     expect(readCart()).toEqual([])
   })
 
-  it("adds to cart and closes the modal when the modal's add button is clicked", async () => {
+  it("adds to cart and returns to the gallery grid (not closing entirely) for a multi-variant product", async () => {
     const { container, onAdded } = await renderCard()
     await openVariantDetail(container, "A1")
 
@@ -79,6 +79,27 @@ describe("ProductCard — variant detail modal", () => {
     expect(readCart()).toHaveLength(1)
     expect(readCart()[0].variant_id).toBe(1)
     expect(onAdded).toHaveBeenCalledWith("A1")
+
+    // Back at the picker, not closed — so the buyer can add another code
+    // right away instead of re-opening the product from the collection page.
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog).toBeTruthy()
+    const labels = [...dialog.querySelectorAll("span")].map((s) => s.textContent)
+    expect(labels).toContain("A1")
+    expect(labels).toContain("B2")
+  })
+
+  it("closes entirely after adding to cart for a single-variant product", async () => {
+    const single = baseProduct({ variants: [{ id: 9, label: "Std", stock_qty: null, image_url: null }] })
+    const { container, onAdded } = await renderCard({ product: single })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const addBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Add to cart")
+    await act(async () => { addBtn.click() })
+
+    expect(readCart()).toHaveLength(1)
+    expect(onAdded).toHaveBeenCalledWith("Std")
     expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 
@@ -209,6 +230,26 @@ describe("ProductCard — full variant gallery", () => {
     expect(labels).toContain("B2")
   })
 
+  it("sinks sold-out variants after in-stock ones in the gallery, without reordering within each group", async () => {
+    const product = baseProduct({
+      variants: [
+        { id: 1, label: "Sold1", stock_qty: 0, image_url: null },
+        { id: 2, label: "InStock1", stock_qty: 5, image_url: null },
+        { id: 3, label: "Sold2", stock_qty: 0, image_url: null },
+        { id: 4, label: "InStock2", stock_qty: 3, image_url: null },
+      ],
+    })
+    const { container } = await renderCard({ product })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const labels = [...dialog.querySelectorAll("button")]
+      .map((b) => [...b.querySelectorAll("span")].map((s) => s.textContent)[0])
+      .filter(Boolean)
+    expect(labels).toEqual(["InStock1", "InStock2", "Sold1", "Sold2"])
+  })
+
   it("clicking a thumbnail in the gallery opens that variant's detail modal", async () => {
     const { container } = await renderCard()
     const coverImg = container.querySelector('img[src="https://x/cover.jpg"]')
@@ -247,12 +288,31 @@ describe("ProductCard — full variant gallery", () => {
     expect(dialog.querySelector("button")?.textContent).not.toBe("Close")
   })
 
-  it("does not open the picker from a card click when the collection is closed (not orderable)", async () => {
+  it("still opens the picker from a card click when the collection is closed (not orderable) — browsing is allowed, buying isn't", async () => {
     const { container } = await renderCard({ orderable: false })
     const cover = container.querySelector('img[src="https://x/cover.jpg"]')
     await act(async () => { cover.click() })
 
-    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(container.querySelector('[role="dialog"]')).toBeTruthy()
+  })
+
+  it("disables Add to cart and hides the qty stepper in the detail modal for a closed (not orderable) collection, even for in-stock variants", async () => {
+    const { container } = await renderCard({ orderable: false })
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const addBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Add to cart")
+    expect(addBtn.disabled).toBe(true)
+    expect(dialog.querySelector('input[type="number"]')).toBeNull()
+  })
+
+  it("shows 'this drop has ended', not the (irrelevant) stock count, for a closed collection's in-stock variant", async () => {
+    const { container } = await renderCard({ orderable: false })
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).toContain("This drop has ended")
+    expect(dialog.textContent).not.toContain("left")
   })
 
   it("uses a narrow column layout for a small number of variants", async () => {
