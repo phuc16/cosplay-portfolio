@@ -11,19 +11,11 @@ const PIN_LOCKOUT_MINUTES = 15
 const ORDER_SESSION_HOURS = 24
 
 /**
- * Gates the public order page and its sibling routes (payment info, QR
- * images, proof upload) — order_token in the URL alone used to be
- * sufficient, which let anyone the buyer casually shared the link with
- * also see the pickup code and upload payment proof (griefing: an attacker
- * could overwrite it with a fake photo, causing admin to decline a real
- * order). Access now requires ONE of:
- *   - a valid admin JWT (the same one issued by POST /api/login) — an admin
- *     following a buyer's link (support, troubleshooting) never needs a PIN
- *   - a verified-PIN session JWT scoped to this exact order_token, issued
- *     by POST /:token/verify-pin
- * Any other case (missing/invalid/expired token, or a session scoped to a
- * DIFFERENT order) responds 401 with error "pin_required" — the frontend
- * treats any 401 here as "show the PIN entry gate", not "order not found".
+ * Gates the public order page and its sibling routes (payment info, QR,
+ * proof upload). Requires either an admin JWT, or a verified-PIN session JWT
+ * scoped to this exact order_token (from POST /:token/verify-pin). Any other
+ * case responds 401 "pin_required" — the frontend shows the PIN gate on any
+ * 401 here, not "order not found".
  */
 function orderAccess(req, res, next) {
   const header = req.headers.authorization

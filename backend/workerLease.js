@@ -1,36 +1,19 @@
 const crypto = require("crypto")
 const redis = require("./redis")
 
-// Singleton lease for the worker's polling loop. Guards against exactly the
-// incident documented in .superpowers/sdd/f14-reinvestigation-report.md: a
-// stale `node worker.js` (old build, missing code) running alongside the
-// current one, silently double-processing the same rows with no error and
-// no crash — because nothing stopped two processes from polling the same
-// DB at once. This is a NEW guard against *multiple processes*; it is
-// independent of (and does not touch) worker.js's existing in-process
-// `running` flag, which only guards against overlapping ticks within one
-// process.
-//
-// Implementation: a single Redis key held via `SET key holder PX ttl NX`,
-// renewed on every successful tick with a compare-and-extend Lua script so a
-// worker can only ever renew a lease it still actually owns (never someone
-// else's, e.g. after its own lease already expired and a new holder took
-// over). No graceful release is required or provided as part of normal
-// operation — the whole point is protecting against processes that die or
-// get orphaned ungracefully, so correctness must not depend on a shutdown
-// hook ever running. The key's TTL is the only cleanup mechanism.
+// Singleton lease guarding against multiple worker processes (e.g. a stale
+// deploy left running) double-processing the same rows — see
+// .superpowers/sdd/f14-reinvestigation-report.md. Independent of worker.js's
+// `running` flag, which only guards overlapping ticks within one process.
+// A Redis key (`SET key holder PX ttl NX`) renewed each tick via a
+// compare-and-extend Lua script, so a worker can only renew a lease it still
+// owns. No graceful release: correctness must hold even if a process dies
+// ungracefully, so the TTL is the only cleanup mechanism.
 const LEASE_KEY = "worker:lease"
 
-// The worker's poll tick is ~5s (see the setInterval at the bottom of
-// worker.js). The TTL must comfortably outlive tick-to-tick jitter (a slow
-// DB query, a GC pause, a burst of thumbnail work) so a healthy worker can
-// never lose its own lease just from normal timing variance, but still
-// expire soon enough after a real death that a stale-process incident is
-// caught quickly rather than lingering. 6x the tick interval is the chosen
-// multiple: a live worker renews on every tick, so it would have to miss six
-// consecutive ticks in a row (~30s of total silence) before losing a lease
-// it still holds — far beyond ordinary jitter — while a genuinely dead
-// process's lease still clears out within half a minute.
+// TTL = 6x the ~5s poll tick: a live worker renews every tick, so it'd need
+// to miss 6 in a row (~30s) before losing its own lease to jitter, while a
+// dead process's lease still clears within half a minute.
 const TICK_INTERVAL_MS = 5000
 const LEASE_TTL_MS = TICK_INTERVAL_MS * 6
 

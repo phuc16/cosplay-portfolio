@@ -9,10 +9,7 @@ module.exports = function adminEmailRoutes() {
 
   router.get("/email-templates", async (req, res) => {
     try {
-      // default_subject/default_body_html let the admin UI offer "restore
-      // default" without duplicating DEFAULT_TEMPLATES client-side — once a
-      // template has a saved override, getTemplate() no longer returns the
-      // shipped default, so it has to be sent alongside explicitly.
+      // default_subject/default_body_html let the UI offer "restore default" — once overridden, getTemplate() no longer returns the shipped default.
       const rows = await Promise.all(TYPES.map(async (type) => ({
         type,
         ...(await templates.getTemplate(type)),

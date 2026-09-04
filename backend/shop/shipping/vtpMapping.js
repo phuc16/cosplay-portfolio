@@ -34,12 +34,9 @@ function normalize(s) {
 }
 
 /** Requires the whole (prefix-stripped) province field to BE a Ho Chi Minh
- * City designation, not merely contain one as a substring. Substring
- * matching used to let "Đường Hồ Chí Minh" — a real highway running through
- * Nghệ An, Kon Tum, Đắk Lắk, Hòa Bình, Thanh Hóa, Bình Phước, etc. — falsely
- * select the intra-city service for a parcel nowhere near HCMC. Per spec
- * that's the dangerous direction: wrongly-inter-province only costs more
- * postage, wrongly-intra-province fails to deliver outright. */
+ * City designation, not merely contain one as a substring — "Đường Hồ Chí
+ * Minh" (a highway running through several other provinces) would otherwise
+ * falsely match intra-city service for a parcel nowhere near HCMC. */
 function isHoChiMinh(province) {
   const n = normalize(province)
   if (!n) return false

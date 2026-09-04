@@ -69,12 +69,7 @@ export default function Admin() {
     }
   }, [])
 
-  // A restored or still-active token can still expire mid-session (8h JWT) —
-  // when that happens the server answers 401/403 and every admin tab would
-  // otherwise sit there silently failing. Try the refresh token first (it
-  // outlives the access token by design, 30 days vs 8h) and retry the
-  // request that triggered this; only drop to the login screen if there is
-  // no refresh token or it's also no longer valid.
+  // On a 401/403 mid-session, try the refresh token (30d vs the access token's 8h) and retry; only log out if that also fails.
   useEffect(() => {
     if (!token) return
     const id = api.interceptors.response.use(

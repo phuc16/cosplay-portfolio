@@ -8,21 +8,15 @@ import SearchableSelect from "./SearchableSelect"
 const STREET_SEARCH_DEBOUNCE_MS = 400
 
 /**
- * Province (34) + ward picked from reference data, not a live per-keystroke
- * autocomplete — replaces the original Goong-autocomplete design, which
- * fired a request on nearly every character typed with NO ward/province
- * scoping at all (the whole country was the search space). Data reflects
- * Vietnam's post-2025 restructuring (34 provinces/cities, no district
- * level), fetched through our own backend (backend/shop/vnAddress.js),
- * which caches each response for 30 days.
+ * Province (34) + ward picked from reference data (Vietnam's post-2025
+ * restructuring: 34 provinces/cities, no district level), fetched through
+ * our own backend (backend/shop/vnAddress.js), which caches each response
+ * for 30 days.
  *
  * Street/house-number search auto-fires (debounced, see
  * STREET_SEARCH_DEBOUNCE_MS) once BOTH province and ward are picked — the
- * street field itself is disabled until then. Unlike the original
- * nationwide autocomplete, every query here is scoped to one ward, cheap
- * enough to run per typing pause rather than requiring an explicit
- * search-button click (the design this replaces, from when the query was
- * unscoped and thus much more expensive per keystroke).
+ * street field itself is disabled until then, keeping every query scoped to
+ * one ward and cheap enough to run per typing pause.
  */
 export default function AddressFields({ value, onChange }) {
   const { t } = useLanguage()
@@ -89,8 +83,7 @@ export default function AddressFields({ value, onChange }) {
   // Debounced auto-search: restarts on every keystroke (street/wardCode/
   // provinceCode all in the dependency array) so only the LAST pause in a
   // burst of typing actually fires a request. Never runs before both
-  // province and ward are picked (streetEnabled) — that's what keeps each
-  // query scoped and cheap, unlike the original nationwide design.
+  // province and ward are picked (streetEnabled), keeping each query scoped.
   useEffect(() => {
     if (!streetEnabled || street.trim().length < 3) {
       setStreetSuggestions([])

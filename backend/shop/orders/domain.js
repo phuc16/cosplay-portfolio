@@ -19,13 +19,9 @@ function generatePickupCode() {
 }
 
 /**
- * 6-digit numeric PIN gating the public order page (see routes/orders.js's
- * orderAccess middleware). order_token alone used to be sufficient to view
- * an order and act on it (upload payment proof, see the pickup code) — this
- * closes that gap for anyone who only has the order LINK (e.g. a buyer
- * casually shared it), since the PIN travels through a separate channel
- * (email) rather than sitting in the same URL. Same shape as pickup_code —
- * short enough to read from an email and type on a phone.
+ * 6-digit numeric PIN gating the public order page (routes/orders.js's
+ * orderAccess middleware) — guards against anyone who only has the order
+ * link, since the PIN travels via a separate channel (email).
  */
 function generateAccessPin() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0")

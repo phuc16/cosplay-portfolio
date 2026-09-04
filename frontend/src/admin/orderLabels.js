@@ -1,10 +1,8 @@
 /**
- * The single source of Vietnamese labels for order status, payment method,
- * fulfilment method, and admin action buttons. The admin panel is
- * hardcoded Vietnamese (unlike the bilingual shop, which uses
- * frontend/src/i18n/translations.js) — this module is that hardcoding's
- * one place, so the orders list and the statistics page cannot drift
- * apart on wording. STATUS_LABELS previously lived only in StatsDrop.jsx.
+ * Single source of Vietnamese labels for order status/payment/fulfilment/
+ * action buttons — the admin panel is hardcoded Vietnamese (unlike the
+ * bilingual shop's i18n/translations.js), so this keeps the orders list and
+ * stats page from drifting apart on wording.
  */
 export const STATUS_LABELS = {
   pending: "Chờ xử lý",
