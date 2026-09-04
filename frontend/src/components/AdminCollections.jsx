@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   adminListCollections, adminCreateCollection, adminUpdateCollection,
   adminDeleteCollection, adminCopyCollection, adminUploadImage,
@@ -26,6 +26,7 @@ export default function AdminCollections() {
   const [editingId, setEditingId] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   const [error, setError] = useState("")
+  const formRef = useRef(null)
 
   const reload = () => adminListCollections().then(setCollections)
 
@@ -70,6 +71,11 @@ export default function AdminCollections() {
       payment_deadline_hours: c.payment_deadline_hours || "",
       cover_image: c.cover_image || "", thumbnail_image: c.thumbnail_image || "",
     })
+    // The edit form is one shared block below the whole list, not inline
+    // under each card — without this, clicking "Sửa" on an item far down
+    // the list changes state invisibly, leaving the admin looking at
+    // whatever they were already scrolled to.
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   const remove = async (id) => {
@@ -118,7 +124,7 @@ export default function AdminCollections() {
         </div>
       ))}
 
-      <div className="p-4 rounded-2xl border border-dashed border-[var(--border-brand)]">
+      <div ref={formRef} className="p-4 rounded-2xl border border-dashed border-[var(--border-brand)]">
         <p className="font-medium mb-3">{editingId ? "Sửa bộ sưu tập" : "Tạo bộ sưu tập"}</p>
 
         <input
