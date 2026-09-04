@@ -81,8 +81,8 @@ export const FAQ_ITEMS = [
       en: "Who pays for shipping?",
     },
     answer: {
-      vi: "Phí vận chuyển không nằm trong tổng tiền đơn hàng — bạn thanh toán phí này trực tiếp cho shipper khi nhận hàng.",
-      en: "Shipping isn't included in the order total — you pay that fee directly to the courier on delivery.",
+      vi: "Với đơn giao hàng: phí vận chuyển không nằm trong tổng tiền đơn hàng — bạn thanh toán phí này trực tiếp cho shipper khi nhận hàng. Đơn nhận tại sự kiện không phát sinh phí vận chuyển.",
+      en: "For orders shipped to you: shipping isn't included in the order total — you pay that fee directly to the courier on delivery. Event pickup orders have no shipping fee at all.",
     },
   },
   {
