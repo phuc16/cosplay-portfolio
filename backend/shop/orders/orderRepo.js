@@ -11,28 +11,20 @@ const TRANSITION_EMAILS = {
 }
 
 class OutOfStockError extends Error {
-  constructor(variantLabel) {
-    super(`Hết hàng: ${variantLabel}`)
+  constructor(variantLabel, productName) {
+    super(`Hết hàng: ${productName} - ${variantLabel}`)
     this.name = "OutOfStockError"
     this.variantLabel = variantLabel
+    this.productName = productName
   }
 }
 
-/**
- * Distinct from OutOfStockError: a cart line's variant_id matches no row at
- * all (deleted, or never existed) rather than one that exists but is sold
- * out. Reusing OutOfStockError for this used to stuff the placeholder label
- * "không tồn tại" ("doesn't exist") into the buyer-facing quoted-label
- * message, reading as if that literal string were a product name.
- */
+/** Distinct from OutOfStockError: the variant_id matches no row at all (deleted or never existed), not one that's merely sold out. */
 class VariantNotFoundError extends Error {
   constructor(missingIds) {
     super("Một sản phẩm trong giỏ hàng không còn tồn tại")
     this.name = "VariantNotFoundError"
-    // The route uses this to tell the client exactly which cart lines to
-    // drop — the buyer has no way to know which one is stale otherwise,
-    // and "refresh the page" alone does nothing: a stale line lives in
-    // localStorage, not anything a page reload would clear.
+    // Lets the client drop exactly the stale cart lines (they live in localStorage, not cleared by a page reload).
     this.missingVariantIds = missingIds
   }
 }
@@ -65,6 +57,22 @@ class FulfillmentNotOfferedError extends Error {
         : "Bộ sưu tập này không hỗ trợ giao hàng"
     )
     this.name = "FulfillmentNotOfferedError"
+  }
+}
+
+/**
+ * A cart line's collection is no longer "active" — most commonly, it was
+ * open when the item was added to the buyer's cart but the seller ended the
+ * drop (status -> "closed") before checkout. Mirrors OutOfStockError's shape
+ * (a real product/variant to quote) so the route can map it the same way:
+ * a 409 race the client cannot retry unchanged, not a 400 validation error.
+ */
+class CollectionNotActiveError extends Error {
+  constructor(variantLabel, productName) {
+    super(`Bộ sưu tập đã đóng: ${productName} - ${variantLabel}`)
+    this.name = "CollectionNotActiveError"
+    this.variantLabel = variantLabel
+    this.productName = productName
   }
 }
 
@@ -156,7 +164,8 @@ async function createOrder(input) {
     // block, while the same on product_variants does.
     const [rows] = await conn.query(
       `SELECT v.id, v.label, v.stock_qty, p.id AS product_id, p.name AS product_name,
-              p.price, p.collection_id, c.allow_ship, c.allow_pickup, c.payment_deadline_hours
+              p.price, p.collection_id, c.status AS collection_status,
+              c.allow_ship, c.allow_pickup, c.payment_deadline_hours
          FROM product_variants v
          JOIN products p ON p.id = v.product_id
          JOIN collections c ON c.id = p.collection_id
@@ -170,10 +179,17 @@ async function createOrder(input) {
       throw new VariantNotFoundError(ids.filter((id) => !foundIds.has(id)))
     }
 
-    // Every line's collection must actually offer the requested fulfillment
-    // method. A cart could in principle span collections; check each row's
-    // own collection rather than assuming a single one for the whole order.
+    // Every line's collection must still be open for ordering, and must
+    // actually offer the requested fulfillment method. A cart could in
+    // principle span collections; check each row's own collection rather
+    // than assuming a single one for the whole order. Checked with the same
+    // row lock as the stock check below, so a cart item added while a
+    // collection was "active" cannot slip through a race against the admin
+    // closing it — see CollectionNotActiveError.
     for (const row of rows) {
+      if (row.collection_status !== "active") {
+        throw new CollectionNotActiveError(row.label, row.product_name)
+      }
       if (input.fulfillment_method === "ship" && !row.allow_ship) {
         throw new FulfillmentNotOfferedError("ship")
       }
@@ -189,7 +205,7 @@ async function createOrder(input) {
       const variant = byId.get(id)
       const qty = wanted.get(id)
       if (!domain.isReservable(variant.stock_qty, qty)) {
-        throw new OutOfStockError(variant.label)
+        throw new OutOfStockError(variant.label, variant.product_name)
       }
       lines.push({
         variant_id: id,
@@ -288,12 +304,28 @@ async function createOrder(input) {
   }
 }
 
+/** products.images is a JSON column; mysql2 may hand back a string or an array. */
+function firstImage(value) {
+  const arr = Array.isArray(value) ? value : (typeof value === "string" && value.trim() ? JSON.parse(value) : [])
+  return Array.isArray(arr) ? arr[0] || null : null
+}
+
 async function attachItems(order) {
   if (!order) return null
-  const [items] = await db.query(
-    "SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC",
+  // pv.image_url is kept in sync with the variant's own gallery by catalogRepo;
+  // fall back to the product's images when the variant has none of its own.
+  const [rows] = await db.query(
+    `SELECT oi.*, pv.image_url AS variant_image_url, p.images AS product_images
+       FROM order_items oi
+       LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
+       LEFT JOIN products p ON p.id = pv.product_id
+      WHERE oi.order_id = ? ORDER BY oi.id ASC`,
     [order.id]
   )
+  const items = rows.map(({ variant_image_url, product_images, ...item }) => ({
+    ...item,
+    image_url: variant_image_url || firstImage(product_images),
+  }))
   return { ...order, items }
 }
 
@@ -314,7 +346,15 @@ async function getOrderByToken(token) {
 }
 
 async function getOrderById(id) {
-  const [[row]] = await db.query("SELECT * FROM orders WHERE id = ? LIMIT 1", [id])
+  // Same LEFT JOIN as getOrderByToken — the email sender needs
+  // pickup_location/pickup_note too, to tell a pickup buyer where to go.
+  const [[row]] = await db.query(
+    `SELECT o.*, c.pickup_location, c.pickup_note
+       FROM orders o
+       LEFT JOIN collections c ON c.id = o.collection_id
+      WHERE o.id = ? LIMIT 1`,
+    [id]
+  )
   return attachItems(row)
 }
 
@@ -426,18 +466,13 @@ async function transitionOrder(id, toStatus, extra = {}) {
     )
     if (!order) { await conn.rollback(); return false }
 
-    // canTransition alone is not enough for the expiry sweep: confirmed ->
-    // cancelled is a legal admin action, so a sweep that queued behind an
-    // admin's confirm would wake up, see 'confirmed', and cancel an order the
-    // buyer had just paid for — releasing its stock back to the shop. The
-    // sweep therefore states the status it acted on and we verify it here.
+    // Guards the expiry sweep against a race with a concurrent admin confirm.
     if (extra.expectedFromStatus !== undefined && order.status !== extra.expectedFromStatus) {
       await conn.rollback()
       return false
     }
 
-    // Same class of race on the deadline itself: an order whose expires_at was
-    // extended after the sweep's read must not be cancelled as overdue.
+    // Guards against a deadline extended after the sweep's unlocked read.
     if (extra.expiredBefore !== undefined) {
       const expiresAt = order.expires_at === null ? null : new Date(order.expires_at)
       if (expiresAt === null || expiresAt > new Date(extra.expiredBefore)) {
@@ -446,10 +481,7 @@ async function transitionOrder(id, toStatus, extra = {}) {
       }
     }
 
-    // Same class of race on proof-of-payment: a buyer who uploads their
-    // screenshot between the sweep's unlocked read and this locked check
-    // must not be auto-cancelled — they'd done their part before the sweep
-    // actually acted, even if not before it merely queued the row.
+    // Guards against proof uploaded after the sweep's unlocked read.
     if (extra.requireNoProof && order.payment_proof_url) {
       await conn.rollback()
       return false
@@ -581,4 +613,5 @@ module.exports = {
   EmptyCartError,
   RequestKeyConflictError,
   FulfillmentNotOfferedError,
+  CollectionNotActiveError,
 }

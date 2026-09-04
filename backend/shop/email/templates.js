@@ -4,7 +4,7 @@ const { formatOrderCode } = require("./../orders/domain")
 const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
-  "payment_note", "shop_name", "receiver_info",
+  "payment_note", "shop_name", "receiver_info", "shipping_fee_note", "prep_note",
 ]
 
 const SHOP_NAME = process.env.SHOP_NAME || "Shop"
@@ -19,12 +19,6 @@ const SHOP_EMAIL = process.env.SMTP_FROM || process.env.SMTP_USER || ""
  * block rather than substituted into the template body, so it always
  * renders as the very last section of the mail, below the QR — not baked
  * into `wrap()`, which finishes before the QR is even built.
- *
- * Previously also rendered a row of social-link badges here. Tried real
- * brand logos as data-URI <img>s first (broken-image icon in real
- * testing), then plain colored-circle + letter badges as a fallback — cut
- * entirely per explicit feedback: a fake-looking letter badge was worse
- * than no badge at all.
  */
 function footerHtml() {
   return `
@@ -47,11 +41,8 @@ const formatVnd = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`
 const BRAND = "#6BBF59"
 
 /**
- * "Thông tin nhận hàng" block (name/phone/address), same pattern as
- * Shopee's order confirmation — lets the buyer catch a typo'd phone or
- * address right away instead of only finding out when it fails to deliver.
- * Address is omitted for a pickup order (orderRepo nulls address_raw for
- * those regardless of what was submitted).
+ * "Thông tin nhận hàng" block: name/phone always, then either the ship
+ * address or the pickup location/note, matching what the order page shows.
  */
 function receiverInfoHtml(order) {
   const rows = [
@@ -60,6 +51,10 @@ function receiverInfoHtml(order) {
   ]
   if (order.fulfillment_method === "ship" && order.address_raw) {
     rows.push(["Địa chỉ nhận hàng", order.address_raw])
+  }
+  if (order.fulfillment_method === "pickup") {
+    if (order.pickup_location) rows.push(["Địa điểm nhận", order.pickup_location])
+    if (order.pickup_note) rows.push(["Ghi chú nhận hàng", order.pickup_note])
   }
   const cells = rows.map(([label, value]) => `
     <tr>
@@ -74,6 +69,11 @@ function receiverInfoHtml(order) {
 function itemsHtml(items = []) {
   const rows = items.map((i) => `
     <tr>
+      <td style="padding:8px 8px 8px 0;border-bottom:1px solid #f0f0f0;width:44px">
+        ${i.image_url
+          ? `<img src="${escapeHtml(SITE_URL + i.image_url)}" width="44" height="44" style="width:44px;height:44px;object-fit:cover;border-radius:8px;display:block" />`
+          : ""}
+      </td>
       <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px">${escapeHtml(i.product_name_snapshot)} · ${escapeHtml(i.variant_label_snapshot)} × ${Number(i.qty)}</td>
       <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-size:14px;white-space:nowrap">${formatVnd(i.unit_price_snapshot * i.qty)}</td>
     </tr>`).join("")
@@ -106,6 +106,17 @@ function buildVars(order) {
     payment_note: escapeHtml(order.payment_note || ""),
     shop_name: escapeHtml(SHOP_NAME),
     receiver_info: receiverInfoHtml(order),
+    // Only a ship order has a shipper to pay at the door — a pickup order's
+    // buyer never encounters this fee, so the note would just be confusing.
+    shipping_fee_note: order.fulfillment_method === "ship"
+      ? `<p style="font-size:12px;color:#888;margin:12px 0 0">Phí ship trả cho shipper khi nhận hàng.</p>`
+      : "",
+    // payment_confirmed's "what happens next" line — a pickup order is never
+    // "gửi hàng" (shipped), so it gets its own wording pointing at the
+    // pickup code/QR instead.
+    prep_note: order.fulfillment_method === "pickup"
+      ? "sẽ chuẩn bị hàng — mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận."
+      : "sẽ chuẩn bị và gửi hàng sớm nhất có thể.",
   }
 }
 
@@ -127,11 +138,8 @@ function validatePlaceholders(text) {
   return [...new Set(found.filter((name) => !PLACEHOLDERS.includes(name)))]
 }
 
-// Header bar + card, with the "view order" link as a footer — same shape
-// for every email so the seller's mail always reads as one consistent brand.
-// The order code line lives here (not per-template) so every lifecycle
-// email — order placed, payment confirmed, shipped, cancelled, and any
-// future one — shows it the same way without each template repeating it.
+// Header bar + card, shared by every template so the order code/receiver
+// info/link show up the same way everywhere without each one repeating them.
 const wrap = (inner) => `
 <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#fff">
   <div style="background:${BRAND};padding:18px 24px;border-radius:12px 12px 0 0">
@@ -140,10 +148,11 @@ const wrap = (inner) => `
   <div style="padding:24px;border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;color:#222;font-size:14px;line-height:1.6">
     <p style="margin:0 0 14px;font-size:13px;color:#888">Mã đơn hàng: <strong style="color:#222">{{order_id}}</strong></p>
     ${inner}
+    {{receiver_info}}
     <p style="margin:20px 0 0;font-size:14px">Trân trọng,<br/>{{shop_name}}</p>
-    <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#999">
-      <a href="{{order_url}}" style="color:${BRAND};text-decoration:none;font-weight:600">Xem đơn hàng →</a>
-    </p>
+    <div style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;text-align:center">
+      <a href="{{order_url}}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 28px;border-radius:8px">Xem đơn hàng →</a>
+    </div>
   </div>
 </div>`
 
@@ -155,14 +164,13 @@ const DEFAULT_TEMPLATES = {
       <p style="margin:0 0 12px">Vui lòng chuyển khoản rồi tải ảnh chuyển khoản lên trang đơn hàng — đơn sẽ chuyển sang <strong>Chờ xác nhận</strong> ngay khi bạn gửi ảnh. Gửi nhầm ảnh cũng không sao, bạn có thể thay ảnh khác sau đó.</p>
       {{items}}
       ${TOTAL_ROW}
-      <p style="font-size:12px;color:#888;margin:12px 0 0">Phí ship trả cho shipper khi nhận hàng.</p>
-      <p style="font-size:13px;margin:8px 0 0">{{payment_note}}</p>
-      {{receiver_info}}`),
+      {{shipping_fee_note}}
+      <p style="font-size:13px;margin:8px 0 0">{{payment_note}}</p>`),
   },
   payment_confirmed: {
     subject: "Đã xác nhận thanh toán đơn #{{order_id}}",
     body_html: wrap(`
-      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, mình đã xác nhận thanh toán — sẽ chuẩn bị và gửi hàng sớm nhất có thể.</p>
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, mình đã xác nhận thanh toán — {{prep_note}}</p>
       {{items}}
       ${TOTAL_ROW}`),
   },
@@ -175,7 +183,7 @@ const DEFAULT_TEMPLATES = {
           Mã vận đơn: <strong style="color:${BRAND}">{{tracking_code}}</strong>
         </td></tr>
       </table>
-      <p style="font-size:12px;color:#888;margin:12px 0 0">Phí ship trả cho shipper khi nhận hàng.</p>`),
+      {{shipping_fee_note}}`),
   },
   cancelled: {
     subject: "Đơn #{{order_id}} đã bị hủy",

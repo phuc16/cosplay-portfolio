@@ -56,6 +56,11 @@ function toPublicOrder(order) {
     // unguessable token in the URL, so this does trade some safety for a
     // buyer being able to catch a typo'd address/phone before it ships.
     buyer_name, phone, address_raw,
+    // Shown in place of the generic "save this link" note once an order is
+    // cancelled — the buyer lands here wanting to know why, not to be told
+    // to bookmark an order that's already dead. Same field the admin's own
+    // view and the cancellation email already show.
+    cancel_reason,
   } = order
   // The code is only meaningful once the order is actually paid for — an
   // unpaid pending order (or one that got cancelled after confirming) has
@@ -74,6 +79,7 @@ function toPublicOrder(order) {
     // order page never surfaced it before, leaving a buyer with no code to
     // reference when contacting support, only the opaque URL token.
     order_code: formatOrderCode(id, created_at),
+    cancel_reason: cancel_reason || null,
   }
 }
 
@@ -175,7 +181,16 @@ module.exports = function orderRoutes() {
       if (err instanceof repo.OutOfStockError) {
         return res.status(409).json({
           error: "out_of_stock",
-          message: `Rất tiếc, "${err.variantLabel}" vừa hết hàng. Vui lòng chọn lại.`,
+          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" vừa hết hàng. Vui lòng chọn lại.`,
+        })
+      }
+      // A cart line's collection stopped being "active" between add-to-cart
+      // and checkout (most commonly: the seller closed the drop) — a race
+      // the client cannot retry unchanged, same as OutOfStockError.
+      if (err instanceof repo.CollectionNotActiveError) {
+        return res.status(409).json({
+          error: "collection_not_active",
+          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" thuộc một đợt mở bán đã kết thúc. Vui lòng xóa khỏi giỏ hàng.`,
         })
       }
       // A colliding request_key belonging to a different buyer: the unique

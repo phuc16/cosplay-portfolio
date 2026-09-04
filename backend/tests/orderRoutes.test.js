@@ -173,12 +173,26 @@ describe("POST /api/orders", () => {
     }
   })
 
-  it("returns 409 when stock is insufficient", async () => {
+  it("returns 409 when stock is insufficient, quoting the product name alongside the variant label", async () => {
     const v = await seed(1)
     const res = await request(app).post("/api/orders")
       .send(body(v, { items: [{ variant_id: v, qty: 2 }] }))
     expect(res.status).toBe(409)
     expect(res.body.error).toBe("out_of_stock")
+    // A cart can hold the same variant label ("A1") across different
+    // products — the product name disambiguates which one is out of stock.
+    expect(res.body.message).toContain("Card")
+    expect(res.body.message).toContain("A1")
+  })
+
+  // A cart item can be added while its collection is "active" and then
+  // outlive that — the seller closes the drop before the buyer checks out.
+  it("returns 409 collection_not_active when the item's collection was closed after being added to cart", async () => {
+    const v = await seed(5, { status: "closed" })
+    const res = await request(app).post("/api/orders").send(body(v))
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe("collection_not_active")
+    expect(res.body.message).toContain("Card")
   })
 
   // A stale cart (e.g. the admin deleted the variant after it was added)
@@ -332,6 +346,24 @@ describe("GET /api/orders/:token", () => {
     expect(res.body).not.toHaveProperty("stock_released_at")
     expect(res.body).not.toHaveProperty("note")
     expect(res.body).not.toHaveProperty("email")
+  })
+
+  it("includes cancel_reason once cancelled, so the order page can show it instead of just the generic save-link note", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const stored = await orders.getOrderByToken(created.body.order_token)
+    await orders.transitionOrder(stored.id, "cancelled", { cancel_reason: "Hết hàng thực tế" })
+
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
+    expect(res.body.cancel_reason).toBe("Hết hàng thực tế")
+  })
+
+  it("has a null cancel_reason for a non-cancelled order", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
+    expect(res.body.cancel_reason).toBeFalsy()
   })
 
   it("includes the human-readable order_code shown everywhere else (admin, emails)", async () => {

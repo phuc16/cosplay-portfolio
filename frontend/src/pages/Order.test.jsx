@@ -97,6 +97,49 @@ describe("Order — order code", () => {
   })
 })
 
+describe("Order — QR caption differs by fulfillment method", () => {
+  it("shows both the pickup-flavored caption and the reopen-page caption for a pickup order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", status: "confirmed" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Show this QR code at pickup")
+    expect(container.textContent).toContain("reopen your order page")
+  })
+
+  it("shows the ship-flavored caption for a ship order, not the pickup wording", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "ship", status: "confirmed" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("reopen your order page")
+    expect(container.textContent).not.toContain("Show this QR code at pickup")
+  })
+})
+
+describe("Order — item photos", () => {
+  it("shows the variant's photo for an item that has one", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1, image_url: "/api/storage/shop/a.webp" }],
+    }))
+
+    const container = await renderOrder()
+
+    const img = container.querySelector('img[src="/api/storage/shop/a.webp"]')
+    expect(img).not.toBeNull()
+  })
+
+  it("renders a placeholder, not a broken image, for an item with no photo", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1, image_url: null }],
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.querySelector('img[alt=""]')).toBeNull()
+  })
+})
+
 describe("Order — tracking code", () => {
   it("labels the tracking code as a ViettelPost code, not just a bare number", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "shipped", tracking_code: "151045353461" }))
@@ -511,6 +554,33 @@ describe("Order — page heading reserves 'Order placed' for a confirmed order",
     const container = await renderOrder()
 
     expect(container.querySelector("h1").textContent).toBe("Order cancelled")
+  })
+})
+
+describe("Order — cancel reason", () => {
+  it("shows the cancel reason inside the status card when the order was cancelled with one", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "cancelled", cancel_reason: "Hết hàng thực tế" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Cancellation reason")
+    expect(container.textContent).toContain("Hết hàng thực tế")
+  })
+
+  it("shows no cancel reason line for a cancelled order that has none", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "cancelled", cancel_reason: null }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Cancellation reason")
+  })
+
+  it("shows no cancel reason line for a non-cancelled order even if one is somehow present", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed", cancel_reason: "Hết hàng thực tế" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Cancellation reason")
   })
 })
 

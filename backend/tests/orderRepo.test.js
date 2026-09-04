@@ -86,6 +86,18 @@ describe("createOrder", () => {
     expect(orders).toHaveLength(0)
   })
 
+  it("carries both the product name and variant label on OutOfStockError, to disambiguate a cart with the same variant label across products", async () => {
+    const { variantId } = await seedVariant(2)
+    try {
+      await repo.createOrder(order(variantId, 3))
+      throw new Error("expected createOrder to reject")
+    } catch (err) {
+      expect(err).toBeInstanceOf(repo.OutOfStockError)
+      expect(err.productName).toBe("Photocard")
+      expect(err.variantLabel).toBe("A1")
+    }
+  })
+
   it("rejects an empty cart", async () => {
     await expect(repo.createOrder({ ...order(1), items: [] })).rejects.toThrow(repo.EmptyCartError)
   })
@@ -259,6 +271,58 @@ describe("createOrder", () => {
 
     const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
     expect(v.stock_qty).toBe(5)
+    const [orders] = await db.query("SELECT id FROM orders")
+    expect(orders).toHaveLength(0)
+  })
+
+  // A cart item can be added while its collection is "active" and then
+  // outlive that — the seller closes the drop before the buyer checks out.
+  // Without this guard, createOrder never looked at collection.status at
+  // all, so a stale cart could still place an order against an ended drop.
+  it("refuses an order for a closed collection, leaving stock untouched", async () => {
+    const { variantId } = await seedVariant(5, { status: "closed" })
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
+
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(5)
+    const [orders] = await db.query("SELECT id FROM orders")
+    expect(orders).toHaveLength(0)
+  })
+
+  it("refuses an order for a draft collection (defense in depth — never publicly listed anyway)", async () => {
+    const { variantId } = await seedVariant(5, { status: "draft" })
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
+  })
+
+  it("refuses an order for an archived collection", async () => {
+    const { variantId } = await seedVariant(5, { status: "archived" })
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
+  })
+
+  it("carries the product name and variant label on CollectionNotActiveError, to identify which cart line is stuck", async () => {
+    const { variantId } = await seedVariant(5, { status: "closed" })
+    try {
+      await repo.createOrder(order(variantId, 1))
+      throw new Error("expected createOrder to reject")
+    } catch (err) {
+      expect(err).toBeInstanceOf(repo.CollectionNotActiveError)
+      expect(err.productName).toBe("Photocard")
+      expect(err.variantLabel).toBe("A1")
+    }
+  })
+
+  it("rejects a multi-item cart if any single line's collection is closed, even when the other line's collection is active", async () => {
+    const { variantId: activeId } = await seedVariant(5)
+    const closedCid = await catalog.createCollection({ title: "Closed Drop", status: "closed" })
+    const closedPid = await catalog.createProduct({ collection_id: closedCid, name: "Poster", price: 20000 })
+    await catalog.replaceVariants(closedPid, [{ label: "B1", stock_qty: 5 }])
+    const [[closedVariant]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [closedPid])
+
+    await expect(repo.createOrder({
+      ...order(activeId),
+      items: [{ variant_id: activeId, qty: 1 }, { variant_id: closedVariant.id, qty: 1 }],
+    })).rejects.toThrow(repo.CollectionNotActiveError)
+
     const [orders] = await db.query("SELECT id FROM orders")
     expect(orders).toHaveLength(0)
   })
@@ -748,6 +812,27 @@ describe("getOrderByToken", () => {
     const found = await repo.getOrderByToken(res.order_token)
     expect(found.items[0].product_name_snapshot).toBe("Photocard")
     expect(found.items[0].unit_price_snapshot).toBe(35000)
+    expect(found.items[0].image_url).toBeNull()
     void pid
+  })
+
+  it("includes the variant's own photo on each item", async () => {
+    const { pid, variantId } = await seedVariant(5)
+    await catalog.replaceVariants(pid, [{ id: variantId, label: "A1", image_url: "/api/storage/shop/variants/a1.webp", stock_qty: 5 }])
+    const res = await repo.createOrder(order(variantId, 1))
+
+    const found = await repo.getOrderByToken(res.order_token)
+    expect(found.items[0].image_url).toBe("/api/storage/shop/variants/a1.webp")
+  })
+
+  it("falls back to the product's photo when the variant has none of its own", async () => {
+    const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Photocard", price: 35000, images: ["/api/storage/shop/products/p1.webp"] })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+
+    const res = await repo.createOrder(order(v.id, 1))
+    const found = await repo.getOrderByToken(res.order_token)
+    expect(found.items[0].image_url).toBe("/api/storage/shop/products/p1.webp")
   })
 })

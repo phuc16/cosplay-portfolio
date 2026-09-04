@@ -87,6 +87,7 @@ export const translations = {
     orderPickupCode: "Pickup code",
     orderPickupCodeHint: "Show or read this to event staff if the QR code can't be scanned.",
     orderTrackingCodeLabel: "ViettelPost tracking code",
+    orderCancelReasonLabel: "Cancellation reason",
 
     // Payment instructions
     paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
@@ -104,7 +105,8 @@ export const translations = {
     proofTooLarge: "Image is too large. Please choose a file under 8MB.",
     proofSubmit: "Submit", proofPendingHint: "Check the photo, then submit.",
     proofCanReplace: "Sent the wrong screenshot? You can still replace it below.",
-    orderQrCaption: "Show this QR code at pickup or to the seller.",
+    orderQrCaptionPickup: "Show this QR code at pickup or to the seller.",
+    orderQrCaptionShip: "Scan this to reopen your order page anytime.",
 
     // Hero
     btnViewGallery: "View gallery",
@@ -246,6 +248,7 @@ export const translations = {
     orderPickupCode: "Mã nhận hàng",
     orderPickupCodeHint: "Đọc hoặc cho nhân viên xem mã này nếu không quét được mã QR.",
     orderTrackingCodeLabel: "Mã vận đơn Viettel Post",
+    orderCancelReasonLabel: "Lý do hủy",
 
     // Payment instructions
     paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",
@@ -263,7 +266,8 @@ export const translations = {
     proofCanReplace: "Gửi nhầm ảnh? Bạn vẫn có thể thay ảnh khác bên dưới.",
     proofError: "Không tải được ảnh lên. Vui lòng thử lại.",
     proofTooLarge: "Ảnh quá lớn. Vui lòng chọn ảnh dưới 8MB.",
-    orderQrCaption: "Đưa mã QR này khi nhận hàng hoặc cho người bán xem.",
+    orderQrCaptionPickup: "Đưa mã QR này khi nhận hàng tại sự kiện hoặc cho người bán xem.",
+    orderQrCaptionShip: "Quét mã này để mở lại trang đơn hàng bất cứ lúc nào.",
 
     // Hero
     btnViewGallery: "Xem bộ sưu tập",

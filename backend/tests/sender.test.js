@@ -227,7 +227,7 @@ describe("sendQueued: order QR gating", () => {
     expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
   })
 
-  it("cancelled ship order: no QR image or attachment", async () => {
+  it("cancelled ship order: still includes the QR image/attachment (order page is still worth a look)", async () => {
     const o = await seedOrder("ship")
     await orders.transitionOrder(o.id, "cancelled")
 
@@ -235,8 +235,8 @@ describe("sendQueued: order QR gating", () => {
 
     expect(sendMailMock).toHaveBeenCalledTimes(1)
     const sentArg = sendMailMock.mock.calls[0][0]
-    expect(sentArg.html).not.toContain("cid:orderqr")
-    expect(sentArg.attachments).toEqual([])
+    expect(sentArg.html).toContain("cid:orderqr")
+    expect(sentArg.attachments).toHaveLength(1)
   })
 
   it("pickup order: has the QR image and attachment even while still pending", async () => {
@@ -279,7 +279,7 @@ describe("sendQueued: order QR gating", () => {
     expect(sentArg.html).toContain("nhận hàng tại sự kiện")
   })
 
-  it("cancelled pickup order: no QR image, attachment, or pickup caption at all", async () => {
+  it("cancelled pickup order: includes the QR image/attachment, but no pickup caption (nothing to collect)", async () => {
     const o = await seedOrder("pickup")
     // transitionOrder already auto-enqueues the "cancelled" email itself
     // (TRANSITION_EMAILS) — no need to enqueue a second one here.
@@ -289,9 +289,9 @@ describe("sendQueued: order QR gating", () => {
 
     expect(sendMailMock).toHaveBeenCalledTimes(1)
     const sentArg = sendMailMock.mock.calls[0][0]
-    expect(sentArg.html).not.toContain("cid:orderqr")
+    expect(sentArg.html).toContain("cid:orderqr")
     expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
-    expect(sentArg.attachments).toEqual([])
+    expect(sentArg.attachments).toHaveLength(1)
   })
 
   it("cancelled order: includes the admin's cancel_reason when present", async () => {
@@ -313,6 +313,22 @@ describe("sendQueued: order QR gating", () => {
 
     const sentArg = sendMailMock.mock.calls[0][0]
     expect(sentArg.html).not.toContain("Lý do hủy")
+  })
+
+  it("places cancel_reason right after the greeting, ahead of the item list/total — not down by the QR/link", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "cancelled", { cancel_reason: "Hết hàng thực tế" })
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    const greetingIndex = html.indexOf("đã bị hủy")
+    const reasonIndex = html.indexOf("Hết hàng thực tế")
+    const itemsIndex = html.indexOf("Tổng cộng")
+    const linkIndex = html.indexOf("Xem đơn hàng")
+    expect(reasonIndex).toBeGreaterThan(greetingIndex)
+    expect(reasonIndex).toBeLessThan(itemsIndex)
+    expect(reasonIndex).toBeLessThan(linkIndex)
   })
 
   it("cancelled order: escapes HTML in an admin-supplied cancel_reason", async () => {
@@ -338,6 +354,101 @@ describe("sendQueued: order QR gating", () => {
     expect(sentArg.html).toContain("cid:orderqr")
     expect(sentArg.html).not.toContain("Mã xác nhận")
     expect(sentArg.html).not.toContain("null")
+  })
+})
+
+describe("sendQueued: receiver info and order code on every lifecycle email", () => {
+  it("shows the order code, buyer name, phone, and address in order_placed", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Mã đơn hàng")
+    expect(html).toContain("Thông tin nhận hàng")
+    expect(html).toContain(">A<")
+    expect(html).toContain("09")
+    expect(html).toContain("x")
+  })
+
+  it("also shows receiver info in payment_confirmed, not just order_placed", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "confirmed")
+    await queue.enqueue(o.id, "payment_confirmed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Thông tin nhận hàng")
+  })
+
+  it("also shows receiver info in cancelled", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "cancelled")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Thông tin nhận hàng")
+  })
+
+  it("omits the address line for a pickup order's receiver info", async () => {
+    const o = await seedOrder("pickup")
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Thông tin nhận hàng")
+    expect(html).not.toContain("Địa chỉ nhận hàng")
+  })
+
+  it("shows the pickup location and note for a pickup order, in receiver info", async () => {
+    const cid = await catalog.createCollection({
+      title: "Drop", status: "active", allow_ship: true, allow_pickup: true,
+      pickup_location: "Comic Fest, Booth 12", pickup_note: "9am-6pm, both days",
+    })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "09", email: "a@example.com" },
+      fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Địa điểm nhận")
+    expect(html).toContain("Comic Fest, Booth 12")
+    expect(html).toContain("Ghi chú nhận hàng")
+    expect(html).toContain("9am-6pm, both days")
+  })
+})
+
+describe("sendQueued: PIN reminder on later lifecycle emails", () => {
+  it("reminds the buyer the PIN was already emailed, on payment_confirmed", async () => {
+    const o = await seedOrder("ship")
+    await orders.transitionOrder(o.id, "confirmed")
+    await queue.enqueue(o.id, "payment_confirmed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("mã PIN")
+  })
+
+  it("still omits any PIN mention on the admin's own order_placed copy (no payload)", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "admin@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).not.toContain("PIN")
   })
 })
 
@@ -374,9 +485,12 @@ describe("sendQueued: access PIN in order_placed", () => {
     const pinIndex = html.indexOf("482913")
     // The PIN must appear after the link (same reading order as the card)...
     expect(pinIndex).toBeGreaterThan(linkIndex)
-    // ...but before the card's own closing </div>, i.e. still inside it —
-    // not appended after the whole rendered HTML like the QR/footer blocks.
-    const cardCloseAfterLink = html.indexOf("</div>", linkIndex)
+    // ...but before the card's own closing </div>, i.e. still inside it — not
+    // appended after the whole rendered HTML like the QR/footer blocks. The
+    // link itself sits inside its own centered <div>, so the card's real
+    // close is the SECOND </div> after the link text, not the first.
+    const linkDivClose = html.indexOf("</div>", linkIndex)
+    const cardCloseAfterLink = html.indexOf("</div>", linkDivClose + 1)
     expect(pinIndex).toBeLessThan(cardCloseAfterLink)
   })
 

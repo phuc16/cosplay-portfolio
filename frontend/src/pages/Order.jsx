@@ -19,19 +19,13 @@ const STATUS_KEY = {
   completed: "orderCompleted", cancelled: "orderCancelled",
 }
 
-// The big page heading, distinct from STATUS_KEY's compact badge text —
-// "Order placed" only fits the moment the seller confirms it; shipped/
-// completed/cancelled each need their own headline instead of reusing it.
+// The big page heading — distinct per status, unlike STATUS_KEY's compact badge text.
 const ORDER_TITLE_KEY = {
   confirmed: "orderPlaced", shipped: "orderShippedTitle",
   completed: "orderCompletedTitle", cancelled: "orderCancelledTitle",
 }
 
-// Which timestamp column corresponds to the order's *current* status — the
-// public order response now includes all of these (see routes/orders.js
-// toPublicOrder), same fields the admin's OrderTimeline already reads for
-// its full history. Kept separate from render for the same reason
-// OrderTimeline.buildTimelineSteps is: pure, directly unit-testable logic.
+// Which timestamp column matches the order's *current* status. Kept pure and separate from render so it's directly unit-testable.
 const STATUS_TIMESTAMP_FIELD = {
   pending: "created_at", confirmed: "confirmed_at", shipped: "shipped_at",
   completed: "completed_at", cancelled: "cancelled_at",
@@ -50,22 +44,17 @@ function readFileAsBase64(file) {
   })
 }
 
-// Well under the backend's 50MB body limit — rejects an obviously oversized
-// photo client-side before it's ever base64-encoded and sent, so a buyer
-// doesn't burn a retry against the proof rate limiter on a doomed upload.
+// Well under the backend's 50MB limit — rejects an oversized photo before it burns a retry against the proof rate limiter.
 const MAX_PROOF_BYTES = 8 * 1024 * 1024
 
 function ProofUpload({ token, existingProofUrl, onUploaded }) {
   const { t } = useLanguage()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
-  // Picking a file only stages it — nothing is sent until the buyer presses
-  // proofSubmit, so a fat-fingered pick can't accidentally submit a photo
-  // before they've had a chance to check it.
+  // Picking a file only stages it — nothing sends until proofSubmit is pressed.
   const [pendingFile, setPendingFile] = useState(null)
   const [pendingPreviewUrl, setPendingPreviewUrl] = useState(null)
-  // A fresh upload this visit overrides what the order fetch returned, so
-  // replacing the proof updates the preview immediately without a refetch.
+  // Overrides existingProofUrl so a fresh upload updates the preview without a refetch.
   const [uploadedUrl, setUploadedUrl] = useState(null)
   const previewUrl = pendingPreviewUrl || uploadedUrl || existingProofUrl
   const alreadyUploaded = Boolean(uploadedUrl || existingProofUrl)
@@ -168,9 +157,7 @@ function DeadlineBlock({ expiresAt }) {
     return <p className="text-sm text-[var(--text-danger)] mt-1">{t("orderDeadlinePassed")}</p>
   }
 
-  // "còn {n} giờ" / "{n}h left" is composed here, not stored as a sixth
-  // translation key — see Task 3 Step 2's note: this phrase is a number
-  // wrapped in locale-specific phrasing, not a fixed label on its own.
+  // Composed here rather than as a fixed translation key, since it wraps a number in locale-specific phrasing.
   const remaining = lang === "vi" ? `còn ${info.remainingHours} giờ` : `${info.remainingHours}h left`
   return (
     <p className="text-sm mt-1 text-[var(--text-warning)]">
@@ -179,12 +166,7 @@ function DeadlineBlock({ expiresAt }) {
   )
 }
 
-// order_token in the URL alone used to be sufficient to view this page —
-// anyone the buyer casually shared the link with could also see the pickup
-// code and upload payment proof (able to overwrite a real buyer's proof
-// with a fake one, causing admin to decline their order). The backend now
-// requires either an admin session (attached automatically — see
-// orderAuthHeaders) or this PIN, emailed to the buyer at order creation.
+// Backend requires either an admin session (see orderAuthHeaders) or this PIN, emailed to the buyer at order creation.
 function PinGate({ token, onVerified }) {
   const { t } = useLanguage()
   const [pin, setPin] = useState("")
@@ -248,18 +230,13 @@ export default function Order() {
   const [order, setOrder] = useState(undefined)
   const [instructions, setInstructions] = useState(null)
   const [needsPin, setNeedsPin] = useState(false)
-  // Bumped after a successful PIN verification to retrigger the fetch below
-  // with the now-available session token — token/params alone don't change.
+  // Bumped after PIN verification to retrigger the fetch below (token/params alone don't change).
   const [unlockCount, setUnlockCount] = useState(0)
-  // The buyer can re-open the bank/QR details on demand while awaiting
-  // confirmation (e.g. they need to send the transfer again), even though
-  // they're hidden by default once proof is submitted.
+  // Lets the buyer re-open the bank/QR panel on demand once proof is submitted (hidden by default at that point).
   const [showPaymentAgain, setShowPaymentAgain] = useState(false)
 
   useEffect(() => {
-    // Belt and braces with the server's X-Robots-Tag: the order page is
-    // protected only by an unguessable token (+ PIN/admin session) and must
-    // never be indexed.
+    // Belt and braces with the server's X-Robots-Tag — must never be indexed.
     const meta = document.createElement("meta")
     meta.name = "robots"
     meta.content = "noindex, nofollow"
@@ -273,9 +250,7 @@ export default function Order() {
           setOrder(null)
           return
         }
-        // A cached admin_token can simply be expired (24h) while its refresh
-        // token (30 days) is still good — redeem it and retry once before
-        // asking an admin for a PIN they were never sent.
+        // admin_token can be merely expired (24h) while its refresh token (30d) is still good — redeem and retry once.
         if (await refreshAdminSession()) {
           try {
             const data = await fetchOrder(token, orderAuthHeaders(token))
@@ -283,8 +258,7 @@ export default function Order() {
             setOrder(data)
             return
           } catch {
-            // Refresh worked but the retry still failed for some other
-            // reason — fall through to the PIN gate below like normal.
+            // fall through to the PIN gate
           }
         }
         setNeedsPin(true)
@@ -325,36 +299,20 @@ export default function Order() {
   }
 
   const isPending = order.status === "pending"
-  // A pending prepaid order (bank/momo/paypal) hasn't actually been "ordered"
-  // from the buyer's point of view until they've paid and uploaded proof —
   // COD has no payment step, so it skips straight to the normal pending copy.
   const awaitingPayment = isPending && instructions && instructions.method !== "cod" && !order.has_payment_proof
-  // Once proof is submitted, the bank/QR details and the payment deadline no
-  // longer apply — the buyer already paid, they're just waiting on the
-  // seller now. Showing them a countdown or "transfer this amount" panel
-  // past that point reads as if they still need to act.
   const awaitingConfirmation = isPending && instructions && instructions.method !== "cod" && order.has_payment_proof
-  // The buyer can still choose to re-open the bank/QR panel while awaiting
-  // confirmation (e.g. to send the transfer again) — it just isn't shown by
-  // default once they've already paid and uploaded proof.
+  // Hidden by default once proof is submitted, but the buyer can re-open it (showPaymentAgain).
   const showPaymentInstructions = awaitingPayment || (awaitingConfirmation && showPaymentAgain)
-  // Transfer-specific copy: only relevant when there's a transfer to make
-  // (showPaymentInstructions already excludes COD) and only while the
-  // deadline hasn't passed — once it has, DeadlineBlock's passed message is
-  // the one true statement about this order, and inviting a faster upload
-  // of an order that's being cancelled would contradict it.
   const deadlineInfo = formatDeadline(order.expires_at)
   const showManualConfirmNote = awaitingPayment && !deadlineInfo?.passed
+  const isPickupOrder = order.fulfillment_method === "pickup"
 
   return (
     <>
       <ShopHeader />
       <main className="max-w-2xl mx-auto px-4 py-10">
-      {/* "Order placed" reads as "this is a done deal" — reserved for once the
-          seller has actually confirmed it. Still waiting on the buyer's own
-          payment gets the most actionable title; pending-but-paid (proof
-          already submitted) gets the more honest "received, not yet
-          confirmed" title instead of either extreme. */}
+      {/* "Order placed" is reserved for once the seller has confirmed it — the other phases get their own titles. */}
       <h1 className="text-2xl font-bold mb-1">
         {t(awaitingPayment ? "orderAwaitingPaymentTitle" : (isPending ? "orderReceivedTitle" : (ORDER_TITLE_KEY[order.status] ?? "orderPlaced")))}
       </h1>
@@ -364,11 +322,7 @@ export default function Order() {
       <div className="p-4 rounded-xl border border-[var(--border-brand)] mb-6">
         <p className="text-sm opacity-70">{t("orderStatus")}</p>
         <p className="font-semibold">
-          {/* STATUS_KEY[order.status] is undefined for an unrecognized status;
-              t(undefined) falls through LanguageContext's own key ?? key
-              chain to return the raw status text — this fallback is already
-              in place and is not changed here, only the wrapping badge is
-              added. */}
+          {/* An unrecognized status falls through to its raw text via t()'s own key ?? key chain. */}
           <StatusBadge
             label={t(awaitingPayment ? "orderAwaitingPayment" : (STATUS_KEY[order.status] ?? order.status))}
             variant={variantForStatus(order.status)}
@@ -377,15 +331,18 @@ export default function Order() {
         {formatVnDateTime(statusTimestamp(order)) && (
           <p className="text-xs opacity-60 mt-1">{formatVnDateTime(statusTimestamp(order))}</p>
         )}
+        {order.status === "cancelled" && order.cancel_reason && (
+          <p className="text-sm mt-2">
+            <span className="opacity-70">{t("orderCancelReasonLabel")}:</span> {order.cancel_reason}
+          </p>
+        )}
         {order.tracking_code && (
           <div className="mt-1">
             <p className="text-xs opacity-60">{t("orderTrackingCodeLabel")}</p>
             <p className="text-sm font-medium">#{order.tracking_code}</p>
           </div>
         )}
-        {/* Deadline only applies while the buyer still needs to pay — once
-            proof is submitted (or admin confirms), the countdown is no
-            longer meaningful and the backend no longer enforces it either. */}
+        {/* Deadline only applies before proof is submitted/confirmed — the backend stops enforcing it too. */}
         {awaitingPayment && <DeadlineBlock expiresAt={order.expires_at} />}
         {showManualConfirmNote && <p className="text-sm opacity-70 mt-1">{t("orderManualConfirmNote")}</p>}
         {awaitingConfirmation && (
@@ -404,12 +361,9 @@ export default function Order() {
 
       {showPaymentInstructions && <PaymentInstructions instructions={instructions} token={token} />}
 
-      {/* The exact transfer note only exists on PaymentInstructions, so this
-          explanation is only relevant alongside it. */}
       {showPaymentInstructions && <p className="text-xs opacity-70 mb-4">{t("orderTransferNoteExplain")}</p>}
 
-      {/* Hidden entirely once the order leaves pending — the API itself
-          refuses uploads past that point, so this mirrors the server rule. */}
+      {/* Mirrors the server rule: proof uploads are refused once an order leaves pending. */}
       {isPending && (
         <ProofUpload
           token={token}
@@ -420,9 +374,14 @@ export default function Order() {
 
       <h2 className="font-semibold mb-2">{t("orderItems")}</h2>
       {order.items.map((i) => (
-        <div key={i.id} className="flex justify-between py-2 border-b border-[var(--border-brand)]">
-          <span>{i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty}</span>
-          <span>{formatVnd(i.unit_price_snapshot * i.qty)}</span>
+        <div key={i.id} className="flex justify-between items-center gap-3 py-2 border-b border-[var(--border-brand)]">
+          <div className="flex items-center gap-3 min-w-0">
+            {i.image_url
+              ? <img src={i.image_url} alt="" className="w-12 h-12 object-cover rounded-lg shrink-0" />
+              : <div className="w-12 h-12 rounded-lg bg-[var(--surface-neutral)] shrink-0" />}
+            <span className="truncate">{i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty}</span>
+          </div>
+          <span className="shrink-0">{formatVnd(i.unit_price_snapshot * i.qty)}</span>
         </div>
       ))}
 
@@ -463,9 +422,12 @@ export default function Order() {
 
       {qrSrc && (
         <div className="mt-6 flex flex-col items-center">
-          <img src={qrSrc} alt={t("orderQrCaption")}
+          <img src={qrSrc} alt={isPickupOrder ? t("orderQrCaptionPickup") : t("orderQrCaptionShip")}
             className="w-40 h-40 rounded-lg border border-[var(--border-brand)]" />
-          <p className="text-xs opacity-60 mt-2 text-center">{t("orderQrCaption")}</p>
+          <p className="text-xs opacity-60 mt-2 text-center">
+            {isPickupOrder && <>{t("orderQrCaptionPickup")}<br /></>}
+            {t("orderQrCaptionShip")}
+          </p>
         </div>
       )}
       </main>

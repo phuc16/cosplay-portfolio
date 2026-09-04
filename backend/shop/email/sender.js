@@ -50,10 +50,6 @@ async function sendQueued(limit = 10) {
         templates.buildVars({ ...order, payment_note: settings.payment_note })
       )
 
-      // The QR is a link to the order's own status page — useful for any
-      // order (open it on a phone, or a pickup staffer scans it), except a
-      // cancelled one, which has nothing left to act on.
-      const showOrderQr = order.status !== "cancelled"
       const isPickup = order.fulfillment_method === "pickup"
       // The code is only meaningful once the order is actually paid for —
       // matches the same gate toPublicOrder applies to the buyer's order
@@ -65,54 +61,61 @@ async function sendQueued(limit = 10) {
       let html = rendered.html
       const attachments = []
 
-      // Appended rather than a template placeholder (same reasoning as the
-      // cancel_reason/pickup_code blocks below): the plaintext PIN only ever
-      // exists here, in this queue row's payload — orders.access_pin_hash is
-      // one-way, so it can't be re-derived from the order the way every
-      // other template variable can, and a customizable {{access_pin}}
-      // placeholder would silently stop appearing the moment a seller edits
-      // this template, exactly like cancel_reason/pickup_code already are.
-      //
-      // Spliced in right before the card's closing </div> (immediately after
-      // the "Xem đơn hàng →" link every template's wrap() ends with) rather
-      // than appended after the whole rendered HTML — the PIN only matters
-      // in the context of that link, so it needs to read as part of the same
-      // card, not a disconnected block below the QR image.
-      if (row.type === "order_placed" && row.payload) {
+      // Inserts before the card's closing </div> (the link sits in its own
+      // nested <div>, so this skips two </div>s, not one).
+      function spliceBeforeCardClose(htmlIn, block) {
+        const linkIndex = htmlIn.indexOf("Xem đơn hàng")
+        if (linkIndex === -1) return htmlIn + block
+        const linkDivClose = htmlIn.indexOf("</div>", linkIndex)
+        const cardCloseIndex = linkDivClose === -1 ? -1 : htmlIn.indexOf("</div>", linkDivClose + 1)
+        return cardCloseIndex === -1
+          ? htmlIn + block
+          : htmlIn.slice(0, cardCloseIndex) + block + htmlIn.slice(cardCloseIndex)
+      }
+
+      // access_pin_hash is one-way, so the plaintext only exists here.
+      if (row.type === "order_placed") {
         let payload
         try { payload = JSON.parse(row.payload) } catch { payload = null }
         if (payload?.access_pin) {
-          const pinBlock = `
+          html = spliceBeforeCardClose(html, `
             <p style="margin:12px 0 0;font-size:13px">
               Mã PIN xác thực đơn hàng: <strong style="color:${templates.BRAND}">${templates.escapeHtml(payload.access_pin)}</strong><br/>
               <span style="font-size:12px;color:#888">Cần mã này để xem lại đơn hàng qua link nếu trang yêu cầu xác thực.</span>
-            </p>`
-          // The card's OWN closing </div> is the first one after the link —
-          // wrap()'s outer wrapper div closes after it (a second, later
-          // </div>), which lastIndexOf would find instead and land the PIN
-          // outside the padded card entirely.
-          const linkIndex = html.indexOf("Xem đơn hàng")
-          const cardCloseIndex = linkIndex === -1 ? -1 : html.indexOf("</div>", linkIndex)
-          html = cardCloseIndex === -1
-            ? html + pinBlock
-            : html.slice(0, cardCloseIndex) + pinBlock + html.slice(cardCloseIndex)
+            </p>`)
         }
+      } else {
+        html = spliceBeforeCardClose(html, `
+          <p style="margin:12px 0 0;font-size:12px;color:#888">
+            Nếu trang yêu cầu mã PIN, mã đã được gửi trong email xác nhận lúc bạn đặt hàng.
+          </p>`)
       }
 
-      // Appended rather than a template placeholder: the cancelled template
-      // is static and shared by every cancellation, most of which have no
-      // reason at all (admin skipped the prompt, or the order predates this
-      // field) — a placeholder would either always show an empty "Lý do
-      // hủy:" label or need its own conditional the substitution engine
-      // can't express, same reasoning as the QR block below.
+      // Spliced right after the greeting paragraph (not appended at the end)
+      // rather than a template placeholder: the cancelled template is static
+      // and shared by every cancellation, most of which have no reason at
+      // all (admin skipped the prompt, or the order predates this field) —
+      // a placeholder would either always show an empty "Lý do hủy:" label
+      // or need its own conditional the substitution engine can't express,
+      // same reasoning as the QR block below. wrap()'s own "Mã đơn hàng:"
+      // line is always the first <p> in the card, so the SECOND </p> is the
+      // greeting's close — inserting there puts the reason where a buyer's
+      // eye actually lands first, ahead of the item list/total, without
+      // depending on the greeting's exact (admin-editable) wording.
       if (order.status === "cancelled" && order.cancel_reason) {
-        html += `
-          <p style="font-size:14px;margin-top:12px">
+        const firstP = html.indexOf("</p>")
+        const greetingClose = firstP === -1 ? -1 : html.indexOf("</p>", firstP + 1)
+        const block = `
+          <p style="font-size:14px;margin:12px 0 0">
             <strong>Lý do hủy:</strong> ${templates.escapeHtml(order.cancel_reason)}
           </p>`
+        html = greetingClose === -1
+          ? html + block
+          : html.slice(0, greetingClose + "</p>".length) + block + html.slice(greetingClose + "</p>".length)
       }
 
-      if (showOrderQr) {
+      // Included even for a cancelled order, so the buyer can still check its final state.
+      {
         // cid: attachment rather than a data URI (Gmail strips those) or a
         // remote URL (blocked by default in many clients).
         const png = await qr.qrPngBuffer(qr.orderUrl(order.order_token))

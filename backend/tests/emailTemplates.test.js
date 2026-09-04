@@ -34,6 +34,18 @@ describe("renderTemplate", () => {
     expect(out.html).toContain("Poster")
   })
 
+  it("renders a variant photo for an item that has one", () => {
+    const withImage = { ...order, items: [{ ...order.items[0], image_url: "/api/storage/shop/products/1/a.webp" }] }
+    const out = t.renderTemplate({ subject: "x", body_html: "{{items}}" }, t.buildVars(withImage))
+    expect(out.html).toContain("/api/storage/shop/products/1/a.webp")
+  })
+
+  it("omits the image cell's <img> for an item with no photo", () => {
+    const noImage = { ...order, items: [{ ...order.items[0], image_url: null }] }
+    const out = t.renderTemplate({ subject: "x", body_html: "{{items}}" }, t.buildVars(noImage))
+    expect(out.html).not.toContain("<img")
+  })
+
   it("leaves an unknown placeholder empty rather than printing braces", () => {
     const out = t.renderTemplate({ subject: "x", body_html: "[{{nope}}]" }, t.buildVars(order))
     expect(out.html).toBe("[]")
@@ -50,6 +62,33 @@ describe("renderTemplate", () => {
     const evil = { ...order, buyer_name: "<b>x</b>" }
     const out = t.renderTemplate({ subject: "{{buyer_name}}", body_html: "x" }, t.buildVars(evil))
     expect(out.subject).not.toContain("<b>")
+  })
+})
+
+describe("shipping_fee_note", () => {
+  it("shows the shipper-fee note in order_placed for a ship order", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(order))
+    expect(out.html).toContain("Phí ship trả cho shipper khi nhận hàng")
+  })
+
+  it("omits the shipper-fee note in order_placed for a pickup order — there is no shipper to pay", () => {
+    const pickupOrder = { ...order, fulfillment_method: "pickup" }
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(pickupOrder))
+    expect(out.html).not.toContain("Phí ship trả cho shipper khi nhận hàng")
+  })
+})
+
+describe("prep_note", () => {
+  it("says the item will be shipped for a ship order", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_confirmed, t.buildVars(order))
+    expect(out.html).toContain("gửi hàng")
+  })
+
+  it("points at the pickup code/QR instead of shipping for a pickup order", () => {
+    const pickupOrder = { ...order, fulfillment_method: "pickup" }
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_confirmed, t.buildVars(pickupOrder))
+    expect(out.html).not.toContain("gửi hàng")
+    expect(out.html).toContain("mã QR")
   })
 })
 
