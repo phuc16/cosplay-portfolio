@@ -11,6 +11,7 @@ import { formatVnd } from "../utils/money"
 import { formatDeadline, formatVnDateTime } from "../utils/orderDeadline"
 import PaymentInstructions from "../components/shop/PaymentInstructions"
 import ShopHeader from "../components/shop/ShopHeader"
+import ShopFooter from "../components/shop/ShopFooter"
 import StatusBadge from "../components/StatusBadge"
 import { variantForStatus } from "../constants/statusVariant"
 
@@ -220,6 +221,7 @@ function PinGate({ token, onVerified }) {
           </button>
         </form>
       </main>
+      <ShopFooter />
     </>
   )
 }
@@ -286,6 +288,7 @@ export default function Order() {
       <>
         <ShopHeader />
         <main className="max-w-2xl mx-auto px-4 py-10 opacity-60">...</main>
+        <ShopFooter />
       </>
     )
   }
@@ -294,6 +297,7 @@ export default function Order() {
       <>
         <ShopHeader />
         <main className="max-w-2xl mx-auto px-4 py-10 opacity-70">{t("orderNotFound")}</main>
+        <ShopFooter />
       </>
     )
   }
@@ -431,6 +435,7 @@ export default function Order() {
         </div>
       )}
       </main>
+      <ShopFooter />
     </>
   )
 }

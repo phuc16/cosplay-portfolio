@@ -4,6 +4,7 @@ import { readCart, updateQty, removeFromCart, cartTotal } from "../shop/cart"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import ShopHeader from "../components/shop/ShopHeader"
+import ShopFooter from "../components/shop/ShopFooter"
 
 export default function Cart() {
   const { t } = useLanguage()
@@ -26,6 +27,7 @@ export default function Cart() {
           <p className="opacity-70 mb-4">{t("cartEmpty")}</p>
           <Link to="/merchandise" className="text-[var(--text-link)]">{t("shopBack")}</Link>
         </main>
+        <ShopFooter />
       </>
     )
   }
@@ -105,6 +107,7 @@ export default function Cart() {
         </button>
       </div>
       </main>
+      <ShopFooter />
 
       {pendingRemove && (
         <div

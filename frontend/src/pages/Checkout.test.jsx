@@ -24,6 +24,13 @@ vi.mock("../api/shop", () => ({
   searchAddress: (...args) => searchAddress(...args),
 }))
 
+// ShopFooter (rendered on every shop page) fetches /api/settings — mocked
+// here so tests don't attempt a real network call.
+vi.mock("axios", async (importOriginal) => {
+  const actual = await importOriginal()
+  return { default: { ...actual.default, get: vi.fn().mockResolvedValue({ data: {} }) } }
+})
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: Checkout } = await import("./Checkout")

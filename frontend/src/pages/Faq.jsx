@@ -2,6 +2,7 @@ import { useLanguage } from "../contexts/LanguageContext"
 import { getLocalized } from "../utils/localize"
 import { FAQ_ITEMS } from "../shop/faq"
 import ShopHeader from "../components/shop/ShopHeader"
+import ShopFooter from "../components/shop/ShopFooter"
 
 export default function Faq() {
   const { t, lang } = useLanguage()
@@ -30,6 +31,7 @@ export default function Faq() {
           ))}
         </div>
       </main>
+      <ShopFooter />
     </>
   )
 }

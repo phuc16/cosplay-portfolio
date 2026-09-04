@@ -8,6 +8,7 @@ import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import AddressFields from "../components/shop/AddressFields"
 import ShopHeader from "../components/shop/ShopHeader"
+import ShopFooter from "../components/shop/ShopFooter"
 import vietqrLogo from "../assets/vietqr-logo.svg"
 
 // One icon per payment method, shown alongside its label in the picker —
@@ -188,6 +189,7 @@ export default function Checkout() {
       <>
         <ShopHeader />
         <main className="max-w-2xl mx-auto px-4 py-10 opacity-70">{t("cartEmpty")}</main>
+        <ShopFooter />
       </>
     )
   }
@@ -299,6 +301,7 @@ export default function Checkout() {
         {submitting ? "..." : t("checkoutPlaceOrder")}
       </button>
       </main>
+      <ShopFooter />
     </>
   )
 }

@@ -20,9 +20,11 @@ vi.mock("../api/shop", () => ({
   fetchOrderQrBlob: (...args) => fetchOrderQrBlob(...args),
 }))
 
+// ShopFooter (rendered on every shop page) fetches /api/settings via `get`
+// — mocked here alongside `post` so tests don't attempt a real network call.
 vi.mock("axios", async (importOriginal) => {
   const actual = await importOriginal()
-  return { default: { ...actual.default, post: vi.fn() } }
+  return { default: { ...actual.default, post: vi.fn(), get: vi.fn().mockResolvedValue({ data: {} }) } }
 })
 
 // jsdom has no createObjectURL/revokeObjectURL; useBlobUrl calls both.

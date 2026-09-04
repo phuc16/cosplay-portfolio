@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter } from "react-router-dom"
@@ -6,6 +6,13 @@ import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
 import { FAQ_ITEMS } from "../shop/faq"
 import Faq from "./Faq"
+
+// ShopFooter (rendered on every shop page) fetches /api/settings — mocked
+// here so tests don't attempt a real network call.
+vi.mock("axios", async (importOriginal) => {
+  const actual = await importOriginal()
+  return { default: { ...actual.default, get: vi.fn().mockResolvedValue({ data: {} }) } }
+})
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
