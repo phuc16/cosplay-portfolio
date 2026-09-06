@@ -150,6 +150,26 @@ describe("Collection — search, filter, sort", () => {
 
     expect(container.textContent).toContain("No products match your search.")
   })
+
+  it("keeps a sold-out product sunk to the end even under a non-default sort (name A-Z)", async () => {
+    // "Photocard" would sort before "Zebra Poster" alphabetically, but it's
+    // sold out — it must still land last.
+    fetchCollection.mockResolvedValue(twoProducts(
+      { name: "Photocard", variants: [{ id: 1, label: "A1", stock_qty: 0 }] },
+      { name: "Zebra Poster" }
+    ))
+    const container = await renderCollection()
+
+    const sortSelect = [...container.querySelectorAll("select")][1]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(sortSelect, "name_asc")
+      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent)
+    expect(names).toEqual(["Zebra Poster", "Photocard"])
+  })
 })
 
 describe("Collection — add-to-cart toast", () => {

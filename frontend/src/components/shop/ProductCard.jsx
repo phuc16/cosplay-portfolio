@@ -105,12 +105,19 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
         className={"flex flex-col flex-1" + (hasVariants ? " cursor-pointer" : "")}
       >
         {cover && (
-          <img
-            src={cover}
-            alt={product.name}
-            loading="lazy"
-            className="w-full aspect-square object-cover"
-          />
+          <div className="relative">
+            <img
+              src={cover}
+              alt={product.name}
+              loading="lazy"
+              className="w-full aspect-square object-cover"
+            />
+            {isProductSoldOut(product) && (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-white font-semibold">
+                {t("shopSoldOut")}
+              </span>
+            )}
+          </div>
         )}
 
         <div className="p-4 flex flex-col gap-2 flex-1">

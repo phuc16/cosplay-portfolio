@@ -5,15 +5,16 @@ import { useLanguage } from "../contexts/LanguageContext"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 
+// Closed (ended) collections always sink to the end, under every sort mode
+// — not just the default — so switching to "Name A-Z" etc. never mixes an
+// ended drop back in among open ones.
 function sortCollections(list, sortBy) {
   const sorted = [...list]
   if (sortBy === "name_asc") sorted.sort((a, b) => a.title.localeCompare(b.title, "vi"))
   else if (sortBy === "name_desc") sorted.sort((a, b) => b.title.localeCompare(a.title, "vi"))
   else if (sortBy === "newest") sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   else if (sortBy === "oldest") sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-  // Default: stable sort, closed (ended) drops sink after active ones,
-  // without disturbing relative order within each group.
-  else sorted.sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
+  sorted.sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
   return sorted
 }
 
@@ -50,33 +51,35 @@ export default function Shop() {
       {collections?.length === 0 && <p className="opacity-60">{t("shopEmpty")}</p>}
 
       {collections?.length > 0 && (
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex flex-col sm:flex-row gap-2 mb-6">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("shopSearchCollections")}
-            className="flex-1 min-w-[180px] px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            className="w-full sm:flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            <option value="">{t("shopFilterAllStatus")}</option>
-            <option value="active">{t("shopFilterActive")}</option>
-            <option value="closed">{t("shopFilterEnded")}</option>
-          </select>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            <option value="default">{t("shopSortDefault")}</option>
-            <option value="name_asc">{t("shopSortNameAsc")}</option>
-            <option value="name_desc">{t("shopSortNameDesc")}</option>
-            <option value="newest">{t("shopSortNewest")}</option>
-            <option value="oldest">{t("shopSortOldest")}</option>
-          </select>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            >
+              <option value="">{t("shopFilterAllStatus")}</option>
+              <option value="active">{t("shopFilterActive")}</option>
+              <option value="closed">{t("shopFilterEnded")}</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            >
+              <option value="default">{t("shopSortDefault")}</option>
+              <option value="name_asc">{t("shopSortNameAsc")}</option>
+              <option value="name_desc">{t("shopSortNameDesc")}</option>
+              <option value="newest">{t("shopSortNewest")}</option>
+              <option value="oldest">{t("shopSortOldest")}</option>
+            </select>
+          </div>
         </div>
       )}
 

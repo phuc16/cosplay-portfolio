@@ -130,6 +130,29 @@ describe("Shop — search, filter, sort", () => {
     expect(titles).toEqual(["Apple Drop", "Zebra Drop"])
   })
 
+  it("keeps a closed (ended) collection sunk to the end even under a non-default sort (name A-Z)", async () => {
+    // "Apple Drop" would sort before "Zebra Drop" alphabetically, but it's
+    // closed — it must still land last.
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Apple Drop", status: "closed", product_count: 1 },
+      { id: 2, slug: "z", title: "Zebra Drop", status: "active", product_count: 1 },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const sortSelect = [...container.querySelectorAll("select")][1]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(sortSelect, "name_asc")
+      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    expect(titles).toEqual(["Zebra Drop", "Apple Drop"])
+  })
+
   it("shows a no-match message when the search matches nothing", async () => {
     fetchCollections.mockResolvedValue([
       { id: 1, slug: "hobby", title: "Hobby Horizon", status: "active", product_count: 1 },

@@ -6,16 +6,18 @@ import { renderMarkdown } from "../utils/markdown"
 import ProductCard, { isProductSoldOut } from "../components/shop/ProductCard"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
+import FitTitle from "../components/shop/FitTitle"
 
+// Sold-out products always sink to the end, under every sort mode — not
+// just the default — so switching to "Price: low to high" etc. never mixes
+// an unbuyable item back in among available ones.
 function sortProducts(list, sortBy) {
   const sorted = [...list]
   if (sortBy === "name_asc") sorted.sort((a, b) => a.name.localeCompare(b.name, "vi"))
   else if (sortBy === "name_desc") sorted.sort((a, b) => b.name.localeCompare(a.name, "vi"))
   else if (sortBy === "price_asc") sorted.sort((a, b) => a.price - b.price)
   else if (sortBy === "price_desc") sorted.sort((a, b) => b.price - a.price)
-  // Default: stable sort, sold-out products sink after available ones,
-  // without disturbing relative order within each group.
-  else sorted.sort((a, b) => Number(isProductSoldOut(a)) - Number(isProductSoldOut(b)))
+  sorted.sort((a, b) => Number(isProductSoldOut(a)) - Number(isProductSoldOut(b)))
   return sorted
 }
 
@@ -101,7 +103,7 @@ export default function Collection() {
         />
       )}
 
-      <h1 className="text-3xl font-bold mb-2">{collection.title}</h1>
+      <FitTitle text={collection.title} className="font-bold mb-2" />
 
       <div className="flex flex-wrap gap-2 mb-4 text-xs">
         {collection.allow_ship && (
@@ -142,33 +144,35 @@ export default function Collection() {
       ) : (
         <>
           {collection.products.length > 1 && (
-            <div className="flex gap-2 mb-5 flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-2 mb-5">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("shopSearchProducts")}
-                className="flex-1 min-w-[160px] px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                className="w-full sm:flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
               />
-              <select
-                value={stockFilter}
-                onChange={(e) => setStockFilter(e.target.value)}
-                className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
-              >
-                <option value="">{t("shopFilterAllStock")}</option>
-                <option value="in_stock">{t("shopFilterInStock")}</option>
-                <option value="sold_out">{t("shopFilterSoldOut")}</option>
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
-              >
-                <option value="default">{t("shopSortDefault")}</option>
-                <option value="name_asc">{t("shopSortNameAsc")}</option>
-                <option value="name_desc">{t("shopSortNameDesc")}</option>
-                <option value="price_asc">{t("shopSortPriceAsc")}</option>
-                <option value="price_desc">{t("shopSortPriceDesc")}</option>
-              </select>
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                <select
+                  value={stockFilter}
+                  onChange={(e) => setStockFilter(e.target.value)}
+                  className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                >
+                  <option value="">{t("shopFilterAllStock")}</option>
+                  <option value="in_stock">{t("shopFilterInStock")}</option>
+                  <option value="sold_out">{t("shopFilterSoldOut")}</option>
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                >
+                  <option value="default">{t("shopSortDefault")}</option>
+                  <option value="name_asc">{t("shopSortNameAsc")}</option>
+                  <option value="name_desc">{t("shopSortNameDesc")}</option>
+                  <option value="price_asc">{t("shopSortPriceAsc")}</option>
+                  <option value="price_desc">{t("shopSortPriceDesc")}</option>
+                </select>
+              </div>
             </div>
           )}
 

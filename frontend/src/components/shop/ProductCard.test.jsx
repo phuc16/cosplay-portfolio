@@ -74,6 +74,29 @@ describe("ProductCard — variant description", () => {
   })
 })
 
+describe("ProductCard — sold-out overlay", () => {
+  it("shows a 'Sold out' overlay on the cover when every variant is sold out", async () => {
+    const product = baseProduct({
+      variants: [
+        { id: 1, label: "A1", stock_qty: 0, image_url: "https://x/a1.jpg" },
+        { id: 2, label: "B2", stock_qty: 0, image_url: null },
+      ],
+    })
+    const { container } = await renderCard({ product })
+
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    const overlay = cover.parentElement.querySelector("span")
+    expect(overlay).toBeTruthy()
+    expect(overlay.textContent).toBe("Sold out")
+  })
+
+  it("shows no overlay when at least one variant is still in stock", async () => {
+    const { container } = await renderCard()
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    expect(cover.parentElement.querySelector("span")).toBeNull()
+  })
+})
+
 describe("ProductCard — variant thumbnail_image", () => {
   it("uses a variant's own thumbnail_image as its gallery-grid cover, not its own photo", async () => {
     const product = baseProduct({
