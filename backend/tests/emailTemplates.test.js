@@ -92,6 +92,46 @@ describe("prep_note", () => {
   })
 })
 
+describe("digital delivery link", () => {
+  const digitalOrder = (overrides = {}) => ({
+    id: 1, order_token: "tok", buyer_name: "A", total: 99000, status: "confirmed",
+    fulfillment_method: "digital", created_at: new Date(),
+    items: [{ product_name_snapshot: "Digital Album", variant_label_snapshot: "", qty: 1, unit_price_snapshot: 99000, delivery_link_snapshot: "https://drive.google.com/x" }],
+    ...overrides,
+  })
+
+  it("renders the download link in the items block once confirmed", () => {
+    const vars = t.buildVars(digitalOrder())
+    expect(vars.items).toContain("https://drive.google.com/x")
+  })
+
+  it("never renders the link while pending", () => {
+    const vars = t.buildVars(digitalOrder({ status: "pending" }))
+    expect(vars.items).not.toContain("https://drive.google.com/x")
+  })
+
+  it("never renders the link once cancelled", () => {
+    const vars = t.buildVars(digitalOrder({ status: "cancelled" }))
+    expect(vars.items).not.toContain("https://drive.google.com/x")
+  })
+
+  it("mentions the digital link in prep_note for an all-digital order", () => {
+    const vars = t.buildVars(digitalOrder())
+    expect(vars.prep_note).toContain("tải")
+  })
+
+  it("still mentions the digital link in prep_note for a mixed ship+digital order", () => {
+    const vars = t.buildVars(digitalOrder({
+      fulfillment_method: "ship",
+      items: [
+        ...digitalOrder().items,
+        { product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1, unit_price_snapshot: 35000, delivery_link_snapshot: null },
+      ],
+    }))
+    expect(vars.prep_note).toContain("tải")
+  })
+})
+
 describe("validatePlaceholders", () => {
   it("accepts known placeholders", () => {
     expect(t.validatePlaceholders("{{order_id}} {{buyer_name}} {{total}}")).toEqual([])

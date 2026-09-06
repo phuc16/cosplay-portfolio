@@ -45,6 +45,7 @@ const BRAND = "#6BBF59"
  * address or the pickup location/note, matching what the order page shows.
  */
 function receiverInfoHtml(order) {
+  // A 'digital' order falls through both branches below — name/phone only, no address or pickup info to show.
   const rows = [
     ["Tên người nhận", order.buyer_name],
     ["Số điện thoại", order.phone],
@@ -66,7 +67,7 @@ function receiverInfoHtml(order) {
     <table style="width:100%;border-collapse:collapse">${cells}</table>`
 }
 
-function itemsHtml(items = []) {
+function itemsHtml(items = [], { showDeliveryLink = false } = {}) {
   const rows = items.map((i) => `
     <tr>
       <td style="padding:8px 8px 8px 0;border-bottom:1px solid #f0f0f0;width:44px">
@@ -74,7 +75,12 @@ function itemsHtml(items = []) {
           ? `<img src="${escapeHtml(SITE_URL + i.image_url)}" width="44" height="44" style="width:44px;height:44px;object-fit:cover;border-radius:8px;display:block" />`
           : ""}
       </td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px">${escapeHtml(i.product_name_snapshot)} · ${escapeHtml(i.variant_label_snapshot)} × ${Number(i.qty)}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px">
+        ${escapeHtml(i.product_name_snapshot)}${i.variant_label_snapshot ? ` · ${escapeHtml(i.variant_label_snapshot)}` : ""} × ${Number(i.qty)}
+        ${showDeliveryLink && i.delivery_link_snapshot
+          ? `<br/><a href="${escapeHtml(i.delivery_link_snapshot)}" style="color:${BRAND}">Tải về</a>`
+          : ""}
+      </td>
       <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-size:14px;white-space:nowrap">${formatVnd(i.unit_price_snapshot * i.qty)}</td>
     </tr>`).join("")
   return `<table style="width:100%;border-collapse:collapse;margin-top:12px">${rows}</table>`
@@ -92,13 +98,19 @@ const TOTAL_ROW = `
     </table>`
 
 function buildVars(order) {
+  // The delivery link is only trustworthy once payment is confirmed — an
+  // unpaid or cancelled order must never leak it, matching the route-layer gate.
+  const showDeliveryLink = ["confirmed", "shipped", "completed"].includes(order.status)
+  const hasDigitalItem = (order.items || []).some((i) => i.delivery_link_snapshot)
+  const digitalNote = "Link tải sản phẩm số đã có trong danh sách bên dưới."
+
   return {
     order_id: escapeHtml(formatOrderCode(order.id, order.created_at)),
     order_token: escapeHtml(order.order_token),
     order_url: `${SITE_URL}/order/${order.order_token}`,
     buyer_name: escapeHtml(order.buyer_name),
     total: formatVnd(order.total),
-    items: itemsHtml(order.items),           // built from escaped parts above
+    items: itemsHtml(order.items, { showDeliveryLink }),   // built from escaped parts above
     status: escapeHtml(order.status),
     payment_method: escapeHtml(order.payment_method),
     fulfillment_method: escapeHtml(order.fulfillment_method),
@@ -113,10 +125,14 @@ function buildVars(order) {
       : "",
     // payment_confirmed's "what happens next" line — a pickup order is never
     // "gửi hàng" (shipped), so it gets its own wording pointing at the
-    // pickup code/QR instead.
-    prep_note: order.fulfillment_method === "pickup"
-      ? "sẽ chuẩn bị hàng — mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận."
-      : "sẽ chuẩn bị và gửi hàng sớm nhất có thể.",
+    // pickup code/QR instead. A digital order has nothing to ship or pick
+    // up, and any order with a digital item alongside physical ones still
+    // needs the download-link mention appended.
+    prep_note: order.fulfillment_method === "digital"
+      ? digitalNote
+      : order.fulfillment_method === "pickup"
+        ? "sẽ chuẩn bị hàng — mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận." + (hasDigitalItem ? ` ${digitalNote}` : "")
+        : "sẽ chuẩn bị và gửi hàng sớm nhất có thể." + (hasDigitalItem ? ` ${digitalNote}` : ""),
   }
 }
 
