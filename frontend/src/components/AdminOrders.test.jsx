@@ -414,6 +414,39 @@ describe("AdminOrders — semantic status/action styling (Admin UI plan)", () =>
     expect(detailBtn().textContent).toBe("Chi tiết")
   })
 
+  it("shows a digital badge and the delivery link for a digital line item", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, email: "a@b.com",
+      items: [{ id: 1, product_name_snapshot: "Digital Album", variant_label_snapshot: "", qty: 1, unit_price_snapshot: 99000, delivery_link_snapshot: "https://drive.google.com/x" }],
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("Số")
+    expect(container.querySelector('a[href="https://drive.google.com/x"]')).toBeTruthy()
+  })
+
+  it("shows no digital badge or link for a physical line item", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, email: "a@b.com",
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1, unit_price_snapshot: 35000, delivery_link_snapshot: null }],
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).not.toContain("Số")
+  })
+
   it("fetches payment instructions by id under admin auth when opening the detail panel, not the buyer's public token route", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({ id: 1, email: "a@b.com", items: [] }))

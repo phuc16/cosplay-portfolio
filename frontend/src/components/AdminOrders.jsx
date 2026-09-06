@@ -388,8 +388,18 @@ export default function AdminOrders() {
               <ul className="mt-2">
                 {detail.items.map((i) => (
                   <li key={i.id}>
-                    {i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty} —{" "}
+                    {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty} —{" "}
                     {formatVnd(i.unit_price_snapshot * i.qty)}
+                    {i.delivery_link_snapshot && (
+                      <>
+                        {" "}
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">Số</span>
+                        {" — "}
+                        <a href={i.delivery_link_snapshot} target="_blank" rel="noreferrer" className="text-[var(--text-link)]">
+                          {i.delivery_link_snapshot}
+                        </a>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
