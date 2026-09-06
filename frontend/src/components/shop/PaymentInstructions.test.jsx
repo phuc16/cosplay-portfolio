@@ -155,6 +155,34 @@ describe("PaymentInstructions", () => {
     expect(container.textContent).toContain("Ship trong 3 ngày")
   })
 
+  it("does not duplicate the note as a footer paragraph when it's already shown as the bank transfer-content row", async () => {
+    const container = await renderWith({
+      method: "bank", amount: 100000, payment_note: "Chuyen tien don hang",
+      bank_name: "ACB", account_number: "123456789", account_holder: "A",
+      transfer_note: "Chuyen tien don hang", vietqr_payload: null,
+    })
+    const occurrences = container.textContent.split("Chuyen tien don hang").length - 1
+    expect(occurrences).toBe(1)
+  })
+
+  it("does not duplicate the note as a footer paragraph when it's already shown as the momo transfer-content row", async () => {
+    const container = await renderWith({
+      method: "momo", amount: 50000, payment_note: "Chuyen tien don hang",
+      momo_phone: "0900000000", momo_account_holder: "A",
+      transfer_note: "Chuyen tien don hang",
+    })
+    const occurrences = container.textContent.split("Chuyen tien don hang").length - 1
+    expect(occurrences).toBe(1)
+  })
+
+  it("still shows the footer note for paypal, which has no transfer-content row", async () => {
+    const container = await renderWith({
+      method: "paypal", amount: 20000, payment_note: "Chuyen tien don hang",
+      paypal_link: "https://paypal.me/x", transfer_note: "Chuyen tien don hang",
+    })
+    expect(container.textContent).toContain("Chuyen tien don hang")
+  })
+
   it("renders nothing when instructions is not yet loaded", async () => {
     const container = await renderWith(null)
     expect(container.innerHTML).toBe("")

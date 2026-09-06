@@ -135,7 +135,9 @@ export default function PaymentInstructions({ instructions, token }) {
 
       {method === "cod" && <p className="text-sm opacity-70 mt-2">{t("paymentCodNote")}</p>}
 
-      {payment_note && <p className="text-sm mt-3 italic opacity-70">{payment_note}</p>}
+      {payment_note && method !== "bank" && method !== "momo" && (
+        <p className="text-sm mt-3 italic opacity-70">{payment_note}</p>
+      )}
     </div>
   )
 }
