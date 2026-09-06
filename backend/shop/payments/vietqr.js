@@ -35,7 +35,7 @@ function sanitizeInfo(text) {
   return String(text || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/[đĐ]/g, "d")
+    .replace(/[đĐ]/g, "D")
     .replace(/[^A-Za-z0-9 ]/g, "")
     .trim()
     .slice(0, 25)

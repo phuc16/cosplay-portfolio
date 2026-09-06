@@ -31,7 +31,7 @@ describe("buildInstructions", () => {
   it("sanitizes diacritics in payment_note before embedding it in the QR, but keeps the raw text in transfer_note", () => {
     const i = buildInstructions(order, { ...settings, payment_note: "Ghi chú đơn hàng" })
     expect(i.transfer_note).toBe("Ghi chú đơn hàng")
-    expect(i.vietqr_payload).toContain("Ghi chu don hang")
+    expect(i.vietqr_payload).toContain("Ghi chu Don hang")
   })
 
   it("returns transfer_note as null when payment_note is not set", () => {
