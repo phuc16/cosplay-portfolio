@@ -13,8 +13,12 @@ function stockLabel(variant, t) {
 
 const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 
-/** A product with no variants isn't a purchasable stock item, so it's never "sold out". */
-export const isProductSoldOut = (p) => p.variants?.length > 0 && p.variants.every(isSoldOut)
+/** A product with no variants isn't a purchasable stock item, so it's never "sold out".
+ *  A digital product has no variant list — its stock lives on the flattened product.stock_qty instead. */
+export const isProductSoldOut = (p) => {
+  if (p.type === "digital") return p.stock_qty !== null && p.stock_qty !== undefined && p.stock_qty <= 0
+  return p.variants?.length > 0 && p.variants.every(isSoldOut)
+}
 
 /** Most variants carry a single photo (image_url); a few carry a gallery (images). */
 function variantImages(v) {
@@ -52,8 +56,15 @@ function galleryGridClasses(count) {
 
 export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
   const { t } = useLanguage()
-  const cover = product.images?.[0] || variantCover(product.variants?.find((v) => variantCover(v)) || {})
-  const hasVariants = product.variants?.length > 0
+  const isDigital = product.type === "digital"
+  // A digital product is treated exactly like a product with one variant —
+  // the same single-variant code path below (no picker, straight to detail)
+  // already does the right thing; this just supplies that one "variant".
+  const variants = isDigital
+    ? [{ id: product.variant_id, label: "", stock_qty: product.stock_qty, images: product.images }]
+    : (product.variants || [])
+  const cover = product.images?.[0] || variantCover(variants.find((v) => variantCover(v)) || {})
+  const hasVariants = variants.length > 0
   // null = closed, "grid" = full variant gallery, an object = single-variant detail.
   const [view, setView] = useState(null)
   const [qty, setQty] = useState(1)
@@ -77,13 +88,14 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
       price: product.price,
       image_url: variantCover(v) || product.images?.[0] || null,
       collection_slug: collectionSlug,
+      is_digital: isDigital,
     })
     onAdded?.(v.label)
     // A multi-variant product's buyer is often picking up several codes in
     // one visit — dropping them back into the picker grid lets them add the
     // next one immediately, instead of re-opening the whole product from
     // the collection page for every single code.
-    setView(product.variants.length > 1 ? "grid" : null)
+    setView(variants.length > 1 ? "grid" : null)
   }
 
   const openPicker = () => {
@@ -91,7 +103,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
     // A closed collection still lets a buyer browse what was in it — only
     // adding to cart is blocked (see the "Add to cart" button below).
     // A single-variant product has nothing to "browse" — go straight to its detail.
-    if (product.variants.length === 1) openDetail(product.variants[0])
+    if (variants.length === 1) openDetail(variants[0])
     else setView("grid")
   }
 
@@ -157,10 +169,10 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
             </div>
 
             <div className="overflow-y-auto p-4 sm:p-5 pt-3">
-              <div className={"grid " + galleryGridClasses(product.variants.length) + " gap-3"}>
+              <div className={"grid " + galleryGridClasses(variants.length) + " gap-3"}>
                 {/* Stable sort: sold-out variants sink after in-stock ones,
                     without disturbing relative order within each group. */}
-                {[...product.variants].sort((a, b) => Number(isSoldOut(a)) - Number(isSoldOut(b))).map((v) => {
+                {[...variants].sort((a, b) => Number(isSoldOut(a)) - Number(isSoldOut(b))).map((v) => {
                   const img = variantCover(v) || cover
                   return (
                     <button
@@ -228,8 +240,8 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
             )}
             <div className="p-4 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-lg">{product.name} · {detail.label}</h3>
-                {product.variants.length > 1 && (
+                <h3 className="font-semibold text-lg">{product.name}{detail.label ? ` · ${detail.label}` : ""}</h3>
+                {variants.length > 1 && (
                   <button
                     type="button"
                     onClick={() => setView("grid")}

@@ -6,7 +6,7 @@ import { readCart } from "../../shop/cart"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: ProductCard } = await import("./ProductCard")
+const { default: ProductCard, isProductSoldOut } = await import("./ProductCard")
 
 function baseProduct(over = {}) {
   return {
@@ -297,6 +297,47 @@ describe("ProductCard — quantity in the detail modal", () => {
 
     dialog = container.querySelector('[role="dialog"]')
     expect(dialog.querySelector('input[type="number"]').value).toBe("1")
+  })
+})
+
+describe("digital products", () => {
+  const digitalProduct = (overrides = {}) => ({
+    id: 1, name: "Digital Album", price: 99000, type: "digital",
+    images: ["https://x/cover.jpg"], variant_id: 42, stock_qty: 5,
+    ...overrides,
+  })
+
+  it("has no variant picker — opens straight to add-to-cart", async () => {
+    const { container } = await renderCard({ product: digitalProduct() })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    expect(container.querySelector('[role="dialog"]')).toBeTruthy()
+    expect(container.textContent).toContain("Digital Album")
+  })
+
+  it("adds to cart using the flattened variant_id", async () => {
+    const { container } = await renderCard({ product: digitalProduct() })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const addButton = [...container.querySelectorAll("button")].find((b) => /add to cart/i.test(b.textContent))
+    await act(async () => { addButton.click() })
+
+    const cart = readCart()
+    expect(cart[0].variant_id).toBe(42)
+    expect(cart[0].is_digital).toBe(true)
+  })
+
+  it("isProductSoldOut reads the flattened stock_qty for a digital product", () => {
+    expect(isProductSoldOut(digitalProduct({ stock_qty: 0 }))).toBe(true)
+    expect(isProductSoldOut(digitalProduct({ stock_qty: 5 }))).toBe(false)
+    expect(isProductSoldOut(digitalProduct({ stock_qty: null }))).toBe(false)
+  })
+
+  it("shows the sold-out overlay on a digital product's cover when stock_qty is 0", async () => {
+    const { container } = await renderCard({ product: digitalProduct({ stock_qty: 0 }) })
+    expect(container.textContent).toContain("Sold out")
   })
 })
 
