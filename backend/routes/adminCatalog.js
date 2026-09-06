@@ -46,6 +46,14 @@ function validateProduct(body) {
   if (String(body.name).length > NAME_MAX_LEN) return `Tên sản phẩm không được quá ${NAME_MAX_LEN} ký tự`
   const price = Number(body.price)
   if (!Number.isInteger(price) || price < 0) return "Giá phải là số nguyên không âm (VND)"
+  if (body.type !== undefined && !["physical", "digital"].includes(body.type)) return "Loại sản phẩm không hợp lệ"
+  if (body.type === "digital") {
+    if (body.stock_qty !== null && body.stock_qty !== undefined && body.stock_qty !== "") {
+      const stock = Number(body.stock_qty)
+      if (!Number.isInteger(stock) || stock < 0) return "Số lượng phải là số nguyên không âm, hoặc để trống nếu không giới hạn"
+    }
+    if (body.delivery_link && String(body.delivery_link).length > 2048) return "Link tải về quá dài"
+  }
   return null
 }
 

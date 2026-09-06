@@ -226,6 +226,33 @@ describe("products and variants", () => {
     expect(res.status).toBe(400)
   })
 
+  it("rejects an invalid product type", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Album", price: 99000, type: "cd" })
+    expect(res.status).toBe(400)
+  })
+
+  it("creates a digital product with stock_qty and delivery_link", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Digital Album", price: 99000, type: "digital", stock_qty: 20, delivery_link: "https://drive.google.com/x" })
+    expect(res.status).toBe(201)
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const product = detail.products.find((p) => p.id === res.body.id)
+    expect(product.type).toBe("digital")
+    expect(product.stock_qty).toBe(20)
+    expect(product.delivery_link).toBe("https://drive.google.com/x")
+  })
+
+  it("rejects a negative stock_qty on a digital product", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Digital Album", price: 99000, type: "digital", stock_qty: -1 })
+    expect(res.status).toBe(400)
+  })
+
   it("accepts a product name at exactly the 255-char column limit", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
     const name = "a".repeat(255)
