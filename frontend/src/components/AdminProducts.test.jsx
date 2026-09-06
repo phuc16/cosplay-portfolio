@@ -138,6 +138,63 @@ describe("AdminProducts — reordering via drag and drop", () => {
   })
 })
 
+describe("AdminProducts — digital products", () => {
+  it("creates a digital product with stock_qty and delivery_link, no variant button", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+
+    const container = await renderProducts()
+    await flush()
+
+    const typeSelect = container.querySelector('select[name="product-type"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(typeSelect, "digital")
+      typeSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.querySelector('input[placeholder="Số lượng"]')).toBeTruthy()
+    expect(container.querySelector('input[placeholder="Link tải về"]')).toBeTruthy()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Digital Album")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Digital Album", type: "digital" })
+    )
+  })
+
+  it("hides the variant/Phân loại button for a digital product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Digital Album", price: 99000, type: "digital", images: [], stock_qty: 10, delivery_link: "https://x" }],
+    })
+
+    const container = await renderProducts()
+    await flush()
+
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Phân loại")).toBe(false)
+  })
+
+  it("still shows the variant/Phân loại button for a physical product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Card", price: 35000, type: "physical", images: [], variants: [] }],
+    })
+
+    const container = await renderProducts()
+    await flush()
+
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Phân loại")).toBe(true)
+  })
+})
+
 describe("AdminProducts — search, filter, sort", () => {
   it("filters the list by name, case-insensitively", async () => {
     adminGetCollection.mockResolvedValue({

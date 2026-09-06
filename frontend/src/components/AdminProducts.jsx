@@ -6,7 +6,7 @@ import {
 import AdminVariants from "./AdminVariants"
 import { formatVnd } from "../utils/money"
 
-const blank = { name: "", description: "", price: "", images: [] }
+const blank = { name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "" }
 
 const SORTS = [
   { value: "default", label: "Thứ tự kéo thả" },
@@ -85,7 +85,10 @@ export default function AdminProducts({ collection }) {
 
   const edit = (p) => {
     setEditingId(p.id)
-    setDraft({ name: p.name, description: p.description || "", price: p.price, images: p.images || [] })
+    setDraft({
+      name: p.name, description: p.description || "", price: p.price, images: p.images || [],
+      type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
+    })
   }
 
   const cancelEdit = () => {
@@ -158,6 +161,18 @@ export default function AdminProducts({ collection }) {
     <div className="p-3 rounded-xl border border-dashed border-[var(--border-brand)]">
       <p className="font-medium mb-2">{editingId ? "Sửa sản phẩm" : "Thêm sản phẩm"}</p>
 
+      {!editingId && (
+        <select
+          name="product-type"
+          value={draft.type}
+          onChange={(e) => setDraft({ ...draft, type: e.target.value })}
+          className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+        >
+          <option value="physical">Vật lý</option>
+          <option value="digital">Số (digital)</option>
+        </select>
+      )}
+
       <input
         value={draft.name}
         onChange={(e) => setDraft({ ...draft, name: e.target.value })}
@@ -178,6 +193,24 @@ export default function AdminProducts({ collection }) {
         rows={3}
         className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
       />
+      {draft.type === "digital" && (
+        <>
+          <input
+            value={draft.stock_qty}
+            onChange={(e) => setDraft({ ...draft, stock_qty: e.target.value })}
+            placeholder="Số lượng"
+            inputMode="numeric"
+            className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+          <input
+            value={draft.delivery_link}
+            onChange={(e) => setDraft({ ...draft, delivery_link: e.target.value })}
+            placeholder="Link tải về"
+            className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+        </>
+      )}
+
       <input
         type="file"
         accept="image/*"
@@ -299,18 +332,20 @@ export default function AdminProducts({ collection }) {
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setExpandedProductId(expandedProductId === p.id ? null : p.id)}
-                className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]"
-              >
-                {expandedProductId === p.id ? "Thu gọn" : "Phân loại"}
-              </button>
+              {p.type !== "digital" && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedProductId(expandedProductId === p.id ? null : p.id)}
+                  className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]"
+                >
+                  {expandedProductId === p.id ? "Thu gọn" : "Phân loại"}
+                </button>
+              )}
               <button type="button" onClick={() => edit(p)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Sửa</button>
               <button type="button" onClick={() => remove(p.id)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Xóa</button>
             </div>
           </div>
-          {expandedProductId === p.id && <AdminVariants product={p} onSaved={reload} />}
+          {p.type !== "digital" && expandedProductId === p.id && <AdminVariants product={p} onSaved={reload} />}
           {editingId === p.id && <div className="mt-3">{form}</div>}
         </div>
       ))}
