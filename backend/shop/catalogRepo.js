@@ -60,11 +60,33 @@ async function nextSortOrder(table, whereSql = "", params = []) {
   return next
 }
 
+/**
+ * Real, persisted transition — not a display-only computed value. Called by
+ * every collection-read path below, so the first read after end_at (by
+ * anyone — admin or a buyer) is what flips it; there is no separate
+ * sweep/cron. The `AND status = 'active'` guard makes concurrent calls
+ * from simultaneous requests safely idempotent.
+ */
+async function closeExpiredCollections(rows) {
+  const now = new Date()
+  const due = rows.filter((r) => r.status === "active" && r.end_at && new Date(r.end_at) <= now)
+  if (!due.length) return rows
+
+  const ids = due.map((r) => r.id)
+  await db.query(
+    `UPDATE collections SET status = 'closed' WHERE id IN (${ids.map(() => "?").join(",")}) AND status = 'active'`,
+    ids
+  )
+  const dueIds = new Set(ids)
+  return rows.map((r) => (dueIds.has(r.id) ? { ...r, status: "closed" } : r))
+}
+
 async function listAllCollections() {
   const [rows] = await db.query(
     "SELECT * FROM collections ORDER BY sort_order ASC, id ASC"
   )
-  return rows.map(mapCollection)
+  const updated = await closeExpiredCollections(rows)
+  return updated.map(mapCollection)
 }
 
 async function listPublicCollections() {
@@ -72,12 +94,13 @@ async function listPublicCollections() {
     `SELECT c.*, COUNT(p.id) AS product_count
        FROM collections c
        LEFT JOIN products p ON p.collection_id = c.id
-      WHERE c.status IN (?, ?)
+      WHERE c.status IN (?, ?) AND (c.start_at IS NULL OR c.start_at <= NOW())
       GROUP BY c.id
       ORDER BY c.sort_order ASC, c.id ASC`,
     PUBLIC_STATUSES
   )
-  return rows.map((r) => ({ ...mapCollection(r), product_count: Number(r.product_count) }))
+  const updated = await closeExpiredCollections(rows)
+  return updated.map((r) => ({ ...mapCollection(r), product_count: Number(r.product_count) }))
 }
 
 /** Nests a collection row with its products and each product's variants. */
@@ -136,11 +159,12 @@ async function nestCollectionDetail(collection) {
 
 async function getPublicCollectionBySlug(slug) {
   const [[collection]] = await db.query(
-    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) LIMIT 1",
+    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) AND (start_at IS NULL OR start_at <= NOW()) LIMIT 1",
     [slug, ...PUBLIC_STATUSES]
   )
   if (!collection) return null
-  const detail = await nestCollectionDetail(collection)
+  const [updated] = await closeExpiredCollections([collection])
+  const detail = await nestCollectionDetail(updated)
   // delivery_link is only trustworthy once an order is confirmed/shipped/completed
   // (see routes/orders.js and email templates.js) — nestCollectionDetail is shared
   // with the admin-only getCollectionDetailById, which legitimately needs the link,
@@ -159,7 +183,8 @@ async function getCollectionDetailById(id) {
     [id]
   )
   if (!collection) return null
-  return nestCollectionDetail(collection)
+  const [updated] = await closeExpiredCollections([collection])
+  return nestCollectionDetail(updated)
 }
 
 async function createCollection(data, attempt = 0) {
@@ -184,8 +209,9 @@ async function insertCollection(data, slug, sortOrder) {
   const [res] = await db.query(
     `INSERT INTO collections
        (title, slug, description, cover_image, thumbnail_image, status,
-        allow_ship, allow_pickup, pickup_location, pickup_note, payment_deadline_hours, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        allow_ship, allow_pickup, pickup_location, pickup_note, payment_deadline_hours,
+        start_at, end_at, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.title,
       slug,
@@ -198,6 +224,8 @@ async function insertCollection(data, slug, sortOrder) {
       data.pickup_location || null,
       data.pickup_note || null,
       data.payment_deadline_hours || null,
+      data.start_at || null,
+      data.end_at || null,
       sortOrder,
     ]
   )
@@ -218,7 +246,8 @@ async function updateCollection(id, data, attempt = 0) {
     const [res] = await db.query(
       `UPDATE collections
           SET title = ?, slug = ?, description = ?, cover_image = ?, thumbnail_image = ?, status = ?,
-              allow_ship = ?, allow_pickup = ?, pickup_location = ?, pickup_note = ?, payment_deadline_hours = ?
+              allow_ship = ?, allow_pickup = ?, pickup_location = ?, pickup_note = ?, payment_deadline_hours = ?,
+              start_at = ?, end_at = ?
         WHERE id = ?`,
       [
         data.title,
@@ -232,6 +261,8 @@ async function updateCollection(id, data, attempt = 0) {
         data.pickup_location || null,
         data.pickup_note || null,
         data.payment_deadline_hours || null,
+        data.start_at || null,
+        data.end_at || null,
         id,
       ]
     )

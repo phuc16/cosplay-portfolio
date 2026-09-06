@@ -521,3 +521,92 @@ describe("copyCollection", () => {
     expect(secondCopy.slug).toBe("fes-hh2026-copy-2")
   })
 })
+
+describe("collection scheduling", () => {
+  it("hides a not-yet-started collection from the public list and slug lookup", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Future Drop", status: "active", start_at: future })
+
+    const list = await repo.listPublicCollections()
+    expect(list.find((c) => c.id === cid)).toBeUndefined()
+    expect(await repo.getPublicCollectionBySlug((await repo.getCollectionDetailById(cid)).slug)).toBeNull()
+  })
+
+  it("still shows a not-yet-started collection to the admin", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Future Drop", status: "active", start_at: future })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.status).toBe("active")
+    // start_at is a DATETIME column (no fractional seconds), so MySQL
+    // rounds sub-second precision on write — allow up to 1s of drift.
+    expect(Math.abs(new Date(detail.start_at).getTime() - future.getTime())).toBeLessThanOrEqual(1000)
+  })
+
+  it("shows a collection once its start_at has passed", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Live Drop", status: "active", start_at: past })
+
+    const list = await repo.listPublicCollections()
+    expect(list.find((c) => c.id === cid)).toBeTruthy()
+  })
+
+  it("really closes a collection past end_at, on the admin path, persisted to the DB row", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Ended Drop", status: "active", end_at: past })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.status).toBe("closed")
+
+    const [[row]] = await db.query("SELECT status FROM collections WHERE id = ?", [cid])
+    expect(row.status).toBe("closed")
+  })
+
+  it("really closes a collection past end_at, on the public path too", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Ended Drop", status: "active", end_at: past })
+    const slug = (await repo.getCollectionDetailById(cid)).slug
+
+    const detail = await repo.getPublicCollectionBySlug(slug)
+    expect(detail.status).toBe("closed")
+
+    const [[row]] = await db.query("SELECT status FROM collections WHERE id = ?", [cid])
+    expect(row.status).toBe("closed")
+  })
+
+  it("closes a collection past end_at when surfaced via listAllCollections/listPublicCollections too", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Ended Drop", status: "active", end_at: past })
+
+    const adminList = await repo.listAllCollections()
+    expect(adminList.find((c) => c.id === cid).status).toBe("closed")
+
+    const publicList = await repo.listPublicCollections()
+    expect(publicList.find((c) => c.id === cid).status).toBe("closed")
+  })
+
+  it("is idempotent — reading an already-closed-by-expiry collection again does not error or change anything", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Ended Drop", status: "active", end_at: past })
+
+    await repo.getCollectionDetailById(cid)
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.status).toBe("closed")
+  })
+
+  it("never auto-closes a collection with no end_at set", async () => {
+    const cid = await repo.createCollection({ title: "Forever Drop", status: "active" })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.status).toBe("active")
+  })
+
+  it("does not carry start_at/end_at into a copyCollection duplicate", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Scheduled", status: "active", start_at: future, end_at: future })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.start_at).toBeNull()
+    expect(copy.end_at).toBeNull()
+  })
+})
