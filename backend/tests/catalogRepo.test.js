@@ -96,6 +96,94 @@ describe("variant description", () => {
   })
 })
 
+describe("digital products", () => {
+  it("creates a digital product with a hidden variant carrying stock_qty and delivery_link", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000,
+      images: ["https://x/cover.jpg"], type: "digital",
+      stock_qty: 50, delivery_link: "https://drive.google.com/abc",
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const product = detail.products[0]
+    expect(product.type).toBe("digital")
+    expect(product.images).toEqual(["https://x/cover.jpg"])
+    expect(product.variants).toEqual([])
+    expect(product.stock_qty).toBe(50)
+    expect(product.delivery_link).toBe("https://drive.google.com/abc")
+    expect(typeof product.variant_id).toBe("number")
+
+    const [[hidden]] = await db.query("SELECT label FROM product_variants WHERE product_id = ?", [pid])
+    expect(hidden.label).toBe("")
+  })
+
+  it("defaults type to physical when not submitted, unchanged from before", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].type).toBe("physical")
+    expect(detail.products[0].variants).toEqual([])
+
+    const [rows] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+    expect(rows).toHaveLength(0)
+  })
+
+  it("updates a digital product's hidden variant in place, keeping the same variant_id", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 10, delivery_link: "https://drive.google.com/v1",
+    })
+    const before = (await repo.getCollectionDetailById(cid)).products[0]
+
+    await repo.updateProduct(pid, {
+      name: "Digital Album v2", price: 120000, images: [],
+      stock_qty: 5, delivery_link: "https://drive.google.com/v2",
+    })
+
+    const after = (await repo.getCollectionDetailById(cid)).products[0]
+    expect(after.name).toBe("Digital Album v2")
+    expect(after.stock_qty).toBe(5)
+    expect(after.delivery_link).toBe("https://drive.google.com/v2")
+    expect(after.variant_id).toBe(before.variant_id)
+  })
+
+  it("does not throw VariantInUseError when updating a digital product with a live order", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital", stock_qty: 10,
+    })
+    const variantId = (await repo.getCollectionDetailById(cid)).products[0].variant_id
+    await db.query(
+      `INSERT INTO orders (order_token, buyer_name, phone, email, fulfillment_method, status, payment_method, total, expires_at, access_pin_hash)
+       VALUES ('tok1', 'A', '0900000000', 'a@example.com', 'digital', 'pending', 'bank', 99000, NOW(), 'x')`
+    )
+    const [[o]] = await db.query("SELECT id FROM orders WHERE order_token = 'tok1'")
+    await db.query(
+      "INSERT INTO order_items (order_id, product_variant_id, product_name_snapshot, variant_label_snapshot, unit_price_snapshot, qty) VALUES (?, ?, 'Digital Album', '', 99000, 1)",
+      [o.id, variantId]
+    )
+
+    await expect(repo.updateProduct(pid, { name: "Digital Album", price: 99000, stock_qty: 10 })).resolves.toBe(true)
+  })
+
+  it("copyCollection carries a digital product's type, stock_qty, and delivery_link through", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 3, delivery_link: "https://drive.google.com/orig",
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].type).toBe("digital")
+    expect(copy.products[0].stock_qty).toBe(3)
+    expect(copy.products[0].delivery_link).toBe("https://drive.google.com/orig")
+  })
+})
+
 describe("createCollection", () => {
   it("generates a slug from the Vietnamese title", async () => {
     const id = await repo.createCollection({ title: "Bộ sưu tập Hè", status: "active" })

@@ -109,11 +109,28 @@ async function nestCollectionDetail(collection) {
 
   return {
     ...mapCollection(collection),
-    products: products.map((p) => ({
-      ...p,
-      images: parseImages(p.images),
-      variants: byProduct.get(p.id) || [],
-    })),
+    products: products.map((p) => {
+      const productVariants = byProduct.get(p.id) || []
+      // Digital products have no variant list in any UI — the one hidden
+      // variant they do have is flattened onto the product itself here so
+      // nothing downstream needs to know it secretly exists.
+      if (p.type === "digital") {
+        const hidden = productVariants[0] || null
+        return {
+          ...p,
+          images: parseImages(p.images),
+          variants: [],
+          variant_id: hidden?.id ?? null,
+          stock_qty: hidden?.stock_qty ?? null,
+          delivery_link: hidden?.delivery_link ?? null,
+        }
+      }
+      return {
+        ...p,
+        images: parseImages(p.images),
+        variants: productVariants,
+      }
+    }),
   }
 }
 
@@ -252,13 +269,17 @@ async function copyCollection(id) {
       description: p.description,
       price: p.price,
       images: p.images,
+      type: p.type,
+      stock_qty: p.stock_qty,
+      delivery_link: p.delivery_link,
     })
-    if (p.variants.length) {
+    if (p.type !== "digital" && p.variants.length) {
       await replaceVariants(
         newProductId,
         p.variants.map((v) => ({
           label: v.label, image_url: v.image_url, images: v.images,
           thumbnail_image: v.thumbnail_image, description: v.description, stock_qty: v.stock_qty,
+          delivery_link: v.delivery_link,
         }))
       )
     }
@@ -274,26 +295,60 @@ async function deleteCollection(id) {
 
 async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
+  const type = data.type === "digital" ? "digital" : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
       data.description || null,
       Number(data.price) || 0,
       JSON.stringify(data.images || []),
+      type,
       sortOrder,
     ]
   )
-  return res.insertId
+  const productId = res.insertId
+  // Digital products have no admin-managed variant list — this single
+  // hidden row (no label) carries stock_qty/delivery_link through the same
+  // variant_id-based cart/order_items/stock-decrement pipeline unchanged.
+  if (type === "digital") {
+    await replaceVariants(productId, [{
+      label: "",
+      stock_qty: data.stock_qty,
+      delivery_link: data.delivery_link,
+    }])
+  }
+  return productId
 }
 
 async function updateProduct(id, data) {
+  const [[existing]] = await db.query("SELECT type FROM products WHERE id = ?", [id])
+  if (!existing) return false
+
   const [res] = await db.query(
     "UPDATE products SET name = ?, description = ?, price = ?, images = ? WHERE id = ?",
     [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
   )
+
+  if (existing.type === "digital") {
+    // Reuses the hidden variant's own id — replaceVariants must UPDATE it,
+    // never delete-and-recreate: order_items.product_variant_id would SET
+    // NULL on every edit, and a live order referencing it would make
+    // replaceVariants throw VariantInUseError on an ordinary product edit.
+    const [[currentVariant]] = await db.query(
+      "SELECT id FROM product_variants WHERE product_id = ? LIMIT 1",
+      [id]
+    )
+    await replaceVariants(id, [{
+      id: currentVariant ? currentVariant.id : undefined,
+      label: "",
+      stock_qty: data.stock_qty,
+      delivery_link: data.delivery_link,
+    }])
+  }
+
   return res.affectedRows > 0
 }
 
@@ -392,13 +447,13 @@ async function replaceVariants(productId, variants) {
         // not rely on this update succeeding without checking product ownership
         // themselves.
         await conn.query(
-          "UPDATE product_variants SET label = ?, image_url = ?, images = ?, thumbnail_image = ?, description = ?, stock_qty = ?, sort_order = ? WHERE id = ? AND product_id = ?",
-          [v.label, imageUrl, JSON.stringify(images), v.thumbnail_image || null, v.description || null, stock, index, v.id, productId]
+          "UPDATE product_variants SET label = ?, image_url = ?, images = ?, thumbnail_image = ?, description = ?, stock_qty = ?, delivery_link = ?, sort_order = ? WHERE id = ? AND product_id = ?",
+          [v.label, imageUrl, JSON.stringify(images), v.thumbnail_image || null, v.description || null, stock, v.delivery_link || null, index, v.id, productId]
         )
       } else {
         await conn.query(
-          "INSERT INTO product_variants (product_id, label, image_url, images, thumbnail_image, description, stock_qty, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [productId, v.label, imageUrl, JSON.stringify(images), v.thumbnail_image || null, v.description || null, stock, index]
+          "INSERT INTO product_variants (product_id, label, image_url, images, thumbnail_image, description, stock_qty, delivery_link, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [productId, v.label, imageUrl, JSON.stringify(images), v.thumbnail_image || null, v.description || null, stock, v.delivery_link || null, index]
         )
       }
     }
