@@ -142,6 +142,20 @@ describe("Order — item photos", () => {
   })
 })
 
+describe("Order — digital items download link", () => {
+  it("shows a download button for a digital item once the order is confirmed", async () => {
+    fetchOrder.mockResolvedValue({
+      ...baseOrder(),
+      status: "confirmed",
+      items: [{ id: 1, product_name_snapshot: "Digital Album", variant_label_snapshot: "", qty: 1, unit_price_snapshot: 99000, delivery_link_snapshot: "https://drive.google.com/x" }],
+    })
+    const container = await renderOrder()
+
+    const link = container.querySelector('a[href="https://drive.google.com/x"]')
+    expect(link).toBeTruthy()
+  })
+})
+
 describe("Order — tracking code", () => {
   it("labels the tracking code as a ViettelPost code, not just a bare number", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "shipped", tracking_code: "151045353461" }))

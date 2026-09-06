@@ -383,7 +383,16 @@ export default function Order() {
             {i.image_url
               ? <img src={i.image_url} alt="" className="w-12 h-12 object-cover rounded-lg shrink-0" />
               : <div className="w-12 h-12 rounded-lg bg-[var(--surface-neutral)] shrink-0" />}
-            <span className="truncate">{i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty}</span>
+            <div className="min-w-0">
+              <span className="truncate block">
+                {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty}
+              </span>
+              {i.delivery_link_snapshot && (
+                <a href={i.delivery_link_snapshot} target="_blank" rel="noreferrer" className="text-sm text-[var(--text-link)] underline">
+                  {t("orderDownloadLink")}
+                </a>
+              )}
+            </div>
           </div>
           <span className="shrink-0">{formatVnd(i.unit_price_snapshot * i.qty)}</span>
         </div>
