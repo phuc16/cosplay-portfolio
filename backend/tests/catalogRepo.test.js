@@ -182,6 +182,36 @@ describe("digital products", () => {
     expect(copy.products[0].stock_qty).toBe(3)
     expect(copy.products[0].delivery_link).toBe("https://drive.google.com/orig")
   })
+
+  it("never exposes delivery_link on the public path, but does on the admin path", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 10, delivery_link: "https://drive.google.com/secret",
+    })
+
+    const publicDetail = await repo.getPublicCollectionBySlug("drop")
+    expect(publicDetail.products[0].delivery_link).toBeUndefined()
+    expect(publicDetail.products[0].stock_qty).toBe(10)
+
+    const adminDetail = await repo.getCollectionDetailById(cid)
+    expect(adminDetail.products[0].delivery_link).toBe("https://drive.google.com/secret")
+  })
+
+  it("updateProduct preserves an omitted delivery_link/stock_qty instead of nulling them", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 7, delivery_link: "https://drive.google.com/keepme",
+    })
+
+    await repo.updateProduct(pid, { name: "Digital Album v2", price: 1, description: "" })
+
+    const after = (await repo.getCollectionDetailById(cid)).products[0]
+    expect(after.name).toBe("Digital Album v2")
+    expect(after.stock_qty).toBe(7)
+    expect(after.delivery_link).toBe("https://drive.google.com/keepme")
+  })
 })
 
 describe("createCollection", () => {

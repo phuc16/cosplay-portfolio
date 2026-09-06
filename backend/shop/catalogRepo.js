@@ -140,7 +140,16 @@ async function getPublicCollectionBySlug(slug) {
     [slug, ...PUBLIC_STATUSES]
   )
   if (!collection) return null
-  return nestCollectionDetail(collection)
+  const detail = await nestCollectionDetail(collection)
+  // delivery_link is only trustworthy once an order is confirmed/shipped/completed
+  // (see routes/orders.js and email templates.js) — nestCollectionDetail is shared
+  // with the admin-only getCollectionDetailById, which legitimately needs the link,
+  // so it is stripped here, on the public path only. stock_qty stays: buyers
+  // legitimately need to see stock/sold-out state before ever placing an order.
+  return {
+    ...detail,
+    products: detail.products.map(({ delivery_link, ...rest }) => rest),
+  }
 }
 
 /** Admin-only: full nested detail by id, regardless of status (draft/archived included). */
@@ -338,14 +347,19 @@ async function updateProduct(id, data) {
     // NULL on every edit, and a live order referencing it would make
     // replaceVariants throw VariantInUseError on an ordinary product edit.
     const [[currentVariant]] = await db.query(
-      "SELECT id FROM product_variants WHERE product_id = ? LIMIT 1",
+      "SELECT id, stock_qty, delivery_link FROM product_variants WHERE product_id = ? LIMIT 1",
       [id]
     )
+    // A field omitted from the request body (undefined) falls back to the
+    // current value instead of being coerced to null by replaceVariants — an
+    // explicit null/"" is still honored as "clear the field". Otherwise a
+    // partial-payload caller (a script, a future partial-update form) would
+    // silently blank the product's entire deliverable.
     await replaceVariants(id, [{
       id: currentVariant ? currentVariant.id : undefined,
       label: "",
-      stock_qty: data.stock_qty,
-      delivery_link: data.delivery_link,
+      stock_qty: data.stock_qty !== undefined ? data.stock_qty : currentVariant?.stock_qty,
+      delivery_link: data.delivery_link !== undefined ? data.delivery_link : currentVariant?.delivery_link,
     }])
   }
 

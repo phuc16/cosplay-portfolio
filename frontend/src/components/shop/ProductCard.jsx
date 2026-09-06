@@ -60,8 +60,12 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
   // A digital product is treated exactly like a product with one variant —
   // the same single-variant code path below (no picker, straight to detail)
   // already does the right thing; this just supplies that one "variant".
+  // A digital product should always have a variant_id (createProduct always
+  // creates the hidden variant) — but if one somehow doesn't, treat it as
+  // having no variants at all, same as a physical product with zero
+  // variants, rather than letting it submit variant_id: null to the cart.
   const variants = isDigital
-    ? [{ id: product.variant_id, label: "", stock_qty: product.stock_qty, images: product.images }]
+    ? (product.variant_id != null ? [{ id: product.variant_id, label: "", stock_qty: product.stock_qty, images: product.images }] : [])
     : (product.variants || [])
   const cover = product.images?.[0] || variantCover(variants.find((v) => variantCover(v)) || {})
   const hasVariants = variants.length > 0

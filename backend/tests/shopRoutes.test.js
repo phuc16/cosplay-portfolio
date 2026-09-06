@@ -41,6 +41,19 @@ describe("GET /api/shop/collections/:slug", () => {
     expect(res.body.products[0].variants[0].label).toBe("A1")
   })
 
+  it("never exposes delivery_link for a digital product", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 10, delivery_link: "https://drive.google.com/secret",
+    })
+
+    const res = await request(app).get("/api/shop/collections/drop")
+    expect(res.status).toBe(200)
+    expect(JSON.stringify(res.body)).not.toContain("delivery_link")
+    expect(res.body.products[0].stock_qty).toBe(10)
+  })
+
   it("404s for a draft collection", async () => {
     await repo.createCollection({ title: "Secret", status: "draft" })
     const res = await request(app).get("/api/shop/collections/secret")

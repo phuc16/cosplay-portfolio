@@ -122,7 +122,7 @@ async function getDropStats(collectionId) {
 
   const received = { bank: 0, momo: 0, paypal: 0, cod: 0 }
   const orderCounts = { pending: 0, confirmed: 0, shipped: 0, completed: 0, cancelled: 0 }
-  const fulfillmentCounts = { ship: 0, pickup: 0 }
+  const fulfillmentCounts = { ship: 0, pickup: 0, digital: 0 }
   let awaitingPayment = 0
   let toCollect = 0
   let lost = 0

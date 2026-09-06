@@ -17,9 +17,13 @@ const SORTS = [
 ]
 
 // A product with no variants isn't a purchasable stock item, so it's never "sold out".
-const isProductSoldOut = (p) => p.variants?.length > 0 && p.variants.every(
-  (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
-)
+// A digital product has no variant list — its stock lives on the flattened product.stock_qty instead.
+const isProductSoldOut = (p) => {
+  if (p.type === "digital") return p.stock_qty !== null && p.stock_qty !== undefined && p.stock_qty <= 0
+  return p.variants?.length > 0 && p.variants.every(
+    (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
+  )
+}
 
 function sortProducts(list, sortBy) {
   const sorted = [...list]

@@ -135,6 +135,14 @@ describe("digital delivery link", () => {
     const vars = t.buildVars(digitalOrder({ status: "cancelled" }))
     expect(vars.prep_note).not.toContain("tải")
   })
+
+  it("prep_note is never empty for a digital order with no delivery_link on its items", () => {
+    const vars = t.buildVars(digitalOrder({
+      items: [{ product_name_snapshot: "Digital Album", variant_label_snapshot: "", qty: 1, unit_price_snapshot: 99000, delivery_link_snapshot: null }],
+    }))
+    expect(vars.prep_note).not.toBe("")
+    expect(vars.prep_note.length).toBeGreaterThan(0)
+  })
 })
 
 describe("validatePlaceholders", () => {

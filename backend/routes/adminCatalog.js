@@ -52,7 +52,16 @@ function validateProduct(body) {
       const stock = Number(body.stock_qty)
       if (!Number.isInteger(stock) || stock < 0) return "Số lượng phải là số nguyên không âm, hoặc để trống nếu không giới hạn"
     }
-    if (body.delivery_link && String(body.delivery_link).length > 2048) return "Link tải về quá dài"
+    // The link is snapshotted at order-creation time, not looked up live at
+    // fulfillment — an admin filling it in later never reaches buyers who
+    // already ordered, so a blank link must be rejected up front, not just
+    // an overlong one.
+    const link = body.delivery_link === undefined || body.delivery_link === null
+      ? ""
+      : String(body.delivery_link).trim()
+    if (!link) return "Cần link tải về cho sản phẩm số"
+    if (link.length > 2048) return "Link tải về quá dài"
+    if (!/^https?:\/\//i.test(link)) return "Link tải về phải bắt đầu bằng http:// hoặc https://"
   }
   return null
 }

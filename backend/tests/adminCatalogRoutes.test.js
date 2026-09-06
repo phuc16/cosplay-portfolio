@@ -253,6 +253,27 @@ describe("products and variants", () => {
     expect(res.status).toBe(400)
   })
 
+  it("rejects a digital product with no delivery_link", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Digital Album", price: 99000, type: "digital", stock_qty: 20 })
+    expect(res.status).toBe(400)
+  })
+
+  it("rejects a digital product with a blank delivery_link", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Digital Album", price: 99000, type: "digital", stock_qty: 20, delivery_link: "   " })
+    expect(res.status).toBe(400)
+  })
+
+  it("rejects a digital product with a non-http(s) delivery_link scheme", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Digital Album", price: 99000, type: "digital", stock_qty: 20, delivery_link: "javascript:alert(1)" })
+    expect(res.status).toBe(400)
+  })
+
   it("accepts a product name at exactly the 255-char column limit", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
     const name = "a".repeat(255)

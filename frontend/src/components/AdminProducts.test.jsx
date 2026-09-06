@@ -193,6 +193,27 @@ describe("AdminProducts — digital products", () => {
 
     expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Phân loại")).toBe(true)
   })
+
+  it("filters a digital product as sold out by its flattened stock_qty, not its (empty) variants", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [
+        product({ id: 1, name: "Digital In Stock", type: "digital", stock_qty: 5, variants: [] }),
+        product({ id: 2, name: "Digital Sold Out", type: "digital", stock_qty: 0, variants: [] }),
+      ],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const stockSelect = [...container.querySelectorAll("select")][0]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
+      setter.call(stockSelect, "sold_out")
+      stockSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Digital Sold Out")
+    expect(container.textContent).not.toContain("Digital In Stock")
+  })
 })
 
 describe("AdminProducts — search, filter, sort", () => {

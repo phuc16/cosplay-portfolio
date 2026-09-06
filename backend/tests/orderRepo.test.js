@@ -839,7 +839,7 @@ describe("getOrderByToken", () => {
     const cid = await catalog.createCollection({ title: "Drop", status: "active" })
     const pid = await catalog.createProduct({ collection_id: cid, name: "Photocard", price: 35000, images: ["/api/storage/shop/products/p1.webp"] })
     await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
-    const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ? LIMIT 1", [pid])
 
     const res = await repo.createOrder(order(v.id, 1))
     const found = await repo.getOrderByToken(res.order_token)

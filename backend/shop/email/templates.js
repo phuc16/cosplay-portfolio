@@ -130,7 +130,7 @@ function buildVars(order) {
     // up, and any order with a digital item alongside physical ones still
     // needs the download-link mention appended.
     prep_note: order.fulfillment_method === "digital"
-      ? (showDigitalNote ? digitalNote : "")
+      ? (showDigitalNote ? digitalNote : "sẽ chuẩn bị và gửi hàng sớm nhất có thể.")
       : order.fulfillment_method === "pickup"
         ? "sẽ chuẩn bị hàng — mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận." + (showDigitalNote ? ` ${digitalNote}` : "")
         : "sẽ chuẩn bị và gửi hàng sớm nhất có thể." + (showDigitalNote ? ` ${digitalNote}` : ""),

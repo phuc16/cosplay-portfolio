@@ -22,6 +22,7 @@ export const PAYMENT_METHOD_LABELS = {
 export const FULFILLMENT_METHOD_LABELS = {
   ship: "Giao hàng",
   pickup: "Nhận tại chỗ",
+  digital: "Số",
 }
 
 export const ACTION_LABELS = {

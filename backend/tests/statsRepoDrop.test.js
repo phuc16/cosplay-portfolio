@@ -136,7 +136,23 @@ describe("getDropStats", () => {
     await placeOrder(variantId, { fulfillment_method: "pickup" })
 
     const stats = await statsRepo.getDropStats(collectionId)
-    expect(stats.fulfillment_counts).toEqual({ ship: 1, pickup: 1 })
+    expect(stats.fulfillment_counts).toEqual({ ship: 1, pickup: 1, digital: 0 })
+  })
+
+  it("counts a digital order under fulfillment_counts.digital, not NaN", async () => {
+    const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+    const pid = await catalog.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital", stock_qty: 5,
+      delivery_link: "https://drive.google.com/x",
+    })
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+    await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 1 }], buyer, payment_method: "bank",
+    })
+
+    const stats = await statsRepo.getDropStats(cid)
+    expect(stats.fulfillment_counts.digital).toBe(1)
+    expect(Number.isNaN(stats.fulfillment_counts.digital)).toBe(false)
   })
 
   it("shows an unlimited variant as such, never a 0% or null sell-through", async () => {
