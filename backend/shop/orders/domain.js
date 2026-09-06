@@ -129,7 +129,7 @@ const TRANSITIONS = {
 function canTransition(from, to, fulfillment) {
   const allowed = TRANSITIONS[from]
   if (!allowed || !allowed.includes(to)) return false
-  if (fulfillment === "pickup" && to === "shipped") return false
+  if ((fulfillment === "pickup" || fulfillment === "digital") && to === "shipped") return false
   return true
 }
 

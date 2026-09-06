@@ -15,8 +15,18 @@ async function seedVariant(stock, collectionOver = {}) {
   const cid = await catalog.createCollection({ title: "Drop", status: "active", ...collectionOver })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Photocard", price: 35000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: stock }])
-  const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+  const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ? LIMIT 1", [pid])
   return { cid, pid, variantId: v.id }
+}
+
+async function seedDigitalVariant(stock, deliveryLink = "https://drive.google.com/x", collectionOver = {}) {
+  const cid = await catalog.createCollection({ title: "Drop", status: "active", ...collectionOver })
+  const pid = await catalog.createProduct({
+    collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+    stock_qty: stock, delivery_link: deliveryLink,
+  })
+  const detail = await catalog.getCollectionDetailById(cid)
+  return { cid, pid, variantId: detail.products[0].variant_id }
 }
 
 const order = (variantId, qty = 1, over = {}) => ({
@@ -834,5 +844,75 @@ describe("getOrderByToken", () => {
     const res = await repo.createOrder(order(v.id, 1))
     const found = await repo.getOrderByToken(res.order_token)
     expect(found.items[0].image_url).toBe("/api/storage/shop/products/p1.webp")
+  })
+})
+
+describe("createOrder — digital items", () => {
+  it("rejects COD when the cart has any digital item", async () => {
+    const { variantId } = await seedDigitalVariant(10)
+    await expect(
+      repo.createOrder(order(variantId, 1, { payment_method: "cod", fulfillment_method: "digital" }))
+    ).rejects.toThrow(repo.NoCodForDigitalError)
+  })
+
+  it("rejects COD on a mixed cart (physical + digital)", async () => {
+    const { variantId: digitalId } = await seedDigitalVariant(10)
+    const { variantId: physicalId } = await seedVariant(5)
+    await expect(
+      repo.createOrder({
+        items: [{ variant_id: digitalId, qty: 1 }, { variant_id: physicalId, qty: 1 }],
+        buyer,
+        fulfillment_method: "ship",
+        payment_method: "cod",
+      })
+    ).rejects.toThrow(repo.NoCodForDigitalError)
+  })
+
+  it("forces fulfillment_method to 'digital' and skips address for an all-digital cart", async () => {
+    const { variantId } = await seedDigitalVariant(10)
+    const res = await repo.createOrder({
+      items: [{ variant_id: variantId, qty: 1 }],
+      buyer,
+      payment_method: "bank",
+    })
+
+    const [[row]] = await db.query("SELECT fulfillment_method, address_raw FROM orders WHERE id = ?", [res.id])
+    expect(row.fulfillment_method).toBe("digital")
+    expect(row.address_raw).toBeNull()
+  })
+
+  it("still requires ship/pickup for a mixed cart", async () => {
+    const { variantId: digitalId } = await seedDigitalVariant(10)
+    const { variantId: physicalId } = await seedVariant(5)
+    await expect(
+      repo.createOrder({
+        items: [{ variant_id: digitalId, qty: 1 }, { variant_id: physicalId, qty: 1 }],
+        buyer,
+        payment_method: "bank",
+      })
+    ).rejects.toThrow(repo.FulfillmentRequiredError)
+  })
+
+  it("snapshots delivery_link_snapshot on the digital line, null on physical lines", async () => {
+    const { variantId: digitalId } = await seedDigitalVariant(10, "https://drive.google.com/y")
+    const { variantId: physicalId } = await seedVariant(5)
+    await repo.createOrder({
+      items: [{ variant_id: digitalId, qty: 1 }, { variant_id: physicalId, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+
+    const [rows] = await db.query(
+      "SELECT product_variant_id, delivery_link_snapshot FROM order_items ORDER BY id ASC"
+    )
+    expect(rows.find((r) => r.product_variant_id === digitalId).delivery_link_snapshot).toBe("https://drive.google.com/y")
+    expect(rows.find((r) => r.product_variant_id === physicalId).delivery_link_snapshot).toBeNull()
+  })
+
+  it("decrements a digital product's stock_qty like any other variant", async () => {
+    const { variantId } = await seedDigitalVariant(3)
+    await repo.createOrder({ items: [{ variant_id: variantId, qty: 2 }], buyer, payment_method: "bank" })
+
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(1)
   })
 })

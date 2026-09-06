@@ -76,6 +76,22 @@ class CollectionNotActiveError extends Error {
   }
 }
 
+/** COD collects cash at physical delivery — nothing to collect once a digital good has already been emailed out. */
+class NoCodForDigitalError extends Error {
+  constructor() {
+    super("Không hỗ trợ thanh toán COD cho đơn có sản phẩm số")
+    this.name = "NoCodForDigitalError"
+  }
+}
+
+/** A cart with at least one physical line must pick ship/pickup — only an all-digital cart may omit it. */
+class FulfillmentRequiredError extends Error {
+  constructor() {
+    super("Hình thức nhận hàng không hợp lệ")
+    this.name = "FulfillmentRequiredError"
+  }
+}
+
 /**
  * Look up a previous submit of this idempotency key.
  *
@@ -163,7 +179,7 @@ async function createOrder(input) {
     // 8.4: with OF v, a concurrent SELECT ... FROM products FOR UPDATE does not
     // block, while the same on product_variants does.
     const [rows] = await conn.query(
-      `SELECT v.id, v.label, v.stock_qty, p.id AS product_id, p.name AS product_name,
+      `SELECT v.id, v.label, v.stock_qty, v.delivery_link, p.id AS product_id, p.name AS product_name, p.type AS product_type,
               p.price, p.collection_id, c.status AS collection_status,
               c.allow_ship, c.allow_pickup, c.payment_deadline_hours
          FROM product_variants v
@@ -179,22 +195,38 @@ async function createOrder(input) {
       throw new VariantNotFoundError(ids.filter((id) => !foundIds.has(id)))
     }
 
-    // Every line's collection must still be open for ordering, and must
-    // actually offer the requested fulfillment method. A cart could in
-    // principle span collections; check each row's own collection rather
-    // than assuming a single one for the whole order. Checked with the same
-    // row lock as the stock check below, so a cart item added while a
-    // collection was "active" cannot slip through a race against the admin
-    // closing it — see CollectionNotActiveError.
+    const allDigital = rows.every((r) => r.product_type === "digital")
+    const anyDigital = rows.some((r) => r.product_type === "digital")
+
+    if (anyDigital && input.payment_method === "cod") {
+      throw new NoCodForDigitalError()
+    }
+    if (!allDigital && !["ship", "pickup"].includes(input.fulfillment_method)) {
+      throw new FulfillmentRequiredError()
+    }
+    const fulfillmentMethod = allDigital ? "digital" : input.fulfillment_method
+
+    // Every line's collection must still be open for ordering, and — for a
+    // physical line — must actually offer the requested fulfillment method.
+    // A digital line is never checked against allow_ship/allow_pickup: those
+    // flags describe how a collection ships/hands over physical goods, and
+    // have nothing to say about a line that was never going to be shipped.
+    // A cart could in principle span collections; check each row's own
+    // collection rather than assuming a single one for the whole order.
+    // Checked with the same row lock as the stock check below, so a cart
+    // item added while a collection was "active" cannot slip through a race
+    // against the admin closing it — see CollectionNotActiveError.
     for (const row of rows) {
       if (row.collection_status !== "active") {
         throw new CollectionNotActiveError(row.label, row.product_name)
       }
-      if (input.fulfillment_method === "ship" && !row.allow_ship) {
-        throw new FulfillmentNotOfferedError("ship")
-      }
-      if (input.fulfillment_method === "pickup" && !row.allow_pickup) {
-        throw new FulfillmentNotOfferedError("pickup")
+      if (row.product_type !== "digital") {
+        if (fulfillmentMethod === "ship" && !row.allow_ship) {
+          throw new FulfillmentNotOfferedError("ship")
+        }
+        if (fulfillmentMethod === "pickup" && !row.allow_pickup) {
+          throw new FulfillmentNotOfferedError("pickup")
+        }
       }
     }
 
@@ -214,6 +246,7 @@ async function createOrder(input) {
         variant_label_snapshot: variant.label,
         unit_price_snapshot: variant.price,
         collection_id: variant.collection_id,
+        delivery_link_snapshot: variant.product_type === "digital" ? variant.delivery_link : null,
       })
     }
 
@@ -235,7 +268,9 @@ async function createOrder(input) {
     // parameter) when the collection has no override configured.
     const deadlineHours = byId.get(lines[0].variant_id).payment_deadline_hours || undefined
     const expiresAt = domain.computeExpiry(input.payment_method, new Date(), deadlineHours)
-    const isPickup = input.fulfillment_method === "pickup"
+    const isPickup = fulfillmentMethod === "pickup"
+    // Neither a pickup nor an all-digital order has anywhere to ship to.
+    const skipAddress = isPickup || fulfillmentMethod === "digital"
     const pickupCode = isPickup ? domain.generatePickupCode() : null
     // Only the hash is ever persisted (see migration 021) — accessPin itself
     // is returned once here so the caller can email it, same lifecycle as
@@ -256,12 +291,12 @@ async function createOrder(input) {
         buyer.buyer_name,
         buyer.phone,
         buyer.email,
-        input.fulfillment_method,
-        isPickup ? null : buyer.address_street || null,
-        isPickup ? null : buyer.address_ward || null,
-        isPickup ? null : buyer.address_district || null,
-        isPickup ? null : buyer.address_province || null,
-        isPickup ? null : buyer.address_raw || null,
+        fulfillmentMethod,
+        skipAddress ? null : buyer.address_street || null,
+        skipAddress ? null : buyer.address_ward || null,
+        skipAddress ? null : buyer.address_district || null,
+        skipAddress ? null : buyer.address_province || null,
+        skipAddress ? null : buyer.address_raw || null,
         input.note || null,
         input.payment_method,
         total,
@@ -277,10 +312,10 @@ async function createOrder(input) {
       await conn.query(
         `INSERT INTO order_items
            (order_id, product_variant_id, product_name_snapshot,
-            variant_label_snapshot, unit_price_snapshot, qty)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+            variant_label_snapshot, unit_price_snapshot, qty, delivery_link_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [res.insertId, line.variant_id, line.product_name_snapshot,
-         line.variant_label_snapshot, line.unit_price_snapshot, line.qty]
+         line.variant_label_snapshot, line.unit_price_snapshot, line.qty, line.delivery_link_snapshot]
       )
     }
 
@@ -616,4 +651,6 @@ module.exports = {
   RequestKeyConflictError,
   FulfillmentNotOfferedError,
   CollectionNotActiveError,
+  NoCodForDigitalError,
+  FulfillmentRequiredError,
 }
