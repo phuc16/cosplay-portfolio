@@ -102,6 +102,7 @@ function buildVars(order) {
   // unpaid or cancelled order must never leak it, matching the route-layer gate.
   const showDeliveryLink = ["confirmed", "shipped", "completed"].includes(order.status)
   const hasDigitalItem = (order.items || []).some((i) => i.delivery_link_snapshot)
+  const showDigitalNote = showDeliveryLink && hasDigitalItem
   const digitalNote = "Link tải sản phẩm số đã có trong danh sách bên dưới."
 
   return {
@@ -129,10 +130,10 @@ function buildVars(order) {
     // up, and any order with a digital item alongside physical ones still
     // needs the download-link mention appended.
     prep_note: order.fulfillment_method === "digital"
-      ? digitalNote
+      ? (showDigitalNote ? digitalNote : "")
       : order.fulfillment_method === "pickup"
-        ? "sẽ chuẩn bị hàng — mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận." + (hasDigitalItem ? ` ${digitalNote}` : "")
-        : "sẽ chuẩn bị và gửi hàng sớm nhất có thể." + (hasDigitalItem ? ` ${digitalNote}` : ""),
+        ? "sẽ chuẩn bị hàng — mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận." + (showDigitalNote ? ` ${digitalNote}` : "")
+        : "sẽ chuẩn bị và gửi hàng sớm nhất có thể." + (showDigitalNote ? ` ${digitalNote}` : ""),
   }
 }
 

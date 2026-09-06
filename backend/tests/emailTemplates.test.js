@@ -130,6 +130,11 @@ describe("digital delivery link", () => {
     }))
     expect(vars.prep_note).toContain("tải")
   })
+
+  it("never mentions the digital link in prep_note once cancelled", () => {
+    const vars = t.buildVars(digitalOrder({ status: "cancelled" }))
+    expect(vars.prep_note).not.toContain("tải")
+  })
 })
 
 describe("validatePlaceholders", () => {
