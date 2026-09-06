@@ -30,6 +30,13 @@ describe("catalog schema", () => {
     expect(c.status.COLUMN_TYPE).toContain("archived")
   })
 
+  it("creates collections with nullable start_at/end_at scheduling columns", async () => {
+    const c = await columns("collections")
+    expect(Object.keys(c)).toEqual(expect.arrayContaining(["start_at", "end_at"]))
+    expect(c.start_at.IS_NULLABLE).toBe("YES")
+    expect(c.end_at.IS_NULLABLE).toBe("YES")
+  })
+
   it("creates products with integer VND price", async () => {
     const c = await columns("products")
     expect(Object.keys(c)).toEqual(
