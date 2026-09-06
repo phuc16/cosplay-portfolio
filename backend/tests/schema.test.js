@@ -51,4 +51,30 @@ describe("catalog schema", () => {
     expect(c.thumbnail_image.IS_NULLABLE).toBe("YES")
     expect(c.description.IS_NULLABLE).toBe("YES")
   })
+
+  it("creates products with a type column defaulting to physical", async () => {
+    const c = await columns("products")
+    expect(Object.keys(c)).toEqual(expect.arrayContaining(["type"]))
+    expect(c.type.COLUMN_TYPE).toContain("digital")
+    expect(c.type.IS_NULLABLE).toBe("NO")
+  })
+
+  it("creates product_variants with a nullable delivery_link", async () => {
+    const c = await columns("product_variants")
+    expect(Object.keys(c)).toEqual(expect.arrayContaining(["delivery_link"]))
+    expect(c.delivery_link.IS_NULLABLE).toBe("YES")
+  })
+})
+
+describe("digital order schema", () => {
+  it("creates order_items with a nullable delivery_link_snapshot", async () => {
+    const c = await columns("order_items")
+    expect(Object.keys(c)).toEqual(expect.arrayContaining(["delivery_link_snapshot"]))
+    expect(c.delivery_link_snapshot.IS_NULLABLE).toBe("YES")
+  })
+
+  it("extends orders.fulfillment_method with 'digital'", async () => {
+    const c = await columns("orders")
+    expect(c.fulfillment_method.COLUMN_TYPE).toContain("digital")
+  })
 })
