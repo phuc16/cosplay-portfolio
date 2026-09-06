@@ -257,6 +257,57 @@ describe("Checkout — order-page PIN bypass for this session", () => {
   })
 })
 
+describe("Checkout — digital cart", () => {
+  const digitalCartItem = { variant_id: 1, qty: 1, price: 99000, product_name: "Digital Album", variant_label: "", is_digital: true }
+  const physicalCartItem = { variant_id: 2, qty: 1, price: 35000, product_name: "Card", variant_label: "A1", is_digital: false }
+
+  it("hides the fulfillment fieldset for an all-digital cart", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]')).toHaveLength(0)
+    expect(container.textContent).not.toContain("Delivery method")
+  })
+
+  it("hides cod for an all-digital cart", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
+
+    const container = await renderCheckout()
+
+    const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
+    expect(options).toEqual(["Bank transfer"])
+  })
+
+  it("hides cod for a mixed cart but still shows the fulfillment fieldset", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem, physicalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]').length).toBeGreaterThan(0)
+    const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
+    expect(options).toEqual(["Bank transfer"])
+  })
+
+  it("omits fulfillment_method from the submitted order for an all-digital cart", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 99000 })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ fulfillment_method: undefined })
+    )
+  })
+})
+
 describe("Checkout — variant_not_found recovery", () => {
   it("removes the stale line(s) from the cart itself, not just shows an error", async () => {
     localStorage.setItem("shop_cart", JSON.stringify([

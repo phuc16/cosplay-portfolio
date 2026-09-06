@@ -80,6 +80,11 @@ export default function Checkout() {
   // State, not a one-time useMemo: a variant_not_found response needs to
   // drop the stale line(s) and re-render with what's left.
   const [cart, setCart] = useState(() => readCart())
+  // A digital-only cart has no delivery to arrange and no address to
+  // collect; a mixed cart still needs both, it just can't pay COD (nothing
+  // to collect cash at for the digital line).
+  const allDigital = cart.length > 0 && cart.every((c) => c.is_digital)
+  const anyDigital = cart.some((c) => c.is_digital)
 
   const [buyer, setBuyer] = useState({ buyer_name: "", phone: "", email: "" })
   const [address, setAddress] = useState({ address_raw: "" })
@@ -100,10 +105,11 @@ export default function Checkout() {
   }, [])
 
   useEffect(() => {
+    if (allDigital) return
     let ignore = false
     loadFulfillmentFlags(cart).then((f) => { if (!ignore) setFlags(f) })
     return () => { ignore = true }
-  }, [cart])
+  }, [cart, allDigital])
 
   // Auto-select the sole offered method once the real flags are in, and
   // never leave the picker pointed at a method the collection doesn't offer.
@@ -124,8 +130,8 @@ export default function Checkout() {
   // event pickup, which requires prepayment. The server rejects this
   // combination too (routes/orders.js validate()); this is the UI half.
   const offeredPayment = useMemo(
-    () => (methods || []).filter((m) => !(m === "cod" && fulfillment === "pickup")),
-    [methods, fulfillment]
+    () => (methods || []).filter((m) => !(m === "cod" && (fulfillment === "pickup" || anyDigital))),
+    [methods, fulfillment, anyDigital]
   )
 
   useEffect(() => {
@@ -145,8 +151,8 @@ export default function Checkout() {
     try {
       const res = await createOrder({
         items: cart.map((c) => ({ variant_id: c.variant_id, qty: c.qty })),
-        buyer: { ...buyer, ...(fulfillment === "ship" ? address : {}) },
-        fulfillment_method: fulfillment,
+        buyer: { ...buyer, ...(fulfillment === "ship" && !allDigital ? address : {}) },
+        fulfillment_method: allDigital ? undefined : fulfillment,
         payment_method: payment,
         note,
         request_key: requestKey,
@@ -216,37 +222,41 @@ export default function Checkout() {
       {field("phone", t("checkoutPhone"), "tel")}
       {field("email", t("checkoutEmail"), "email")}
 
-      <fieldset className="mb-4">
-        <legend className="text-sm mb-1">{t("checkoutFulfillment")}</legend>
-        {/* Only the methods the collection(s) in the cart actually offer are
-            rendered — offering ship/pickup regardless of the collection led
-            buyers straight into a 400 the backend correctly rejects. */}
-        {offered.map((m) => (
-          <label key={m} className="mr-4 text-sm">
-            <input type="radio" name="fulfillment" checked={fulfillment === m}
-              onChange={() => setFulfillment(m)} className="mr-1" />
-            {m === "ship" ? t("checkoutShip") : t("checkoutPickup")}
-          </label>
-        ))}
-        {flags.loaded && offered.length === 0 && (
-          <p className="text-sm text-[var(--text-error)]">{t("checkoutNoFulfillment")}</p>
-        )}
-      </fieldset>
+      {!allDigital && (
+        <>
+          <fieldset className="mb-4">
+            <legend className="text-sm mb-1">{t("checkoutFulfillment")}</legend>
+            {/* Only the methods the collection(s) in the cart actually offer are
+                rendered — offering ship/pickup regardless of the collection led
+                buyers straight into a 400 the backend correctly rejects. */}
+            {offered.map((m) => (
+              <label key={m} className="mr-4 text-sm">
+                <input type="radio" name="fulfillment" checked={fulfillment === m}
+                  onChange={() => setFulfillment(m)} className="mr-1" />
+                {m === "ship" ? t("checkoutShip") : t("checkoutPickup")}
+              </label>
+            ))}
+            {flags.loaded && offered.length === 0 && (
+              <p className="text-sm text-[var(--text-error)]">{t("checkoutNoFulfillment")}</p>
+            )}
+          </fieldset>
 
-      {fulfillment === "ship" && (
-        <div className="mb-4">
-          <AddressFields value={address} onChange={setAddress} />
-          <p className="text-xs opacity-70 mt-1">{t("checkoutShippingNote")}</p>
-        </div>
-      )}
-
-      {fulfillment === "pickup" && (flags.pickup_location || flags.pickup_note) && (
-        <div className="mb-4 p-3 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm">
-          {flags.pickup_location && (
-            <p className="font-semibold">{t("shopPickupLocation")}: {flags.pickup_location}</p>
+          {fulfillment === "ship" && (
+            <div className="mb-4">
+              <AddressFields value={address} onChange={setAddress} />
+              <p className="text-xs opacity-70 mt-1">{t("checkoutShippingNote")}</p>
+            </div>
           )}
-          {flags.pickup_note && <p>{t("shopPickupNote")}: {flags.pickup_note}</p>}
-        </div>
+
+          {fulfillment === "pickup" && (flags.pickup_location || flags.pickup_note) && (
+            <div className="mb-4 p-3 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm">
+              {flags.pickup_location && (
+                <p className="font-semibold">{t("shopPickupLocation")}: {flags.pickup_location}</p>
+              )}
+              {flags.pickup_note && <p>{t("shopPickupNote")}: {flags.pickup_note}</p>}
+            </div>
+          )}
+        </>
       )}
 
       <div className="mb-4">
@@ -274,6 +284,9 @@ export default function Checkout() {
         </div>
         {methods && methods.length === 0 && (
           <p className="text-sm text-[var(--text-error)] mt-1">{t("checkoutNoMethods")}</p>
+        )}
+        {anyDigital && (methods || []).includes("cod") && (
+          <p className="text-xs opacity-70 mt-1">{t("checkoutCodUnavailableDigital")}</p>
         )}
         {/* Stated before the buyer commits — cod never expires, so the
             notice is only shown for the payment methods that actually
