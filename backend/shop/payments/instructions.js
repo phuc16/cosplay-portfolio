@@ -1,20 +1,14 @@
 const { buildVietQrPayload } = require("./vietqr")
 
 /**
- * Short, uppercase, alphanumeric reference the buyer puts in the transfer
- * note. Derived from the order token so it is stable and unguessable, but
- * short enough for a banking app's note field.
- */
-function transferNote(orderToken) {
-  return `DH${String(orderToken).slice(0, 8).toUpperCase()}`
-}
-
-/**
  * Only the details for the order's own method are returned. A Momo order never
  * receives bank account details, so a leaked order page exposes the minimum.
  */
 function buildInstructions(order, settings) {
-  const note = transferNote(order.order_token)
+  // Admin-authored, shared across every payment method — not per-order, by
+  // design (the seller matches transfers by amount/timing/buyer contact
+  // instead of a unique code).
+  const note = settings.payment_note || null
   const base = { method: order.payment_method, amount: order.total, payment_note: settings.payment_note || null }
 
   if (order.payment_method === "bank") {
@@ -60,4 +54,4 @@ function buildInstructions(order, settings) {
   return base
 }
 
-module.exports = { buildInstructions, transferNote }
+module.exports = { buildInstructions }
