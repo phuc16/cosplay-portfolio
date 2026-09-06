@@ -21,8 +21,22 @@ async function seed(stock = 5, collectionOver = {}) {
   const cid = await catalog.createCollection({ title: "Drop", status: "active", ...collectionOver })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: stock }])
-  const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+  // Scoped to this product's own row — a bare LIMIT 1 would grab whichever
+  // variant happens to sort first in the table, wrong the moment a test
+  // (e.g. the digital-cart tests below) seeds more than one product before
+  // calling this helper.
+  const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ? LIMIT 1", [pid])
   return v.id
+}
+
+async function seedDigital(stock = 5, deliveryLink = "https://drive.google.com/x") {
+  const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+  const pid = await catalog.createProduct({
+    collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+    stock_qty: stock, delivery_link: deliveryLink,
+  })
+  const detail = await catalog.getCollectionDetailById(cid)
+  return detail.products[0].variant_id
 }
 
 const body = (variantId, over = {}) => ({
@@ -266,6 +280,66 @@ describe("POST /api/orders — rate limiting", () => {
     // wait time, nothing actionable.
     expect(res.body.message).toContain("10 đơn")
     expect(res.body.message).toMatch(/\d+ phút/)
+  })
+})
+
+describe("POST /api/orders — digital items", () => {
+  it("accepts an all-digital cart with no fulfillment_method or address", async () => {
+    const v = await seedDigital()
+    const res = await request(app).post("/api/orders").send({
+      items: [{ variant_id: v, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" },
+      payment_method: "bank",
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it("rejects COD for an all-digital cart", async () => {
+    const v = await seedDigital()
+    const res = await request(app).post("/api/orders").send({
+      items: [{ variant_id: v, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" },
+      payment_method: "cod",
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("rejects a mixed cart with no fulfillment_method", async () => {
+    const digital = await seedDigital()
+    const physical = await seed(5)
+    const res = await request(app).post("/api/orders").send({
+      items: [{ variant_id: digital, qty: 1 }, { variant_id: physical, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "1 ABC" },
+      payment_method: "bank",
+    })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe("GET /api/orders/:token — digital delivery link exposure", () => {
+  it("hides delivery_link_snapshot while pending", async () => {
+    const v = await seedDigital(5, "https://drive.google.com/hidden")
+    const created = await request(app).post("/api/orders").send({
+      items: [{ variant_id: v, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" },
+      payment_method: "bank",
+    })
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
+    expect(res.body.items[0].delivery_link_snapshot).toBeFalsy()
+  })
+
+  it("shows delivery_link_snapshot once confirmed", async () => {
+    const v = await seedDigital(5, "https://drive.google.com/shown")
+    const created = await request(app).post("/api/orders").send({
+      items: [{ variant_id: v, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" },
+      payment_method: "bank",
+    })
+    const [[o]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [created.body.order_token])
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
+    expect(res.body.items[0].delivery_link_snapshot).toBe("https://drive.google.com/shown")
   })
 })
 

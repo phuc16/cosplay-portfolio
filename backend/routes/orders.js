@@ -68,8 +68,16 @@ function toPublicOrder(order) {
   // "I placed an order" as "I can collect it" before the seller ever
   // verified payment.
   const paidPickupCode = ["confirmed", "completed"].includes(status) ? pickup_code : null
+  // Same trust boundary as pickup_code above — a link that's fixed on the
+  // product for every buyer is only worth showing once the seller has
+  // actually accepted (confirmed) the order, never for pending/cancelled.
+  const showDelivery = ["confirmed", "shipped", "completed"].includes(status)
+  const publicItems = (items || []).map((i) => ({
+    ...i,
+    delivery_link_snapshot: showDelivery ? i.delivery_link_snapshot : null,
+  }))
   return {
-    id, order_token, status, total, fulfillment_method, tracking_code, created_at, items,
+    id, order_token, status, total, fulfillment_method, tracking_code, created_at, items: publicItems,
     confirmed_at, shipped_at, completed_at, cancelled_at,
     pickup_location, pickup_note, expires_at, pickup_code: paidPickupCode,
     has_payment_proof: Boolean(payment_proof_url),
@@ -93,7 +101,13 @@ function validate(body) {
     if (!Number.isInteger(qty) || qty <= 0) return "Số lượng không hợp lệ"
   }
 
-  if (!FULFILLMENT.includes(fulfillment_method)) return "Hình thức nhận hàng không hợp lệ"
+  // A physical line requires ship/pickup; an all-digital cart may omit it
+  // entirely — orderRepo.createOrder is the only place that knows a cart's
+  // item types, so it does the real requiredness check and throws
+  // FulfillmentRequiredError if a physical line has none.
+  if (fulfillment_method !== undefined && fulfillment_method !== null && !FULFILLMENT.includes(fulfillment_method)) {
+    return "Hình thức nhận hàng không hợp lệ"
+  }
   if (!PAYMENT_METHODS.includes(payment_method)) return "Phương thức thanh toán không hợp lệ"
   // Pickup orders require prepayment — COD only applies when there is a
   // delivery to collect cash at. A crafted request could otherwise bypass
@@ -168,6 +182,8 @@ module.exports = function orderRoutes() {
     } catch (err) {
       if (err instanceof repo.EmptyCartError) return bad(res, err.message)
       if (err instanceof repo.FulfillmentNotOfferedError) return bad(res, err.message)
+      if (err instanceof repo.NoCodForDigitalError) return bad(res, err.message)
+      if (err instanceof repo.FulfillmentRequiredError) return bad(res, err.message)
       // A cart line's variant_id matches no row at all (deleted, or a stale
       // cart carrying an id that never existed) — distinct from a real
       // OutOfStockError, which always has an actual product label to quote.
