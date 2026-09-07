@@ -13,6 +13,11 @@ vi.mock("axios", async (importOriginal) => {
   return { default: { ...actual.default, get: vi.fn().mockResolvedValue({ data: {} }) } }
 })
 
+const fetchCollection = vi.fn()
+vi.mock("../api/shop", () => ({
+  fetchCollection: (...args) => fetchCollection(...args),
+}))
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: Cart } = await import("./Cart")
@@ -39,10 +44,15 @@ async function renderCart() {
 
 beforeEach(() => {
   localStorage.clear()
+  fetchCollection.mockReset()
 })
 
 describe("Cart — clicking an item goes to its product", () => {
   it("links the item to its collection page", async () => {
+    fetchCollection.mockResolvedValue({
+      status: "active",
+      products: [{ type: "physical", variants: [{ id: 1, stock_qty: null }] }],
+    })
     addToCart({
       variant_id: 1, qty: 1, product_name: "Poster A4", variant_label: "Std",
       price: 90000, image_url: null, collection_slug: "drop",
@@ -69,6 +79,10 @@ describe("Cart — clicking an item goes to its product", () => {
 
 describe("Cart — removing an item", () => {
   it("shows a confirm popup naming the item, and keeps it when Cancel is clicked", async () => {
+    fetchCollection.mockResolvedValue({
+      status: "active",
+      products: [{ type: "physical", variants: [{ id: 3, stock_qty: null }] }],
+    })
     addToCart({
       variant_id: 3, qty: 1, product_name: "Poster A4", variant_label: "Std",
       price: 90000, image_url: null, collection_slug: "drop",
@@ -90,6 +104,10 @@ describe("Cart — removing an item", () => {
   })
 
   it("removes the item once Remove is clicked in the popup", async () => {
+    fetchCollection.mockResolvedValue({
+      status: "active",
+      products: [{ type: "physical", variants: [{ id: 4, stock_qty: null }] }],
+    })
     addToCart({
       variant_id: 4, qty: 1, product_name: "Poster A4", variant_label: "Std",
       price: 90000, image_url: null, collection_slug: "drop",
@@ -105,5 +123,60 @@ describe("Cart — removing an item", () => {
 
     expect(container.querySelector('[role="dialog"]')).toBeNull()
     expect(readCart()).toEqual([])
+  })
+})
+
+describe("Cart — early availability validation", () => {
+  it("shows a sold-out badge, disables quantity controls, and disables checkout for a sold-out line", async () => {
+    fetchCollection.mockResolvedValue({
+      status: "active",
+      products: [{ type: "physical", variants: [{ id: 20, stock_qty: 0 }] }],
+    })
+    addToCart({ variant_id: 20, qty: 1, product_name: "Sold Out Item", variant_label: "Std", price: 10000, image_url: null, collection_slug: "drop" })
+
+    const container = await renderCart()
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Sold out")
+    const checkoutBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Checkout")
+    expect(checkoutBtn.disabled).toBe(true)
+  })
+
+  it("shows an ended badge for a closed collection's line", async () => {
+    fetchCollection.mockResolvedValue({ status: "closed", products: [] })
+    addToCart({ variant_id: 21, qty: 1, product_name: "Ended Drop Item", variant_label: "Std", price: 10000, image_url: null, collection_slug: "ended" })
+
+    const container = await renderCart()
+    await act(async () => {})
+
+    expect(container.textContent).toContain("This drop has ended")
+  })
+
+  it("shows an unavailable badge when the collection fetch fails", async () => {
+    fetchCollection.mockRejectedValue(new Error("404"))
+    addToCart({ variant_id: 22, qty: 1, product_name: "Hidden Item", variant_label: "Std", price: 10000, image_url: null, collection_slug: "hidden" })
+
+    const container = await renderCart()
+    await act(async () => {})
+
+    expect(container.textContent).toContain("No longer available")
+  })
+
+  it("re-enables checkout after removing the only bad line", async () => {
+    fetchCollection.mockResolvedValue({
+      status: "active",
+      products: [{ type: "physical", variants: [{ id: 23, stock_qty: 0 }] }],
+    })
+    addToCart({ variant_id: 23, qty: 1, product_name: "Sold Out Item", variant_label: "Std", price: 10000, image_url: null, collection_slug: "drop" })
+
+    const container = await renderCart()
+    await act(async () => {})
+
+    const removeBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "✕")
+    await act(async () => { removeBtn.click() })
+    const confirmBtn = [...container.querySelector('[role="dialog"]').querySelectorAll("button")].find((b) => b.textContent === "Remove")
+    await act(async () => { confirmBtn.click() })
+
+    expect(readCart()).toHaveLength(0)
   })
 })

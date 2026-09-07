@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { readCart, updateQty, removeFromCart, cartTotal } from "../shop/cart"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
+import { checkCartAvailability } from "../shop/cartAvailability"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 
@@ -11,12 +12,35 @@ export default function Cart() {
   const navigate = useNavigate()
   const [cart, setCart] = useState(readCart())
   const [pendingRemove, setPendingRemove] = useState(null)
+  const [problems, setProblems] = useState(new Map())
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    let ignore = false
+    checkCartAvailability(cart)
+      .then((result) => { if (!ignore) setProblems(result) })
+      .finally(() => { if (!ignore) setChecking(false) })
+    return () => { ignore = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const change = (variantId, qty) => setCart(updateQty(variantId, qty))
   const confirmRemove = () => {
     setCart(removeFromCart(pendingRemove.variantId))
     setPendingRemove(null)
   }
+
+  // Recomputed from the current cart on every render (not pruned on
+  // removal) — removing the one bad line already makes it disappear here
+  // for free, no re-fetch needed.
+  const activeProblems = cart.filter((c) => problems.has(c.variant_id))
+  const hasProblems = checking || activeProblems.length > 0
+
+  const problemLabel = (reason) => ({
+    sold_out: t("cartItemSoldOut"),
+    ended: t("cartItemEnded"),
+    unavailable: t("cartItemUnavailable"),
+  }[reason])
 
   if (!cart.length) {
     return (
@@ -39,7 +63,9 @@ export default function Cart() {
       <Link to="/merchandise" className="inline-block mb-4 text-sm text-[var(--text-link)]">← {t("shopBack")}</Link>
       <h1 className="text-2xl font-bold mb-6">{t("cart")}</h1>
 
-      {cart.map((c) => (
+      {cart.map((c) => {
+        const reason = problems.get(c.variant_id)
+        return (
         <div key={c.variant_id} className="flex gap-3 items-center py-3 border-b border-[var(--border-brand)]">
           {c.collection_slug ? (
             <Link to={`/merchandise/${c.collection_slug}`} className="flex gap-3 items-center flex-1 min-w-0">
@@ -47,6 +73,7 @@ export default function Cart() {
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{c.product_name}</p>
                 <p className="text-sm opacity-70">{c.variant_label} · {formatVnd(c.price)}</p>
+                {reason && <p className="text-xs text-[var(--text-error)] mt-0.5">{problemLabel(reason)}</p>}
               </div>
             </Link>
           ) : (
@@ -55,6 +82,7 @@ export default function Cart() {
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{c.product_name}</p>
                 <p className="text-sm opacity-70">{c.variant_label} · {formatVnd(c.price)}</p>
+                {reason && <p className="text-xs text-[var(--text-error)] mt-0.5">{problemLabel(reason)}</p>}
               </div>
             </>
           )}
@@ -62,7 +90,7 @@ export default function Cart() {
             <button
               type="button"
               onClick={() => change(c.variant_id, c.qty - 1)}
-              disabled={c.qty <= 1}
+              disabled={c.qty <= 1 || Boolean(reason)}
               aria-label={t("shopQtyDecrease")}
               className="w-8 h-8 rounded-lg border border-[var(--border-brand)] disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -71,14 +99,16 @@ export default function Cart() {
             <input
               type="number" min="1" value={c.qty}
               onChange={(e) => change(c.variant_id, Number(e.target.value))}
+              disabled={Boolean(reason)}
               aria-label={t("cartQty")}
-              className="w-14 text-center px-1 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+              className="w-14 text-center px-1 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent disabled:opacity-40"
             />
             <button
               type="button"
               onClick={() => change(c.variant_id, c.qty + 1)}
+              disabled={Boolean(reason)}
               aria-label={t("shopQtyIncrease")}
-              className="w-8 h-8 rounded-lg border border-[var(--border-brand)]"
+              className="w-8 h-8 rounded-lg border border-[var(--border-brand)] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               +
             </button>
@@ -91,20 +121,27 @@ export default function Cart() {
             ✕
           </button>
         </div>
-      ))}
+        )
+      })}
 
       <div className="mt-6 flex justify-between items-center">
         <div>
           <p className="text-sm opacity-70">{t("cartTotal")}</p>
           <p className="text-xl font-bold text-[var(--brand)]">{formatVnd(cartTotal(cart))}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate("/checkout")}
-          className="px-5 py-2 rounded-xl bg-[var(--brand)] text-white"
-        >
-          {t("cartCheckout")}
-        </button>
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={() => navigate("/checkout")}
+            disabled={hasProblems}
+            className="px-5 py-2 rounded-xl bg-[var(--brand)] text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t("cartCheckout")}
+          </button>
+          {activeProblems.length > 0 && (
+            <p className="text-xs text-[var(--text-error)] mt-1">{t("cartResolveIssues")}</p>
+          )}
+        </div>
       </div>
       </main>
       <ShopFooter />
