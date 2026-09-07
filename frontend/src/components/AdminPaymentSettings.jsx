@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { adminGetPaymentSettings, adminSavePaymentSettings, adminUploadImage } from "../api/shop"
+import { sanitizeVietQrInfo, willTruncateInVietQr, VIETQR_INFO_MAX_LEN } from "../shop/vietqrSanitize"
 
 // SePay fields (sepay_api_key, sepay_webhook_secret) are reserved but not
 // wired to anything yet, and settingsRepo strips them from public responses
@@ -128,6 +129,20 @@ export default function AdminPaymentSettings() {
         <span className="block text-sm mb-1 opacity-70">Ghi chú thanh toán / Nội dung chuyển khoản (hiển thị cho khách, dùng cho cả mã QR)</span>
         <textarea value={settings.payment_note || ""} onChange={(e) => set("payment_note", e.target.value)} rows={2}
           className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+        {(() => {
+          // The QR's own field only fits VIETQR_INFO_MAX_LEN plain-ASCII
+          // characters (diacritics/punctuation are stripped before
+          // counting) — banking apps show this exact truncated text, not
+          // the raw note, so warn here rather than let it silently clip.
+          const sanitized = sanitizeVietQrInfo(settings.payment_note)
+          const isTruncated = willTruncateInVietQr(settings.payment_note)
+          return (
+            <p className={"text-xs mt-1 " + (isTruncated ? "text-[var(--text-error)]" : "opacity-60")}>
+              Trong mã QR: "{sanitized}" ({sanitized.length}/{VIETQR_INFO_MAX_LEN} ký tự
+              {isTruncated ? " — có thể bị cắt bớt, hãy rút ngắn ghi chú" : ""})
+            </p>
+          )
+        })()}
       </label>
 
       <button type="button" onClick={save}
