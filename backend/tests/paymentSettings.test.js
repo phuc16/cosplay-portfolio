@@ -48,14 +48,11 @@ describe("enabledMethods", () => {
 })
 
 describe("publicSettings", () => {
-  it("never exposes reserved auto-confirm secrets", () => {
+  it("passes settings through unchanged — there are no secret fields to strip", () => {
     const pub = repo.publicSettings({
       bank_enabled: true, bank_name: "ACB", bank_account_number: "123",
-      sepay_api_key: "SECRET", sepay_webhook_secret: "ALSO-SECRET",
     })
-    expect(pub.sepay_api_key).toBeUndefined()
-    expect(pub.sepay_webhook_secret).toBeUndefined()
-    expect(JSON.stringify(pub)).not.toContain("SECRET")
     expect(pub.bank_name).toBe("ACB")
+    expect(pub.bank_account_number).toBe("123")
   })
 })

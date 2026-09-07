@@ -23,12 +23,6 @@ describe("GET /api/shop/payment-methods", () => {
     expect(res.body.methods).toEqual(["bank", "cod"])
   })
 
-  it("never leaks reserved secrets", async () => {
-    await settings.updateSettings({ bank_enabled: true, sepay_api_key: "SECRET" })
-    const res = await request(app).get("/api/shop/payment-methods")
-    expect(JSON.stringify(res.body)).not.toContain("SECRET")
-  })
-
   it("does not leak the account number to the public list endpoint", async () => {
     await settings.updateSettings({ bank_enabled: true, bank_account_number: "999888777" })
     const res = await request(app).get("/api/shop/payment-methods")
@@ -68,19 +62,6 @@ describe("admin payment settings", () => {
       bank_account_number: "1", bank_account_holder: "A",
     })
     expect(res.status).toBe(400)
-  })
-
-  it("never leaks sepay secrets to the admin's own browser", async () => {
-    await settings.updateSettings({
-      bank_enabled: true, bank_name: "ACB", bank_bin: "970416",
-      bank_account_number: "123456789", bank_account_holder: "NGUYEN VAN A",
-      sepay_api_key: "SEPAY_KEY_SECRET", sepay_webhook_secret: "SEPAY_WEBHOOK_SECRET",
-    })
-    const res = await authed(request(app).get("/api/admin/payment-settings"))
-    expect(res.body.sepay_api_key).toBeUndefined()
-    expect(res.body.sepay_webhook_secret).toBeUndefined()
-    expect(JSON.stringify(res.body)).not.toContain("SEPAY_KEY_SECRET")
-    expect(JSON.stringify(res.body)).not.toContain("SEPAY_WEBHOOK_SECRET")
   })
 })
 

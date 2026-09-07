@@ -2,9 +2,6 @@ import { useEffect, useState } from "react"
 import { adminGetPaymentSettings, adminSavePaymentSettings, adminUploadImage } from "../api/shop"
 import { sanitizeVietQrInfo, willTruncateInVietQr, VIETQR_INFO_MAX_LEN } from "../shop/vietqrSanitize"
 
-// SePay fields (sepay_api_key, sepay_webhook_secret) are reserved but not
-// wired to anything yet, and settingsRepo strips them from public responses
-// anyway — they are intentionally never rendered here.
 const blank = {
   bank_enabled: false, bank_name: "", bank_bin: "", bank_account_number: "", bank_account_holder: "",
   momo_enabled: false, momo_phone: "", momo_qr_image: "", momo_account_holder: "",

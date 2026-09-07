@@ -7,20 +7,18 @@ const DEFAULTS = {
   paypal_enabled: false, paypal_link: null,
   cod_enabled: false,
   payment_note: null,
-  auto_confirm_enabled: false,
 }
 
-const BOOLEANS = ["bank_enabled", "momo_enabled", "paypal_enabled", "cod_enabled", "auto_confirm_enabled"]
+const BOOLEANS = ["bank_enabled", "momo_enabled", "paypal_enabled", "cod_enabled"]
 
 const FIELDS = [
   "bank_enabled", "bank_name", "bank_bin", "bank_account_number", "bank_account_holder",
   "momo_enabled", "momo_phone", "momo_qr_image", "momo_account_holder",
   "paypal_enabled", "paypal_link", "cod_enabled", "payment_note",
-  "sepay_api_key", "sepay_webhook_secret", "auto_confirm_enabled",
 ]
 
 /** Secrets that must never reach a browser. */
-const SECRET_FIELDS = ["sepay_api_key", "sepay_webhook_secret"]
+const SECRET_FIELDS = []
 
 async function getSettings() {
   const [[row]] = await db.query("SELECT * FROM payment_settings ORDER BY id LIMIT 1")
