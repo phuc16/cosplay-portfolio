@@ -41,7 +41,17 @@ const blank = {
   allow_ship: true, allow_pickup: false,
   pickup_location: "", pickup_note: "",
   payment_deadline_hours: "",
+  start_at: "", end_at: "",
   cover_image: "", thumbnail_image: "",
+}
+
+/** MySQL DATETIME -> the `YYYY-MM-DDTHH:mm` shape a <input type="datetime-local"> needs, in local time. */
+function toDatetimeLocal(value) {
+  if (!value) return ""
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ""
+  const pad = (n) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export default function AdminCollections() {
@@ -96,6 +106,7 @@ export default function AdminCollections() {
       allow_ship: c.allow_ship, allow_pickup: c.allow_pickup,
       pickup_location: c.pickup_location || "", pickup_note: c.pickup_note || "",
       payment_deadline_hours: c.payment_deadline_hours || "",
+      start_at: toDatetimeLocal(c.start_at), end_at: toDatetimeLocal(c.end_at),
       cover_image: c.cover_image || "", thumbnail_image: c.thumbnail_image || "",
     })
     // The edit form is one shared block below the whole list, not inline
@@ -220,6 +231,25 @@ export default function AdminCollections() {
             onChange={(e) => setDraft({ ...draft, payment_deadline_hours: e.target.value })}
             placeholder="Mặc định"
             className="w-full mt-1 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+        </label>
+
+        <label className="block mb-3">
+          <span className="block text-sm mb-1">Bắt đầu (để trống = hiển thị ngay)</span>
+          <input
+            type="datetime-local"
+            value={draft.start_at}
+            onChange={(e) => setDraft({ ...draft, start_at: e.target.value })}
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+        </label>
+        <label className="block mb-3">
+          <span className="block text-sm mb-1">Kết thúc (để trống = không tự đóng)</span>
+          <input
+            type="datetime-local"
+            value={draft.end_at}
+            onChange={(e) => setDraft({ ...draft, end_at: e.target.value })}
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
           />
         </label>
 

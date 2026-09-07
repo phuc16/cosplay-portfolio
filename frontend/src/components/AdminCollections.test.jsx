@@ -92,6 +92,94 @@ describe("AdminCollections — edit", () => {
   })
 })
 
+describe("AdminCollections — scheduling", () => {
+  it("creates a collection with start_at and end_at", async () => {
+    adminListCollections.mockResolvedValue([])
+    adminCreateCollection.mockResolvedValue({ id: 1 })
+
+    const container = await renderCollections()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên bộ sưu tập"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Winter Drop")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const datetimeInputs = [...container.querySelectorAll('input[type="datetime-local"]')]
+    expect(datetimeInputs).toHaveLength(2)
+    const [startInput, endInput] = datetimeInputs
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(startInput, "2026-09-10T09:00")
+      startInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(endInput, "2026-09-20T18:00")
+      endInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Tạo")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateCollection).toHaveBeenCalledWith(
+      expect.objectContaining({ start_at: "2026-09-10T09:00", end_at: "2026-09-20T18:00" })
+    )
+  })
+
+  it("rejects an end time before the start time, showing the server's error message", async () => {
+    adminListCollections.mockResolvedValue([])
+    adminCreateCollection.mockRejectedValue({ response: { data: { message: "Thời gian kết thúc phải sau thời gian bắt đầu" } } })
+
+    const container = await renderCollections()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên bộ sưu tập"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Broken Schedule")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const [startInput, endInput] = [...container.querySelectorAll('input[type="datetime-local"]')]
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(startInput, "2026-09-20T18:00")
+      startInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(endInput, "2026-09-10T09:00")
+      endInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Tạo")
+    await act(async () => { saveButton.click() })
+
+    expect(container.textContent).toContain("Thời gian kết thúc phải sau thời gian bắt đầu")
+  })
+
+  it("populates start_at and end_at as datetime-local strings when editing an existing collection", async () => {
+    adminListCollections.mockResolvedValue([
+      collection({ id: 1, title: "Scheduled", start_at: "2026-09-10T09:00:00.000Z", end_at: "2026-09-20T18:00:00.000Z" }),
+    ])
+    const container = await renderCollections()
+    await flush()
+
+    const form = container.querySelector("p.font-medium.mb-3")?.closest("div")
+    form.scrollIntoView = vi.fn()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const [startInput, endInput] = [...container.querySelectorAll('input[type="datetime-local"]')]
+    expect(startInput.value).not.toBe("")
+    expect(endInput.value).not.toBe("")
+  })
+})
+
 describe("AdminCollections — search, filter, sort", () => {
   it("filters the list by title or slug, case-insensitively", async () => {
     adminListCollections.mockResolvedValue([
