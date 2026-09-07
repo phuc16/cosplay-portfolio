@@ -38,6 +38,14 @@ function mapCollection(row) {
   }
 }
 
+/** Normalizes a start_at/end_at value to a Date mysql2 can serialize correctly — a raw ISO string with milliseconds/Z (e.g. from .toISOString()) otherwise throws ER_TRUNCATED_WRONG_VALUE. */
+function normalizeDatetime(value) {
+  if (!value) return null
+  if (value instanceof Date) return value
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 /** products.images is a JSON column; mysql2 may hand back a string or an array. */
 function parseImages(value) {
   if (Array.isArray(value)) return value
@@ -224,8 +232,8 @@ async function insertCollection(data, slug, sortOrder) {
       data.pickup_location || null,
       data.pickup_note || null,
       data.payment_deadline_hours || null,
-      data.start_at || null,
-      data.end_at || null,
+      normalizeDatetime(data.start_at),
+      normalizeDatetime(data.end_at),
       sortOrder,
     ]
   )
@@ -261,8 +269,8 @@ async function updateCollection(id, data, attempt = 0) {
         data.pickup_location || null,
         data.pickup_note || null,
         data.payment_deadline_hours || null,
-        data.start_at || null,
-        data.end_at || null,
+        normalizeDatetime(data.start_at),
+        normalizeDatetime(data.end_at),
         id,
       ]
     )

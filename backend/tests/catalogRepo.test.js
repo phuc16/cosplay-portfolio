@@ -600,6 +600,22 @@ describe("collection scheduling", () => {
     expect(detail.status).toBe("active")
   })
 
+  it("accepts start_at/end_at as raw ISO strings with milliseconds/Z (e.g. from .toISOString()) without throwing ER_TRUNCATED_WRONG_VALUE", async () => {
+    const start = new Date(Date.now() - 60 * 60 * 1000)
+    const end = new Date(Date.now() + 60 * 60 * 1000)
+    const cid = await repo.createCollection({
+      title: "ISO String Drop",
+      status: "active",
+      start_at: start.toISOString(),
+      end_at: end.toISOString(),
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    // DATETIME has second precision, so allow up to 1s of drift.
+    expect(Math.abs(new Date(detail.start_at).getTime() - start.getTime())).toBeLessThanOrEqual(1000)
+    expect(Math.abs(new Date(detail.end_at).getTime() - end.getTime())).toBeLessThanOrEqual(1000)
+  })
+
   it("does not carry start_at/end_at into a copyCollection duplicate", async () => {
     const future = new Date(Date.now() + 60 * 60 * 1000)
     const cid = await repo.createCollection({ title: "Scheduled", status: "active", start_at: future, end_at: future })

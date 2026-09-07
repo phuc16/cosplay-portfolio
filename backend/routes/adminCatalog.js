@@ -111,15 +111,7 @@ module.exports = function adminCatalogRoutes() {
       const invalid = validateCollection(req.body)
       if (invalid) return bad(res, invalid)
 
-      const data = { ...req.body }
-      if (data.start_at && typeof data.start_at === "string") {
-        data.start_at = new Date(data.start_at)
-      }
-      if (data.end_at && typeof data.end_at === "string") {
-        data.end_at = new Date(data.end_at)
-      }
-
-      const id = await repo.createCollection(data)
+      const id = await repo.createCollection(req.body)
       res.status(201).json({ id })
     } catch (err) { oops(res, err, "Lỗi tạo collection") }
   })
@@ -129,15 +121,7 @@ module.exports = function adminCatalogRoutes() {
       const invalid = validateCollection(req.body)
       if (invalid) return bad(res, invalid)
 
-      const data = { ...req.body }
-      if (data.start_at && typeof data.start_at === "string") {
-        data.start_at = new Date(data.start_at)
-      }
-      if (data.end_at && typeof data.end_at === "string") {
-        data.end_at = new Date(data.end_at)
-      }
-
-      const ok = await repo.updateCollection(req.params.id, data)
+      const ok = await repo.updateCollection(req.params.id, req.body)
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
 
       res.json({ ok: true })
