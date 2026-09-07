@@ -115,6 +115,10 @@ describe("POST /api/orders/:token/verify-pin", () => {
     }
     const res = await request(app).post(`/api/orders/${o.order_token}/verify-pin`).send({ pin: o.access_pin })
     expect(res.status).toBe(429)
+    // Structured so the frontend can build its own localized message
+    // instead of displaying this response's Vietnamese-only `message` field
+    // verbatim on an English-language page.
+    expect(res.body.retry_after_seconds).toBeGreaterThan(0)
   })
 
   it("does not lock a DIFFERENT order after failures on this one", async () => {

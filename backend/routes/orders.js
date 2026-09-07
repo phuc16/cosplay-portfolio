@@ -240,7 +240,12 @@ module.exports = function orderRoutes() {
       if (result.locked) {
         return res.status(429).json({
           error: "too_many_attempts",
+          // message is Vietnamese-only, kept for API completeness/logging —
+          // the frontend builds its own localized string from
+          // retry_after_seconds instead of displaying this verbatim, so an
+          // English-language buyer never sees Vietnamese text here.
           message: `Sai mã PIN quá nhiều lần. Thử lại sau ${Math.ceil(result.retryAfterSeconds / 60)} phút.`,
+          retry_after_seconds: result.retryAfterSeconds,
         })
       }
       if (!result.ok) {

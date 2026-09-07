@@ -831,7 +831,10 @@ describe("Order — PIN gate", () => {
   it("shows a lockout message, not the generic wrong-PIN error, after too many attempts (429)", async () => {
     fetchOrder.mockRejectedValue({ response: { status: 401, data: { error: "pin_required" } } })
     verifyOrderPin.mockRejectedValue({
-      response: { status: 429, data: { error: "too_many_attempts", message: "Sai mã PIN quá nhiều lần. Thử lại sau 15 phút." } },
+      // message is Vietnamese-only (server-side, for logging) — the UI must
+      // build its own localized string from retry_after_seconds instead of
+      // displaying this verbatim, so an English-language buyer never sees it.
+      response: { status: 429, data: { error: "too_many_attempts", message: "Sai mã PIN quá nhiều lần. Thử lại sau 15 phút.", retry_after_seconds: 900 } },
     })
 
     const container = await renderOrder()
@@ -840,7 +843,23 @@ describe("Order — PIN gate", () => {
     const form = container.querySelector("form")
     await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })))
 
-    expect(container.textContent).toContain("Thử lại sau 15 phút")
+    expect(container.textContent).toContain("Try again in 15 minutes")
+    expect(container.textContent).not.toContain("Sai mã PIN")
+  })
+
+  it("falls back to a generic wait time if the server response has no retry_after_seconds", async () => {
+    fetchOrder.mockRejectedValue({ response: { status: 401, data: { error: "pin_required" } } })
+    verifyOrderPin.mockRejectedValue({
+      response: { status: 429, data: { error: "too_many_attempts" } },
+    })
+
+    const container = await renderOrder()
+    const input = container.querySelector('input[inputmode="numeric"]')
+    await act(async () => setInputValue(input, "000000"))
+    const form = container.querySelector("form")
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })))
+
+    expect(container.textContent).toContain("Try again in 15 minutes")
   })
 })
 

@@ -184,11 +184,16 @@ function PinGate({ token, onVerified }) {
       setOrderSessionToken(token, accessToken)
       onVerified()
     } catch (err) {
-      setError(
-        err.response?.status === 429
-          ? (err.response?.data?.message || t("orderPinLocked"))
-          : t("orderPinError")
-      )
+      if (err.response?.status === 429) {
+        // Built from the server's retry_after_seconds, not its message —
+        // that message is Vietnamese-only, and would show up untranslated
+        // for a buyer on the English UI otherwise.
+        const seconds = err.response?.data?.retry_after_seconds
+        const minutes = Number.isFinite(seconds) ? Math.ceil(seconds / 60) : 15
+        setError(t("orderPinLocked", { minutes }))
+      } else {
+        setError(t("orderPinError"))
+      }
     } finally {
       setBusy(false)
     }
