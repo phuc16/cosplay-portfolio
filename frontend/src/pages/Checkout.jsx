@@ -171,13 +171,20 @@ export default function Checkout() {
       if (e.response?.data?.error === "request_key_conflict") {
         setRequestKey(generateRequestKey())
       }
-      // A stale cart line (its variant was deleted after being added) — the
-      // server tells us exactly which variant_ids to drop. Removing them
-      // here is the only way "try again" can actually succeed; the buyer
-      // has no way to identify or remove a bad line themselves, since this
-      // page never shows individual cart items.
-      if (e.response?.data?.error === "variant_not_found") {
-        for (const id of e.response.data.variant_ids || []) removeFromCart(id)
+      // A stale cart line — deleted (variant_not_found, one or more ids),
+      // just sold out, or its collection ended between the Cart page's own
+      // check and this submit (out_of_stock / collection_not_active, always
+      // exactly one id). The server tells us exactly which line(s) to drop;
+      // removing them here is the only way "try again" can actually
+      // succeed, since this page never shows individual cart items for the
+      // buyer to identify and remove themselves.
+      const staleIds =
+        e.response?.data?.error === "variant_not_found" ? e.response.data.variant_ids || []
+        : ["out_of_stock", "collection_not_active"].includes(e.response?.data?.error) && e.response.data.variant_id
+          ? [e.response.data.variant_id]
+          : []
+      if (staleIds.length) {
+        for (const id of staleIds) removeFromCart(id)
         setCart(readCart())
       }
       setError(

@@ -197,6 +197,8 @@ describe("POST /api/orders", () => {
     // products — the product name disambiguates which one is out of stock.
     expect(res.body.message).toContain("Card")
     expect(res.body.message).toContain("A1")
+    // Lets the client auto-drop exactly this line, same as variant_not_found.
+    expect(res.body.variant_id).toBe(v)
   })
 
   // A cart item can be added while its collection is "active" and then
@@ -207,6 +209,7 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(409)
     expect(res.body.error).toBe("collection_not_active")
     expect(res.body.message).toContain("Card")
+    expect(res.body.variant_id).toBe(v)
   })
 
   // A stale cart (e.g. the admin deleted the variant after it was added)

@@ -189,16 +189,19 @@ module.exports = function orderRoutes() {
       if (err instanceof repo.OutOfStockError) {
         return res.status(409).json({
           error: "out_of_stock",
-          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" vừa hết hàng. Vui lòng chọn lại.`,
+          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" vừa hết hàng. Đã tự động xóa khỏi giỏ hàng, vui lòng kiểm tra lại và thử lại.`,
+          variant_id: err.variantId,
         })
       }
       // A cart line's collection stopped being "active" between add-to-cart
-      // and checkout (most commonly: the seller closed the drop) — a race
-      // the client cannot retry unchanged, same as OutOfStockError.
+      // and checkout (most commonly: the seller closed the drop, or its
+      // scheduled end_at just passed) — a race the client cannot retry
+      // unchanged, same as OutOfStockError.
       if (err instanceof repo.CollectionNotActiveError) {
         return res.status(409).json({
           error: "collection_not_active",
-          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" thuộc một đợt mở bán đã kết thúc. Vui lòng xóa khỏi giỏ hàng.`,
+          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" thuộc một đợt mở bán đã kết thúc. Đã tự động xóa khỏi giỏ hàng, vui lòng kiểm tra lại và thử lại.`,
+          variant_id: err.variantId,
         })
       }
       // A colliding request_key belonging to a different buyer: the unique

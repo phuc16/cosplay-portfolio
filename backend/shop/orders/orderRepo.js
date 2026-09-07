@@ -10,11 +10,13 @@ const TRANSITION_EMAILS = {
 }
 
 class OutOfStockError extends Error {
-  constructor(variantLabel, productName) {
+  constructor(variantLabel, productName, variantId) {
     super(`Hết hàng: ${productName} - ${variantLabel}`)
     this.name = "OutOfStockError"
     this.variantLabel = variantLabel
     this.productName = productName
+    // Lets the client auto-drop exactly this line, same as VariantNotFoundError.
+    this.variantId = variantId
   }
 }
 
@@ -67,11 +69,13 @@ class FulfillmentNotOfferedError extends Error {
  * a 409 race the client cannot retry unchanged, not a 400 validation error.
  */
 class CollectionNotActiveError extends Error {
-  constructor(variantLabel, productName) {
+  constructor(variantLabel, productName, variantId) {
     super(`Bộ sưu tập đã đóng: ${productName} - ${variantLabel}`)
     this.name = "CollectionNotActiveError"
     this.variantLabel = variantLabel
     this.productName = productName
+    // Lets the client auto-drop exactly this line, same as VariantNotFoundError.
+    this.variantId = variantId
   }
 }
 
@@ -229,7 +233,7 @@ async function createOrder(input) {
       const collectionNotStarted = row.collection_start_at && new Date(row.collection_start_at) > now
       const collectionExpired = row.collection_end_at && new Date(row.collection_end_at) <= now
       if (row.collection_status !== "active" || collectionNotStarted || collectionExpired) {
-        throw new CollectionNotActiveError(row.label, row.product_name)
+        throw new CollectionNotActiveError(row.label, row.product_name, row.id)
       }
       if (row.product_type !== "digital") {
         if (fulfillmentMethod === "ship" && !row.allow_ship) {
@@ -248,7 +252,7 @@ async function createOrder(input) {
       const variant = byId.get(id)
       const qty = wanted.get(id)
       if (!domain.isReservable(variant.stock_qty, qty)) {
-        throw new OutOfStockError(variant.label, variant.product_name)
+        throw new OutOfStockError(variant.label, variant.product_name, id)
       }
       lines.push({
         variant_id: id,

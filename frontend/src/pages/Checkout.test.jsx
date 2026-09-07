@@ -353,3 +353,40 @@ describe("Checkout — variant_not_found recovery", () => {
     expect(container.textContent).toContain("Your cart is empty")
   })
 })
+
+describe("Checkout — out_of_stock / collection_not_active recovery", () => {
+  it("removes the offending line when the server reports out_of_stock at submit time", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([
+      { variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop" },
+      { variant_id: 2, qty: 1, product_name: "Poster", variant_label: "Std", price: 90000, image_url: null, collection_slug: "drop" },
+    ]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockRejectedValue({
+      response: { status: 409, data: { error: "out_of_stock", message: "x", variant_id: 2 } },
+    })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    const remaining = readCart()
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].variant_id).toBe(1)
+  })
+
+  it("removes the offending line when the server reports collection_not_active at submit time (drop ended after the cart page's own check)", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([
+      { variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop" },
+    ]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockRejectedValue({
+      response: { status: 409, data: { error: "collection_not_active", message: "x", variant_id: 1 } },
+    })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(readCart()).toEqual([])
+  })
+})

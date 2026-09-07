@@ -105,6 +105,7 @@ describe("createOrder", () => {
       expect(err).toBeInstanceOf(repo.OutOfStockError)
       expect(err.productName).toBe("Photocard")
       expect(err.variantLabel).toBe("A1")
+      expect(err.variantId).toBe(variantId)
     }
   })
 
@@ -352,6 +353,7 @@ describe("createOrder", () => {
       expect(err).toBeInstanceOf(repo.CollectionNotActiveError)
       expect(err.productName).toBe("Photocard")
       expect(err.variantLabel).toBe("A1")
+      expect(err.variantId).toBe(variantId)
     }
   })
 
