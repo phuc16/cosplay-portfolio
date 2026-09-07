@@ -6,7 +6,7 @@ import { readCart } from "../../shop/cart"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: ProductCard, isProductSoldOut } = await import("./ProductCard")
+const { default: ProductCard, isProductSoldOut, isSoldOut } = await import("./ProductCard")
 
 function baseProduct(over = {}) {
   return {
@@ -71,6 +71,15 @@ describe("ProductCard — variant description", () => {
 
     const dialog = container.querySelector('[role="dialog"]')
     expect(dialog.querySelector(".prose")).toBeNull()
+  })
+})
+
+describe("isSoldOut (per-variant)", () => {
+  it("is exported and reports true only for a variant whose stock_qty is a non-null number <= 0", () => {
+    expect(isSoldOut({ stock_qty: 0 })).toBe(true)
+    expect(isSoldOut({ stock_qty: 5 })).toBe(false)
+    expect(isSoldOut({ stock_qty: null })).toBe(false)
+    expect(isSoldOut({ stock_qty: undefined })).toBe(false)
   })
 })
 

@@ -11,7 +11,7 @@ function stockLabel(variant, t) {
   return t("shopInStock", { n: variant.stock_qty })
 }
 
-const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
+export const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 
 /** A product with no variants isn't a purchasable stock item, so it's never "sold out".
  *  A digital product has no variant list — its stock lives on the flattened product.stock_qty instead. */
