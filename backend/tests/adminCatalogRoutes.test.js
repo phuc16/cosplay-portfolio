@@ -140,6 +140,22 @@ describe("POST /api/admin/collections", () => {
       .send({ title: "Fes", status: "active", payment_deadline_hours: 6.5 })
     expect(res.status).toBe(400)
   })
+
+  it("rejects an end_at that is not after start_at", async () => {
+    const start = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const end = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title: "Fes", status: "active", start_at: start, end_at: end })
+    expect(res.status).toBe(400)
+  })
+
+  it("accepts start_at/end_at when end is after start", async () => {
+    const start = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    const end = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title: "Fes", status: "active", start_at: start, end_at: end })
+    expect(res.status).toBe(201)
+  })
 })
 
 describe("PUT /api/admin/collections/:id", () => {

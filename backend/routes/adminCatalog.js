@@ -37,6 +37,13 @@ function validateCollection(body) {
     const hours = Number(body.payment_deadline_hours)
     if (!Number.isInteger(hours) || hours <= 0) return "Hạn chuyển khoản phải là số giờ nguyên dương"
   }
+  if (body.start_at && body.end_at) {
+    const start = new Date(body.start_at)
+    const end = new Date(body.end_at)
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end <= start) {
+      return "Thời gian kết thúc phải sau thời gian bắt đầu"
+    }
+  }
   return null
 }
 
@@ -104,7 +111,15 @@ module.exports = function adminCatalogRoutes() {
       const invalid = validateCollection(req.body)
       if (invalid) return bad(res, invalid)
 
-      const id = await repo.createCollection(req.body)
+      const data = { ...req.body }
+      if (data.start_at && typeof data.start_at === "string") {
+        data.start_at = new Date(data.start_at)
+      }
+      if (data.end_at && typeof data.end_at === "string") {
+        data.end_at = new Date(data.end_at)
+      }
+
+      const id = await repo.createCollection(data)
       res.status(201).json({ id })
     } catch (err) { oops(res, err, "Lỗi tạo collection") }
   })
@@ -114,7 +129,15 @@ module.exports = function adminCatalogRoutes() {
       const invalid = validateCollection(req.body)
       if (invalid) return bad(res, invalid)
 
-      const ok = await repo.updateCollection(req.params.id, req.body)
+      const data = { ...req.body }
+      if (data.start_at && typeof data.start_at === "string") {
+        data.start_at = new Date(data.start_at)
+      }
+      if (data.end_at && typeof data.end_at === "string") {
+        data.end_at = new Date(data.end_at)
+      }
+
+      const ok = await repo.updateCollection(req.params.id, data)
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
 
       res.json({ ok: true })
