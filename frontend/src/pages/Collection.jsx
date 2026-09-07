@@ -126,9 +126,9 @@ export default function Collection() {
       )}
 
       {closed && (
-        <div className="mb-6 p-4 rounded-xl border border-[var(--border-brand)] opacity-80">
-          <p className="font-semibold">{t("shopClosed")}</p>
-          <p className="text-sm">{t("shopClosedNote")}</p>
+        <div className="mb-6 p-4 rounded-xl border border-red-500/50 bg-red-500/10">
+          <p className="font-semibold text-red-500">{t("shopClosed")}</p>
+          <p className="text-sm text-red-500/80">{t("shopClosedNote")}</p>
         </div>
       )}
 
