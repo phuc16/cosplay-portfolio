@@ -2,17 +2,14 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest"
 import request from "supertest"
 import app from "../server.js"
 import repo from "../shop/catalogRepo.js"
-import cache from "../shop/catalogCache.js"
 import redis from "../redis.js"
 import { resetTables, closeDb } from "./helpers/db.js"
 
 beforeEach(async () => {
   await resetTables("product_variants", "products", "collections")
-  await cache.invalidate()
 })
 
 afterAll(async () => {
-  await cache.invalidate()
   await redis.quit()
   await closeDb()
 })

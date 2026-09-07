@@ -1,7 +1,7 @@
 const Redis = require("ioredis")
 
 // REDIS_DB isolates the test suite (db 15) from dev/prod data (db 0), so a
-// test calling invalidate() can never flush real cache keys.
+// test can never touch real keys.
 module.exports = new Redis({
   host: process.env.REDIS_HOST,
   port: Number(process.env.REDIS_PORT) || 6379,
@@ -10,8 +10,8 @@ module.exports = new Redis({
   // retryStrategy backoff capped at 2s) let a queued command sit behind a
   // stalled/backing-off reconnect attempt for a long time before it ever
   // rejects, so a Redis outage hangs whatever awaited it (e.g. a shop request)
-  // instead of failing fast. Bound all three so a command fails quickly and
-  // callers (see shop/catalogCache.js) can fall back to the DB:
+  // instead of failing fast. Bound all three so a command fails quickly
+  // instead of hanging whatever awaited it:
   //   - connectTimeout: give up on a stalled connection attempt quickly.
   //   - maxRetriesPerRequest: stop retrying an individual command almost
   //     immediately instead of waiting through many reconnect cycles.

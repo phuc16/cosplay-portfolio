@@ -1,5 +1,5 @@
 const express = require("express")
-const cache = require("../shop/catalogCache")
+const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const vnAddress = require("../shop/vnAddress")
 
@@ -12,7 +12,7 @@ module.exports = function shopRoutes() {
 
   router.get("/collections", async (req, res) => {
     try {
-      res.json(await cache.getCollections())
+      res.json(await catalogRepo.listPublicCollections())
     } catch (err) {
       console.error("[SHOP] Lỗi lấy danh sách collection:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
@@ -21,7 +21,7 @@ module.exports = function shopRoutes() {
 
   router.get("/collections/:slug", async (req, res) => {
     try {
-      const collection = await cache.getCollection(req.params.slug)
+      const collection = await catalogRepo.getPublicCollectionBySlug(req.params.slug)
       if (!collection) {
         return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
       }

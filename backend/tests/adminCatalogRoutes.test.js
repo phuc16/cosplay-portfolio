@@ -4,7 +4,6 @@ import jwt from "jsonwebtoken"
 import sharp from "sharp"
 import app from "../server.js"
 import repo from "../shop/catalogRepo.js"
-import cache from "../shop/catalogCache.js"
 import redis from "../redis.js"
 import { MAX_UPLOAD_BYTES } from "../shop/images.js"
 import { resetTables, closeDb } from "./helpers/db.js"
@@ -14,11 +13,9 @@ const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 
 beforeEach(async () => {
   await resetTables("product_variants", "products", "collections")
-  await cache.invalidate()
 })
 
 afterAll(async () => {
-  await cache.invalidate()
   await redis.quit()
   await closeDb()
 })
@@ -114,8 +111,8 @@ describe("POST /api/admin/collections", () => {
     expect(res.body.error).toBe("invalid_input")
   })
 
-  it("invalidates the public cache", async () => {
-    await request(app).get("/api/shop/collections") // warm the cache
+  it("makes a newly created collection immediately visible on the public list", async () => {
+    await request(app).get("/api/shop/collections")
     await authed(request(app).post("/api/admin/collections")).send({ title: "New", status: "active" })
 
     const res = await request(app).get("/api/shop/collections")

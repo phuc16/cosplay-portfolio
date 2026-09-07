@@ -1,6 +1,5 @@
 const express = require("express")
 const repo = require("../shop/catalogRepo")
-const cache = require("../shop/catalogCache")
 const { processShopImage, storeShopImage, InvalidImageError } = require("../shop/images")
 
 const STATUSES = ["draft", "active", "closed", "archived"]
@@ -106,7 +105,6 @@ module.exports = function adminCatalogRoutes() {
       if (invalid) return bad(res, invalid)
 
       const id = await repo.createCollection(req.body)
-      await cache.invalidate()
       res.status(201).json({ id })
     } catch (err) { oops(res, err, "Lỗi tạo collection") }
   })
@@ -119,7 +117,6 @@ module.exports = function adminCatalogRoutes() {
       const ok = await repo.updateCollection(req.params.id, req.body)
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
 
-      await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi sửa collection") }
   })
@@ -129,7 +126,6 @@ module.exports = function adminCatalogRoutes() {
       const newId = await repo.copyCollection(req.params.id)
       if (newId === null) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
 
-      await cache.invalidate()
       res.status(201).json({ id: newId })
     } catch (err) { oops(res, err, "Lỗi sao chép collection") }
   })
@@ -139,7 +135,6 @@ module.exports = function adminCatalogRoutes() {
       const ok = await repo.deleteCollection(req.params.id)
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
 
-      await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi xóa collection") }
   })
@@ -150,7 +145,6 @@ module.exports = function adminCatalogRoutes() {
       if (invalid) return bad(res, invalid)
 
       const id = await repo.createProduct({ ...req.body, collection_id: Number(req.params.id) })
-      await cache.invalidate()
       res.status(201).json({ id })
     } catch (err) { oops(res, err, "Lỗi tạo sản phẩm") }
   })
@@ -165,7 +159,6 @@ module.exports = function adminCatalogRoutes() {
         return bad(res, "product_ids phải là mảng số nguyên")
       }
       await repo.reorderProducts(Number(req.params.id), productIds)
-      await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi đổi thứ tự sản phẩm") }
   })
@@ -178,7 +171,6 @@ module.exports = function adminCatalogRoutes() {
       const ok = await repo.updateProduct(req.params.id, req.body)
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy sản phẩm" })
 
-      await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi sửa sản phẩm") }
   })
@@ -188,7 +180,6 @@ module.exports = function adminCatalogRoutes() {
       const ok = await repo.deleteProduct(req.params.id)
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy sản phẩm" })
 
-      await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi xóa sản phẩm") }
   })
@@ -207,7 +198,6 @@ module.exports = function adminCatalogRoutes() {
         }
         throw err
       }
-      await cache.invalidate()
       res.json({ ok: true })
     } catch (err) { oops(res, err, "Lỗi lưu phân loại") }
   })

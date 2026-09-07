@@ -1,6 +1,5 @@
 const express = require("express")
 const repo = require("../shop/orders/orderRepo")
-const catalogCache = require("../shop/catalogCache")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const { buildInstructions } = require("../shop/payments/instructions")
 const { processShopImage, storeShopImage, InvalidImageError } = require("../shop/images")
@@ -145,18 +144,11 @@ module.exports = function orderRoutes() {
 
       const order = await repo.createOrder(req.body)
 
-      // Both best-effort, after the order (and its stock decrement) is
-      // already committed: neither a Redis nor a mail failure may fail an
-      // order the buyer has already placed. A replayed (reused) request
-      // reserved no new stock and already queued its email the first time
-      // around, so it does neither again.
+      // Best-effort, after the order (and its stock decrement) is already
+      // committed: a mail failure may not fail an order the buyer has
+      // already placed. A replayed (reused) request already queued its
+      // email the first time around, so it does not do so again.
       if (!order.reused) {
-        try {
-          await catalogCache.invalidate()
-        } catch (err) {
-          console.error("[ORDERS] Không xoá được cache catalog:", err.message)
-        }
-
         try {
           // access_pin only goes to the buyer's own copy — admin already
           // bypasses the PIN gate via their own login, so their copy has no

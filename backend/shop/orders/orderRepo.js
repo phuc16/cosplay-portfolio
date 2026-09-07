@@ -1,7 +1,6 @@
 const db = require("./../../db")
 const domain = require("./domain")
 const emailQueue = require("./../email/queue")
-const catalogCache = require("./../catalogCache")
 
 const TRANSITION_EMAILS = {
   confirmed: "payment_confirmed",
@@ -497,7 +496,6 @@ async function transitionOrder(id, toStatus, extra = {}) {
   let notifyEmailType = null
   let notifyAddress = null
   let notifyAdminType = null
-  let stockReleased = false
   try {
     await conn.beginTransaction()
 
@@ -536,7 +534,6 @@ async function transitionOrder(id, toStatus, extra = {}) {
 
     if (toStatus === "cancelled" && order.stock_released_at === null) {
       await releaseStock(conn, id)
-      stockReleased = true
     }
 
     const sets = ["status = ?"]
@@ -577,19 +574,11 @@ async function transitionOrder(id, toStatus, extra = {}) {
     conn.release()
   }
 
-  // Both the cache invalidation and the email enqueues below run only after
-  // the connection above has been released (see `finally`) — none of them
-  // may hold a pool connection while doing follow-up work (see commit
-  // 58dad02). Each is independently best-effort: a Redis or mail failure
-  // must never fail or roll back a status change the seller already made.
-  if (stockReleased) {
-    try {
-      await catalogCache.invalidate()
-    } catch (err) {
-      console.error("[ORDERS] Không xoá được cache catalog:", err.message)
-    }
-  }
-
+  // The email enqueue below runs only after the connection above has been
+  // released (see `finally`) — it may not hold a pool connection while
+  // doing follow-up work (see commit 58dad02). It is best-effort: a mail
+  // failure must never fail or roll back a status change the seller
+  // already made.
   if (notifyEmailType) {
     try {
       await emailQueue.enqueue(id, notifyEmailType, notifyAddress)
