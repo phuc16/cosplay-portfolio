@@ -329,6 +329,20 @@ describe("createOrder", () => {
     await expect(repo.createOrder(order(variantId, 1))).resolves.toMatchObject({ reused: false })
   })
 
+  it("rejects an order on a collection whose start_at hasn't arrived yet, even with a valid variant_id in hand", async () => {
+    const future = new Date(Date.now() + 15 * 60 * 1000)
+    const { variantId } = await seedVariant(5, { start_at: future })
+
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
+  })
+
+  it("still allows an order once start_at has passed", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const { variantId } = await seedVariant(5, { start_at: past })
+
+    await expect(repo.createOrder(order(variantId, 1))).resolves.toMatchObject({ reused: false })
+  })
+
   it("carries the product name and variant label on CollectionNotActiveError, to identify which cart line is stuck", async () => {
     const { variantId } = await seedVariant(5, { status: "closed" })
     try {
