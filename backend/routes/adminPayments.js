@@ -11,6 +11,9 @@ function validate(d) {
   if (d.momo_enabled && !d.momo_phone?.trim() && !d.momo_qr_image?.trim()) {
     return "Momo cần số điện thoại hoặc ảnh QR"
   }
+  if (d.momo_qr_image?.trim() && !/^https?:\/\//i.test(d.momo_qr_image.trim())) {
+    return "Ảnh QR Momo phải bắt đầu bằng http:// hoặc https://"
+  }
   if (d.paypal_enabled && !d.paypal_link?.trim()) return "Cần link PayPal"
   return null
 }

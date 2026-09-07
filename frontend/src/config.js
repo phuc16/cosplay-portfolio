@@ -14,7 +14,7 @@ export function applyColorScheme(name) {
   r.style.setProperty("--brand-hover",       sc.hover)
   r.style.setProperty("--brand-strong",      sc.strong)
   r.style.setProperty("--brand-soft",        sc.soft)
-  r.style.setProperty("--border-brand",      sc.soft.replace(".15)", ".50)").replace(".30)", ".50)").replace(".10)", ".50)"))
+  r.style.setProperty("--border-brand",      sc.soft.replace(/[\d.]+\)$/, ".50)"))
   r.style.setProperty("--text-link",         sc.brand)
   r.style.setProperty("--shadow-pink-glow",  "0 0 20px " + sc.glow)
   r.style.setProperty("--shadow-pink-soft",  "0 4px 14px " + sc.soft)

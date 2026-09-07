@@ -52,10 +52,11 @@ export function addToCart(item) {
   const cart = readCart()
   const existing = cart.find((c) => c.variant_id === item.variant_id)
 
-  if (existing) existing.qty += item.qty
-  else cart.push({ ...item })
+  const next = existing
+    ? cart.map((c) => (c.variant_id === item.variant_id ? { ...c, qty: c.qty + item.qty } : c))
+    : [...cart, { ...item }]
 
-  return writeCart(cart)
+  return writeCart(next)
 }
 
 export function updateQty(variantId, qty) {

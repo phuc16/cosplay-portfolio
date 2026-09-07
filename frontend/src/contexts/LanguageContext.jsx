@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- context module exports both Provider and hook by design */
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { translations } from "../i18n/translations"
 
 const LanguageContext = createContext()
@@ -16,18 +16,20 @@ export function LanguageProvider({ children }) {
     localStorage.setItem("lang", lang)
   }, [lang])
 
-  const t = (key, params = {}) => {
+  const t = useCallback((key, params = {}) => {
     let str = translations[lang]?.[key] ?? translations.en?.[key] ?? key
     Object.entries(params).forEach(([k, v]) => {
       str = str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v))
     })
     return str
-  }
+  }, [lang])
 
   const setLang = (l) => setLangState(l === "vi" || l === "en" ? l : "en")
 
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t])
+
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   )
