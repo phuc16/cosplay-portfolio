@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken"
 import sharp from "sharp"
 import app from "../server.js"
 import repo from "../shop/catalogRepo.js"
+import db from "../db.js"
 import redis from "../redis.js"
 import { MAX_UPLOAD_BYTES } from "../shop/images.js"
 import { resetTables, closeDb } from "./helpers/db.js"
@@ -11,8 +12,22 @@ import { resetTables, closeDb } from "./helpers/db.js"
 const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET || "change-me-in-production")
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 
+/** Inserts an order + single order_item referencing variantId, at the given status. */
+async function insertOrderForVariant(variantId, status, orderToken) {
+  await db.query(
+    `INSERT INTO orders (order_token, buyer_name, phone, email, fulfillment_method, status, payment_method, total, expires_at, access_pin_hash)
+     VALUES (?, 'A', '0900000000', 'a@example.com', 'ship', ?, 'bank', 99000, NOW(), 'x')`,
+    [orderToken, status]
+  )
+  const [[o]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [orderToken])
+  await db.query(
+    "INSERT INTO order_items (order_id, product_variant_id, product_name_snapshot, variant_label_snapshot, unit_price_snapshot, qty) VALUES (?, ?, 'Card', 'A1', 99000, 1)",
+    [o.id, variantId]
+  )
+}
+
 beforeEach(async () => {
-  await resetTables("product_variants", "products", "collections")
+  await resetTables("order_items", "orders", "product_variants", "products", "collections")
 })
 
 afterAll(async () => {
@@ -353,6 +368,19 @@ describe("products and variants", () => {
     expect(res.status).toBe(200)
     expect(await repo.listAllCollections()).toHaveLength(0)
   })
+
+  it("returns 409 instead of deleting when a product's variant is referenced by a live order", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 1 }])
+    const variantId = (await repo.getCollectionDetailById(cid)).products[0].variants[0].id
+    await insertOrderForVariant(variantId, "pending", "tok-route-del-collection")
+
+    const res = await authed(request(app).delete(`/api/admin/collections/${cid}`))
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe("variant_in_use")
+    expect(await repo.listAllCollections()).toHaveLength(1)
+  })
 })
 
 describe("PUT /api/admin/collections/:id/products/reorder", () => {
@@ -440,6 +468,21 @@ describe("DELETE /api/admin/products/:id", () => {
     const res = await authed(request(app).delete("/api/admin/products/999999"))
     expect(res.status).toBe(404)
     expect(res.body.error).toBe("not_found")
+  })
+
+  it("returns 409 instead of deleting when a variant is referenced by a live order", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 1 }])
+    const variantId = (await repo.getCollectionDetailById(cid)).products[0].variants[0].id
+    await insertOrderForVariant(variantId, "shipped", "tok-route-del-product")
+
+    const res = await authed(request(app).delete(`/api/admin/products/${pid}`))
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe("variant_in_use")
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products).toHaveLength(1)
   })
 })
 

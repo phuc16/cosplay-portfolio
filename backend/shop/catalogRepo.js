@@ -336,9 +336,49 @@ async function copyCollection(id) {
   return newId
 }
 
+/**
+ * Guards a cascading DELETE against silently wiping variants (and nulling
+ * their order_items) still referenced by a live order — same shape as the
+ * live-order check in replaceVariants, run on the same connection/transaction
+ * that holds the row locks so a concurrent checkout can't slip in between.
+ */
+async function blockedVariantsOnConn(conn, variantIds) {
+  if (!variantIds.length) return []
+  const [rows] = await conn.query(
+    `SELECT DISTINCT oi.product_variant_id AS id, v.label
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       JOIN product_variants v ON v.id = oi.product_variant_id
+      WHERE o.status IN (?, ?, ?)
+        AND oi.product_variant_id IN (${variantIds.map(() => "?").join(",")})`,
+    [...LIVE_ORDER_STATUSES, ...variantIds]
+  )
+  return rows
+}
+
 async function deleteCollection(id) {
-  const [res] = await db.query("DELETE FROM collections WHERE id = ?", [id])
-  return res.affectedRows > 0
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    const [variants] = await conn.query(
+      `SELECT v.id, v.label FROM product_variants v
+         JOIN products p ON p.id = v.product_id
+        WHERE p.collection_id = ? ORDER BY v.id ASC FOR UPDATE`,
+      [id]
+    )
+    const blocked = await blockedVariantsOnConn(conn, variants.map((v) => v.id))
+    if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
+
+    const [res] = await conn.query("DELETE FROM collections WHERE id = ?", [id])
+    await conn.commit()
+    return res.affectedRows > 0
+  } catch (err) {
+    await conn.rollback()
+    throw err
+  } finally {
+    conn.release()
+  }
 }
 
 async function createProduct(data) {
@@ -406,8 +446,26 @@ async function updateProduct(id, data) {
 }
 
 async function deleteProduct(id) {
-  const [res] = await db.query("DELETE FROM products WHERE id = ?", [id])
-  return res.affectedRows > 0
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    const [variants] = await conn.query(
+      "SELECT id, label FROM product_variants WHERE product_id = ? ORDER BY id ASC FOR UPDATE",
+      [id]
+    )
+    const blocked = await blockedVariantsOnConn(conn, variants.map((v) => v.id))
+    if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
+
+    const [res] = await conn.query("DELETE FROM products WHERE id = ?", [id])
+    await conn.commit()
+    return res.affectedRows > 0
+  } catch (err) {
+    await conn.rollback()
+    throw err
+  } finally {
+    conn.release()
+  }
 }
 
 /**

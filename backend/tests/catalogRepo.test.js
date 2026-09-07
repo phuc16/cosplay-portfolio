@@ -396,6 +396,57 @@ describe("replaceVariants", () => {
   })
 })
 
+/** Inserts an order + single order_item referencing variantId, at the given status. */
+async function insertOrderForVariant(variantId, status, token) {
+  await db.query(
+    `INSERT INTO orders (order_token, buyer_name, phone, email, fulfillment_method, status, payment_method, total, expires_at, access_pin_hash)
+     VALUES (?, 'A', '0900000000', 'a@example.com', 'ship', ?, 'bank', 99000, NOW(), 'x')`,
+    [token, status]
+  )
+  const [[o]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [token])
+  await db.query(
+    "INSERT INTO order_items (order_id, product_variant_id, product_name_snapshot, variant_label_snapshot, unit_price_snapshot, qty) VALUES (?, ?, 'Card', 'A1', 99000, 1)",
+    [o.id, variantId]
+  )
+}
+
+describe("deleteProduct", () => {
+  it("rejects with VariantInUseError when a variant is referenced by a pending/confirmed/shipped order", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 1 }])
+    const variantId = (await repo.getCollectionDetailById(cid)).products[0].variants[0].id
+    await insertOrderForVariant(variantId, "pending", "tok-del-product-1")
+
+    await expect(repo.deleteProduct(pid)).rejects.toThrow(repo.VariantInUseError)
+
+    const [products] = await db.query("SELECT id FROM products WHERE id = ?", [pid])
+    expect(products).toHaveLength(1)
+  })
+
+  it("deletes normally when no live orders reference its variants", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 1 }])
+
+    await expect(repo.deleteProduct(pid)).resolves.toBe(true)
+
+    const [products] = await db.query("SELECT id FROM products WHERE id = ?", [pid])
+    expect(products).toHaveLength(0)
+  })
+
+  it("does not block deletion when the only referencing order is cancelled or completed", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 1 }])
+    const variantId = (await repo.getCollectionDetailById(cid)).products[0].variants[0].id
+    await insertOrderForVariant(variantId, "cancelled", "tok-del-product-2")
+    await insertOrderForVariant(variantId, "completed", "tok-del-product-3")
+
+    await expect(repo.deleteProduct(pid)).resolves.toBe(true)
+  })
+})
+
 describe("deleteCollection", () => {
   it("cascades to products and variants", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
@@ -408,6 +459,29 @@ describe("deleteCollection", () => {
     const [variants] = await db.query("SELECT id FROM product_variants")
     expect(products).toHaveLength(0)
     expect(variants).toHaveLength(0)
+  })
+
+  it("rejects with VariantInUseError when any product's variant is referenced by a live order", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 1 }])
+    const variantId = (await repo.getCollectionDetailById(cid)).products[0].variants[0].id
+    await insertOrderForVariant(variantId, "confirmed", "tok-del-collection-1")
+
+    await expect(repo.deleteCollection(cid)).rejects.toThrow(repo.VariantInUseError)
+
+    const [collections] = await db.query("SELECT id FROM collections WHERE id = ?", [cid])
+    expect(collections).toHaveLength(1)
+  })
+
+  it("does not block deletion when the only referencing order is cancelled or completed", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 1 }])
+    const variantId = (await repo.getCollectionDetailById(cid)).products[0].variants[0].id
+    await insertOrderForVariant(variantId, "completed", "tok-del-collection-2")
+
+    await expect(repo.deleteCollection(cid)).resolves.toBe(true)
   })
 })
 

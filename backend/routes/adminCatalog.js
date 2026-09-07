@@ -139,7 +139,15 @@ module.exports = function adminCatalogRoutes() {
 
   router.delete("/collections/:id", async (req, res) => {
     try {
-      const ok = await repo.deleteCollection(req.params.id)
+      let ok
+      try {
+        ok = await repo.deleteCollection(req.params.id)
+      } catch (err) {
+        if (err instanceof repo.VariantInUseError) {
+          return res.status(409).json({ error: "variant_in_use", message: err.message })
+        }
+        throw err
+      }
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy bộ sưu tập" })
 
       res.json({ ok: true })
@@ -184,7 +192,15 @@ module.exports = function adminCatalogRoutes() {
 
   router.delete("/products/:id", async (req, res) => {
     try {
-      const ok = await repo.deleteProduct(req.params.id)
+      let ok
+      try {
+        ok = await repo.deleteProduct(req.params.id)
+      } catch (err) {
+        if (err instanceof repo.VariantInUseError) {
+          return res.status(409).json({ error: "variant_in_use", message: err.message })
+        }
+        throw err
+      }
       if (!ok) return res.status(404).json({ error: "not_found", message: "Không tìm thấy sản phẩm" })
 
       res.json({ ok: true })
