@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react"
-import axios from "axios"
+import { api } from "../api/api"
 import { useDropzone } from "react-dropzone"
 import { toLocalizedObj } from "../utils/localize"
 import { COLOR_SCHEMES, applyColorScheme } from "../config"
@@ -15,7 +15,7 @@ function ImageUpload({ endpoint, imageUrl, onUpload, onRemove, label = "Kéo th�
     const reader = new FileReader()
     reader.onload = () => {
       const base64 = reader.result.split(",")[1]
-      axios
+      api
         .post(endpoint, { base64 })
         .then((r) => onUpload(r.data.url))
         .catch((err) => setError(err.response?.data?.message || "Upload thất bại"))
@@ -59,7 +59,7 @@ function ClickUpload({ endpoint, onUrl, children }) {
     const reader = new FileReader()
     reader.onload = () => {
       const base64 = reader.result.split(",")[1]
-      axios
+      api
         .post(endpoint, { base64 })
         .then((r) => onUrl(r.data.url))
         .catch(() => {})
@@ -271,7 +271,7 @@ export default function AdminSettings() {
   const [draggedEventIdx, setDraggedEventIdx] = useState(null)
 
   useEffect(() => {
-    axios
+    api
       .get("/api/settings")
       .then((r) => {
         const normalized = normalizeConfig(r.data)
@@ -287,7 +287,7 @@ export default function AdminSettings() {
     setSaving(true)
     setMsg("")
     try {
-      await axios.put("/api/settings", config)
+      await api.put("/api/settings", config)
       setMsg("Đã lưu!")
       setDirty(false)
     } catch (err) {
@@ -388,7 +388,7 @@ export default function AdminSettings() {
       return
     }
     setSaving(true)
-    axios.put("/api/settings", nextConfig)
+    api.put("/api/settings", nextConfig)
       .then(() => setMsg("Đã lưu thứ tự."))
       .catch(() => setMsg("Lỗi lưu thứ tự."))
       .finally(() => setSaving(false))
@@ -497,7 +497,7 @@ export default function AdminSettings() {
         const reader = new FileReader()
         reader.onload = () => {
           const base64 = reader.result.split(",")[1]
-          axios.post("/api/upload/thumbnail", { base64 })
+          api.post("/api/upload/thumbnail", { base64 })
             .then((r) => { addHeroImage(r.data.url, r.data.accentColor); resolve() })
             .catch(reject)
         }
@@ -524,7 +524,7 @@ export default function AdminSettings() {
       new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
-          axios.post("/api/upload/thumbnail", { base64: reader.result.split(",")[1] })
+          api.post("/api/upload/thumbnail", { base64: reader.result.split(",")[1] })
             .then((r) => { setDirty(true); setConfig((prev) => ({ ...prev, latestPhotos: [...(prev.latestPhotos || []), r.data.url] })); resolve() })
             .catch(reject)
         }

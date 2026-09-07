@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import axios from "axios"
+import { api } from "../api/api"
 import AdminAlbumForm from "./AdminAlbumForm"
 import AdminAlbumImages from "./AdminAlbumImages"
 
@@ -10,9 +10,10 @@ export default function AdminAlbums() {
   const [editing, setEditing] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
   const [reorderPending, setReorderPending] = useState(false)
+  const [error, setError] = useState("")
 
   const fetchAlbums = () => {
-    axios.get("/api/albums").then((r) => setAlbums(r.data))
+    api.get("/api/albums").then((r) => setAlbums(r.data))
   }
 
   useEffect(() => {
@@ -20,25 +21,34 @@ export default function AdminAlbums() {
   }, [])
 
   const createAlbum = (title, description) => {
-    return axios.post("/api/albums", { title, description }).then(() => {
+    setError("")
+    return api.post("/api/albums", { title, description }).then(() => {
       fetchAlbums()
       setShowForm(false)
+    }).catch((err) => {
+      setError(err.response?.data?.message || "Tạo album thất bại")
     })
   }
 
   const updateAlbum = (id, title, description) => {
-    return axios.put(`/api/albums/${id}`, { title, description }).then(() => {
+    setError("")
+    return api.put(`/api/albums/${id}`, { title, description }).then(() => {
       fetchAlbums()
       setEditing(null)
       if (selected?.id === id) setSelected({ ...selected, title, description })
+    }).catch((err) => {
+      setError(err.response?.data?.message || "Sửa album thất bại")
     })
   }
 
   const deleteAlbum = (id) => {
     if (!confirm("Xóa album và tất cả ảnh trong album?")) return
-    axios.delete(`/api/albums/${id}`).then(() => {
+    setError("")
+    api.delete(`/api/albums/${id}`).then(() => {
       fetchAlbums()
       if (selected?.id === id) setSelected(null)
+    }).catch((err) => {
+      setError(err.response?.data?.message || "Xóa album thất bại")
     })
   }
 
@@ -77,7 +87,7 @@ export default function AdminAlbums() {
     setAlbums(next)
     setDraggedId(null)
     setReorderPending(true)
-    axios
+    api
       .put("/api/albums/reorder", { albumIds: next.map((x) => x.id) })
       .then(() => setReorderPending(false))
       .catch((err) => {
@@ -123,6 +133,8 @@ export default function AdminAlbums() {
           title="Sửa album"
         />
       )}
+
+      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
 
       <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">Kéo thả album để đổi thứ tự.</p>
       {reorderPending && (
