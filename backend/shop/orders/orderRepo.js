@@ -180,7 +180,7 @@ async function createOrder(input) {
     // block, while the same on product_variants does.
     const [rows] = await conn.query(
       `SELECT v.id, v.label, v.stock_qty, v.delivery_link, p.id AS product_id, p.name AS product_name, p.type AS product_type,
-              p.price, p.collection_id, c.status AS collection_status,
+              p.price, p.collection_id, c.status AS collection_status, c.end_at AS collection_end_at,
               c.allow_ship, c.allow_pickup, c.payment_deadline_hours
          FROM product_variants v
          JOIN products p ON p.id = v.product_id
@@ -217,7 +217,12 @@ async function createOrder(input) {
     // item added while a collection was "active" cannot slip through a race
     // against the admin closing it — see CollectionNotActiveError.
     for (const row of rows) {
-      if (row.collection_status !== "active") {
+      // A collection whose end_at has already passed is rejected here even
+      // if its stored status still says "active" — the real transition to
+      // "closed" only happens lazily on a read path (see catalogRepo.js's
+      // closeExpiredCollections), which this write path never calls.
+      const collectionExpired = row.collection_end_at && new Date(row.collection_end_at) <= new Date()
+      if (row.collection_status !== "active" || collectionExpired) {
         throw new CollectionNotActiveError(row.label, row.product_name)
       }
       if (row.product_type !== "digital") {

@@ -309,6 +309,26 @@ describe("createOrder", () => {
     await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
   })
 
+  it("rejects an order once the collection's end_at has passed, even if status is still 'active' in the DB", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const { variantId } = await seedVariant(5, { end_at: past })
+
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
+
+    const [[row]] = await db.query(
+      "SELECT c.status FROM product_variants v JOIN products p ON p.id = v.product_id JOIN collections c ON c.id = p.collection_id WHERE v.id = ?",
+      [variantId]
+    )
+    expect(row.status).toBe("active") // createOrder itself never writes the transition — see Task 2 for that
+  })
+
+  it("still allows an order when end_at is in the future", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000)
+    const { variantId } = await seedVariant(5, { end_at: future })
+
+    await expect(repo.createOrder(order(variantId, 1))).resolves.toMatchObject({ reused: false })
+  })
+
   it("carries the product name and variant label on CollectionNotActiveError, to identify which cart line is stuck", async () => {
     const { variantId } = await seedVariant(5, { status: "closed" })
     try {
