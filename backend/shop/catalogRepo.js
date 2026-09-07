@@ -102,7 +102,7 @@ async function listPublicCollections() {
     `SELECT c.*, COUNT(p.id) AS product_count
        FROM collections c
        LEFT JOIN products p ON p.collection_id = c.id
-      WHERE c.status IN (?, ?) AND (c.start_at IS NULL OR c.start_at <= NOW())
+      WHERE c.status IN (?, ?) AND (c.start_at IS NULL OR c.start_at <= UTC_TIMESTAMP())
       GROUP BY c.id
       ORDER BY c.sort_order ASC, c.id ASC`,
     PUBLIC_STATUSES
@@ -167,7 +167,7 @@ async function nestCollectionDetail(collection) {
 
 async function getPublicCollectionBySlug(slug) {
   const [[collection]] = await db.query(
-    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) AND (start_at IS NULL OR start_at <= NOW()) LIMIT 1",
+    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) AND (start_at IS NULL OR start_at <= UTC_TIMESTAMP()) LIMIT 1",
     [slug, ...PUBLIC_STATUSES]
   )
   if (!collection) return null

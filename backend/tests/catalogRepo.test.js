@@ -616,6 +616,20 @@ describe("collection scheduling", () => {
     expect(Math.abs(new Date(detail.end_at).getTime() - end.getTime())).toBeLessThanOrEqual(1000)
   })
 
+  it("treats a naive-looking ISO string with a Z suffix as an unambiguous UTC instant, not local time", async () => {
+    // Pins the contract the frontend now always relies on: normalizeDatetime
+    // must never re-interpret an already-unambiguous instant (Z suffix) in
+    // any timezone other than the one it names — UTC. A value like
+    // "2026-09-10T09:00:00.000Z" must always mean 09:00 UTC, regardless of
+    // what timezone the Node process running this test happens to be in.
+    const isoUtc = "2026-09-10T09:00:00.000Z"
+    const cid = await repo.createCollection({ title: "UTC Pin Drop", status: "active", start_at: isoUtc })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(new Date(detail.start_at).getTime()).toBe(new Date(isoUtc).getTime())
+    expect(new Date(detail.start_at).toISOString()).toBe(isoUtc)
+  })
+
   it("does not carry start_at/end_at into a copyCollection duplicate", async () => {
     const future = new Date(Date.now() + 60 * 60 * 1000)
     const cid = await repo.createCollection({ title: "Scheduled", status: "active", start_at: future, end_at: future })

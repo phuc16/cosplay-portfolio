@@ -88,8 +88,18 @@ export default function AdminCollections() {
   const save = async () => {
     setError("")
     try {
-      if (editingId) await adminUpdateCollection(editingId, draft)
-      else await adminCreateCollection(draft)
+      // datetime-local inputs give a naive wall-clock string with no
+      // timezone offset — only the browser knows which timezone the admin
+      // meant, so it must be converted to an unambiguous UTC instant here,
+      // before it ever reaches the backend (which may run on a different
+      // machine/clock than the admin's browser).
+      const payload = {
+        ...draft,
+        start_at: draft.start_at ? new Date(draft.start_at).toISOString() : "",
+        end_at: draft.end_at ? new Date(draft.end_at).toISOString() : "",
+      }
+      if (editingId) await adminUpdateCollection(editingId, payload)
+      else await adminCreateCollection(payload)
 
       setDraft(blank)
       setEditingId(null)

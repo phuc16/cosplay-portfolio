@@ -25,6 +25,36 @@ describe("GET /api/shop/collections", () => {
     expect(res.body[0].title).toBe("Live")
     expect(res.body[0].allow_ship).toBe(true)
   })
+
+  it("behaves exactly as before for a collection with neither start_at nor end_at set", async () => {
+    await repo.createCollection({ title: "Ordinary", status: "active" })
+
+    const res = await request(app).get("/api/shop/collections")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].title).toBe("Ordinary")
+    expect(res.body[0].status).toBe("active")
+  })
+
+  it("excludes a collection whose start_at is in the future", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000)
+    await repo.createCollection({ title: "Not Yet", status: "active", start_at: future })
+
+    const res = await request(app).get("/api/shop/collections")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(0)
+  })
+
+  it("includes a collection whose end_at is in the past, with status closed in the response body", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    await repo.createCollection({ title: "Ended", status: "active", end_at: past })
+
+    const res = await request(app).get("/api/shop/collections")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].title).toBe("Ended")
+    expect(res.body[0].status).toBe("closed")
+  })
 })
 
 describe("GET /api/shop/collections/:slug", () => {
@@ -57,5 +87,23 @@ describe("GET /api/shop/collections/:slug", () => {
     expect(res.status).toBe(404)
     expect(res.body.error).toBe("not_found")
     expect(res.body.message).toBe("Không tìm thấy bộ sưu tập")
+  })
+
+  it("404s for a collection whose start_at is in the future", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000)
+    await repo.createCollection({ title: "Not Yet", status: "active", start_at: future })
+
+    const res = await request(app).get("/api/shop/collections/not-yet")
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe("not_found")
+  })
+
+  it("returns a collection whose end_at is in the past, with status closed in the response body", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    await repo.createCollection({ title: "Ended", status: "active", end_at: past })
+
+    const res = await request(app).get("/api/shop/collections/ended")
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe("closed")
   })
 })

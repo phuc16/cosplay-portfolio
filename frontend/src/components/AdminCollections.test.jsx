@@ -124,9 +124,19 @@ describe("AdminCollections — scheduling", () => {
     const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Tạo")
     await act(async () => { saveButton.click() })
 
+    // The naive datetime-local string is ambiguous without a timezone — it
+    // must be converted to an unambiguous UTC instant (ISO string with a Z
+    // suffix), interpreted as the browser's own local time, before being
+    // sent to the backend.
     expect(adminCreateCollection).toHaveBeenCalledWith(
-      expect.objectContaining({ start_at: "2026-09-10T09:00", end_at: "2026-09-20T18:00" })
+      expect.objectContaining({
+        start_at: new Date("2026-09-10T09:00").toISOString(),
+        end_at: new Date("2026-09-20T18:00").toISOString(),
+      })
     )
+    const [payload] = adminCreateCollection.mock.calls[0]
+    expect(payload.start_at).toMatch(/Z$/)
+    expect(payload.end_at).toMatch(/Z$/)
   })
 
   it("rejects an end time before the start time, showing the server's error message", async () => {
