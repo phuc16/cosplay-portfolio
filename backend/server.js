@@ -243,8 +243,15 @@ const API_PREFIX = "/api"
 
 
 // LOGIN ADMIN - check env (RAM), no DB + brute force protection
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin"
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin"
+// No default fallback here (unlike JWT_SECRET/SITE_URL's warn-and-continue) —
+// a silently-defaulted admin/admin credential is a well-known password, not
+// a degraded-but-safe mode, so refuse to start instead.
+if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
+  console.error("Lỗi: Cần đặt ADMIN_USERNAME và ADMIN_PASSWORD trong .env hoặc environment. Không dùng giá trị mặc định.")
+  process.exit(1)
+}
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 const LOGIN_MAX_ATTEMPTS = 5
 const LOGIN_LOCKOUT_MINUTES = 15
 
@@ -703,6 +710,7 @@ app.delete(`${API_PREFIX}/albums/:id`, auth, async (req, res) => {
 
 // IMAGES CRUD - lưu vào MinIO, DB chỉ lưu url
 const sharp = require("sharp")
+const { validateImageBuffer, InvalidImageError } = require("./shop/images")
 const MAX_FULL_WIDTH = 1920
 const JPEG_QUALITY = 85
 
@@ -710,6 +718,10 @@ const JPEG_QUALITY = 85
 // images WITH an alpha channel are written as PNG so background-removed
 // (tách nền) uploads stay transparent; opaque images stay JPEG for size.
 async function processImage(buffer) {
+  // Same magic-byte/size sniff every shop upload goes through (shop/images.js)
+  // — portfolio uploads used to hand base64 straight to sharp with no check
+  // beyond the outer JSON body limit.
+  validateImageBuffer(buffer)
   const meta = await sharp(buffer).metadata()
   let pipeline = sharp(buffer).rotate()
   if (meta.width > MAX_FULL_WIDTH) {
@@ -764,6 +776,9 @@ app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
     console.log(`[UPLOAD/HERO] Đã lưu: ${key} accent=${accentColor}`)
     res.json({ url, accentColor })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[UPLOAD/HERO] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
@@ -788,6 +803,9 @@ app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
     console.log(`[UPLOAD/THUMB] Đã lưu: ${key} accent=${accentColor}`)
     res.json({ url, accentColor })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[UPLOAD/THUMB] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
@@ -811,6 +829,9 @@ app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
     console.log(`[UPLOAD/EVENT] Đã lưu: ${key}`)
     res.json({ url })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[UPLOAD/EVENT] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
@@ -851,6 +872,9 @@ app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
     console.log(`[IMAGE] Đã lưu ảnh vào MinIO album ${album_id}`)
     res.json({ ok: true })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[IMAGE] Lỗi upload:", err.message)
     res.status(500).json({ error: "server_error", message: `Upload thất bại. Kiểm tra kích thước ảnh (max ${UPLOAD_LIMIT}) hoặc thử lại.` })
   }

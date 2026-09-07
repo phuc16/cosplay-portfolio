@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_DB=15 vitest run",
-    "test:watch": "DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_DB=15 vitest",
+    "test": "DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_DB=15 ADMIN_USERNAME=test-admin ADMIN_PASSWORD=test-admin-pass vitest run",
+    "test:watch": "DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_DB=15 ADMIN_USERNAME=test-admin ADMIN_PASSWORD=test-admin-pass vitest",
     "migrate": "knex migrate:latest",
     "seed": "knex seed:run",
     "rollback": "knex migrate:rollback"

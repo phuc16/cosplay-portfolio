@@ -220,6 +220,7 @@ async function createOrder(input) {
     // Checked with the same row lock as the stock check below, so a cart
     // item added while a collection was "active" cannot slip through a race
     // against the admin closing it — see CollectionNotActiveError.
+    const now = new Date()
     for (const row of rows) {
       // A collection whose end_at has already passed is rejected here even
       // if its stored status still says "active" — the real transition to
@@ -229,7 +230,6 @@ async function createOrder(input) {
       // way — catalogRepo hides it from listing/lookup, but a buyer who
       // already has the variant_id (an old cart, a stale page, a crafted
       // request) must not be able to check out before it's actually live.
-      const now = new Date()
       const collectionNotStarted = row.collection_start_at && new Date(row.collection_start_at) > now
       const collectionExpired = row.collection_end_at && new Date(row.collection_end_at) <= now
       if (row.collection_status !== "active" || collectionNotStarted || collectionExpired) {

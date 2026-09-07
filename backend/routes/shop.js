@@ -57,6 +57,11 @@ module.exports = function shopRoutes() {
   })
 
   router.get("/wards/:provinceCode", async (req, res) => {
+    // Vietnam province codes are short numeric strings — reject anything
+    // else before it reaches the outbound fetch URL or the Redis cache key.
+    if (!/^\d{1,3}$/.test(req.params.provinceCode)) {
+      return res.status(400).json({ error: "invalid_input", message: "Mã tỉnh/thành không hợp lệ" })
+    }
     try {
       res.json(await vnAddress.getWards(req.params.provinceCode))
     } catch (err) {

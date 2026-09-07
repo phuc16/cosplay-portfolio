@@ -23,7 +23,7 @@ module.exports = function adminPaymentRoutes() {
 
   router.get("/payment-settings", async (req, res) => {
     try {
-      res.json(await repo.getSettings())
+      res.json(repo.publicSettings(await repo.getSettings()))
     } catch (err) {
       console.error("[ADMIN/PAYMENTS] Lỗi đọc cấu hình:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })

@@ -57,4 +57,20 @@ describe("GET /api/shop/wards/:provinceCode", () => {
     expect(res.body).toEqual([{ code: "100", name: "Bến Nghé" }])
     expect(fetchSpy).toHaveBeenCalledWith("https://provinces.open-api.vn/api/v2/p/79?depth=2")
   })
+
+  it("400s on a non-numeric provinceCode instead of reaching fetch/cache-key logic", async () => {
+    fetchSpy = vi.spyOn(globalThis, "fetch")
+
+    const res = await request(app).get("/api/shop/wards/abc")
+    expect(res.status).toBe(400)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("400s on an over-length numeric provinceCode", async () => {
+    fetchSpy = vi.spyOn(globalThis, "fetch")
+
+    const res = await request(app).get("/api/shop/wards/99999")
+    expect(res.status).toBe(400)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })

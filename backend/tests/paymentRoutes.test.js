@@ -69,6 +69,19 @@ describe("admin payment settings", () => {
     })
     expect(res.status).toBe(400)
   })
+
+  it("never leaks sepay secrets to the admin's own browser", async () => {
+    await settings.updateSettings({
+      bank_enabled: true, bank_name: "ACB", bank_bin: "970416",
+      bank_account_number: "123456789", bank_account_holder: "NGUYEN VAN A",
+      sepay_api_key: "SEPAY_KEY_SECRET", sepay_webhook_secret: "SEPAY_WEBHOOK_SECRET",
+    })
+    const res = await authed(request(app).get("/api/admin/payment-settings"))
+    expect(res.body.sepay_api_key).toBeUndefined()
+    expect(res.body.sepay_webhook_secret).toBeUndefined()
+    expect(JSON.stringify(res.body)).not.toContain("SEPAY_KEY_SECRET")
+    expect(JSON.stringify(res.body)).not.toContain("SEPAY_WEBHOOK_SECRET")
+  })
 })
 
 describe("checkout respects enabled methods", () => {

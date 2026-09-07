@@ -4,9 +4,7 @@ import jwt from "jsonwebtoken"
 import app from "../server.js"
 import redis from "../redis.js"
 
-// Tests rely on the default admin/admin fallback (ADMIN_USERNAME/PASSWORD
-// unset in the test environment, same as every other suite in this repo).
-const CREDS = { username: "admin", password: "admin" }
+const CREDS = { username: process.env.ADMIN_USERNAME, password: process.env.ADMIN_PASSWORD }
 
 beforeEach(async () => {
   const keys = await redis.keys("login_*")

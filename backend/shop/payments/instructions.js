@@ -9,7 +9,7 @@ function buildInstructions(order, settings) {
   // design (the seller matches transfers by amount/timing/buyer contact
   // instead of a unique code).
   const note = settings.payment_note || null
-  const base = { method: order.payment_method, amount: order.total, payment_note: settings.payment_note || null }
+  const base = { method: order.payment_method, amount: order.total, payment_note: note }
 
   if (order.payment_method === "bank") {
     let payload = null
