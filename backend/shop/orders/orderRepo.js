@@ -182,7 +182,8 @@ async function createOrder(input) {
     // 8.4: with OF v, a concurrent SELECT ... FROM products FOR UPDATE does not
     // block, while the same on product_variants does.
     const [rows] = await conn.query(
-      `SELECT v.id, v.label, v.stock_qty, v.delivery_link, p.id AS product_id, p.name AS product_name, p.type AS product_type,
+      `SELECT v.id, v.label, v.stock_qty, v.delivery_link, v.thumbnail_image, v.image_url,
+              p.id AS product_id, p.name AS product_name, p.type AS product_type, p.images AS product_images,
               p.price, p.collection_id, c.status AS collection_status,
               c.start_at AS collection_start_at, c.end_at AS collection_end_at,
               c.allow_ship, c.allow_pickup, c.payment_deadline_hours
@@ -262,6 +263,7 @@ async function createOrder(input) {
         unit_price_snapshot: variant.price,
         collection_id: variant.collection_id,
         delivery_link_snapshot: variant.product_type === "digital" ? variant.delivery_link : null,
+        image_url_snapshot: variant.thumbnail_image || variant.image_url || firstImage(variant.product_images),
       })
     }
 
@@ -327,10 +329,11 @@ async function createOrder(input) {
       await conn.query(
         `INSERT INTO order_items
            (order_id, product_variant_id, product_name_snapshot,
-            variant_label_snapshot, unit_price_snapshot, qty, delivery_link_snapshot)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            variant_label_snapshot, unit_price_snapshot, qty, delivery_link_snapshot, image_url_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [res.insertId, line.variant_id, line.product_name_snapshot,
-         line.variant_label_snapshot, line.unit_price_snapshot, line.qty, line.delivery_link_snapshot]
+         line.variant_label_snapshot, line.unit_price_snapshot, line.qty, line.delivery_link_snapshot,
+         line.image_url_snapshot]
       )
     }
 
@@ -362,10 +365,10 @@ function firstImage(value) {
 
 async function attachItems(order) {
   if (!order) return null
-  // The variant's own thumbnail_image wins (same cover shown in the picker
-  // grid); pv.image_url (kept in sync with the variant's gallery by
-  // catalogRepo) is next; the product's images are the last resort, for a
-  // variant with no photo of its own at all.
+  // image_url_snapshot (taken at order-creation time) wins — it survives the
+  // variant/product being deleted later, which a completed order's own
+  // history must not depend on. The live join is a fallback only for orders
+  // placed before this snapshot column existed.
   const [rows] = await db.query(
     `SELECT oi.*, pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
        FROM order_items oi
@@ -376,7 +379,7 @@ async function attachItems(order) {
   )
   const items = rows.map(({ variant_thumbnail, variant_image_url, product_images, ...item }) => ({
     ...item,
-    image_url: variant_thumbnail || variant_image_url || firstImage(product_images),
+    image_url: item.image_url_snapshot || variant_thumbnail || variant_image_url || firstImage(product_images),
   }))
   return { ...order, items }
 }

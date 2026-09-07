@@ -214,6 +214,23 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(itemB1.image_url).toBe("/api/storage/shop/products/p1.webp")
   })
 
+  it("keeps an item's photo on the roster even after its variant is deleted", async () => {
+    const cid = await catalog.createCollection({ title: "Photo Drop", status: "active", allow_pickup: true })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 40000 })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5, image_url: "/api/storage/shop/variants/a1.webp" }])
+    const [[variant]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+    const o = await orders.createOrder({
+      items: [{ variant_id: variant.id, qty: 1 }],
+      buyer, fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await orders.transitionOrder(o.id, "confirmed")
+    await db.query("DELETE FROM product_variants WHERE id = ?", [variant.id])
+
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${cid}`))
+    const row = res.body.rows.find((r) => r.order_id === o.id)
+    expect(row.items[0].image_url).toBe("/api/storage/shop/variants/a1.webp")
+  })
+
   it("includes pickup_code in the roster row", async () => {
     const { collectionId, orderId } = await seedPickupOrder()
     const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))

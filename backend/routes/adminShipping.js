@@ -387,7 +387,7 @@ module.exports = function adminShippingRoutes() {
         // Same variant-thumbnail-with-fallback join as orderRepo.attachItems
         // — staff packing at the roster need to see the item, not just its name.
         [itemRows] = await db.query(
-          `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty,
+          `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty, oi.image_url_snapshot,
                   pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
              FROM order_items oi
              LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
@@ -398,8 +398,8 @@ module.exports = function adminShippingRoutes() {
       }
 
       const itemsByOrder = new Map()
-      for (const { variant_thumbnail, variant_image_url, product_images, ...item } of itemRows) {
-        const withImage = { ...item, image_url: variant_thumbnail || variant_image_url || firstImage(product_images) }
+      for (const { image_url_snapshot, variant_thumbnail, variant_image_url, product_images, ...item } of itemRows) {
+        const withImage = { ...item, image_url: image_url_snapshot || variant_thumbnail || variant_image_url || firstImage(product_images) }
         if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, [])
         itemsByOrder.get(item.order_id).push(withImage)
       }

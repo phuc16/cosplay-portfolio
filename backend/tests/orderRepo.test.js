@@ -858,8 +858,17 @@ describe("getOrderByToken", () => {
     const found = await repo.getOrderByToken(res.order_token)
     expect(found.items[0].product_name_snapshot).toBe("Photocard")
     expect(found.items[0].unit_price_snapshot).toBe(35000)
-    expect(found.items[0].image_url).toBeNull()
     void pid
+  })
+
+  it("keeps the item photo after its variant is deleted — the live join degrades to null, but the snapshot taken at order time does not", async () => {
+    const { pid, variantId } = await seedVariant(5)
+    await catalog.replaceVariants(pid, [{ id: variantId, label: "A1", image_url: "/api/storage/shop/variants/a1.webp", stock_qty: 5 }])
+    const res = await repo.createOrder(order(variantId, 1))
+    await db.query("DELETE FROM product_variants WHERE id = ?", [variantId])
+
+    const found = await repo.getOrderByToken(res.order_token)
+    expect(found.items[0].image_url).toBe("/api/storage/shop/variants/a1.webp")
   })
 
   it("includes the variant's own photo on each item", async () => {
