@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 
-// Reference size the hidden measuring span renders at — font metrics scale
+// Reference size the hidden measuring span renders at - font metrics scale
 // linearly with font-size for the same text/font, so measuring once at this
 // size and scaling proportionally is enough; no need to re-measure per size.
 const BASE_PX = 16
@@ -49,7 +49,7 @@ export default function FitTitle({ text, as: Tag = "h1", minPx = 20, maxPx = 40,
   return (
     <div ref={containerRef} className="relative w-full overflow-hidden">
       {/* overflow/textOverflow is a safety net for a title so long even
-          minPx can't fit it on one line — truncates with "…" rather than
+          minPx can't fit it on one line - truncates with "…" rather than
           silently clipping mid-character. */}
       <Tag
         className={className}

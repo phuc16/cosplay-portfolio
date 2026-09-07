@@ -1,4 +1,4 @@
-# Merch Shop — Test Strategy
+# Merch Shop - Test Strategy
 
 Covers all three implementation plans (catalog → checkout/orders → payments/email/QR). Defines what is tested at each level, with what tooling, and what must pass before shipping.
 
@@ -29,53 +29,53 @@ Test effort is allocated against these. Anything rated High gets coverage at mul
 
 ## 2. Test levels
 
-### L1 — Unit
+### L1 - Unit
 
 Pure logic, no I/O, no database. Fast enough to run on every save.
 
 **Tooling:** Vitest (backend, `backend/tests/*.test.js`); Vitest + jsdom (frontend, `frontend/src/**/*.test.js`).
 
 **Scope:**
-- `slugify` / `uniqueSlug` — diacritics, `đ`, punctuation, collisions, empty fallback
-- `formatVnd` — grouping, zero, large values, non-numeric input
-- `renderMarkdown` — formatting **and** XSS vectors (see §5)
-- Validators — price, stock, labels, status, fulfillment, email, phone, address
-- Order total computation (Plan 2) — sum of `unit_price_snapshot × qty`, integer-only
-- Stock state derivation — `null`/`0`/`n` → available/sold-out/remaining
-- Order state machine (Plan 2) — legal and illegal transitions
+- `slugify` / `uniqueSlug` - diacritics, `đ`, punctuation, collisions, empty fallback
+- `formatVnd` - grouping, zero, large values, non-numeric input
+- `renderMarkdown` - formatting **and** XSS vectors (see §5)
+- Validators - price, stock, labels, status, fulfillment, email, phone, address
+- Order total computation (Plan 2) - sum of `unit_price_snapshot × qty`, integer-only
+- Stock state derivation - `null`/`0`/`n` → available/sold-out/remaining
+- Order state machine (Plan 2) - legal and illegal transitions
 - QR payload construction (Plan 3)
-- Webhook signature verification (Plan 3) — valid, tampered, replayed, missing
+- Webhook signature verification (Plan 3) - valid, tampered, replayed, missing
 
 **Rule:** every branch of money and stock logic has a test. These functions are small and cheap to cover exhaustively; there is no excuse for a gap.
 
-### L2 — Integration
+### L2 - Integration
 
 A module against its real dependency. Slower, still automated.
 
 **Tooling:** Vitest against a dedicated `cosplay_test` MySQL schema and Redis DB 15, both isolated from dev data by `DB_NAME` / `REDIS_DB` pinned in the `npm test` script.
 
 **Scope:**
-- `catalogRepo` ↔ MySQL — CRUD, cascade deletes, `NULL` stock preservation, slug collision retry, `replaceVariants` transaction and rollback
-- `catalogCache` ↔ Redis — hit/miss, TTL, invalidation, no caching of misses
-- `orderRepo` ↔ MySQL (Plan 2) — reservation under `SELECT ... FOR UPDATE`, release on cancel/expiry
-- `storage` ↔ MinIO — upload, retrieve, proxy URL shape
-- Email dispatch ↔ SMTP (Plan 3) — against a local capture server, never a real inbox
-- Migrations — `up` produces the expected schema; `down` rolls back cleanly
+- `catalogRepo` ↔ MySQL - CRUD, cascade deletes, `NULL` stock preservation, slug collision retry, `replaceVariants` transaction and rollback
+- `catalogCache` ↔ Redis - hit/miss, TTL, invalidation, no caching of misses
+- `orderRepo` ↔ MySQL (Plan 2) - reservation under `SELECT ... FOR UPDATE`, release on cancel/expiry
+- `storage` ↔ MinIO - upload, retrieve, proxy URL shape
+- Email dispatch ↔ SMTP (Plan 3) - against a local capture server, never a real inbox
+- Migrations - `up` produces the expected schema; `down` rolls back cleanly
 
-### L3 — Module / component
+### L3 - Module / component
 
 A unit's public interface with its collaborators stubbed.
 
 **Tooling:** Vitest + jsdom + Testing Library (frontend); Vitest with `vi.mock` (backend).
 
 **Scope:**
-- `ProductCard` — renders price, struck-through sold-out variants, no stock number for unlimited
-- Cart state module (Plan 2) — add/remove/quantity, localStorage persistence, corrupt-data recovery
-- Checkout form (Plan 2) — validation, conditional address for ship vs pickup
-- Admin variant editor — bulk paste expansion, blank → `null`
-- Upload route with `storage` mocked — no real MinIO needed
+- `ProductCard` - renders price, struck-through sold-out variants, no stock number for unlimited
+- Cart state module (Plan 2) - add/remove/quantity, localStorage persistence, corrupt-data recovery
+- Checkout form (Plan 2) - validation, conditional address for ship vs pickup
+- Admin variant editor - bulk paste expansion, blank → `null`
+- Upload route with `storage` mocked - no real MinIO needed
 
-### L4 — API contract
+### L4 - API contract
 
 The HTTP surface as consumers see it.
 
@@ -83,11 +83,11 @@ The HTTP surface as consumers see it.
 
 **Scope:** status codes; the `{error, message}` shape on every failure path; auth required on every admin route and absent on public ones; public endpoints never leak draft/archived data or PII; rate limiting returns `429`; large bodies accepted on upload paths only.
 
-### L5 — End-to-end
+### L5 - End-to-end
 
 Full stack through a browser, exercising real user journeys.
 
-**Tooling:** manual, scripted by the per-plan verification checklists. Automated browser E2E (Playwright) is **deliberately out of scope** — it is a heavy dependency for a solo-maintained project, and the critical paths are already covered at L1–L4 plus scripted manual acceptance. Revisit if regressions start slipping through.
+**Tooling:** manual, scripted by the per-plan verification checklists. Automated browser E2E (Playwright) is **deliberately out of scope** - it is a heavy dependency for a solo-maintained project, and the critical paths are already covered at L1–L4 plus scripted manual acceptance. Revisit if regressions start slipping through.
 
 **Journeys:**
 1. Browse → cart → checkout → order page → email received (Plan 2–3)
@@ -96,16 +96,16 @@ Full stack through a browser, exercising real user journeys.
 4. Pickup order → QR scanned at booth → completed (Plan 3)
 5. Reservation expires → stock returns → buyer notified (Plan 2)
 
-### L6 — Acceptance
+### L6 - Acceptance
 
 Human verification against the built feature. One checklist per plan:
-- `2026-08-07-merch-shop-1-verification.md` (catalog) — written
-- Plan 2 verification — to be written with Plan 2
-- Plan 3 verification — to be written with Plan 3
+- `2026-08-07-merch-shop-1-verification.md` (catalog) - written
+- Plan 2 verification - to be written with Plan 2
+- Plan 3 verification - to be written with Plan 3
 
 Exit criterion: every item PASS, or a recorded decision to accept a specific failure.
 
-### L7 — Non-functional
+### L7 - Non-functional
 
 | Area | Method |
 |---|---|
@@ -122,9 +122,9 @@ Exit criterion: every item PASS, or a recorded decision to accept a specific fai
 
 | Plan | Must be proven before moving on |
 |---|---|
-| **1 — Catalog** | Price is integer VND end to end; the three stock states never conflate; status visibility matrix holds; cache invalidates on every mutation; variant saves are atomic; markdown cannot inject script |
-| **2 — Orders** | Stock cannot oversell under concurrency; reservation releases exactly once on cancel and on expiry; double-submit creates one order; order totals match cart totals exactly; order tokens are unguessable; COD orders never expire |
-| **3 — Payments** | A payment cannot be confirmed without valid proof or a verified webhook; a replayed or tampered webhook is rejected; email failure never rolls back a committed order; QR resolves to the correct order; backups restore to a working state |
+| **1 - Catalog** | Price is integer VND end to end; the three stock states never conflate; status visibility matrix holds; cache invalidates on every mutation; variant saves are atomic; markdown cannot inject script |
+| **2 - Orders** | Stock cannot oversell under concurrency; reservation releases exactly once on cancel and on expiry; double-submit creates one order; order totals match cart totals exactly; order tokens are unguessable; COD orders never expire |
+| **3 - Payments** | A payment cannot be confirmed without valid proof or a verified webhook; a replayed or tampered webhook is rejected; email failure never rolls back a committed order; QR resolves to the correct order; backups restore to a working state |
 
 ---
 
@@ -134,25 +134,25 @@ The single most important test in the whole feature. Reservation correctness can
 
 **Setup:** one variant with `stock_qty = 1`.
 
-**Test A — last unit race.** Fire 20 concurrent checkout requests for that variant.
+**Test A - last unit race.** Fire 20 concurrent checkout requests for that variant.
 Expected: exactly **1** order created, 19 rejected with an out-of-stock error; final `stock_qty = 0`. Any result where two orders exist, or stock goes negative, is a **blocking** failure.
 
-**Test B — idempotent double-submit.** Fire the same request key twice concurrently.
+**Test B - idempotent double-submit.** Fire the same request key twice concurrently.
 Expected: one order; the second returns the same order rather than creating another.
 
-**Test C — release correctness.** Cancel a reserved order twice concurrently.
-Expected: stock increases by exactly the reserved quantity, once — never twice.
+**Test C - release correctness.** Cancel a reserved order twice concurrently.
+Expected: stock increases by exactly the reserved quantity, once - never twice.
 
-**Test D — expiry vs manual cancel.** Trigger the expiry sweep at the same moment an admin cancels the same order.
+**Test D - expiry vs manual cancel.** Trigger the expiry sweep at the same moment an admin cancels the same order.
 Expected: stock returns exactly once; the order ends in a single terminal state.
 
-These run as automated integration tests (`Promise.all` against the real test DB), not manual checks — a race that reproduces once in twenty runs must be run hundreds of times.
+These run as automated integration tests (`Promise.all` against the real test DB), not manual checks - a race that reproduces once in twenty runs must be run hundreds of times.
 
 ---
 
 ## 5. Security test vectors
 
-**XSS** — every one must render inert, in collection descriptions, product descriptions, and any admin-authored field:
+**XSS** - every one must render inert, in collection descriptions, product descriptions, and any admin-authored field:
 ```
 <script>alert(1)</script>
 <img src=x onerror=alert(1)>
@@ -162,18 +162,18 @@ These run as automated integration tests (`Promise.all` against the real test DB
 <a href="data:text/html,<script>alert(1)</script>">x</a>
 ```
 
-**SQL injection** — into every text input, confirming literal storage and intact schema:
+**SQL injection** - into every text input, confirming literal storage and intact schema:
 ```
 '; DROP TABLE products; --
 ' OR '1'='1
 \'; UPDATE products SET price=0; --
 ```
 
-**Authorization** — for every admin endpoint: no token → `401`; malformed token → `403`; expired token → `403`; token signed with the wrong secret → `403`.
+**Authorization** - for every admin endpoint: no token → `401`; malformed token → `403`; expired token → `403`; token signed with the wrong secret → `403`.
 
-**Order token (Plan 2–3)** — generated with `crypto.randomBytes`, at least 128 bits of entropy, no sequential component; 1000 generated tokens contain no duplicates and no visible pattern; order pages carry `noindex`.
+**Order token (Plan 2–3)** - generated with `crypto.randomBytes`, at least 128 bits of entropy, no sequential component; 1000 generated tokens contain no duplicates and no visible pattern; order pages carry `noindex`.
 
-**Webhook (Plan 3)** — valid signature accepted; tampered body rejected; wrong secret rejected; missing signature rejected; replayed payload does not double-confirm.
+**Webhook (Plan 3)** - valid signature accepted; tampered body rejected; wrong secret rejected; missing signature rejected; replayed payload does not double-confirm.
 
 ---
 
@@ -182,7 +182,7 @@ These run as automated integration tests (`Promise.all` against the real test DB
 - **Automated tests** truncate `product_variants`, `products`, `collections` (and later order tables) before **every** test, and flush Redis DB 15. No test depends on another's leftovers.
 - **Factories** (`backend/tests/helpers/factories.js`) build valid entities with overridable fields, so tests state only what they care about.
 - **Realistic fixtures** mirror the actual Google Form data: a 40-variant photocard sheet, A4/A5 posters, a t-shirt with S/M/L, prices in the 35.000₫–350.000₫ range, Vietnamese names and addresses with full diacritics.
-- **Never** use production data in tests, and never point the suite at the production database — the global setup refuses to run against any schema other than `cosplay_test`.
+- **Never** use production data in tests, and never point the suite at the production database - the global setup refuses to run against any schema other than `cosplay_test`.
 
 ---
 
@@ -194,7 +194,7 @@ These run as automated integration tests (`Promise.all` against the real test DB
 | Local test | Automated suite | `cosplay_test`, Redis DB 15, wiped constantly |
 | Production | Live | Real; nightly `mysqldump`, 14-day retention |
 
-There is deliberately no staging environment — a second full stack does not fit the 2GB box. Acceptance testing therefore runs locally against a production-like Docker stack before deploy, and the backup restore drill (§8) substitutes for the confidence a staging rehearsal would give.
+There is deliberately no staging environment - a second full stack does not fit the 2GB box. Acceptance testing therefore runs locally against a production-like Docker stack before deploy, and the backup restore drill (§8) substitutes for the confidence a staging rehearsal would give.
 
 ---
 

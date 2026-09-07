@@ -29,14 +29,14 @@ beforeEach(async () => {
   if (keys.length) await redis.del(...keys)
   // verify-pin is a POST under /api/orders/*, so it shares orderLimiter's
   // "rl:order:" IP bucket with order creation (same reasoning as
-  // orderRoutes.test.js/paymentProof.test.js) — without clearing it, a test
+  // orderRoutes.test.js/paymentProof.test.js) - without clearing it, a test
   // making several verify-pin calls exhausts the 10/hour budget for the
   // next test in this file, even though each is well under the limit alone.
   const orderLimiterKeys = await redis.keys("rl:order:*")
   if (orderLimiterKeys.length) await redis.del(...orderLimiterKeys)
 })
 
-describe("GET /api/orders/:token — gated by orderAccess", () => {
+describe("GET /api/orders/:token - gated by orderAccess", () => {
   it("401s with pin_required when no Authorization header is sent", async () => {
     const o = await seedOrder()
     const res = await request(app).get(`/api/orders/${o.order_token}`)
@@ -50,7 +50,7 @@ describe("GET /api/orders/:token — gated by orderAccess", () => {
     expect(res.status).toBe(401)
   })
 
-  it("succeeds with a valid admin JWT — no PIN required for admin", async () => {
+  it("succeeds with a valid admin JWT - no PIN required for admin", async () => {
     const o = await seedOrder()
     const res = await authed(request(app).get(`/api/orders/${o.order_token}`))
     expect(res.status).toBe(200)

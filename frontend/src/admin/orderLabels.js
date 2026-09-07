@@ -1,6 +1,6 @@
 /**
  * Single source of Vietnamese labels for order status/payment/fulfilment/
- * action buttons — the admin panel is hardcoded Vietnamese (unlike the
+ * action buttons - the admin panel is hardcoded Vietnamese (unlike the
  * bilingual shop's i18n/translations.js), so this keeps the orders list and
  * stats page from drifting apart on wording.
  */
@@ -35,7 +35,7 @@ export const ACTION_LABELS = {
 /**
  * Looks up `key` in `map`, falling back to the raw `key` itself when
  * absent. Required so an order in a status this module doesn't yet know
- * about renders that raw value rather than "undefined" or nothing —
+ * about renders that raw value rather than "undefined" or nothing -
  * an unknown status must look wrong, never invisible.
  */
 export function labelFor(map, key) {

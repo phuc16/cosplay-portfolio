@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 
 /**
  * Fetches an image/SVG that requires an Authorization header (so a plain
- * <img src="..."> can't be used — browsers never attach custom headers to
+ * <img src="..."> can't be used - browsers never attach custom headers to
  * those requests) and exposes it as a blob: object URL instead. Revokes the
  * previous URL whenever the fetch args change or the component unmounts, so
  * a page that re-fetches repeatedly (e.g. after a PIN unlock) doesn't leak

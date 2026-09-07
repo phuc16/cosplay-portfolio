@@ -14,11 +14,11 @@ async function loadTemplateWorkbook() {
 
 /**
  * Fill the bundled VTP template from row 8 with one row per exportable
- * order. Column G (Số lượng) is fixed at 1 — one parcel per order row, not
+ * order. Column G (Số lượng) is fixed at 1 - one parcel per order row, not
  * a batch-level input (see this plan's Global Constraints); F, H, K, U are
  * entered once and repeated for every row, matching the seller's existing
  * script's interactive prompts. Data validation on the template's dropdown
- * columns is not preserved by this write path — openpyxl already drops it
+ * columns is not preserved by this write path - openpyxl already drops it
  * in the seller's current script and that output imports successfully
  * today, so ViettelPost validates server-side regardless.
  */
@@ -31,7 +31,7 @@ async function buildExportWorkbook(orders, batch) {
   // (buyer name, phone, address, etc.) AND a pre-filled sequential STT
   // (column A only) running all the way down to the sheet's last used row.
   // A one-order export that clears only row 8 would ship ~1,037 rows
-  // carrying nothing but a stray number in column A — unlike the seller's
+  // carrying nothing but a stray number in column A - unlike the seller's
   // proven-working script, which clears every column of every row from
   // DATA_START_ROW down before filling. Match that behaviour here so we
   // never diverge from what is known to import successfully.

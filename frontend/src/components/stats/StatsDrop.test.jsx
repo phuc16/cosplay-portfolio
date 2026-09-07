@@ -102,7 +102,7 @@ describe("StatsDrop", () => {
     expect(container.textContent).toContain("không giới hạn")
   })
 
-  it("shows 'không giới hạn' specifically in the sell-through cell for an unlimited variant, not '—'", async () => {
+  it("shows 'không giới hạn' specifically in the sell-through cell for an unlimited variant, not '-'", async () => {
     adminGetDropStats.mockResolvedValue(dropStats({
       variants: [{ variant_id: 9, product_name: "Poster", variant_label: "Std", sold: 3, deleted: false, unlimited: true, remaining: null, sell_through: null, time_to_sellout_days: null }],
     }))
@@ -145,10 +145,10 @@ describe("StatsDrop", () => {
     const row = Array.from(container.querySelectorAll("tbody tr")).find((tr) => tr.textContent.includes("Sticker"))
     const timeCell = row.querySelectorAll("td")[5]
     expect(timeCell.textContent).not.toMatch(/ngày/)
-    expect(timeCell.textContent).toBe("—")
+    expect(timeCell.textContent).toBe("-")
   })
 
-  it("shows '—' for a deleted variant's remaining stock, never 0", async () => {
+  it("shows '-' for a deleted variant's remaining stock, never 0", async () => {
     adminGetDropStats.mockResolvedValue(dropStats({
       variants: [{ variant_id: null, product_name: "Old card", variant_label: "B2", sold: 2, deleted: true, unlimited: false, remaining: null, sell_through: null, time_to_sellout_days: null }],
     }))
@@ -158,7 +158,7 @@ describe("StatsDrop", () => {
     await flush()
 
     const table = container.querySelector("table")
-    expect(table.textContent).toContain("—")
+    expect(table.textContent).toContain("-")
     expect(table.textContent).not.toMatch(/\b0\b.*Old card|Old card.*\b0\b/)
   })
 
@@ -208,7 +208,7 @@ describe("StatsDrop", () => {
   })
 })
 
-describe("StatsDrop — statistics emphasis (Admin UI plan)", () => {
+describe("StatsDrop - statistics emphasis (Admin UI plan)", () => {
   it("still renders all five money figures with their original values", async () => {
     adminGetDropStats.mockResolvedValue(dropStats({
       received_total: 500000, awaiting_payment: 70000, to_collect: 30000, lost: 10000, pending_cod: 20000,
@@ -248,7 +248,7 @@ describe("StatsDrop — statistics emphasis (Admin UI plan)", () => {
   })
 })
 
-describe("StatsDrop — CSV export", () => {
+describe("StatsDrop - CSV export", () => {
   it("has no export button before a collection is selected", async () => {
     const container = await renderStatsDrop()
     await flush()

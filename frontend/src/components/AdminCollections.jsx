@@ -89,7 +89,7 @@ export default function AdminCollections() {
     setError("")
     try {
       // datetime-local inputs give a naive wall-clock string with no
-      // timezone offset — only the browser knows which timezone the admin
+      // timezone offset - only the browser knows which timezone the admin
       // meant, so it must be converted to an unambiguous UTC instant here,
       // before it ever reaches the backend (which may run on a different
       // machine/clock than the admin's browser).
@@ -120,7 +120,7 @@ export default function AdminCollections() {
       cover_image: c.cover_image || "", thumbnail_image: c.thumbnail_image || "",
     })
     // The edit form is one shared block below the whole list, not inline
-    // under each card — without this, clicking "Sửa" on an item far down
+    // under each card - without this, clicking "Sửa" on an item far down
     // the list changes state invisibly, leaving the admin looking at
     // whatever they were already scrolled to.
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })

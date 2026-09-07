@@ -8,18 +8,18 @@ const STATUSES = ["pending", "confirmed", "shipped", "completed", "cancelled"]
 
 // A griefed drop is at most a few dozen orders; this is generous headroom
 // while still bounding how many DB transactions + email enqueues one request
-// can trigger. Shared by bulk-cancel and bulk-complete — same reasoning
+// can trigger. Shared by bulk-cancel and bulk-complete - same reasoning
 // applies to both.
 const BULK_ACTION_MAX = 100
 
 // The legal next-statuses for a given order, per the real canTransition state
-// machine — the single source of truth. Sent to the frontend so it never needs
+// machine - the single source of truth. Sent to the frontend so it never needs
 // its own copy of TRANSITIONS/the pickup-shipped exclusion rule.
 const TRANSITION_TARGETS = ["confirmed", "shipped", "completed", "cancelled"]
 function withAllowedTransitions(order) {
   if (!order) return order
   // order_token is the buyer's bearer credential for their own public,
-  // unauthenticated order page (GET /api/orders/:token) and payment QR —
+  // unauthenticated order page (GET /api/orders/:token) and payment QR -
   // stripped here rather than never selected, since repo.getOrderById is
   // also the shared lookup for internal uses that DO need it (e.g. the
   // email sender building the order URL). This is the only chokepoint
@@ -61,7 +61,7 @@ module.exports = function adminOrderRoutes() {
   // Backs the admin QR scanner: it only ever extracts a token from the
   // buyer's public order URL, so the lookup has to happen server-side here
   // rather than the admin's browser matching against order_token client-side
-  // (which is why order_token isn't in the list/detail response at all —
+  // (which is why order_token isn't in the list/detail response at all -
   // see withAllowedTransitions above). Registered before "/orders/:id" so
   // Express doesn't swallow "by-token" as an :id value.
   router.get("/orders/by-token/:token", async (req, res) => {
@@ -80,7 +80,7 @@ module.exports = function adminOrderRoutes() {
     } catch (err) { oops(res, err, "Lỗi lấy đơn") }
   })
 
-  // Backs the payment-instructions panel in the admin order detail view —
+  // Backs the payment-instructions panel in the admin order detail view -
   // the same buildInstructions() the buyer's own public page uses, but
   // looked up by numeric id under admin auth rather than the admin's
   // browser calling the buyer's public /api/orders/:token/payment route
@@ -127,7 +127,7 @@ module.exports = function adminOrderRoutes() {
     } catch (err) { oops(res, err, "Lỗi đổi trạng thái đơn") }
   })
 
-  // Bulk cancel — the abuse-resistance mitigation for a griefed drop: lets the
+  // Bulk cancel - the abuse-resistance mitigation for a griefed drop: lets the
   // admin clear a batch of orders in one request. Cancels each order through
   // the same transitionOrder() used everywhere else (stock release, the
   // double-release guard, and the cancellation email all live there), one
@@ -177,7 +177,7 @@ module.exports = function adminOrderRoutes() {
     } catch (err) { oops(res, err, "Lỗi huỷ hàng loạt đơn") }
   })
 
-  // Bulk complete — lets staff who verified pickup buyers offline (via the
+  // Bulk complete - lets staff who verified pickup buyers offline (via the
   // printed roster's pickup_code, when event-venue connectivity was too weak
   // for the live QR-scan flow) batch-apply the completed status once
   // connectivity returns, instead of one order at a time. Mirrors

@@ -76,7 +76,7 @@ describe("parseLocalDateRange / statsRepo.InvalidRangeError", () => {
   })
 })
 
-describe("getBookkeepingStats — timezone boundaries", () => {
+describe("getBookkeepingStats - timezone boundaries", () => {
   it("counts an order placed just after local midnight into that local day", async () => {
     const { variantId } = await seedVariant()
     // 2026-08-01T00:05:00+07:00 == 2026-07-31T17:05:00Z
@@ -102,7 +102,7 @@ describe("getBookkeepingStats — timezone boundaries", () => {
   })
 })
 
-describe("getBookkeepingStats — money and buckets", () => {
+describe("getBookkeepingStats - money and buckets", () => {
   it("splits received by payment method", async () => {
     const { variantId } = await seedVariant()
     const today = new Date()
@@ -213,7 +213,7 @@ describe("getBookkeepingStats — money and buckets", () => {
   })
 })
 
-describe("reconciliation — the highest-value test in this phase", () => {
+describe("reconciliation - the highest-value test in this phase", () => {
   it("per-collection sums (plus the no-collection bucket) equal the bookkeeping total for the same range", async () => {
     const today = new Date()
     const dateStr = vnDateStr(today)

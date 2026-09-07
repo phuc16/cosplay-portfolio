@@ -9,7 +9,7 @@ const PLACEHOLDERS = [
 
 const SHOP_NAME = process.env.SHOP_NAME || "Shop"
 const SITE_URL = process.env.SITE_URL || ""
-// Same address every send actually comes "from" (sender.js) — the point of
+// Same address every send actually comes "from" (sender.js) - the point of
 // showing it is so a buyer's "add to contacts" click keeps future mail out
 // of spam, so it has to be the literal envelope sender, not a display name.
 const SHOP_EMAIL = process.env.SMTP_FROM || process.env.SMTP_USER || ""
@@ -17,7 +17,7 @@ const SHOP_EMAIL = process.env.SMTP_FROM || process.env.SMTP_USER || ""
 /**
  * The "automated email" notice, appended by sender.js AFTER the order-QR
  * block rather than substituted into the template body, so it always
- * renders as the very last section of the mail, below the QR — not baked
+ * renders as the very last section of the mail, below the QR - not baked
  * into `wrap()`, which finishes before the QR is even built.
  */
 function footerHtml() {
@@ -45,7 +45,7 @@ const BRAND = "#6BBF59"
  * address or the pickup location/note, matching what the order page shows.
  */
 function receiverInfoHtml(order) {
-  // A 'digital' order falls through both branches below — name/phone only, no address or pickup info to show.
+  // A 'digital' order falls through both branches below - name/phone only, no address or pickup info to show.
   const rows = [
     ["Tên người nhận", order.buyer_name],
     ["Số điện thoại", order.phone],
@@ -86,7 +86,7 @@ function itemsHtml(items = [], { showDeliveryLink = false } = {}) {
   return `<table style="width:100%;border-collapse:collapse;margin-top:12px">${rows}</table>`
 }
 
-// A visually distinct total row, reused across templates below — table-based
+// A visually distinct total row, reused across templates below - table-based
 // so it renders correctly in Outlook too. {{total}} is a literal placeholder
 // here, substituted at render time like everywhere else.
 const TOTAL_ROW = `
@@ -98,7 +98,7 @@ const TOTAL_ROW = `
     </table>`
 
 function buildVars(order) {
-  // The delivery link is only trustworthy once payment is confirmed — an
+  // The delivery link is only trustworthy once payment is confirmed - an
   // unpaid or cancelled order must never leak it, matching the route-layer gate.
   const showDeliveryLink = ["confirmed", "shipped", "completed"].includes(order.status)
   const hasDigitalItem = (order.items || []).some((i) => i.delivery_link_snapshot)
@@ -119,12 +119,12 @@ function buildVars(order) {
     payment_note: escapeHtml(order.payment_note || ""),
     shop_name: escapeHtml(SHOP_NAME),
     receiver_info: receiverInfoHtml(order),
-    // Only a ship order has a shipper to pay at the door — a pickup order's
+    // Only a ship order has a shipper to pay at the door - a pickup order's
     // buyer never encounters this fee, so the note would just be confusing.
     shipping_fee_note: order.fulfillment_method === "ship"
       ? `<p style="font-size:12px;color:#888;margin:12px 0 0">Phí ship trả cho shipper khi nhận hàng.</p>`
       : "",
-    // payment_confirmed's "what happens next" line — a pickup order is never
+    // payment_confirmed's "what happens next" line - a pickup order is never
     // "gửi hàng" (shipped), so it gets its own wording pointing at the
     // pickup code/QR instead. A digital order has nothing to ship or pick
     // up, and any order with a digital item alongside physical ones still
@@ -132,7 +132,7 @@ function buildVars(order) {
     prep_note: order.fulfillment_method === "digital"
       ? (showDigitalNote ? digitalNote : "sẽ chuẩn bị và gửi hàng sớm nhất có thể.")
       : order.fulfillment_method === "pickup"
-        ? "sẽ chuẩn bị hàng — mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận." + (showDigitalNote ? ` ${digitalNote}` : "")
+        ? "sẽ chuẩn bị hàng - mang mã QR hoặc mã xác nhận nhận hàng đến sự kiện để nhận." + (showDigitalNote ? ` ${digitalNote}` : "")
         : "sẽ chuẩn bị và gửi hàng sớm nhất có thể." + (showDigitalNote ? ` ${digitalNote}` : ""),
   }
 }
@@ -178,7 +178,7 @@ const DEFAULT_TEMPLATES = {
     subject: "Đơn #{{order_id}} đang chờ thanh toán",
     body_html: wrap(`
       <p style="margin:0 0 12px">Cảm ơn <strong>{{buyer_name}}</strong> đã đặt hàng! <strong>Đơn hàng đang chờ thanh toán</strong>.</p>
-      <p style="margin:0 0 12px">Vui lòng chuyển khoản rồi tải ảnh chuyển khoản lên trang đơn hàng — đơn sẽ chuyển sang <strong>Chờ xác nhận</strong> ngay khi bạn gửi ảnh. Gửi nhầm ảnh cũng không sao, bạn có thể thay ảnh khác sau đó.</p>
+      <p style="margin:0 0 12px">Vui lòng chuyển khoản rồi tải ảnh chuyển khoản lên trang đơn hàng - đơn sẽ chuyển sang <strong>Chờ xác nhận</strong> ngay khi bạn gửi ảnh. Gửi nhầm ảnh cũng không sao, bạn có thể thay ảnh khác sau đó.</p>
       {{items}}
       ${TOTAL_ROW}
       {{shipping_fee_note}}`),
@@ -186,7 +186,7 @@ const DEFAULT_TEMPLATES = {
   payment_confirmed: {
     subject: "Đã xác nhận thanh toán đơn #{{order_id}}",
     body_html: wrap(`
-      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, mình đã xác nhận thanh toán — {{prep_note}}</p>
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, mình đã xác nhận thanh toán - {{prep_note}}</p>
       {{items}}
       ${TOTAL_ROW}`),
   },

@@ -16,7 +16,7 @@ afterAll(async () => {
 })
 
 describe("variant thumbnail_image", () => {
-  it("is never included in images — separate cover, not part of the gallery", async () => {
+  it("is never included in images - separate cover, not part of the gallery", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
     const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
     await repo.replaceVariants(pid, [
@@ -613,7 +613,7 @@ describe("collection scheduling", () => {
     const detail = await repo.getCollectionDetailById(cid)
     expect(detail.status).toBe("active")
     // start_at is a DATETIME column (no fractional seconds), so MySQL
-    // rounds sub-second precision on write — allow up to 1s of drift.
+    // rounds sub-second precision on write - allow up to 1s of drift.
     expect(Math.abs(new Date(detail.start_at).getTime() - future.getTime())).toBeLessThanOrEqual(1000)
   })
 
@@ -659,7 +659,7 @@ describe("collection scheduling", () => {
     expect(publicList.find((c) => c.id === cid).status).toBe("closed")
   })
 
-  it("is idempotent — reading an already-closed-by-expiry collection again does not error or change anything", async () => {
+  it("is idempotent - reading an already-closed-by-expiry collection again does not error or change anything", async () => {
     const past = new Date(Date.now() - 60 * 60 * 1000)
     const cid = await repo.createCollection({ title: "Ended Drop", status: "active", end_at: past })
 
@@ -693,7 +693,7 @@ describe("collection scheduling", () => {
   it("treats a naive-looking ISO string with a Z suffix as an unambiguous UTC instant, not local time", async () => {
     // Pins the contract the frontend now always relies on: normalizeDatetime
     // must never re-interpret an already-unambiguous instant (Z suffix) in
-    // any timezone other than the one it names — UTC. A value like
+    // any timezone other than the one it names - UTC. A value like
     // "2026-09-10T09:00:00.000Z" must always mean 09:00 UTC, regardless of
     // what timezone the Node process running this test happens to be in.
     const isoUtc = "2026-09-10T09:00:00.000Z"

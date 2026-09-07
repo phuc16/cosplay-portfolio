@@ -1,10 +1,10 @@
-# Merch Shop — Plan 3: Payments, Email, QR & Backups
+# Merch Shop - Plan 3: Payments, Email, QR & Backups
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A buyer sees real payment instructions (bank VietQR / Momo / PayPal / COD) chosen by the seller, can upload proof of payment, and receives Vietnamese email at every lifecycle step; the seller confirms payments in the admin, scans a QR at event pickup, and has nightly backups of the order data.
 
-**Architecture:** Three new tables (`payment_settings`, `email_templates`, `email_queue`). VietQR payloads are generated locally as EMVCo TLV strings — no third-party image API — so account details never leave the server and the logic is unit-testable. Email is queued to a table and dispatched by the existing `worker.js` loop with retry, so an SMTP failure can never roll back a committed order. Order QR is derived from the token on demand and never stored.
+**Architecture:** Three new tables (`payment_settings`, `email_templates`, `email_queue`). VietQR payloads are generated locally as EMVCo TLV strings - no third-party image API - so account details never leave the server and the logic is unit-testable. Email is queued to a table and dispatched by the existing `worker.js` loop with retry, so an SMTP failure can never roll back a committed order. Order QR is derived from the token on demand and never stored.
 
 **Tech Stack:** As Plans 1–2, plus `nodemailer` (SMTP), `qrcode` (SVG/PNG generation), `jsqr` (admin camera scanning), and host `cron` + `mysqldump` for backups.
 
@@ -15,7 +15,7 @@
 All Plan 1 and Plan 2 Global Constraints still apply. Additionally:
 
 - **Payment confirmation stays manual.** Admin clicks Confirm. Automatic confirmation (SePay, Momo Business API, PayPal webhooks) is explicitly **out of scope**; `payment_settings` reserves nullable credential columns for it, but no integration ships here. Adding it later must not require changing the order model.
-- **SMTP credentials come from env vars only** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`) — never the database, never the admin UI.
+- **SMTP credentials come from env vars only** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`) - never the database, never the admin UI.
 - **Emails are Vietnamese only.** One template set, no locale dimension.
 - **Email sending never blocks or rolls back an order.** Orders commit first; mail is queued and dispatched separately with retry.
 - **VietQR payloads are built locally** to the EMVCo spec. No external QR image service.
@@ -115,7 +115,7 @@ describe("publicSettings", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- paymentSettings`
-Expected: FAIL — table and module missing.
+Expected: FAIL - table and module missing.
 
 - [ ] **Step 3: Create the migration**
 
@@ -379,7 +379,7 @@ describe("buildVietQrPayload", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- vietqr`
-Expected: FAIL — module missing.
+Expected: FAIL - module missing.
 
 - [ ] **Step 3: Implement the generator**
 
@@ -737,7 +737,7 @@ app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminPayments")())
 Run: `cd backend && DB_PORT=3307 npm test`
 Expected: PASS.
 
-Note: Plan 2 tests that place orders will now fail unless a payment method is enabled. Update those tests' setup to enable `bank` (and `cod` where used) — this is a real behaviour change, not a test workaround.
+Note: Plan 2 tests that place orders will now fail unless a payment method is enabled. Update those tests' setup to enable `bank` (and `cod` where used) - this is a real behaviour change, not a test workaround.
 
 - [ ] **Step 8: Commit**
 
@@ -899,7 +899,7 @@ function buildInstructions(order, settings) {
         addInfo: note,
       })
     } catch (err) {
-      // Misconfiguration must not blank the page — the buyer can still
+      // Misconfiguration must not blank the page - the buyer can still
       // transfer manually using the printed details below.
       console.warn("[PAYMENTS] Không tạo được VietQR:", err.message)
     }
@@ -995,13 +995,13 @@ EOF
 ### Task 5: Payment proof upload
 
 **Files:**
-- Modify: `backend/migrations/` — new `013_add_payment_proof.js`
+- Modify: `backend/migrations/` - new `013_add_payment_proof.js`
 - Modify: `backend/routes/orders.js`, `backend/server.js`
 - Test: `backend/tests/paymentProof.test.js`
 
 **Interfaces:**
 - Adds `orders.payment_proof_url` and `orders.payment_proof_uploaded_at`.
-- `POST /api/orders/:token/proof` — body `{base64}` → `201 {url}`.
+- `POST /api/orders/:token/proof` - body `{base64}` → `201 {url}`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1513,7 +1513,7 @@ git add backend/migrations/014_create_email_templates.js backend/shop/email/temp
 git commit -F - <<'EOF'
 feat(email): add Vietnamese order email templates
 
-Four templates — placed, payment confirmed, shipped, cancelled — shipped as
+Four templates - placed, payment confirmed, shipped, cancelled - shipped as
 polished HTML defaults and stored in a table so the seller can reword them
 without a code change.
 
@@ -1776,7 +1776,7 @@ function getTransport() {
 /**
  * Dispatch queued mail. Rendering happens at send time so a template edit
  * applies to anything still queued. Every failure is contained to its own
- * message — one bad address must not stall the rest of the queue.
+ * message - one bad address must not stall the rest of the queue.
  */
 async function sendQueued(limit = 10) {
   if (!isConfigured()) return { sent: 0, failed: 0, skipped: true }
@@ -2076,7 +2076,7 @@ In `backend/routes/orders.js`, inside the `POST /` handler after a successful `c
       }
 ```
 
-Add the import `const emailQueue = require("../shop/email/queue")`. Note `createOrder` must now also return `id` for a reused order — it already does.
+Add the import `const emailQueue = require("../shop/email/queue")`. Note `createOrder` must now also return `id` for a reused order - it already does.
 
 - [ ] **Step 5: Dispatch from the worker**
 
@@ -2131,7 +2131,7 @@ git commit -F - <<'EOF'
 feat(email): send order mail on lifecycle events
 
 Buyers are emailed when an order is placed, when payment is confirmed, when it
-ships, and when it is cancelled. Completed deliberately sends nothing — the
+ships, and when it is cancelled. Completed deliberately sends nothing - the
 buyer already has the item and another mail is just noise.
 
 Enqueueing happens after the transaction commits and is wrapped so a failure is
@@ -2222,7 +2222,7 @@ function orderUrl(token) {
   return `${SITE_URL()}/order/${token}`
 }
 
-// Derived from the token on demand — never stored, so no disk cost.
+// Derived from the token on demand - never stored, so no disk cost.
 const qrSvg = (text) => QRCode.toString(text, { type: "svg", margin: 1, width: 220 })
 const qrPngBuffer = (text) => QRCode.toBuffer(text, { type: "png", margin: 1, width: 320 })
 
@@ -2416,7 +2416,7 @@ describe("variant deletion guard", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- variantDeleteGuard`
-Expected: FAIL — deletions currently succeed.
+Expected: FAIL - deletions currently succeed.
 
 - [ ] **Step 3: Add the guard**
 
@@ -2501,7 +2501,7 @@ fix(shop): refuse to delete variants with live orders
 Closes the gap recorded in plan 2's self-review. order_items references
 variants with SET NULL, so deleting one preserved the order history, but the
 stock that order had reserved could then never be returned when it was
-cancelled — the inventory would silently drift.
+cancelled - the inventory would silently drift.
 
 Deletion is blocked while any order referencing the variant is pending,
 confirmed or shipped, and allowed once every such order is completed or
@@ -2515,7 +2515,7 @@ EOF
 
 ---
 
-### Task 11: Frontend — payment, proof, QR, admin
+### Task 11: Frontend - payment, proof, QR, admin
 
 **Files:**
 - Modify: `frontend/src/pages/Order.jsx`, `frontend/src/pages/Checkout.jsx`, `frontend/src/api/shop.js`
@@ -2578,12 +2578,12 @@ Render the select from `methods`, and disable submit when `methods.length === 0`
 - [ ] **Step 4: Create the payment instructions component**
 
 Create `frontend/src/components/shop/PaymentInstructions.jsx` rendering, per method:
-- **bank** — bank name, account number, holder, amount, the transfer note prominently, and the VietQR rendered from `vietqr_payload` via a client-side QR component or the `/qr.svg` pattern. Include a copy-to-clipboard button for the account number and the note.
-- **momo** — phone, holder, uploaded QR image if present, amount, note.
-- **paypal** — link button, amount.
-- **cod** — amount due on delivery, no account details.
+- **bank** - bank name, account number, holder, amount, the transfer note prominently, and the VietQR rendered from `vietqr_payload` via a client-side QR component or the `/qr.svg` pattern. Include a copy-to-clipboard button for the account number and the note.
+- **momo** - phone, holder, uploaded QR image if present, amount, note.
+- **paypal** - link button, amount.
+- **cod** - amount due on delivery, no account details.
 
-Always show `payment_note` when present. When `vietqr_payload` is `null`, show the printed details with a line explaining the QR is unavailable — never a blank box.
+Always show `payment_note` when present. When `vietqr_payload` is `null`, show the printed details with a line explaining the QR is unavailable - never a blank box.
 
 - [ ] **Step 5: Add proof upload and QR to the order page**
 
@@ -2595,11 +2595,11 @@ In `frontend/src/pages/Order.jsx`:
 
 - [ ] **Step 6: Create the admin payment settings UI**
 
-Create `frontend/src/components/AdminPaymentSettings.jsx` — toggles per method, the fields each requires, a Momo QR image upload reusing `adminUploadImage`, and the shared payment note. Show the validation message returned by the API rather than inventing client-only rules. Do **not** render the reserved SePay fields; they are not wired to anything.
+Create `frontend/src/components/AdminPaymentSettings.jsx` - toggles per method, the fields each requires, a Momo QR image upload reusing `adminUploadImage`, and the shared payment note. Show the validation message returned by the API rather than inventing client-only rules. Do **not** render the reserved SePay fields; they are not wired to anything.
 
 - [ ] **Step 7: Create the admin email template editor**
 
-Create `frontend/src/components/AdminEmailTemplates.jsx` — one editor per type with subject and body, a visible list of valid placeholders, and a save that surfaces the `400` placeholder error naming the bad token. Include a "restore default" action that repopulates from the shipped default.
+Create `frontend/src/components/AdminEmailTemplates.jsx` - one editor per type with subject and body, a visible list of valid placeholders, and a save that surfaces the `400` placeholder error naming the bad token. Include a "restore default" action that repopulates from the shipped default.
 
 - [ ] **Step 8: Create the admin QR scanner**
 
@@ -2823,7 +2823,7 @@ On the server, add to root's crontab (`crontab -e`):
 
 - [ ] **Step 4: Perform the restore drill**
 
-This is the acceptance criterion — a backup that has never been restored does not count.
+This is the acceptance criterion - a backup that has never been restored does not count.
 
 ```bash
 ./deploy/backup.sh
@@ -2899,8 +2899,8 @@ EOF
 **Type consistency:** money stays integer VND through `buildInstructions`, `vietqr` (which rejects non-integers), and the email formatter; `order_token` is 32 hex chars in `qr.orderUrl`, the scanner regex, and every route; email `type` values match across `DEFAULT_TEMPLATES`, `email_queue.type`, `TRANSITION_EMAILS`, and the admin editor.
 
 **Two manual checks that cannot be automated, and must not be skipped:**
-1. **Task 2 Step 5** — the VietQR must be scanned with a real Vietnamese banking app. Unit tests prove the encoding is self-consistent; only a bank app proves it is correct.
-2. **Task 12 Step 4** — the restore drill.
+1. **Task 2 Step 5** - the VietQR must be scanned with a real Vietnamese banking app. Unit tests prove the encoding is self-consistent; only a bank app proves it is correct.
+2. **Task 12 Step 4** - the restore drill.
 
 **Carried risk:** payment confirmation remains fully manual, so a seller who does not check the admin leaves buyers waiting. Automatic confirmation is the obvious next phase, and the reserved columns plus the method-agnostic confirm step mean adding it will not require changing the order model.
 
@@ -2910,6 +2910,6 @@ EOF
 
 Plan complete and saved to `docs/superpowers/plans/2026-08-07-merch-shop-3-payments.md`. Two execution options:
 
-**1. Subagent-Driven (recommended)** — a fresh subagent per task, review between tasks, fast iteration.
+**1. Subagent-Driven (recommended)** - a fresh subagent per task, review between tasks, fast iteration.
 
-**2. Inline Execution** — execute tasks in this session using executing-plans, batch execution with checkpoints.
+**2. Inline Execution** - execute tasks in this session using executing-plans, batch execution with checkpoints.

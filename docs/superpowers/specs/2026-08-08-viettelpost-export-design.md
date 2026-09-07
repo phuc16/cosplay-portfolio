@@ -1,4 +1,4 @@
-# ViettelPost Export & Shipping Handoff (Phase 5) — Design
+# ViettelPost Export & Shipping Handoff (Phase 5) - Design
 
 ## Context
 
@@ -19,9 +19,9 @@ This phase moves that capability into the shop, where the data is structured.
 
 Two deliverables, in this order:
 
-1. **Shipping export** — generate ViettelPost's import spreadsheet directly from
+1. **Shipping export** - generate ViettelPost's import spreadsheet directly from
    confirmed ship orders, then import the resulting tracking codes back.
-2. **Pickup roster** — a printable list of pickup orders to take to an event,
+2. **Pickup roster** - a printable list of pickup orders to take to an event,
    the offline fallback for when venue wifi fails and the QR scanner cannot load
    an order (a gap the original merch-shop spec explicitly assigned to Phase 5).
 
@@ -30,7 +30,7 @@ business account but has not confirmed whether API access is enabled. The
 spreadsheet path is independently valuable and strictly better than the current
 manual process, so it does not wait on that answer. See Outstanding Questions.
 
-## The ViettelPost Template — Verified Facts
+## The ViettelPost Template - Verified Facts
 
 Read directly from `VTP_mau_excel_don_hang_o.xlsx`, not assumed:
 
@@ -49,12 +49,12 @@ template), and those files import successfully today. ViettelPost therefore
 validates on their side, so the Node writer doing the same is safe and matches
 proven behaviour.
 
-## Order Code — a Security Decision
+## Order Code - a Security Decision
 
 The template's column **B (Mã đơn hàng)** is the only field that can carry an
 identifier back through the round trip, so it must hold something matchable.
 
-The shop has no human-facing order code — only `orders.id` and
+The shop has no human-facing order code - only `orders.id` and
 `orders.order_token`. **`order_token` must never be used here.** It is a
 cryptographically random bearer credential; anyone holding it can open the
 buyer's order page. Writing it into a spreadsheet uploaded to a third party
@@ -73,7 +73,7 @@ be matched back to anything and is what makes today's tracking-code entry manual
 ### Selection
 
 An admin action lists ship orders that are `confirmed` and have **no tracking
-code yet** — precisely the orders awaiting booking. The seller ticks which to
+code yet** - precisely the orders awaiting booking. The seller ticks which to
 include and downloads a ready-to-import `.xlsx`.
 
 ### Per-order field mapping
@@ -99,7 +99,7 @@ hóa** (F), **Trọng lượng** (H), **Loại hàng hóa** (K), and **Thời gi
 (U). Photocard weights are near-identical, so per-product weights would be real
 schema work for no practical gain.
 
-These defaults are **deliberately not persisted** between exports — a settings
+These defaults are **deliberately not persisted** between exports - a settings
 table for four fields that take seconds to retype is not yet justified.
 
 ## Tracking-Code Round Trip
@@ -117,7 +117,7 @@ emails a buyer, four properties are required:
 
 - **Idempotent.** Re-importing the same file changes nothing and re-sends no
   email. Uploading twice after a timeout is the obvious accident.
-- **Per-order isolation.** One bad row cannot abort the batch — the same
+- **Per-order isolation.** One bad row cannot abort the batch - the same
   principle as the existing admin bulk-cancel endpoint.
 - **Reuses `transitionOrder`.** No bypassing the order state machine. Its
   guards, transition rules and shipped-email dispatch stay in force. Nothing in
@@ -125,8 +125,8 @@ emails a buyer, four properties are required:
 - **Never guesses a match.** An unmatched tracking code is reported, never
   applied to a nearby order.
 
-The result screen reports **per-order outcomes with reasons** — updated, skipped,
-or failed — not a blanket success message. The failure this prevents: half the
+The result screen reports **per-order outcomes with reasons** - updated, skipped,
+or failed - not a blanket success message. The failure this prevents: half the
 rows silently failing to match while the seller believes every buyer was
 notified.
 
@@ -136,14 +136,14 @@ A printable page generated per collection before an event, taken to the booth on
 paper.
 
 One row per confirmed pickup order: order code, buyer name, phone, the items
-ordered (product, variant, quantity — what is physically handed over), and
+ordered (product, variant, quantity - what is physically handed over), and
 **whether the order is already paid or the money is collected at handover, with
 the amount**. That last distinction is the point of the document: prepaid and COD
 pickup orders are indistinguishable in a queue, and confusing them means either
 giving merch away or charging a buyer twice. Includes a tick column for marking
 handovers.
 
-Sorted by **buyer name** — at a booth the seller is looking a person up by name,
+Sorted by **buyer name** - at a booth the seller is looking a person up by name,
 not by order code.
 
 Rendered as printable HTML the seller prints from the browser, not a
@@ -160,28 +160,28 @@ name*, which the existing script parses out. That hack is fragile, pollutes the
 name that gets printed on the shipping label, and lets a buyer trigger free
 shipping by typing a word into their own name field.
 
-No other schema change. Everything else the export needs — name, phone,
-structured address, `total`, `cod_amount`, `note`, `tracking_code` — already
+No other schema change. Everything else the export needs - name, phone,
+structured address, `total`, `cod_amount`, `note`, `tracking_code` - already
 exists.
 
 ## Architecture
 
 Following Phase 4's shape, with pure logic separated from I/O:
 
-- **`backend/shop/shipping/vtpMapping.js`** — pure functions mapping an order to
+- **`backend/shop/shipping/vtpMapping.js`** - pure functions mapping an order to
   its VTP row values (service selection, COD, payer, address assembly). No Excel,
   no database. This is where the rules that can be silently wrong live, so it is
-  exhaustively testable in isolation — the same reasoning that split `money.js`
+  exhaustively testable in isolation - the same reasoning that split `money.js`
   out in Phase 4.
-- **`backend/shop/shipping/vtpWorkbook.js`** — loads the bundled template with
+- **`backend/shop/shipping/vtpWorkbook.js`** - loads the bundled template with
   `exceljs`, fills rows from row 8, returns a buffer. The template ships in the
   repo so exports do not depend on a file outside it.
-- **`backend/shop/shipping/trackingImport.js`** — parses uploaded/pasted
+- **`backend/shop/shipping/trackingImport.js`** - parses uploaded/pasted
   tracking pairs and resolves them to orders; pure given its input.
-- **`backend/shop/shipping/roster.js`** — assembles pickup-roster data.
-- **`backend/routes/adminShipping.js`** — routes behind the existing `auth`
+- **`backend/shop/shipping/roster.js`** - assembles pickup-roster data.
+- **`backend/routes/adminShipping.js`** - routes behind the existing `auth`
   middleware, matching every other admin router.
-- **Frontend** — an export view, a tracking-import view with its preview step,
+- **Frontend** - an export view, a tracking-import view with its preview step,
   and a print-oriented roster view, under `frontend/src/components/shipping/`.
 
 Admin UI is hardcoded Vietnamese, matching the established convention.
@@ -190,14 +190,14 @@ Admin UI is hardcoded Vietnamese, matching the established convention.
 
 - **Missing address components.** A ship order may have only `address_raw`
   (autocomplete skipped). Column E falls back to it; an order with no usable
-  address at all is excluded from the export and reported, never exported blank —
+  address at all is excluded from the export and reported, never exported blank -
   a blank address column is a shipment that cannot be delivered.
 - **Province not recognised.** If `address_province` is empty or unrecognised,
   service selection defaults to the inter-province service (`VTK`), the safe
   choice: a wrongly-inter-province shipment costs more, a wrongly-intra-province
   one fails.
 - **COD with a null `cod_amount`.** Reported as an error rather than exported
-  with a blank J — a COD shipment that collects nothing is money lost.
+  with a blank J - a COD shipment that collects nothing is money lost.
 - **Duplicate tracking codes** in one import file are rejected.
 - **An order already shipped** is skipped by the importer with a reason, not
   re-transitioned.
@@ -239,5 +239,5 @@ Both raised by the seller and deliberately deferred:
    `partner.viettelpost.vn` (the v2 API authenticates with portal credentials),
    look for *Tích hợp / Kết nối API* in the business portal, or ask the account
    manager. If available, API booking would replace the manual
-   export-book-import loop — the mapping module built here is the same logic an
+   export-book-import loop - the mapping module built here is the same logic an
    API integration would need, so this phase is not wasted work either way.

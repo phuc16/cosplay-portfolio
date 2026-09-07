@@ -7,7 +7,7 @@ import { ThemeProvider } from "../contexts/ThemeContext"
 import { FAQ_ITEMS } from "../shop/faq"
 import Faq from "./Faq"
 
-// ShopFooter (rendered on every shop page) fetches /api/settings — mocked
+// ShopFooter (rendered on every shop page) fetches /api/settings - mocked
 // here so tests don't attempt a real network call.
 vi.mock("axios", async (importOriginal) => {
   const actual = await importOriginal()

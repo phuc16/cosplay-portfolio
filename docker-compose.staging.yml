@@ -1,4 +1,4 @@
-# Acceptance-test stack — same shape as docker-compose.pull.yml, but:
+# Acceptance-test stack - same shape as docker-compose.pull.yml, but:
 #   - images pulled by the `staging` tag (build+push via
 #     ./scripts/build-push.sh staging from the branch under test), never
 #     `latest`, so this never overlaps with what prod is running

@@ -11,7 +11,7 @@ import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import vietqrLogo from "../assets/vietqr-logo.svg"
 
-// One icon per payment method, shown alongside its label in the picker —
+// One icon per payment method, shown alongside its label in the picker -
 // bank reuses the same VietQR mark already used on the order's payment
 // instructions page, so the two screens read as the same payment. Momo and
 // COD have no bundled brand asset, so they get a lightweight monogram/icon
@@ -47,7 +47,7 @@ const FLAGS_LOADING = { loaded: false, allow_ship: true, allow_pickup: true, pic
 
 /**
  * Derives which fulfillment methods the cart's collection(s) actually offer,
- * reusing the existing public collection endpoint (no new one needed) — the
+ * reusing the existing public collection endpoint (no new one needed) - the
  * same data already shown on the pre-purchase collection page. A cart can in
  * principle span more than one collection, so a method only counts as
  * offered if every collection in the cart offers it; pickup location/note
@@ -126,7 +126,7 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flags.loaded, offered])
 
-  // COD requires a delivery to collect cash at — it does not apply to an
+  // COD requires a delivery to collect cash at - it does not apply to an
   // event pickup, which requires prepayment. The server rejects this
   // combination too (routes/orders.js validate()); this is the UI half.
   const offeredPayment = useMemo(
@@ -141,7 +141,7 @@ export default function Checkout() {
 
   // Stable across retries so a double-tap or a retried submit cannot create
   // two orders holding two reservations. Held in state (not a pure useMemo) so
-  // it can be regenerated if the server ever reports a request_key_conflict —
+  // it can be regenerated if the server ever reports a request_key_conflict -
   // otherwise every retry would resend the same colliding key and get stuck.
   const [requestKey, setRequestKey] = useState(() => generateRequestKey())
 
@@ -158,7 +158,7 @@ export default function Checkout() {
         request_key: requestKey,
       })
       clearCart()
-      // Skips the PIN gate for this one browser session — this is the exact
+      // Skips the PIN gate for this one browser session - this is the exact
       // browser that just placed the order, so re-proving identity with a
       // PIN they haven't even opened the confirmation email for yet would be
       // pure friction. Any other session (a different device, or this one
@@ -171,7 +171,7 @@ export default function Checkout() {
       if (e.response?.data?.error === "request_key_conflict") {
         setRequestKey(generateRequestKey())
       }
-      // A stale cart line — deleted (variant_not_found, one or more ids),
+      // A stale cart line - deleted (variant_not_found, one or more ids),
       // just sold out, or its collection ended between the Cart page's own
       // check and this submit (out_of_stock / collection_not_active, always
       // exactly one id). The server tells us exactly which line(s) to drop;
@@ -234,7 +234,7 @@ export default function Checkout() {
           <fieldset className="mb-4">
             <legend className="text-sm mb-1">{t("checkoutFulfillment")}</legend>
             {/* Only the methods the collection(s) in the cart actually offer are
-                rendered — offering ship/pickup regardless of the collection led
+                rendered - offering ship/pickup regardless of the collection led
                 buyers straight into a 400 the backend correctly rejects. */}
             {offered.map((m) => (
               <label key={m} className="mr-4 text-sm">
@@ -295,7 +295,7 @@ export default function Checkout() {
         {anyDigital && (methods || []).includes("cod") && (
           <p className="text-xs opacity-70 mt-1">{t("checkoutCodUnavailableDigital")}</p>
         )}
-        {/* Stated before the buyer commits — cod never expires, so the
+        {/* Stated before the buyer commits - cod never expires, so the
             notice is only shown for the payment methods that actually
             carry a deadline. */}
         {payment && payment !== "cod" && (

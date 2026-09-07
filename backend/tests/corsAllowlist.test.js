@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from "vitest"
 import request from "supertest"
 
 // server.js reads process.env.SITE_URL at module-load time to build the CORS
-// allowlist, so it must be set before the module is first required — hence
+// allowlist, so it must be set before the module is first required - hence
 // the dynamic import here rather than a static one, and this living in its
 // own file (vitest gives each test file a fresh module registry).
 process.env.SITE_URL = "https://shop.example"

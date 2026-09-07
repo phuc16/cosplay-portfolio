@@ -2,7 +2,7 @@ import axios from "axios"
 
 const SESSION_KEY_PREFIX = "order_access:"
 
-// Must match pages/Admin.jsx's own TOKEN_KEY — duplicated to avoid a circular import.
+// Must match pages/Admin.jsx's own TOKEN_KEY - duplicated to avoid a circular import.
 const ADMIN_TOKEN_KEY = "admin_token"
 // Must match pages/Admin.jsx's own REFRESH_KEY, same reason.
 const ADMIN_REFRESH_KEY = "admin_refresh_token"
@@ -45,11 +45,11 @@ export function clearOrderSessionToken(token) {
 /**
  * Auth header for a gated /api/orders/:token/* call.
  *
- * Priority: (1) an admin session already active THIS tab — the shared axios
+ * Priority: (1) an admin session already active THIS tab - the shared axios
  * instance's request interceptor re-reads axios.defaults.headers.common on
  * every call (see api/api.js), so nothing needs attaching explicitly; (2) an
  * admin_token persisted in localStorage from a previous /admin visit, even
- * if Admin.jsx never mounted this page load — attached explicitly, since
+ * if Admin.jsx never mounted this page load - attached explicitly, since
  * nothing else would; (3) a PIN-verified session token for this order.
  */
 export function orderAuthHeaders(token) {

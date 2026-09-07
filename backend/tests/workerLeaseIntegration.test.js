@@ -6,7 +6,7 @@ import { createLease, LEASE_KEY } from "../workerLease.js"
 import { resetTables } from "./helpers/db.js"
 
 // worker.js's exported `lease` uses the real default LEASE_KEY, shared (via
-// Redis) with any other process/handle using that same key — exactly the
+// Redis) with any other process/handle using that same key - exactly the
 // point of the guard. Always release it and clear the raw key afterwards so
 // this file cannot leak lease state into other test files that import
 // worker.js in the same run.
@@ -26,7 +26,7 @@ async function seedAlbumWithPendingImage() {
   return r.insertId
 }
 
-describe("worker.tick() — multi-process singleton guard (Finding 3)", () => {
+describe("worker.tick() - multi-process singleton guard (Finding 3)", () => {
   it("skips the tick's run() entirely when another instance already holds the lease", async () => {
     await seedAlbumWithPendingImage()
     const other = createLease({ key: LEASE_KEY, ttlMs: 5000 })
@@ -40,7 +40,7 @@ describe("worker.tick() — multi-process singleton guard (Finding 3)", () => {
       expect.stringContaining("SINGLETON LEASE HELD BY ANOTHER INSTANCE")
     )
 
-    // The tick must not have run at all — no thumbnail work, no gallery
+    // The tick must not have run at all - no thumbnail work, no gallery
     // invalidation attempt beyond what already existed.
     const [[img]] = await db.query("SELECT thumb_url FROM images LIMIT 1")
     expect(img.thumb_url).toBeNull()

@@ -8,7 +8,7 @@ const LABELS = {
   cancelled: "Đã hủy đơn",
 }
 
-// Mirrors backend/shop/email/templates.js PLACEHOLDERS — shown so the seller
+// Mirrors backend/shop/email/templates.js PLACEHOLDERS - shown so the seller
 // knows what's available without guessing or reading source.
 const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
@@ -30,7 +30,7 @@ function Editor({ tpl, onSaved }) {
     setSaved(false)
     try {
       // The API validates placeholders (backend/shop/email/templates.js
-      // validatePlaceholders) — the exact message it returns is surfaced
+      // validatePlaceholders) - the exact message it returns is surfaced
       // verbatim rather than re-implemented client-side.
       await adminSaveEmailTemplate(tpl.type, { subject, body_html: body })
       setSaved(true)
@@ -102,7 +102,7 @@ function FailedEmails() {
         {failed.map((row) => (
           <li key={row.id} className="opacity-80">
             Đơn #{row.order_id} · {row.type} · {row.to_email}
-            {row.last_error && <span className="opacity-60"> — {row.last_error}</span>}
+            {row.last_error && <span className="opacity-60"> - {row.last_error}</span>}
           </li>
         ))}
       </ul>

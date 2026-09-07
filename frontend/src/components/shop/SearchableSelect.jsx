@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
 
 /**
- * A styled dropdown that replaces a native <select> — browsers render a
+ * A styled dropdown that replaces a native <select> - browsers render a
  * native select's option list with OS-level UI that ignores almost all app
  * CSS (see the screenshot that prompted this: a plain white list with the
  * browser's own blue highlight, clashing hard with the site's dark theme).
  * Also adds type-to-filter, which a plain <select> has no equivalent for
- * and which matters here specifically — a province can have 100+ wards.
+ * and which matters here specifically - a province can have 100+ wards.
  */
 export default function SearchableSelect({ value, onChange, options, placeholder, disabled, label }) {
   const { t } = useLanguage()

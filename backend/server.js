@@ -19,21 +19,21 @@ const storage = require("./storage")
 const app = express()
 // Production path is client -> host Nginx -> frontend container's Nginx ->
 // this server (see deploy/DEPLOY.md §9.2 and frontend/nginx.conf's /api
-// block) — exactly 2 reverse proxies, each appending its own observed
+// block) - exactly 2 reverse proxies, each appending its own observed
 // address via $proxy_add_x_forwarded_for. Without this, Express (and every
 // req.ip-based rate limiter/lockout below) trusted the leftmost entry of
-// X-Forwarded-For, which is whatever the original client sent — fully
+// X-Forwarded-For, which is whatever the original client sent - fully
 // attacker-controlled, letting a single attacker get a fresh rate-limit
 // bucket on every request. `trust proxy: 2` makes req.ip walk in from the
 // right by exactly that many hops, recovering the real client address
 // regardless of what the client prepends.
 app.set("trust proxy", 2)
 // Images are capped at 50MB decoded (shop/images.js MAX_UPLOAD_BYTES); base64
-// inflates that by ~4/3, plus a little JSON overhead — 70mb comfortably fits
+// inflates that by ~4/3, plus a little JSON overhead - 70mb comfortably fits
 // the largest image this app will ever accept.
 const UPLOAD_LIMIT = "70mb"
 // A VTP result spreadsheet is at most MAX_IMPORT_ROWS (200) data rows of
-// plain text — a few hundred KB even with formatting. 10mb is a generous
+// plain text - a few hundred KB even with formatting. 10mb is a generous
 // ceiling for that, far below the image limit, so a malformed/huge
 // upload here can't be used to bypass the image path's specific tuning.
 const IMPORT_LIMIT = "10mb"
@@ -43,17 +43,17 @@ const importJson = express.json({ limit: IMPORT_LIMIT })
 const smallJson = express.json({ limit: "1mb" })
 
 // This server only ever returns JSON or image bytes, never HTML, so a CSP
-// (meant to constrain a page's own scripts/styles) is inert here — the real
+// (meant to constrain a page's own scripts/styles) is inert here - the real
 // value is the frame/sniff/HSTS headers, so CSP is skipped to avoid a false
 // sense of coverage or a misconfigured directive breaking the storage-proxy
 // image responses. crossOriginResourcePolicy is skipped too: its
 // "same-origin" default is enforced by the browser independently of CORS,
 // and would block <img> loads from /api/storage in local dev (frontend
-// :5173, backend :5000 — two origins) even though that route already sets
+// :5173, backend :5000 - two origins) even though that route already sets
 // its own permissive Access-Control-Allow-Origin for exactly this purpose.
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }))
 
-// SITE_URL is already a required env var (used for email/QR links) — reused
+// SITE_URL is already a required env var (used for email/QR links) - reused
 // here as the CORS allowlist instead of a second var. Falls back to
 // allow-all only when unset, matching the JWT_SECRET warning above, so a
 // missing env var degrades dev ergonomics rather than silently reopening
@@ -72,7 +72,7 @@ app.use((req, res, next) => {
   return smallJson(req, res, next)
 })
 
-// Error handler for payload too large (413) — must be immediately after body-parser
+// Error handler for payload too large (413) - must be immediately after body-parser
 app.use((err, req, res, next) => {
   if (err.type === "entity.too.large") {
     const isTrackingImport = req.path === TRACKING_IMPORT_PREVIEW_PATH
@@ -88,7 +88,7 @@ app.use((err, req, res, next) => {
 
 // Rate limiting (chống DDoS)
 // ipKeyGenerator normalizes an IPv6 address to its /56 subnet before using it
-// as a key — a bare IPv6 address varies too easily (a /64 or larger block is
+// as a key - a bare IPv6 address varies too easily (a /64 or larger block is
 // trivial for one attacker to rotate through) to be a stable per-client key
 // on its own.
 const keyGen = (req) => (req.ip ? ipKeyGenerator(req.ip) : "unknown")
@@ -135,7 +135,7 @@ const storageLimiter = rateLimit({
 // keystroke) from AddressFields.jsx, only once ward+province are picked.
 // 30/phút per IP is generous headroom for a buyer typing/correcting one
 // address, capped independent of whatever limit Goong itself allows in
-// case a script hits the endpoint directly — the key never reaches the
+// case a script hits the endpoint directly - the key never reaches the
 // browser to be extracted and called that way, but the route is public.
 const addressLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -169,7 +169,7 @@ const orderLimiter = rateLimit({
 })
 
 // Payment proof upload: 20/hour per IP. Deliberately separate from
-// orderLimiter — a buyer retrying a rejected/blurry proof photo must not
+// orderLimiter - a buyer retrying a rejected/blurry proof photo must not
 // burn the budget order creation needs, and vice versa. Base64-decodes up to
 // 50MB and hands it to sharp on an unauthenticated route, so this still
 // needs its own ceiling, just a more generous one sized for a few retries.
@@ -204,19 +204,19 @@ const globalLimiter = rateLimit({
 })
 app.use(globalLimiter)
 
-// The buyer's order_token (crypto.randomBytes(16).toString("hex") — see
+// The buyer's order_token (crypto.randomBytes(16).toString("hex") - see
 // shop/orders/domain.js) is the sole credential protecting their order page,
 // and it rides in the URL path on every /order/:token and
 // /api/orders/:token/... request. Redact only that exact 32-hex-char segment
-// before logging — never anything shorter/longer or non-hex, like a numeric
-// order id elsewhere in the path — so this can't be widened into hiding
+// before logging - never anything shorter/longer or non-hex, like a numeric
+// order id elsewhere in the path - so this can't be widened into hiding
 // unrelated path segments.
 const ORDER_TOKEN_RE = /\b[0-9a-f]{32}\b/g
 function redactOrderToken(path) {
   return path.replace(ORDER_TOKEN_RE, "[token]")
 }
 
-// Request logging — one structured JSON line per request
+// Request logging - one structured JSON line per request
 app.use((req, res, next) => {
   const start = process.hrtime.bigint()
   res.on("finish", () => {
@@ -243,7 +243,7 @@ const API_PREFIX = "/api"
 
 
 // LOGIN ADMIN - check env (RAM), no DB + brute force protection
-// No default fallback here (unlike JWT_SECRET/SITE_URL's warn-and-continue) —
+// No default fallback here (unlike JWT_SECRET/SITE_URL's warn-and-continue) -
 // a silently-defaulted admin/admin credential is a well-known password, not
 // a degraded-but-safe mode, so refuse to start instead.
 if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
@@ -255,14 +255,14 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 const LOGIN_MAX_ATTEMPTS = 5
 const LOGIN_LOCKOUT_MINUTES = 15
 
-// Same IPv6-subnet normalization as keyGen above — the login lockout below
+// Same IPv6-subnet normalization as keyGen above - the login lockout below
 // is a hand-rolled rate limit and needs the same protection against an
 // attacker rotating through addresses in one /64 to dodge it.
 function getClientIp(req) {
   return req.ip ? ipKeyGenerator(req.ip) : "unknown"
 }
 
-// Constant-time string comparison — prevents character-by-character timing attacks
+// Constant-time string comparison - prevents character-by-character timing attacks
 function safeEqual(a, b) {
   const ha = crypto.createHash("sha256").update(String(a)).digest()
   const hb = crypto.createHash("sha256").update(String(b)).digest()
@@ -323,7 +323,7 @@ const ACCESS_TOKEN_EXPIRY_SECONDS = 24 * 60 * 60
 const REFRESH_TOKEN_EXPIRY_SECONDS = 30 * 24 * 60 * 60
 
 // Only one admin account exists (env-configured credentials, no user table),
-// so the refresh token needs no owner mapping — its mere presence in Redis
+// so the refresh token needs no owner mapping - its mere presence in Redis
 // with a live TTL is proof it was issued by a real login. 32 random bytes:
 // same entropy floor as order_token, since this is a bearer credential too.
 async function issueRefreshToken() {
@@ -443,7 +443,7 @@ const DEFAULT_SETTINGS = {
   ],
   upcomingEvents: [
     { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "", showPopup: true, imageUrl: "" },
-    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "", showPopup: false, imageUrl: "" },
+    { title: { vi: "AniMate Festival - khách mời", en: "AniMate Festival - guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "", showPopup: false, imageUrl: "" },
     { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "", showPopup: false, imageUrl: "" },
   ],
   contact: {
@@ -463,7 +463,7 @@ const DEFAULT_SETTINGS = {
 }
 
 // Favicon available straight from the HTML <link> (no waiting for the React
-// app to fetch settings). Serves a tiny 64×64 PNG generated from the logo —
+// app to fetch settings). Serves a tiny 64×64 PNG generated from the logo -
 // redirecting to the full-size image made browsers show a placeholder while
 // downloading/decoding a huge webp.
 app.get(`${API_PREFIX}/favicon.png`, publicLimiter, async (req, res) => {
@@ -719,7 +719,7 @@ const JPEG_QUALITY = 85
 // (tách nền) uploads stay transparent; opaque images stay JPEG for size.
 async function processImage(buffer) {
   // Same magic-byte/size sniff every shop upload goes through (shop/images.js)
-  // — portfolio uploads used to hand base64 straight to sharp with no check
+  // - portfolio uploads used to hand base64 straight to sharp with no check
   // beyond the outer JSON body limit.
   validateImageBuffer(buffer)
   const meta = await sharp(buffer).metadata()

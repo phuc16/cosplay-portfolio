@@ -13,7 +13,7 @@ beforeEach(async () => {
   if (refreshKeys.length) await redis.del(...refreshKeys)
 })
 
-// Loose bounds rather than an exact second count — asserts "about 1 day" /
+// Loose bounds rather than an exact second count - asserts "about 1 day" /
 // "about 30 days" without being brittle to the few seconds elapsed between
 // jwt.sign()/redis.set() and this assertion running.
 function expiresWithin(expSeconds, expectedSeconds, toleranceSeconds = 60) {
@@ -56,7 +56,7 @@ describe("POST /api/refresh", () => {
     expect(res.status).toBe(200)
   })
 
-  it("rotates the refresh token — the old one is a single-use credential", async () => {
+  it("rotates the refresh token - the old one is a single-use credential", async () => {
     const login = await request(app).post("/api/login").send(CREDS)
     const first = await request(app).post("/api/refresh").send({ refresh_token: login.body.refresh_token })
     expect(first.status).toBe(200)

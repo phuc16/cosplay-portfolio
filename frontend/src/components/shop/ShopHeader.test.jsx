@@ -32,7 +32,7 @@ const cartLink = (c) => [...c.querySelectorAll("a")].find((a) => a.getAttribute(
 beforeEach(() => localStorage.clear())
 
 describe("ShopHeader", () => {
-  it("renders a link to the cart — the route that was unreachable from inside the shop", async () => {
+  it("renders a link to the cart - the route that was unreachable from inside the shop", async () => {
     const container = await renderHeader()
     expect(cartLink(container)).toBeTruthy()
   })
@@ -69,7 +69,7 @@ describe("ShopHeader", () => {
 
   // The regression that matters. Adding to cart happens on the collection page
   // WITHOUT navigating, so a header that reads localStorage only at mount shows
-  // a stale number until a full reload — which is exactly the bug the old
+  // a stale number until a full reload - which is exactly the bug the old
   // portfolio badge had. This fails against any mount-only read.
   it("updates the count when the cart changes without a remount", async () => {
     const container = await renderHeader()
@@ -87,7 +87,7 @@ describe("ShopHeader", () => {
   })
 })
 
-describe("ShopHeader — language and theme controls", () => {
+describe("ShopHeader - language and theme controls", () => {
   beforeEach(() => localStorage.clear())
 
   it("renders a VI and an EN language button", async () => {

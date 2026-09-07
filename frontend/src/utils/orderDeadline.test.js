@@ -29,7 +29,7 @@ describe("formatDeadline", () => {
 
   it("formats the Asia/Ho_Chi_Minh wall-clock time correctly regardless of the runtime's own timezone", () => {
     // A UTC instant that lands on a different calendar day in Asia/Ho_Chi_Minh
-    // than it does in UTC — proves the +7 offset is applied, not passed
+    // than it does in UTC - proves the +7 offset is applied, not passed
     // through as whatever the test runner's local TZ happens to be.
     const now = new Date("2026-08-09T00:00:00Z")
     const result = formatDeadline("2026-08-09T23:00:00Z", now) // 06:00 on 08/10 in UTC+7
@@ -73,9 +73,9 @@ describe("formatDeadline", () => {
     expect(result.passed).toBe(true)
   })
 
-  it("builds the absolute string from formatToParts field values, not from string layout — proven across several known instants", () => {
+  it("builds the absolute string from formatToParts field values, not from string layout - proven across several known instants", () => {
     // Each case's expectation is derived from the known Asia/Ho_Chi_Minh
-    // wall-clock time, not from re-running toLocaleString — this would have
+    // wall-clock time, not from re-running toLocaleString - this would have
     // caught a flipped date/time order or a non-ASCII separator, since
     // neither can produce the right "HH:mm dd/MM" value by accident.
     const now = new Date("2020-01-01T00:00:00Z")

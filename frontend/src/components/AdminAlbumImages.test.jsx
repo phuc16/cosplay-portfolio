@@ -25,7 +25,7 @@ afterEach(() => {
   window.confirm.mockRestore()
 })
 
-describe("AdminAlbumImages — error handling via the shared api instance", () => {
+describe("AdminAlbumImages - error handling via the shared api instance", () => {
   it("routes reads/writes through the shared api instance (so the refresh interceptor applies) and surfaces a failed delete instead of failing silently", async () => {
     const originalAdapter = api.defaults.adapter
     let deleteCalled = false

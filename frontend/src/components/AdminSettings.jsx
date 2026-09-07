@@ -81,7 +81,7 @@ function ClickUpload({ endpoint, onUrl, children }) {
 /* ── Hero cover preview: drag to pan, wheel/buttons to zoom ──────────────── */
 /* zoom = image height as a multiple of the card height; x/y = offsets in % of
    the preview box (the public hero uses the same formula, so WYSIWYG).
-   One preview per breakpoint — box ratios mirror the real hero card:
+   One preview per breakpoint - box ratios mirror the real hero card:
    desktop 1216×500, tablet ~756×500, mobile ~358×300. cutTop = how far the
    cutout container rises above the card (-84px desktop/tablet, -18px mobile). */
 const DEFAULT_COVER = { zoom: 4.5, x: 0, y: -30 }
@@ -127,14 +127,14 @@ function CoverPreview({ url, cover, onChange, box }) {
         onWheel={(e) => { e.preventDefault(); onChange({ zoom: clampZoom(c.zoom + (e.deltaY < 0 ? 0.2 : -0.2)) }) }}
         className="relative overflow-hidden rounded border border-gray-300 dark:border-cosplay-border cursor-grab active:cursor-grabbing select-none"
         style={{ width: box.w, height: box.h, background: "#080810", touchAction: "none" }}
-        title="Kéo để dịch — lăn chuột hoặc dùng nút +/− để zoom"
+        title="Kéo để dịch - lăn chuột hoặc dùng nút +/− để zoom"
       >
         <img
           src={url} alt="" draggable={false}
           className="absolute pointer-events-none max-w-none"
           style={{ height: `${c.zoom * 100}%`, width: "auto", top: `${c.y}%`, left: `${50 + c.x}%`, transform: "translateX(-50%)" }}
         />
-        {/* The slideshow cutout, rendered where it really sits — anything under it is hidden on the live site */}
+        {/* The slideshow cutout, rendered where it really sits - anything under it is hidden on the live site */}
         <div className="absolute pointer-events-none overflow-hidden" style={{ right: 0, top: `${box.cutTop}%`, bottom: 0, width: "55%" }}>
           <img src={url} alt="" draggable={false} className="max-w-none pointer-events-none"
             style={{ width: "100%", height: "auto", maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }} />
@@ -586,7 +586,7 @@ export default function AdminSettings() {
       <div className={cardCls}>
         <div>
           <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Bảng màu (Color Scheme)</h3>
-          <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5 mb-3.5">Chọn tông màu — áp dụng trực tiếp bên dưới.</p>
+          <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5 mb-3.5">Chọn tông màu - áp dụng trực tiếp bên dưới.</p>
         </div>
         <div className="flex gap-2.5 flex-wrap">
           {Object.entries(COLOR_SCHEMES).map(([key, sc]) => {
@@ -669,7 +669,7 @@ export default function AdminSettings() {
       <div className={cardCls}>
         <div>
           <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Hero Slideshow</h3>
-          <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5 mb-3.5">Mỗi ảnh có một màu accent dùng cho nền gradient (Auto lấy từ ảnh — Manual chọn tay). Khung <b>cover</b> là ảnh nền mờ phía sau hero: kéo để dịch vị trí, lăn chuột / nút +− để zoom.</p>
+          <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5 mb-3.5">Mỗi ảnh có một màu accent dùng cho nền gradient (Auto lấy từ ảnh - Manual chọn tay). Khung <b>cover</b> là ảnh nền mờ phía sau hero: kéo để dịch vị trí, lăn chuột / nút +− để zoom.</p>
         </div>
 
         {/* Per-slot rows */}
@@ -771,16 +771,16 @@ export default function AdminSettings() {
           {heroImagesUploadError && <p className="mt-2 text-sm text-red-400">{heroImagesUploadError}</p>}
         </div>
 
-        {/* Cover is derived automatically from the current hero slide — no upload needed */}
+        {/* Cover is derived automatically from the current hero slide - no upload needed */}
         <p className="text-xs text-gray-500 dark:text-slate-500 border-t border-dashed border-gray-200 dark:border-cosplay-border pt-3">
-          Ảnh nền mờ phía sau tự lấy theo slide đang hiển thị — không cần upload riêng.
+          Ảnh nền mờ phía sau tự lấy theo slide đang hiển thị - không cần upload riêng.
         </p>
       </div>
 
       {/* ── Latest photos (Info dashboard grid) ── */}
       <div className={cardCls}>
         <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Ảnh mới nhất (Latest photos)</h3>
-        <p className="text-xs text-gray-500 dark:text-slate-500">Lưới 2×2 ở cột 1 Info Dashboard. Để trống sẽ tự lấy ảnh từ album/gallery. Kéo thả để sắp xếp — 4 ảnh đầu được hiển thị.</p>
+        <p className="text-xs text-gray-500 dark:text-slate-500">Lưới 2×2 ở cột 1 Info Dashboard. Để trống sẽ tự lấy ảnh từ album/gallery. Kéo thả để sắp xếp - 4 ảnh đầu được hiển thị.</p>
         {(config.latestPhotos || []).length > 0 && (
           <div className="flex flex-wrap gap-2">
             {(config.latestPhotos || []).map((url, i) => (
@@ -813,8 +813,8 @@ export default function AdminSettings() {
           <div key={i} className="flex gap-2 items-start border border-gray-200 dark:border-cosplay-border rounded-md p-2">
             <div className="flex-1 space-y-2">
               <div className="grid grid-cols-2 gap-2">
-                <input type="text" value={a.title?.vi ?? ""} onChange={(e) => updateItem("achievements", i, "title", { ...toLocalizedObj(a.title), vi: e.target.value })} className={inputCls} placeholder="Tiêu đề (VI) — 100+ Cosplay" />
-                <input type="text" value={a.title?.en ?? ""} onChange={(e) => updateItem("achievements", i, "title", { ...toLocalizedObj(a.title), en: e.target.value })} className={inputCls} placeholder="Title (EN) — 100+ Cosplays" />
+                <input type="text" value={a.title?.vi ?? ""} onChange={(e) => updateItem("achievements", i, "title", { ...toLocalizedObj(a.title), vi: e.target.value })} className={inputCls} placeholder="Tiêu đề (VI) - 100+ Cosplay" />
+                <input type="text" value={a.title?.en ?? ""} onChange={(e) => updateItem("achievements", i, "title", { ...toLocalizedObj(a.title), en: e.target.value })} className={inputCls} placeholder="Title (EN) - 100+ Cosplays" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="text" value={a.description?.vi ?? ""} onChange={(e) => updateItem("achievements", i, "description", { ...toLocalizedObj(a.description), vi: e.target.value })} className={inputCls} placeholder="Mô tả (VI)" />
@@ -836,7 +836,7 @@ export default function AdminSettings() {
       {/* ── Footer character ── */}
       <div className={cardCls}>
         <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Nhân vật footer (Footer Character)</h3>
-        <p className="text-xs text-gray-500 dark:text-slate-500">Ảnh PNG trong suốt, dọc — hiện ở góc dưới phải trang. Để trống để ẩn.</p>
+        <p className="text-xs text-gray-500 dark:text-slate-500">Ảnh PNG trong suốt, dọc - hiện ở góc dưới phải trang. Để trống để ẩn.</p>
         <ImageUpload
           endpoint="/api/upload/hero"
           imageUrl={config.footerChar}
@@ -892,11 +892,11 @@ export default function AdminSettings() {
               <input type="text" value={ev.title?.en ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "title", { ...toLocalizedObj(ev.title), en: e.target.value })} className={inputCls} placeholder="Event title (EN)" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <input type="text" value={ev.date?.vi ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "date", { ...toLocalizedObj(ev.date), vi: e.target.value })} className={inputCls} placeholder="Ngày (VI) — 15 Th8, 2026" />
-              <input type="text" value={ev.date?.en ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "date", { ...toLocalizedObj(ev.date), en: e.target.value })} className={inputCls} placeholder="Date (EN) — Aug 15, 2026" />
+              <input type="text" value={ev.date?.vi ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "date", { ...toLocalizedObj(ev.date), vi: e.target.value })} className={inputCls} placeholder="Ngày (VI) - 15 Th8, 2026" />
+              <input type="text" value={ev.date?.en ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "date", { ...toLocalizedObj(ev.date), en: e.target.value })} className={inputCls} placeholder="Date (EN) - Aug 15, 2026" />
             </div>
             <div className="flex gap-2 items-center">
-              <input type="text" value={ev.url || ""} onChange={(e) => updateItem("upcomingEvents", i, "url", e.target.value)} className={`${inputCls} flex-1`} placeholder="Link sự kiện (tùy chọn) — để trống nếu không có" />
+              <input type="text" value={ev.url || ""} onChange={(e) => updateItem("upcomingEvents", i, "url", e.target.value)} className={`${inputCls} flex-1`} placeholder="Link sự kiện (tùy chọn) - để trống nếu không có" />
               <button type="button" onClick={() => removeItem("upcomingEvents", i)} className="text-red-400 hover:text-red-300 shrink-0">×</button>
             </div>
             {ev.showPopup && (
@@ -952,7 +952,7 @@ export default function AdminSettings() {
         </div>
         <div>
           <label className={labelCls}>Liên hệ nhanh (Zalo / WhatsApp / Messenger)</label>
-          <p className="text-xs text-gray-500 dark:text-slate-500 mb-2">Nhập số điện thoại hoặc dán link. Số điện thoại KHÔNG hiển thị công khai — chỉ dùng để tạo nút bấm.</p>
+          <p className="text-xs text-gray-500 dark:text-slate-500 mb-2">Nhập số điện thoại hoặc dán link. Số điện thoại KHÔNG hiển thị công khai - chỉ dùng để tạo nút bấm.</p>
           {(config.contact?.contactLinks || []).map((item, i) => (
             <div key={i} className="flex gap-2 items-center mb-2 flex-wrap">
               <select value={item?.type ?? "zalo"} onChange={(e) => updateItem("contact.contactLinks", i, "type", e.target.value)} className={`${inputCls} w-32`}>
@@ -972,7 +972,7 @@ export default function AdminSettings() {
       {/* ── Social links (fixed platform list) ── */}
       <div className={cardCls}>
         <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Social links</h3>
-        <p className="text-xs text-gray-500 dark:text-slate-500">Danh sách nền tảng cố định — chỉ điền URL. Để trống để ẩn nút đó.</p>
+        <p className="text-xs text-gray-500 dark:text-slate-500">Danh sách nền tảng cố định - chỉ điền URL. Để trống để ẩn nút đó.</p>
         {FIXED_SOCIAL_PLATFORMS.map(({ key, label }) => {
           const stored = (config.contact?.social || []).find(
             (s) => (s.platform || "").toLowerCase() === key

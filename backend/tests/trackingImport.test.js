@@ -72,7 +72,7 @@ describe("extractPairsFromSheetRows", () => {
     expect(extractPairsFromSheetRows([["A", "B"], [1, 2]])).toEqual([])
   })
 
-  it("finds the header row even when it isn't row 0 — VTP's own export has letterhead rows above it", () => {
+  it("finds the header row even when it isn't row 0 - VTP's own export has letterhead rows above it", () => {
     const rows2D = [
       [null, null, "TẬP ĐOÀN CÔNG NGHIỆP - VIỄN THÔNG QUÂN ĐỘI"],
       [null, null, null, " DANH SÁCH ĐƠN HÀNG"],
@@ -164,7 +164,7 @@ describe("resolvePreview", () => {
     expect(skipped[1].reason).toBe("not_confirmed")
   })
 
-  it("rejects duplicate tracking codes within the same file — neither row is applied", () => {
+  it("rejects duplicate tracking codes within the same file - neither row is applied", () => {
     const other = { id: 2, status: "confirmed", fulfillment_method: "ship", created_at: CREATED_AT }
     const { toApply, skipped } = resolvePreview(
       [
@@ -178,7 +178,7 @@ describe("resolvePreview", () => {
     expect(skipped.every((s) => s.reason === "duplicate_tracking_code")).toBe(true)
   })
 
-  it("rejects duplicate order codes with different tracking codes — neither row is applied", () => {
+  it("rejects duplicate order codes with different tracking codes - neither row is applied", () => {
     const order12 = { id: 12, status: "confirmed", fulfillment_method: "ship", created_at: CREATED_AT }
     const { toApply, skipped } = resolvePreview(
       [
@@ -225,7 +225,7 @@ describe("resolvePreview", () => {
   it("idempotency: re-running preview against orders already moved to shipped changes nothing", () => {
     // Simulates re-uploading the same file after a successful import: every
     // order is now 'shipped', so every row is skipped as already_shipped,
-    // and toApply is empty — a second confirm would send no new emails.
+    // and toApply is empty - a second confirm would send no new emails.
     const rows = [{ order_code: codeOf(shippedOrder), tracking_code: "VTP001" }]
     const { toApply, skipped } = resolvePreview(rows, byCode(shippedOrder))
     expect(toApply).toEqual([])
@@ -242,7 +242,7 @@ describe("resolvePreview", () => {
     expect(skipped).toEqual([{ order_code: code, tracking_code: "VTP001", reason: "not_shippable", message: expect.any(String) }])
   })
 
-  it("processes multiple valid rows independently — one bad row does not affect a good one", () => {
+  it("processes multiple valid rows independently - one bad row does not affect a good one", () => {
     const code = codeOf(confirmedOrder)
     const { toApply, skipped } = resolvePreview(
       [

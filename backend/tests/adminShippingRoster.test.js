@@ -9,7 +9,7 @@ import orders from "../shop/orders/orderRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 // The route file (`../routes/adminShipping.js`) is CommonJS and does
-// `require("../db")` — grab the exact same cached CJS module.exports object
+// `require("../db")` - grab the exact same cached CJS module.exports object
 // here (rather than the ESM-interop `db` import above) so spying on `.query`
 // actually observes the route's real calls.
 const cjsDb = createRequire(import.meta.url)("../db.js")
@@ -82,7 +82,7 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
   it("reports a COD pickup order with a missing cod_amount as excluded, not a ₫0 row", async () => {
     const { collectionId, orderId } = await seedPickupOrder({ payment_method: "cod" })
     // createOrder() defaults cod_amount to the order total for payment_method
-    // 'cod' — force the missing-amount case this test is actually named for.
+    // 'cod' - force the missing-amount case this test is actually named for.
     await db.query("UPDATE orders SET cod_amount = NULL WHERE id = ?", [orderId])
     const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
     expect(res.body.rows).toEqual([])
@@ -104,13 +104,13 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
   // --- status must genuinely reach buildRoster ---
   // The route's WHERE clause already limits results to status='confirmed', so
   // a COD order that had somehow already been marked 'completed' can only show
-  // up here still carrying 'confirmed'-shaped data in the DB — this test
+  // up here still carrying 'confirmed'-shaped data in the DB - this test
   // instead proves the *plumbing*: if the route stopped selecting/passing
   // `status`, buildRoster would see `order.status === undefined`, which is
   // never "completed", so the `paid` guard would fall through to
   // PREPAID_METHODS only. For a bank-paid order that happens to match either
   // way, so we assert the row actually carries paid:true and amount_due:0 for
-  // a prepaid method AND that a COD order's due amount is untouched — the
+  // a prepaid method AND that a COD order's due amount is untouched - the
   // combination is only meaningful once we also directly unit-test that the
   // route's SQL selects `status`.
   it("a COD pickup order with a real cod_amount is collected, and a prepaid one shows paid, not collect", async () => {
@@ -150,7 +150,7 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
 
     expect(ordersCall).toBeDefined()
     // Check the SELECT column list specifically, not just anywhere in the
-    // query text — the WHERE clause's `status = 'confirmed'` also contains
+    // query text - the WHERE clause's `status = 'confirmed'` also contains
     // the word "status", so a naive whole-string match would stay green even
     // if `status` were dropped from the SELECT list.
     const selectClause = ordersCall[0].slice(0, ordersCall[0].indexOf("FROM orders"))

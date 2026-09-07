@@ -43,7 +43,7 @@ beforeEach(() => {
   axios.post.mockReset()
 })
 
-describe("Admin — session persistence", () => {
+describe("Admin - session persistence", () => {
   it("shows the login form when there is no saved token", async () => {
     const container = await renderAdmin()
     expect(container.textContent).toContain("Đăng nhập Admin")

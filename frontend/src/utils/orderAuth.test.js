@@ -24,7 +24,7 @@ describe("hasAdminSession", () => {
 
   // Regression: a buyer's order link opened directly (never having visited
   // /admin in this tab/page-load) has admin_token in localStorage but no
-  // in-memory axios header — caught live via devtools showing admin_token
+  // in-memory axios header - caught live via devtools showing admin_token
   // present while the PIN gate still rendered.
   it("is true from a persisted admin_token alone, with no in-memory header set", () => {
     localStorage.setItem("admin_token", "persisted-token")

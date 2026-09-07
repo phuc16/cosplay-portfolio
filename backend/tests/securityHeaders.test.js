@@ -37,7 +37,7 @@ describe("CORS", () => {
 describe("client IP resolution (rate limiting / login lockout)", () => {
   it("ignores a client-supplied X-Forwarded-For prefix and trusts only the configured proxy hop count", async () => {
     // With `trust proxy: 2` (server.js), req.ip is derived by walking in 2
-    // hops from the socket peer — a spoofed leftmost entry must not become
+    // hops from the socket peer - a spoofed leftmost entry must not become
     // req.ip, or every rate limiter/login lockout keyed on it is trivially
     // bypassable by sending a new fake IP on every request. The request
     // logger logs getClientIp(req) directly, so spying on it is the

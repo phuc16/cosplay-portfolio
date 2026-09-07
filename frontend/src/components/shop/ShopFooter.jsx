@@ -6,7 +6,7 @@ import { getLocalized } from "../../utils/localize"
 
 /**
  * Copyright/license notice shown on every shop-facing page (/shop,
- * /shop/:slug, /cart, /checkout, /order/:token) — same page list ShopHeader
+ * /shop/:slug, /cart, /checkout, /order/:token) - same page list ShopHeader
  * covers. Fetches its own artistName rather than taking it as a prop, since
  * the shop is a separate page tree with no shared layout to hoist it into.
  */

@@ -81,7 +81,7 @@ describe("POST /api/orders/:token/proof", () => {
     const oversized = Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0)
     oversized[0] = 0xff
     oversized[1] = 0xd8
-    oversized[2] = 0xff // valid jpeg magic bytes — must fail on size, not type
+    oversized[2] = 0xff // valid jpeg magic bytes - must fail on size, not type
 
     const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`))
       .send({ base64: oversized.toString("base64") })
@@ -128,7 +128,7 @@ describe("POST /api/orders/:token/proof", () => {
   })
 
   // Proof upload used to share orderLimiter's "rl:order:" bucket with order
-  // creation — a buyer retrying a rejected photo could exhaust the 10/hour
+  // creation - a buyer retrying a rejected photo could exhaust the 10/hour
   // budget that order creation needs, and vice versa. It now has its own
   // "rl:proof:" bucket, verified here by checking which Redis keys the
   // limiter actually writes to.
@@ -143,7 +143,7 @@ describe("POST /api/orders/:token/proof", () => {
   })
 })
 
-describe("GET /api/orders/:token — has_payment_proof", () => {
+describe("GET /api/orders/:token - has_payment_proof", () => {
   it("is false before any proof is uploaded", async () => {
     const o = await seedOrder()
     const res = await authed(request(app).get(`/api/orders/${o.order_token}`))
@@ -158,7 +158,7 @@ describe("GET /api/orders/:token — has_payment_proof", () => {
     const res = await authed(request(app).get(`/api/orders/${o.order_token}`))
     expect(res.body.has_payment_proof).toBe(true)
     // The buyer sees the same image on every visit, not just the upload
-    // session — same URL the upload response returned.
+    // session - same URL the upload response returned.
     expect(res.body.payment_proof_url).toBe(uploaded.body.url)
   })
 })

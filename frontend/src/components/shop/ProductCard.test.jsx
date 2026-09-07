@@ -39,7 +39,7 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-// The per-card pill list was removed — opening any variant's detail now goes
+// The per-card pill list was removed - opening any variant's detail now goes
 // through the "click the card -> full gallery -> pick a thumbnail" flow. A
 // single-variant product skips the gallery and lands on the detail modal
 // directly from the card click, so there is no thumbnail to click there.
@@ -51,7 +51,7 @@ async function openVariantDetail(container, label) {
   if (thumb) await act(async () => { thumb.click() })
 }
 
-describe("ProductCard — variant description", () => {
+describe("ProductCard - variant description", () => {
   it("renders a variant's own markdown description in its detail modal", async () => {
     const product = baseProduct({
       variants: [{ id: 1, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg", description: "**Size chart** here" }],
@@ -83,7 +83,7 @@ describe("isSoldOut (per-variant)", () => {
   })
 })
 
-describe("ProductCard — sold-out overlay", () => {
+describe("ProductCard - sold-out overlay", () => {
   it("shows a 'Sold out' overlay on the cover when every variant is sold out", async () => {
     const product = baseProduct({
       variants: [
@@ -106,7 +106,7 @@ describe("ProductCard — sold-out overlay", () => {
   })
 })
 
-describe("ProductCard — variant thumbnail_image", () => {
+describe("ProductCard - variant thumbnail_image", () => {
   it("uses a variant's own thumbnail_image as its gallery-grid cover, not its own photo", async () => {
     const product = baseProduct({
       variants: [
@@ -132,7 +132,7 @@ describe("ProductCard — variant thumbnail_image", () => {
     expect(dialog.querySelector('img[src="https://x/a1.jpg"]')).toBeTruthy()
   })
 
-  it("is never used as the detail modal's own picture — only variantImages (images/image_url) appear there", async () => {
+  it("is never used as the detail modal's own picture - only variantImages (images/image_url) appear there", async () => {
     const product = baseProduct({
       variants: [{ id: 1, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg", thumbnail_image: "https://x/a1-thumb.jpg" }],
     })
@@ -145,7 +145,7 @@ describe("ProductCard — variant thumbnail_image", () => {
   })
 })
 
-describe("ProductCard — variant detail modal", () => {
+describe("ProductCard - variant detail modal", () => {
   it("opens the detail modal showing the variant's own photo when picked from the gallery", async () => {
     const { container } = await renderCard()
     await openVariantDetail(container, "A1")
@@ -174,7 +174,7 @@ describe("ProductCard — variant detail modal", () => {
     expect(readCart()[0].variant_id).toBe(1)
     expect(onAdded).toHaveBeenCalledWith("A1")
 
-    // Back at the picker, not closed — so the buyer can add another code
+    // Back at the picker, not closed - so the buyer can add another code
     // right away instead of re-opening the product from the collection page.
     const dialog = container.querySelector('[role="dialog"]')
     expect(dialog).toBeTruthy()
@@ -219,7 +219,7 @@ describe("ProductCard — variant detail modal", () => {
   })
 })
 
-describe("ProductCard — quantity in the detail modal", () => {
+describe("ProductCard - quantity in the detail modal", () => {
   it("defaults to qty 1 and adds that quantity to cart", async () => {
     const { container } = await renderCard()
     await openVariantDetail(container, "A1")
@@ -316,7 +316,7 @@ describe("digital products", () => {
     ...overrides,
   })
 
-  it("has no variant picker — opens straight to add-to-cart", async () => {
+  it("has no variant picker - opens straight to add-to-cart", async () => {
     const { container } = await renderCard({ product: digitalProduct() })
     const cover = container.querySelector('img[src="https://x/cover.jpg"]')
     await act(async () => { cover.click() })
@@ -350,7 +350,7 @@ describe("digital products", () => {
   })
 })
 
-describe("ProductCard — full variant gallery", () => {
+describe("ProductCard - full variant gallery", () => {
   it("clicking anywhere on the card (cover image) opens the full gallery of all variants", async () => {
     const { container } = await renderCard()
     const cover = container.querySelector('img[src="https://x/cover.jpg"]')
@@ -423,7 +423,7 @@ describe("ProductCard — full variant gallery", () => {
     expect(dialog.querySelector("button")?.textContent).not.toBe("Close")
   })
 
-  it("still opens the picker from a card click when the collection is closed (not orderable) — browsing is allowed, buying isn't", async () => {
+  it("still opens the picker from a card click when the collection is closed (not orderable) - browsing is allowed, buying isn't", async () => {
     const { container } = await renderCard({ orderable: false })
     const cover = container.querySelector('img[src="https://x/cover.jpg"]')
     await act(async () => { cover.click() })

@@ -23,7 +23,7 @@ const homeIcon = (
 )
 
 // Same glyph as the portfolio's shopping icon, but here it only ever points
-// at /cart — the shop itself is reached via the text link beside it, so
+// at /cart - the shop itself is reached via the text link beside it, so
 // there is no second destination for it to be mistaken for.
 const cartIcon = (
   <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,7 +35,7 @@ const cartIcon = (
  * Header shown on every shop-facing page (/shop, /shop/:slug, /cart,
  * /checkout, /order/:token). The cart count is read from localStorage on
  * mount and then kept live by subscribing to cart.js's writer notifications
- * — a mount-only read would go stale the moment an item is added on the
+ * - a mount-only read would go stale the moment an item is added on the
  * collection page without a navigation happening.
  */
 export default function ShopHeader() {

@@ -31,7 +31,7 @@ describe("processShopImage", () => {
     const out = await processShopImage(await pngFixture(400, 400))
     const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true })
     const cornerOffset = (info.height - 5) * info.width * info.channels + (info.width - 5) * info.channels
-    // WebP is lossy, so allow the couple-of-levels rounding it introduces —
+    // WebP is lossy, so allow the couple-of-levels rounding it introduces -
     // this is checking "no watermark box painted here", not exact color.
     expect(data[cornerOffset]).toBeCloseTo(200, -1)
     expect(data[cornerOffset + 1]).toBeCloseTo(40, -1)

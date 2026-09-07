@@ -11,7 +11,7 @@ function order(over = {}) {
   }
 }
 
-describe("buildRoster — completed orders never show money owing", () => {
+describe("buildRoster - completed orders never show money owing", () => {
   // A completed pickup order was handed over at the booth, and for COD that
   // means the buyer already paid then. Printing it as owing money would have
   // the seller charge them a second time. The route also filters to
@@ -44,7 +44,7 @@ describe("buildRoster — completed orders never show money owing", () => {
   })
 })
 
-describe("buildRoster — paid vs collect-at-handover", () => {
+describe("buildRoster - paid vs collect-at-handover", () => {
   it("marks a prepaid order as paid with amount_due 0", () => {
     const { rows } = buildRoster([order({ payment_method: "momo" })])
     expect(rows[0].paid).toBe(true)
@@ -67,7 +67,7 @@ describe("buildRoster — paid vs collect-at-handover", () => {
   })
 })
 
-describe("buildRoster — items", () => {
+describe("buildRoster - items", () => {
   it("maps each order's item snapshots to product_name/variant_label/qty/image_url", () => {
     const { rows } = buildRoster([order({
       items: [
@@ -87,7 +87,7 @@ describe("buildRoster — items", () => {
   })
 })
 
-describe("buildRoster — sorting", () => {
+describe("buildRoster - sorting", () => {
   it("sorts rows by buyer_name ascending, Vietnamese-locale aware", () => {
     const { rows } = buildRoster([
       order({ id: 1, buyer_name: "Trần Văn B" }),
@@ -98,14 +98,14 @@ describe("buildRoster — sorting", () => {
   })
 })
 
-describe("buildRoster — pickup_code", () => {
+describe("buildRoster - pickup_code", () => {
   it("includes pickup_code on every row", () => {
     const { rows } = buildRoster([order({ pickup_code: "482913" })])
     expect(rows[0].pickup_code).toBe("482913")
   })
 })
 
-describe("buildRoster — prepared", () => {
+describe("buildRoster - prepared", () => {
   it("includes prepared, coerced to a boolean, on every row", () => {
     const { rows } = buildRoster([order({ id: 1, prepared: 1 }), order({ id: 2, prepared: 0 })])
     expect(rows.map((r) => r.prepared)).toEqual([true, false])
@@ -117,7 +117,7 @@ describe("buildRoster — prepared", () => {
   })
 })
 
-describe("buildRoster — empty input", () => {
+describe("buildRoster - empty input", () => {
   it("returns empty rows and excluded for no orders", () => {
     expect(buildRoster([])).toEqual({ rows: [], excluded: [] })
   })

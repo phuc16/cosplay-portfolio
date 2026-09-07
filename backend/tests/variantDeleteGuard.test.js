@@ -88,7 +88,7 @@ describe("variant deletion guard", () => {
   // Regression test for the TOCTOU race: replaceVariants used to check for
   // live orders on an unlocked read BEFORE opening its delete transaction, so
   // a checkout could commit a brand-new order against a variant in between
-  // that check passing and the DELETE committing — reproducing the exact bug
+  // that check passing and the DELETE committing - reproducing the exact bug
   // the guard exists to prevent, just via a race window instead of a
   // straightforward miss. The fix moves the check inside the transaction,
   // behind a `FOR UPDATE` on the variant row, so the two calls serialize on

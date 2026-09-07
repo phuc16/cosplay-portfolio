@@ -4,7 +4,7 @@ import { formatVnd } from "../../utils/money"
 import { STATUS_LABELS } from "../../admin/orderLabels"
 
 function formatPercent(ratio) {
-  if (ratio === null || ratio === undefined) return "—"
+  if (ratio === null || ratio === undefined) return "-"
   return `${Math.round(ratio * 1000) / 10}%`
 }
 
@@ -63,7 +63,7 @@ export default function StatsDrop() {
             onChange={(e) => { setStats(null); setCollectionId(e.target.value) }}
             className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
           >
-            <option value="">— Chọn một bộ sưu tập —</option>
+            <option value="">- Chọn một bộ sưu tập -</option>
             {collections.map((c) => (
               <option key={c.id} value={c.id}>{c.title}</option>
             ))}
@@ -90,7 +90,7 @@ export default function StatsDrop() {
         ) : (
           <>
             <div className="mb-4">
-              {/* Received is the figure the seller actually cares about — made
+              {/* Received is the figure the seller actually cares about - made
                   dominant. No figure is removed, renamed, or recomputed: the
                   same five values render below, just at unequal visual weight. */}
               <div className="p-4 rounded-xl border border-[var(--border-success)] bg-[var(--surface-success)] mb-3">
@@ -127,12 +127,12 @@ export default function StatsDrop() {
             <p className="mb-4 text-sm">
               Tỷ lệ hết hạn:{" "}
               {stats.expiry_rate === null
-                ? "— (không có đơn trả trước)"
+                ? "- (không có đơn trả trước)"
                 : `${formatPercent(stats.expiry_rate)} (${stats.expired_order_count}/${stats.prepaid_order_count} đơn trả trước)`}
             </p>
 
             <p className="mb-2 text-xs opacity-60">
-              Tỷ lệ bán hết được tính trên số lượng tồn kho hiện tại, không phải tồn kho gốc — nếu
+              Tỷ lệ bán hết được tính trên số lượng tồn kho hiện tại, không phải tồn kho gốc - nếu
               admin đã nhập thêm hàng giữa đợt bán, tỷ lệ này sẽ thay đổi theo.
             </p>
 
@@ -155,13 +155,13 @@ export default function StatsDrop() {
                       <td className="pr-2 py-1">{v.variant_label}</td>
                       <td className="pr-2 py-1">{v.sold}</td>
                       <td className="pr-2 py-1">
-                        {v.deleted ? "—" : v.unlimited ? "không giới hạn" : v.remaining}
+                        {v.deleted ? "-" : v.unlimited ? "không giới hạn" : v.remaining}
                       </td>
                       <td className="pr-2 py-1">
-                        {v.deleted ? "—" : v.unlimited ? "không giới hạn" : formatPercent(v.sell_through)}
+                        {v.deleted ? "-" : v.unlimited ? "không giới hạn" : formatPercent(v.sell_through)}
                       </td>
                       <td className="py-1">
-                        {v.time_to_sellout_days === null ? "—" : `${Math.ceil(v.time_to_sellout_days)} ngày`}
+                        {v.time_to_sellout_days === null ? "-" : `${Math.ceil(v.time_to_sellout_days)} ngày`}
                       </td>
                     </tr>
                   ))}

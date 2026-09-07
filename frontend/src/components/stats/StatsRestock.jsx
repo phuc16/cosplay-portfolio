@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { adminListCollections, adminGetRestockStats, adminDownloadRestockStatsCsv } from "../../api/shop"
 
 function formatPercent(ratio) {
-  if (ratio === null || ratio === undefined) return "—"
+  if (ratio === null || ratio === undefined) return "-"
   return `${Math.round(ratio * 1000) / 10}%`
 }
 
@@ -46,10 +46,10 @@ export default function StatsRestock() {
     <div>
       <p className="text-sm opacity-70 mb-3">
         Vận tốc bán = số lượng đã bán ÷ số ngày mở bán. Danh sách được sắp xếp theo vận tốc, nhanh
-        nhất trước — đây là gợi ý nên in thêm gì và nên dừng in gì.
+        nhất trước - đây là gợi ý nên in thêm gì và nên dừng in gì.
       </p>
       <p className="mb-4 text-xs opacity-60">
-        Lưu ý: một khi một phân loại đã bán hết, nhu cầu thực tế sau đó không còn hiển thị được —
+        Lưu ý: một khi một phân loại đã bán hết, nhu cầu thực tế sau đó không còn hiển thị được -
         không ai đặt được đơn nữa để tính vào số liệu. Thời gian bán hết chỉ là ước lượng tốt nhất,
         không phải nhu cầu thật.
       </p>
@@ -62,7 +62,7 @@ export default function StatsRestock() {
             onChange={(e) => setCollectionId(e.target.value)}
             className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
           >
-            <option value="">— Tất cả bộ sưu tập —</option>
+            <option value="">- Tất cả bộ sưu tập -</option>
             {collections.map((c) => (
               <option key={c.id} value={c.id}>{c.title}</option>
             ))}
@@ -109,7 +109,7 @@ export default function StatsRestock() {
                     {v.unlimited ? "không giới hạn" : formatPercent(v.sell_through)}
                   </td>
                   <td className="py-1">
-                    {v.time_to_sellout_days === null ? "—" : `${Math.ceil(v.time_to_sellout_days)} ngày`}
+                    {v.time_to_sellout_days === null ? "-" : `${Math.ceil(v.time_to_sellout_days)} ngày`}
                   </td>
                 </tr>
               ))}

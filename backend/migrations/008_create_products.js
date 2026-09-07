@@ -12,7 +12,7 @@ exports.up = function (knex) {
     table.string("name").notNullable()
     table.text("description")
 
-    // VND has no minor unit — integer avoids float rounding entirely.
+    // VND has no minor unit - integer avoids float rounding entirely.
     table.integer("price").unsigned().notNullable().defaultTo(0)
 
     // Array of storage proxy URLs, e.g. ["/api/storage/shop/products/1/abc.webp"]

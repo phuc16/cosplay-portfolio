@@ -46,7 +46,7 @@ export default function AdminPaymentSettings() {
     setError("")
     setSaved(false)
     try {
-      // The API is the single source of truth for validity — no client-side
+      // The API is the single source of truth for validity - no client-side
       // rule duplication, whatever it rejects is shown verbatim.
       await adminSavePaymentSettings(settings)
       setSaved(true)
@@ -129,14 +129,14 @@ export default function AdminPaymentSettings() {
         {(() => {
           // The QR's own field only fits VIETQR_INFO_MAX_LEN plain-ASCII
           // characters (diacritics/punctuation are stripped before
-          // counting) — banking apps show this exact truncated text, not
+          // counting) - banking apps show this exact truncated text, not
           // the raw note, so warn here rather than let it silently clip.
           const sanitized = sanitizeVietQrInfo(settings.payment_note)
           const isTruncated = willTruncateInVietQr(settings.payment_note)
           return (
             <p className={"text-xs mt-1 " + (isTruncated ? "text-[var(--text-error)]" : "opacity-60")}>
               Trong mã QR: "{sanitized}" ({sanitized.length}/{VIETQR_INFO_MAX_LEN} ký tự
-              {isTruncated ? " — có thể bị cắt bớt, hãy rút ngắn ghi chú" : ""})
+              {isTruncated ? " - có thể bị cắt bớt, hãy rút ngắn ghi chú" : ""})
             </p>
           )
         })()}

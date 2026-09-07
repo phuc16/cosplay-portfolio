@@ -4,20 +4,20 @@
 
 **Goal:** Replace the auto-generated per-order transfer code with a single admin-set sentence (reusing the existing `payment_note` setting), shown as the transfer-content row for bank/momo and embedded as the VietQR `addInfo`.
 
-**Architecture:** Delete `instructions.js`'s `transferNote()` code-generator; source the same `note` variable from `settings.payment_note` instead. No schema change, no new settings field. Frontend's `Row` component already hides on a falsy value, so "hide when blank" needs no new code — only the footer-duplication guard needs a change.
+**Architecture:** Delete `instructions.js`'s `transferNote()` code-generator; source the same `note` variable from `settings.payment_note` instead. No schema change, no new settings field. Frontend's `Row` component already hides on a falsy value, so "hide when blank" needs no new code - only the footer-duplication guard needs a change.
 
 **Tech Stack:** Same as the rest of the shop backend/frontend (Express/mysql2, React/Vite, Vitest).
 
 ## Global Constraints
 
-- One shared sentence across bank/momo/paypal — no per-method fields.
-- Reuses `payment_note` — no migration, no new settings column.
-- VietQR's `sanitizeInfo` (in `backend/shop/payments/vietqr.js`) strips diacritics/non-alphanumerics and truncates to 25 chars before embedding — a Vietnamese `payment_note` with diacritics will appear in the QR payload in its *sanitized* form, not verbatim. Tests must assert against the sanitized value, not the raw one.
-- Accepted tradeoff (already confirmed with the user): every order's QR/transfer-content is now identical — no more per-order matching by transfer content.
+- One shared sentence across bank/momo/paypal - no per-method fields.
+- Reuses `payment_note` - no migration, no new settings column.
+- VietQR's `sanitizeInfo` (in `backend/shop/payments/vietqr.js`) strips diacritics/non-alphanumerics and truncates to 25 chars before embedding - a Vietnamese `payment_note` with diacritics will appear in the QR payload in its *sanitized* form, not verbatim. Tests must assert against the sanitized value, not the raw one.
+- Accepted tradeoff (already confirmed with the user): every order's QR/transfer-content is now identical - no more per-order matching by transfer content.
 
 ---
 
-### Task 1: Backend — source the transfer note from `payment_note`
+### Task 1: Backend - source the transfer note from `payment_note`
 
 **Files:**
 - Modify: `backend/shop/payments/instructions.js`
@@ -110,7 +110,7 @@ describe("buildInstructions", () => {
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cd backend && DB_HOST=127.0.0.1 DB_PORT=3307 DB_USER=root DB_PASS=root DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_HOST=127.0.0.1 REDIS_PORT=6380 REDIS_DB=15 npx vitest run tests/paymentInstructions.test.js`
-Expected: FAIL — `transfer_note` is still the auto-generated `DH...` code, not `payment_note`'s value.
+Expected: FAIL - `transfer_note` is still the auto-generated `DH...` code, not `payment_note`'s value.
 
 - [ ] **Step 3: Update `instructions.js`**
 
@@ -124,7 +124,7 @@ const { buildVietQrPayload } = require("./vietqr")
  * receives bank account details, so a leaked order page exposes the minimum.
  */
 function buildInstructions(order, settings) {
-  // Admin-authored, shared across every payment method — not per-order, by
+  // Admin-authored, shared across every payment method - not per-order, by
   // design (the seller matches transfers by amount/timing/buyer contact
   // instead of a unique code).
   const note = settings.payment_note || null
@@ -140,7 +140,7 @@ function buildInstructions(order, settings) {
         addInfo: note,
       })
     } catch (err) {
-      // Misconfiguration must not blank the page — the buyer can still
+      // Misconfiguration must not blank the page - the buyer can still
       // transfer manually using the printed details below.
       console.warn("[PAYMENTS] Không tạo được VietQR:", err.message)
     }
@@ -183,7 +183,7 @@ Expected: all pass.
 
 - [ ] **Step 5: Check for any other reference to `transferNote`**
 
-Run: `cd backend && grep -rn "transferNote" --include=*.js .` (excluding `node_modules`). Expected: no matches remain anywhere in the codebase (it was only ever imported by `instructions.js` itself and this test file). If any other file still imports it, that's a signal this task's brief is incomplete — stop and report rather than guessing a fix.
+Run: `cd backend && grep -rn "transferNote" --include=*.js .` (excluding `node_modules`). Expected: no matches remain anywhere in the codebase (it was only ever imported by `instructions.js` itself and this test file). If any other file still imports it, that's a signal this task's brief is incomplete - stop and report rather than guessing a fix.
 
 - [ ] **Step 6: Run the full backend suite**
 
@@ -199,7 +199,7 @@ git commit -m "feat(shop): source the transfer note from admin-set payment_note,
 
 ---
 
-### Task 2: Frontend — avoid duplicate footer note, update admin label
+### Task 2: Frontend - avoid duplicate footer note, update admin label
 
 **Files:**
 - Modify: `frontend/src/components/shop/PaymentInstructions.jsx`
@@ -207,7 +207,7 @@ git commit -m "feat(shop): source the transfer note from admin-set payment_note,
 - Modify: `frontend/src/components/AdminPaymentSettings.jsx`
 
 **Interfaces:**
-- Consumes: `instructions.transfer_note`/`instructions.payment_note` (Task 1's backend, same field names as before — only the value's source changed, so this task has no cross-task type/shape changes to worry about).
+- Consumes: `instructions.transfer_note`/`instructions.payment_note` (Task 1's backend, same field names as before - only the value's source changed, so this task has no cross-task type/shape changes to worry about).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -283,7 +283,7 @@ to:
         <span className="block text-sm mb-1 opacity-70">Ghi chú thanh toán / Nội dung chuyển khoản (hiển thị cho khách, dùng cho cả mã QR)</span>
 ```
 
-This is a plain label-text change with no test coverage expected (this file has no dedicated test for exact label strings — confirm by checking `AdminPaymentSettings.test.jsx` if it exists; if a test asserts this exact string, update it to match).
+This is a plain label-text change with no test coverage expected (this file has no dedicated test for exact label strings - confirm by checking `AdminPaymentSettings.test.jsx` if it exists; if a test asserts this exact string, update it to match).
 
 - [ ] **Step 6: Run the full frontend suite**
 
@@ -322,4 +322,4 @@ cd /Users/phucth/vibes/cosplay-portfolio && bash scripts/build-push.sh staging >
 
 - [ ] **Step 4: Report to the user**
 
-Confirm both suites passed, note the staging push, and remind the user that any Redis-cached payment settings (if cached — check `shop/payments/settingsRepo.js` for a cache layer; if none exists, no cache-flush note is needed) would need invalidation, and that this change is purely additive/no migration, so no DB action is needed at deploy.
+Confirm both suites passed, note the staging push, and remind the user that any Redis-cached payment settings (if cached - check `shop/payments/settingsRepo.js` for a cache layer; if none exists, no cache-flush note is needed) would need invalidation, and that this change is purely additive/no migration, so no DB action is needed at deploy.

@@ -45,7 +45,7 @@ module.exports = function shopRoutes() {
   })
 
   // Static-ish reference data (Vietnam's 34 provinces + wards), not a live
-  // per-keystroke autocomplete — cached 30 days server-side (vnAddress.js)
+  // per-keystroke autocomplete - cached 30 days server-side (vnAddress.js)
   // so this almost never actually reaches the third party.
   router.get("/provinces", async (req, res) => {
     try {
@@ -57,7 +57,7 @@ module.exports = function shopRoutes() {
   })
 
   router.get("/wards/:provinceCode", async (req, res) => {
-    // Vietnam province codes are short numeric strings — reject anything
+    // Vietnam province codes are short numeric strings - reject anything
     // else before it reaches the outbound fetch URL or the Redis cache key.
     if (!/^\d{1,3}$/.test(req.params.provinceCode)) {
       return res.status(400).json({ error: "invalid_input", message: "Mã tỉnh/thành không hợp lệ" })
@@ -72,7 +72,7 @@ module.exports = function shopRoutes() {
 
   // Street/house-number search, debounced (not per-keystroke) from
   // AddressFields.jsx, and only once the buyer has picked both ward and
-  // province — that keeps every query scoped and cheap enough to run per
+  // province - that keeps every query scoped and cheap enough to run per
   // typing pause, and resolves a short, ambiguous street name to the right
   // area instead of a same-named street elsewhere in the country. Proxied
   // server-side (key never reaches the browser) with its own addressLimiter
@@ -102,7 +102,7 @@ module.exports = function shopRoutes() {
       const data = await goongRes.json()
       res.json({ predictions: data.predictions || [] })
     } catch (err) {
-      // Never surfaces as an error to the buyer — the search button just
+      // Never surfaces as an error to the buyer - the search button just
       // shows no results, same as an empty response.
       console.error("[SHOP] Lỗi gọi Goong autocomplete:", err.message)
       res.json({ predictions: [] })

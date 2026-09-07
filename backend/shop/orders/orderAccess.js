@@ -14,7 +14,7 @@ const ORDER_SESSION_HOURS = 24
  * Gates the public order page and its sibling routes (payment info, QR,
  * proof upload). Requires either an admin JWT, or a verified-PIN session JWT
  * scoped to this exact order_token (from POST /:token/verify-pin). Any other
- * case responds 401 "pin_required" — the frontend shows the PIN gate on any
+ * case responds 401 "pin_required" - the frontend shows the PIN gate on any
  * 401 here, not "order not found".
  */
 function orderAccess(req, res, next) {
@@ -76,7 +76,7 @@ async function verifyPin(orderToken, pin) {
 
 /**
  * Issues the same order-access session JWT verifyPin() does, without
- * requiring the PIN — used exactly once, right after checkout: the buyer
+ * requiring the PIN - used exactly once, right after checkout: the buyer
  * who just submitted the order IS the buyer, in that same request/browser,
  * so re-proving it with a PIN they haven't even received the email for yet
  * would be pure friction with no real security benefit. Never called from

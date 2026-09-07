@@ -33,7 +33,7 @@ beforeEach(() => {
   adminUploadImage.mockReset()
 })
 
-describe("AdminVariants — per-row image upload", () => {
+describe("AdminVariants - per-row image upload", () => {
   it("renders images + thumbnail file inputs for each row, plus the batch-upload input", async () => {
     const container = await renderVariants()
     const fileInputs = container.querySelectorAll('input[type="file"]')
@@ -73,7 +73,7 @@ describe("AdminVariants — per-row image upload", () => {
   })
 })
 
-describe("AdminVariants — per-row thumbnail upload", () => {
+describe("AdminVariants - per-row thumbnail upload", () => {
   it("uploads the picked file to the row's own thumbnail_image, separate from images", async () => {
     adminUploadImage.mockResolvedValue({ url: "https://x/thumb.jpg" })
     const container = await renderVariants(baseProduct({
@@ -88,7 +88,7 @@ describe("AdminVariants — per-row thumbnail upload", () => {
 
     expect(adminUploadImage).toHaveBeenCalledWith(expect.any(String), "products/1/variants")
     expect(container.querySelector('img[src="https://x/thumb.jpg"]')).toBeTruthy()
-    // Still there, untouched — the thumbnail is separate from the gallery.
+    // Still there, untouched - the thumbnail is separate from the gallery.
     expect(container.querySelector('img[src="https://x/a1.jpg"]')).toBeTruthy()
     expect(container.querySelector('img[src="https://x/a1b.jpg"]')).toBeTruthy()
   })
@@ -111,7 +111,7 @@ describe("AdminVariants — per-row thumbnail upload", () => {
   })
 })
 
-describe("AdminVariants — batch image upload", () => {
+describe("AdminVariants - batch image upload", () => {
   it("uploads multiple files and creates one row per file, labeled from the filename", async () => {
     adminUploadImage
       .mockResolvedValueOnce({ url: "https://x/a1.jpg" })
@@ -165,7 +165,7 @@ describe("AdminVariants — batch image upload", () => {
   })
 })
 
-describe("AdminVariants — reordering rows", () => {
+describe("AdminVariants - reordering rows", () => {
   it("swaps a row with the previous one when its up arrow is clicked", async () => {
     const container = await renderVariants(
       baseProduct({

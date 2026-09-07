@@ -15,7 +15,7 @@ globalThis.URL.createObjectURL = vi.fn(() => "blob:mock")
 globalThis.URL.revokeObjectURL = vi.fn()
 
 // The component builds a throwaway <a download="..."> and calls .click() on
-// it to trigger the browser download — capture the download attribute at
+// it to trigger the browser download - capture the download attribute at
 // the moment of the click so tests can assert the exported filename.
 let lastAnchorDownload = null
 vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(function anchorClick() {
@@ -109,7 +109,7 @@ describe("StatsBookkeeping", () => {
 
     await click(findButton(container, "Xem"))
 
-    // Edit the date inputs after loading, without clicking "Xem" again — the
+    // Edit the date inputs after loading, without clicking "Xem" again - the
     // screen still shows the August range, so the export must too.
     await setDateInput(findDateInput(container, "Từ ngày"), "2026-09-01")
     await setDateInput(findDateInput(container, "Đến ngày"), "2026-09-08")
@@ -231,7 +231,7 @@ describe("StatsBookkeeping", () => {
 
     const viewButton = findButton(container, "Xem")
     // Dispatch both clicks inside a single act() so the second click fires
-    // before React has re-rendered the button as disabled — this is the
+    // before React has re-rendered the button as disabled - this is the
     // narrow window in which two in-flight requests can genuinely race.
     await act(async () => {
       viewButton.dispatchEvent(new MouseEvent("click", { bubbles: true }))

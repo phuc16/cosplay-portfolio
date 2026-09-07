@@ -1,8 +1,8 @@
-# Merch Shop — Plan 1: Foundations & Catalog
+# Merch Shop - Plan 1: Foundations & Catalog
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Sellers can create merch collections with products and per-variant stock in the admin, and buyers can browse them on a public shop page — no cart or checkout yet.
+**Goal:** Sellers can create merch collections with products and per-variant stock in the admin, and buyers can browse them on a public shop page - no cart or checkout yet.
 
 **Architecture:** Adds three tables (`collections`, `products`, `product_variants`) via Knex migrations, a small catalog module (`backend/shop/`) holding slug generation, SQL access, and Redis caching, and two Express routers mounted by `server.js` (public read, admin write). The frontend gains `/shop` and `/shop/:slug` routes plus an admin catalog tab, reusing the existing axios instance, `LanguageContext`, and Tailwind styling.
 
@@ -11,14 +11,14 @@
 ## Global Constraints
 
 - **Source spec:** `docs/superpowers/specs/2026-08-07-merch-shop-design.md`. Everything here implements Plan 1's slice of it.
-- **Queries use the raw mysql2 pool** from `backend/db.js` — `const [rows] = await db.query(sql, params)`. Knex is used **only** for migrations. Never import knex in request-handling code.
+- **Queries use the raw mysql2 pool** from `backend/db.js` - `const [rows] = await db.query(sql, params)`. Knex is used **only** for migrations. Never import knex in request-handling code.
 - **All API error responses** use the existing shape `{ error: "<snake_case_code>", message: "<Vietnamese message>" }`. HTTP codes follow existing usage: 400 `invalid_input`, 401 `unauthorized`, 403 `forbidden`, 404 `not_found`, 429 `too_many_requests`, 500 `server_error`.
 - **Log lines** follow the existing bracketed-prefix convention, e.g. `console.warn("[SHOP] ...")`, `console.error("[ADMIN/CATALOG] ...")`.
-- **Money is stored as `int unsigned` in VND** (e.g. `35000`). Never use float or decimal — VND has no minor unit and floats introduce rounding bugs.
-- **Images** are processed by the existing pipeline: `sharp().rotate()`, resize to max width 1920 with `withoutEnlargement`, encode `.webp({ quality: 82, effort: 4 })`. The spec's mention of "JPEG ~85%" is outdated — WebP is what `server.js` actually does. Stored in MinIO, served via `/api/storage/{key}`.
+- **Money is stored as `int unsigned` in VND** (e.g. `35000`). Never use float or decimal - VND has no minor unit and floats introduce rounding bugs.
+- **Images** are processed by the existing pipeline: `sharp().rotate()`, resize to max width 1920 with `withoutEnlargement`, encode `.webp({ quality: 82, effort: 4 })`. The spec's mention of "JPEG ~85%" is outdated - WebP is what `server.js` actually does. Stored in MinIO, served via `/api/storage/{key}`.
 - **Redis cache keys** for this plan: `shop:collections` (list) and `shop:collection:<slug>` (detail), both `EX 3600`, matching the existing 1-hour gallery/settings TTL.
 - **Public routes** are mounted behind the existing `publicLimiter`. **Admin routes** are mounted behind the existing `auth` middleware.
-- **UI chrome is bilingual** via `frontend/src/i18n/translations.js` (`en` and `vi` keys, accessed with `t("key")`). **Seller-authored content** (collection/product names and descriptions) is stored and displayed in one language only — never duplicated per locale.
+- **UI chrome is bilingual** via `frontend/src/i18n/translations.js` (`en` and `vi` keys, accessed with `t("key")`). **Seller-authored content** (collection/product names and descriptions) is stored and displayed in one language only - never duplicated per locale.
 - **Markdown descriptions are sanitized before render.** Never use `dangerouslySetInnerHTML` with unsanitized HTML.
 - **No new containers, processes, or services.** Everything runs inside the existing backend/frontend/worker.
 - **Commit after every task** using Conventional Commits with a descriptive body. Do **not** add a `Co-Authored-By` trailer.
@@ -244,7 +244,7 @@ Ensure MySQL is up first (`docker compose up -d mysql redis`), then run:
 ```bash
 cd backend && DB_PORT=3307 npm test
 ```
-Expected: PASS, 1 test. If `server.js` was not exported correctly the run hangs or errors with `app.get is not a function` — fix Step 3 before continuing.
+Expected: PASS, 1 test. If `server.js` was not exported correctly the run hangs or errors with `app.get is not a function` - fix Step 3 before continuing.
 
 - [ ] **Step 10: Commit**
 
@@ -254,7 +254,7 @@ git add backend/package.json backend/package-lock.json backend/db.js backend/kne
 git commit -F - <<'EOF'
 test(backend): add vitest + supertest harness
 
-The backend had no test infrastructure at all — npm test was still the default
+The backend had no test infrastructure at all - npm test was still the default
 error stub. This adds Vitest and Supertest so the merch shop work can be built
 test-first, plus the two changes that were blocking testability:
 
@@ -273,7 +273,7 @@ EOF
 
 ### Task 2: Catalog schema migrations
 
-Creates the three catalog tables. `fulfillment_methods` from the spec is encoded concretely as two booleans (`allow_ship`, `allow_pickup`) — simpler to query and validate than a JSON array.
+Creates the three catalog tables. `fulfillment_methods` from the spec is encoded concretely as two booleans (`allow_ship`, `allow_pickup`) - simpler to query and validate than a JSON array.
 
 **Files:**
 - Create: `backend/migrations/007_create_collections.js`
@@ -357,7 +357,7 @@ describe("catalog schema", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- schema`
-Expected: FAIL — all three tests fail because the tables do not exist, so `columns()` returns `{}`.
+Expected: FAIL - all three tests fail because the tables do not exist, so `columns()` returns `{}`.
 
 - [ ] **Step 3: Create the collections migration**
 
@@ -413,7 +413,7 @@ exports.up = function (knex) {
     table.string("name").notNullable()
     table.text("description")
 
-    // VND has no minor unit — integer avoids float rounding entirely.
+    // VND has no minor unit - integer avoids float rounding entirely.
     table.integer("price").unsigned().notNullable().defaultTo(0)
 
     // Array of storage proxy URLs, e.g. ["/api/storage/shop/products/1/abc.webp"]
@@ -634,16 +634,16 @@ All SQL for the catalog lives here so routes stay thin and the queries are testa
 **Interfaces:**
 - Consumes: `backend/db.js`, `slugify`/`uniqueSlug` from Task 3.
 - Produces: `backend/shop/catalogRepo.js` exporting exactly:
-  - `listPublicCollections(): Promise<Collection[]>` — status `active` or `closed`, ordered by `sort_order, id`, each with `product_count`.
-  - `getPublicCollectionBySlug(slug: string): Promise<CollectionDetail|null>` — status `active` or `closed`, with nested `products[].variants[]`.
-  - `listAllCollections(): Promise<Collection[]>` — every status, for admin.
-  - `createCollection(data): Promise<number>` — returns new id, generates a unique slug from `data.title`.
+  - `listPublicCollections(): Promise<Collection[]>` - status `active` or `closed`, ordered by `sort_order, id`, each with `product_count`.
+  - `getPublicCollectionBySlug(slug: string): Promise<CollectionDetail|null>` - status `active` or `closed`, with nested `products[].variants[]`.
+  - `listAllCollections(): Promise<Collection[]>` - every status, for admin.
+  - `createCollection(data): Promise<number>` - returns new id, generates a unique slug from `data.title`.
   - `updateCollection(id, data): Promise<boolean>`
   - `deleteCollection(id): Promise<boolean>`
   - `createProduct(data): Promise<number>`
   - `updateProduct(id, data): Promise<boolean>`
   - `deleteProduct(id): Promise<boolean>`
-  - `replaceVariants(productId, variants): Promise<void>` — deletes variants absent from the list, updates existing by id, inserts new ones.
+  - `replaceVariants(productId, variants): Promise<void>` - deletes variants absent from the list, updates existing by id, inserts new ones.
 
   `Collection` fields: `id, title, slug, description, cover_image, thumbnail_image, status, allow_ship, allow_pickup, pickup_location, pickup_note, sort_order, created_at`. `allow_ship`/`allow_pickup` are returned as booleans, not 0/1.
 
@@ -1300,7 +1300,7 @@ describe("GET /api/shop/collections/:slug", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- shopRoutes`
-Expected: FAIL — both collection routes return the catch-all 404, so the first test gets `404` instead of `200`.
+Expected: FAIL - both collection routes return the catch-all 404, so the first test gets `404` instead of `200`.
 
 - [ ] **Step 3: Create the router**
 
@@ -1391,7 +1391,7 @@ EOF
   - `POST   /api/admin/collections/:id/products` → `201 {id}`
   - `PUT    /api/admin/products/:id`
   - `DELETE /api/admin/products/:id`
-  - `PUT    /api/admin/products/:id/variants` — body `{ variants: [{id?, label, image_url?, stock_qty?}] }`
+  - `PUT    /api/admin/products/:id/variants` - body `{ variants: [{id?, label, image_url?, stock_qty?}] }`
 
   Every mutating route calls `cache.invalidate()` before responding.
 
@@ -1520,7 +1520,7 @@ describe("products and variants", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- adminCatalogRoutes`
-Expected: FAIL — the admin routes 404, so the auth test gets `404` instead of `401`.
+Expected: FAIL - the admin routes 404, so the auth test gets `404` instead of `401`.
 
 - [ ] **Step 3: Create the admin router**
 
@@ -1693,7 +1693,7 @@ the existing JWT auth middleware, all invalidating the public catalog cache
 before responding.
 
 Variants are saved as a whole list rather than row by row, because a photocard
-sheet is edited as a set — 40-odd codes at once — and per-row endpoints would
+sheet is edited as a set - 40-odd codes at once - and per-row endpoints would
 mean 40 requests to publish one product.
 
 Validation rejects blank titles and labels, non-integer or negative prices,
@@ -1719,7 +1719,7 @@ Reuses the existing WebP pipeline. Product images and per-variant photocard art 
 - Consumes: existing `backend/storage.js`, `sharp`.
 - Produces:
   - `backend/shop/images.js` exporting `processShopImage(buffer: Buffer): Promise<Buffer>` (WebP, max width 1920) and `uploadShopImage(folder: string, buffer: Buffer): Promise<string>` returning a `/api/storage/...` proxy URL.
-  - Route `POST /api/admin/shop/image` — body `{ base64, folder }` → `201 { url }`.
+  - Route `POST /api/admin/shop/image` - body `{ base64, folder }` → `201 { url }`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1863,7 +1863,7 @@ the portfolio's existing pipeline: EXIF auto-orient, cap at 1920px, encode
 WebP. Files land in MinIO under shop/<folder>/ and are served through the
 existing storage proxy rather than exposing MinIO directly.
 
-The body-parser selector in server.js also had to learn about this path —
+The body-parser selector in server.js also had to learn about this path -
 base64 photos exceed the 1mb small-body limit and would otherwise be rejected
 with a 413 before reaching the route.
 EOF
@@ -1883,7 +1883,7 @@ EOF
 - Consumes: existing `frontend/src/api/api.js` axios instance.
 - Produces:
   - `frontend/src/api/shop.js` exporting `fetchCollections()`, `fetchCollection(slug)`, `adminListCollections()`, `adminCreateCollection(data)`, `adminUpdateCollection(id, data)`, `adminDeleteCollection(id)`, `adminCreateProduct(collectionId, data)`, `adminUpdateProduct(id, data)`, `adminDeleteProduct(id)`, `adminSaveVariants(productId, variants)`, `adminUploadImage(base64, folder)`. All return the response body directly.
-  - `frontend/src/utils/markdown.js` exporting `renderMarkdown(text: string): string` — sanitized HTML.
+  - `frontend/src/utils/markdown.js` exporting `renderMarkdown(text: string): string` - sanitized HTML.
   - `frontend/src/utils/money.js` exporting `formatVnd(n: number): string` → `"35.000₫"`.
 
 - [ ] **Step 1: Install the markdown dependencies**
@@ -2313,7 +2313,7 @@ Expected: both succeed.
 - [ ] **Step 7: Verify manually in the browser**
 
 Start the stack (`docker compose up -d`), run `cd frontend && npm run dev`, then:
-1. Visit `http://localhost:5173/shop` — expect the empty-state text (no collections yet).
+1. Visit `http://localhost:5173/shop` - expect the empty-state text (no collections yet).
 2. Confirm the page is readable at a 375px-wide viewport (single column, no horizontal scroll).
 
 - [ ] **Step 8: Commit**
@@ -2805,9 +2805,9 @@ With the stack running and logged into `/admin`:
 2. Confirm it appears at `/shop` with slug `bo-suu-tap-he`.
 3. Expand it → add a product `Photocard` priced `35000`, upload an image.
 4. Add variants in bulk by pasting `A1, A2, B1`, set A1 stock to `2`, leave A2 blank.
-5. Reload `/shop/bo-suu-tap-he` — expect the product, `35.000₫`, and three variant chips.
-6. Set A1 stock to `0`, save, reload — expect A1 struck through.
-7. Set the collection to `draft` — expect it to disappear from `/shop`.
+5. Reload `/shop/bo-suu-tap-he` - expect the product, `35.000₫`, and three variant chips.
+6. Set A1 stock to `0`, save, reload - expect A1 struck through.
+7. Set the collection to `draft` - expect it to disappear from `/shop`.
 
 - [ ] **Step 8: Commit**
 
@@ -2865,6 +2865,6 @@ EOF
 
 Plan complete and saved to `docs/superpowers/plans/2026-08-07-merch-shop-1-catalog.md`. Two execution options:
 
-**1. Subagent-Driven (recommended)** — a fresh subagent per task, review between tasks, fast iteration.
+**1. Subagent-Driven (recommended)** - a fresh subagent per task, review between tasks, fast iteration.
 
-**2. Inline Execution** — execute tasks in this session using executing-plans, batch execution with checkpoints.
+**2. Inline Execution** - execute tasks in this session using executing-plans, batch execution with checkpoints.

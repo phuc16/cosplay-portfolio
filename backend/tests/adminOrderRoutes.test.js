@@ -173,7 +173,7 @@ describe("allowed_transitions", () => {
 
 describe("order_token is never exposed to the admin", () => {
   // order_token is the buyer's bearer credential for their own public,
-  // unauthenticated order page and payment QR — leaking it into the admin
+  // unauthenticated order page and payment QR - leaking it into the admin
   // dashboard's network responses would hand out a working credential to
   // anyone who can read the admin's browser traffic.
   it("is absent from the list endpoint", async () => {
@@ -193,7 +193,7 @@ describe("order_token is never exposed to the admin", () => {
 
 describe("GET /api/admin/orders/by-token/:token", () => {
   // Backs the admin QR scanner, which only ever extracts a token from the
-  // buyer's public order URL — the lookup has to happen server-side since
+  // buyer's public order URL - the lookup has to happen server-side since
   // order_token is deliberately never sent to the browser in the order list.
   it("requires a token", async () => {
     const res = await request(app).get("/api/admin/orders/by-token/anything")

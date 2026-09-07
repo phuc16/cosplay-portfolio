@@ -9,7 +9,7 @@ import settings from "../shop/payments/settingsRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 // routes/orders.js is CommonJS and does `require("../shop/orders/orderRepo")`
-// — grab the exact same cached CJS module.exports object here (rather than
+// - grab the exact same cached CJS module.exports object here (rather than
 // the ESM-interop import) so spying on `.createOrder` actually intercepts
 // the route's real call, same gotcha documented in adminShippingRoster.test.js.
 const cjsRepo = createRequire(import.meta.url)("../shop/orders/orderRepo.js")
@@ -53,14 +53,14 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe("POST /api/orders — failure logging never leaks PII or the order_token", () => {
+describe("POST /api/orders - failure logging never leaks PII or the order_token", () => {
   it("logs only a safe message/code, never the raw error object (with its embedded SQL/params) or any buyer field", async () => {
     const variantId = await seed()
 
     // Simulate a real mysql2-style failure the way it actually shows up:
     // err.message is a generic DB message, but err.sql/err.sqlMessage carry
-    // the fully interpolated statement — including every bound buyer field
-    // and the generated order_token — exactly like the real driver embeds it
+    // the fully interpolated statement - including every bound buyer field
+    // and the generated order_token - exactly like the real driver embeds it
     // on a query failure (over-length field, lock timeout, etc).
     const fakeOrderToken = "deadbeefcafebabe0123456789abcdef"
     const dbError = new Error("Data too long for column 'address_raw' at row 1")

@@ -23,7 +23,7 @@ globalThis.URL.createObjectURL = vi.fn(() => "blob:mock")
 globalThis.URL.revokeObjectURL = vi.fn()
 
 // The component builds a throwaway <a download="..."> and calls .click() on
-// it to trigger the browser download — capture the download attribute at
+// it to trigger the browser download - capture the download attribute at
 // the moment of the click so tests can assert the exported filename, and
 // stub out the click so jsdom doesn't attempt to navigate to a blob: URL.
 let lastAnchorDownload = null

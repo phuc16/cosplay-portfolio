@@ -4,16 +4,16 @@
 
 **Goal:** Let the admin schedule a collection to become visible at a specific date+time and, optionally, auto-close at a later one, with real (not virtual) status transitions and no new background job.
 
-**Architecture:** Two new nullable `DATETIME` columns on `collections`. A not-yet-started collection is excluded by a `WHERE` clause on the public read paths (hidden like a draft). A collection past its `end_at` is transitioned to `status = 'closed'` for real, in the database, the first time ANY read path (admin or public) touches it — a single shared helper does this "lazy write-through" so no cron/worker is needed. The existing public-collections Redis cache is removed entirely rather than adapted, since it saves nothing at this shop's scale and would otherwise reintroduce staleness.
+**Architecture:** Two new nullable `DATETIME` columns on `collections`. A not-yet-started collection is excluded by a `WHERE` clause on the public read paths (hidden like a draft). A collection past its `end_at` is transitioned to `status = 'closed'` for real, in the database, the first time ANY read path (admin or public) touches it - a single shared helper does this "lazy write-through" so no cron/worker is needed. The existing public-collections Redis cache is removed entirely rather than adapted, since it saves nothing at this shop's scale and would otherwise reintroduce staleness.
 
 **Tech Stack:** Express/mysql2 (raw SQL), Knex migrations, React/Vite, Vitest.
 
 ## Global Constraints
 
-- Scheduling layers on top of the existing manual `status` — draft/archived collections are unaffected.
-- A not-yet-started collection (`start_at` in the future) is fully hidden from buyers (404 on direct link, absent from the list) — no "coming soon" page.
-- Reaching `end_at` is a real, persisted `status = 'closed'` write, visible identically to admin and buyer — not a computed/virtual display value.
-- The transition happens via lazy write-through on read (any read path can trigger it) — no periodic sweep, no cron, no worker tick.
+- Scheduling layers on top of the existing manual `status` - draft/archived collections are unaffected.
+- A not-yet-started collection (`start_at` in the future) is fully hidden from buyers (404 on direct link, absent from the list) - no "coming soon" page.
+- Reaching `end_at` is a real, persisted `status = 'closed'` write, visible identically to admin and buyer - not a computed/virtual display value.
+- The transition happens via lazy write-through on read (any read path can trigger it) - no periodic sweep, no cron, no worker tick.
 - `catalogCache.js` (the public-collections Redis cache) is deleted entirely, not adapted.
 - `copyCollection` never carries `start_at`/`end_at` into a duplicated collection.
 - Comments terse, single-line, only for non-obvious rationale, matching this codebase's existing style.
@@ -81,7 +81,7 @@ git commit -m "feat(shop): add collections.start_at/end_at scheduling columns"
 
 ---
 
-### Task 2: Catalog repo — hide before start, real close-on-read past end
+### Task 2: Catalog repo - hide before start, real close-on-read past end
 
 **Files:**
 - Modify: `backend/shop/catalogRepo.js`
@@ -157,7 +157,7 @@ describe("collection scheduling", () => {
     expect(publicList.find((c) => c.id === cid).status).toBe("closed")
   })
 
-  it("is idempotent — reading an already-closed-by-expiry collection again does not error or change anything", async () => {
+  it("is idempotent - reading an already-closed-by-expiry collection again does not error or change anything", async () => {
     const past = new Date(Date.now() - 60 * 60 * 1000)
     const cid = await repo.createCollection({ title: "Ended Drop", status: "active", end_at: past })
 
@@ -187,7 +187,7 @@ describe("collection scheduling", () => {
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `cd backend && DB_HOST=127.0.0.1 DB_PORT=3307 DB_USER=root DB_PASS=root DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_HOST=127.0.0.1 REDIS_PORT=6380 REDIS_DB=15 npx vitest run tests/catalogRepo.test.js`
-Expected: the new tests FAIL — no filtering or transition logic exists yet.
+Expected: the new tests FAIL - no filtering or transition logic exists yet.
 
 - [ ] **Step 3: Add the `closeExpiredCollections` helper**
 
@@ -195,9 +195,9 @@ In `backend/shop/catalogRepo.js`, add this function right after `mapCollection`:
 
 ```js
 /**
- * Real, persisted transition — not a display-only computed value. Called by
+ * Real, persisted transition - not a display-only computed value. Called by
  * every collection-read path below, so the first read after end_at (by
- * anyone — admin or a buyer) is what flips it; there is no separate
+ * anyone - admin or a buyer) is what flips it; there is no separate
  * sweep/cron. The `AND status = 'active'` guard makes concurrent calls
  * from simultaneous requests safely idempotent.
  */
@@ -262,7 +262,7 @@ async function getPublicCollectionBySlug(slug) {
   const [updated] = await closeExpiredCollections([collection])
   const detail = await nestCollectionDetail(updated)
   // delivery_link is only trustworthy once an order is confirmed/shipped/completed
-  // (see routes/orders.js and email templates.js) — nestCollectionDetail is shared
+  // (see routes/orders.js and email templates.js) - nestCollectionDetail is shared
   // with the admin-only getCollectionDetailById, which legitimately needs the link,
   // so it is stripped here, on the public path only. stock_qty stays: buyers
   // legitimately need to see stock/sold-out state before ever placing an order.
@@ -317,7 +317,7 @@ async function insertCollection(data, slug, sortOrder) {
 }
 ```
 
-In `updateCollection`, replace the `UPDATE` query and params (inside the `try` block — the existing function uses `db.query` directly, there is no `conn` here, unlike `replaceVariants` elsewhere in this file):
+In `updateCollection`, replace the `UPDATE` query and params (inside the `try` block - the existing function uses `db.query` directly, there is no `conn` here, unlike `replaceVariants` elsewhere in this file):
 
 ```js
     const [res] = await db.query(
@@ -347,7 +347,7 @@ In `updateCollection`, replace the `UPDATE` query and params (inside the `try` b
 
 - [ ] **Step 7: Confirm `copyCollection` does not forward `start_at`/`end_at`**
 
-`copyCollection`'s `createCollection({...})` call already lists its fields explicitly (`title`, `description`, `cover_image`, `thumbnail_image`, `status: "draft"`, `allow_ship`, `allow_pickup`, `pickup_location`, `pickup_note`, `payment_deadline_hours`) — do NOT add `start_at`/`end_at` to that object. No code change needed here; this step is a verification checkpoint, not an edit.
+`copyCollection`'s `createCollection({...})` call already lists its fields explicitly (`title`, `description`, `cover_image`, `thumbnail_image`, `status: "draft"`, `allow_ship`, `allow_pickup`, `pickup_location`, `pickup_note`, `payment_deadline_hours`) - do NOT add `start_at`/`end_at` to that object. No code change needed here; this step is a verification checkpoint, not an edit.
 
 - [ ] **Step 8: Run to verify they pass**
 
@@ -375,7 +375,7 @@ git commit -m "feat(shop): hide not-yet-started collections, real close-on-read 
 
 - [ ] **Step 1: Write failing tests**
 
-In `backend/tests/orderRepo.test.js`, find the existing `seedVariant(stock, collectionOver = {})` helper — it already accepts a `collectionOver` object spread into `createCollection`. Add a new test near the existing `CollectionNotActiveError` coverage (search for that class name to find the right neighboring `describe` block):
+In `backend/tests/orderRepo.test.js`, find the existing `seedVariant(stock, collectionOver = {})` helper - it already accepts a `collectionOver` object spread into `createCollection`. Add a new test near the existing `CollectionNotActiveError` coverage (search for that class name to find the right neighboring `describe` block):
 
 ```js
   it("rejects an order once the collection's end_at has passed, even if status is still 'active' in the DB", async () => {
@@ -388,7 +388,7 @@ In `backend/tests/orderRepo.test.js`, find the existing `seedVariant(stock, coll
       "SELECT c.status FROM product_variants v JOIN products p ON p.id = v.product_id JOIN collections c ON c.id = p.collection_id WHERE v.id = ?",
       [variantId]
     )
-    expect(row.status).toBe("active") // createOrder itself never writes the transition — see Task 2 for that
+    expect(row.status).toBe("active") // createOrder itself never writes the transition - see Task 2 for that
   })
 
   it("still allows an order when end_at is in the future", async () => {
@@ -428,7 +428,7 @@ Then change the per-row check loop:
 ```js
     for (const row of rows) {
       // A collection whose end_at has already passed is rejected here even
-      // if its stored status still says "active" — the real transition to
+      // if its stored status still says "active" - the real transition to
       // "closed" only happens lazily on a read path (see catalogRepo.js's
       // closeExpiredCollections), which this write path never calls.
       const collectionExpired = row.collection_end_at && new Date(row.collection_end_at) <= new Date()
@@ -484,7 +484,7 @@ git rm backend/shop/catalogCache.js backend/tests/catalogCache.test.js backend/t
 
 - [ ] **Step 2: Update `routes/shop.js` to read the repo directly**
 
-Read the current file first — the two relevant handlers are `router.get("/collections", ...)` and `router.get("/collections/:slug", ...)`. Replace `require("../shop/catalogCache")` with `require("../shop/catalogRepo")`, and change the two call sites:
+Read the current file first - the two relevant handlers are `router.get("/collections", ...)` and `router.get("/collections/:slug", ...)`. Replace `require("../shop/catalogCache")` with `require("../shop/catalogRepo")`, and change the two call sites:
 
 ```js
 const repo = require("../shop/catalogRepo")
@@ -514,25 +514,25 @@ const repo = require("../shop/catalogRepo")
   })
 ```
 
-If `routes/shop.js` already imports something named `repo` for a different module, pick a distinct local name (e.g. `catalogRepo`) and use that consistently in this file instead — check the current imports before pasting.
+If `routes/shop.js` already imports something named `repo` for a different module, pick a distinct local name (e.g. `catalogRepo`) and use that consistently in this file instead - check the current imports before pasting.
 
 - [ ] **Step 3: Remove all `cache.invalidate()` call sites and their imports**
 
 Run: `cd backend && grep -rn "catalogCache" routes/ shop/ --include=*.js`
 For each match in `routes/adminCatalog.js`, `shop/orders/orderRepo.js`, and `routes/orders.js`:
 - Remove the `const cache = require("../shop/catalogCache")` (or `require("./../catalogCache")`) import line.
-- Remove every `await cache.invalidate()` / `await catalogCache.invalidate()` line — delete the line entirely, don't replace it with anything (there is nothing left to invalidate).
+- Remove every `await cache.invalidate()` / `await catalogCache.invalidate()` line - delete the line entirely, don't replace it with anything (there is nothing left to invalidate).
 
-Re-run the grep afterward — expected: zero matches anywhere outside `node_modules`.
+Re-run the grep afterward - expected: zero matches anywhere outside `node_modules`.
 
 - [ ] **Step 4: Update the two test files' cleanup calls**
 
-In `backend/tests/shopRoutes.test.js` and `backend/tests/adminCatalogRoutes.test.js`, remove the line `import cache from "../shop/catalogCache.js"` and every `await cache.invalidate()` call in their `beforeEach`/`afterAll` blocks. Do not remove the `redis` import/`redis.quit()` calls in the same blocks — those close the Redis connection pool for other reasons unrelated to this cache.
+In `backend/tests/shopRoutes.test.js` and `backend/tests/adminCatalogRoutes.test.js`, remove the line `import cache from "../shop/catalogCache.js"` and every `await cache.invalidate()` call in their `beforeEach`/`afterAll` blocks. Do not remove the `redis` import/`redis.quit()` calls in the same blocks - those close the Redis connection pool for other reasons unrelated to this cache.
 
 - [ ] **Step 5: Run the full backend suite**
 
 Run: `cd backend && DB_HOST=127.0.0.1 DB_PORT=3307 DB_USER=root DB_PASS=root DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_HOST=127.0.0.1 REDIS_PORT=6380 REDIS_DB=15 npx vitest run`
-Expected: all pass. If `tests/adminStatsRoutes.test.js`'s bookkeeping-date tests fail, re-run that file alone — it has a documented pre-existing UTC/Asia-Ho-Chi-Minh midnight-boundary flake unrelated to this change (see the comment at the top of that file); do not treat it as a regression from this task.
+Expected: all pass. If `tests/adminStatsRoutes.test.js`'s bookkeeping-date tests fail, re-run that file alone - it has a documented pre-existing UTC/Asia-Ho-Chi-Minh midnight-boundary flake unrelated to this change (see the comment at the top of that file); do not treat it as a regression from this task.
 
 - [ ] **Step 6: Commit**
 
@@ -542,8 +542,8 @@ git commit -m "feat(shop): remove the public-collections Redis cache entirely
 
 At this shop's actual scale (fewer than 5 collections a year) the
 underlying DB query costs nothing extra, and removing the cache
-eliminates staleness as a concern — both for collection scheduling and
-in general — rather than adding TTL-capping complexity for a scale
+eliminates staleness as a concern - both for collection scheduling and
+in general - rather than adding TTL-capping complexity for a scale
 this shop doesn't operate at."
 ```
 
@@ -614,19 +614,19 @@ git commit -m "feat(shop): validate that a collection's end_at is after its star
 
 ---
 
-### Task 6: Admin UI — schedule fields on the collection form
+### Task 6: Admin UI - schedule fields on the collection form
 
 **Files:**
 - Modify: `frontend/src/components/AdminCollections.jsx`
 - Modify: `frontend/src/components/AdminCollections.test.jsx`
 
 **Interfaces:**
-- Consumes: `adminCreateCollection`/`adminUpdateCollection` (unchanged signatures — they already forward whatever object they're given, same as `AdminProducts.jsx`'s equivalents).
+- Consumes: `adminCreateCollection`/`adminUpdateCollection` (unchanged signatures - they already forward whatever object they're given, same as `AdminProducts.jsx`'s equivalents).
 - Produces: two new `datetime-local` fields on the collection form, "Bắt đầu" (start) / "Kết thúc" (end), both optional.
 
 - [ ] **Step 1: Write failing tests**
 
-In `frontend/src/components/AdminCollections.test.jsx`, read the file's existing render/mock helpers first (the same pattern `AdminProducts.test.jsx` uses — `adminCreateCollection`/`adminUpdateCollection` mocks, a render helper). Add:
+In `frontend/src/components/AdminCollections.test.jsx`, read the file's existing render/mock helpers first (the same pattern `AdminProducts.test.jsx` uses - `adminCreateCollection`/`adminUpdateCollection` mocks, a render helper). Add:
 
 ```js
 describe("scheduling", () => {
@@ -638,7 +638,7 @@ describe("scheduling", () => {
 
     const nameInput = container.querySelector('input[placeholder="Tên bộ sưu tập"], input[value=""]')
     // Use whatever selector this file's existing "creates a collection" test
-    // uses for the title input — match that exactly rather than guessing here.
+    // uses for the title input - match that exactly rather than guessing here.
 
     const startInput = container.querySelector('input[type="datetime-local"]')
     expect(startInput).toBeTruthy()
@@ -657,12 +657,12 @@ describe("scheduling", () => {
 })
 ```
 
-(This step is intentionally light on exact DOM query strings for the surrounding form fields — read the file's existing "creates a collection"/save-flow test first and mirror its exact input-filling and save-click sequence; only the two new `datetime-local` inputs and their assertions are new.)
+(This step is intentionally light on exact DOM query strings for the surrounding form fields - read the file's existing "creates a collection"/save-flow test first and mirror its exact input-filling and save-click sequence; only the two new `datetime-local` inputs and their assertions are new.)
 
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `cd frontend && npx vitest run src/components/AdminCollections.test.jsx`
-Expected: FAIL — no `datetime-local` input exists yet.
+Expected: FAIL - no `datetime-local` input exists yet.
 
 - [ ] **Step 3: Update `AdminCollections.jsx`**
 
@@ -679,7 +679,7 @@ const blank = {
 }
 ```
 
-Add a small conversion helper near the top of the file (MySQL returns `DATETIME` as either a JS `Date` or an ISO-ish string depending on driver config — this normalizes either into the `datetime-local` input's required `YYYY-MM-DDTHH:mm` format, using LOCAL time components since that's what a `datetime-local` input displays and edits):
+Add a small conversion helper near the top of the file (MySQL returns `DATETIME` as either a JS `Date` or an ISO-ish string depending on driver config - this normalizes either into the `datetime-local` input's required `YYYY-MM-DDTHH:mm` format, using LOCAL time components since that's what a `datetime-local` input displays and edits):
 
 ```js
 /** MySQL DATETIME -> the `YYYY-MM-DDTHH:mm` shape a <input type="datetime-local"> needs, in local time. */
@@ -732,7 +732,7 @@ In the form JSX, find the existing `payment_deadline_hours` input and add the tw
         </label>
 ```
 
-No change is needed to `save()` — it already spreads `draft` wholesale into the create/update call, so `start_at`/`end_at` are forwarded automatically once they exist on `draft`.
+No change is needed to `save()` - it already spreads `draft` wholesale into the create/update call, so `start_at`/`end_at` are forwarded automatically once they exist on `draft`.
 
 - [ ] **Step 4: Run to verify they pass**
 
@@ -760,7 +760,7 @@ git commit -m "feat(shop): add start/end scheduling fields to the admin collecti
 - [ ] **Step 1: Run the full backend suite**
 
 Run: `cd backend && DB_HOST=127.0.0.1 DB_PORT=3307 DB_USER=root DB_PASS=root DB_NAME=cosplay_test JWT_SECRET=test-secret REDIS_HOST=127.0.0.1 REDIS_PORT=6380 REDIS_DB=15 npx vitest run`
-Expected: all pass (the documented `adminStatsRoutes.test.js` midnight-boundary flake, if it recurs, is not a regression — re-run that file alone to confirm before treating it as one).
+Expected: all pass (the documented `adminStatsRoutes.test.js` midnight-boundary flake, if it recurs, is not a regression - re-run that file alone to confirm before treating it as one).
 
 - [ ] **Step 2: Run the full frontend suite**
 
@@ -776,4 +776,4 @@ cd /Users/phucth/vibes/cosplay-portfolio && bash scripts/build-push.sh staging >
 
 - [ ] **Step 4: Report to the user**
 
-Confirm both suites passed, note the staging push, and remind the user that the public-collections Redis cache no longer exists at all (Task 4) — nothing to flush at deploy, no TTL to wait out — and that a collection whose `end_at` has already passed before this deploy will flip to `closed` for real the next time anyone views it (admin or buyer), not retroactively/immediately at deploy time.
+Confirm both suites passed, note the staging push, and remind the user that the public-collections Redis cache no longer exists at all (Task 4) - nothing to flush at deploy, no TTL to wait out - and that a collection whose `end_at` has already passed before this deploy will flip to `closed` for real the next time anyone views it (admin or buyer), not retroactively/immediately at deploy time.

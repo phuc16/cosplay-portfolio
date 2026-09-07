@@ -10,9 +10,9 @@
 
 ## Global Constraints
 
-- Validation runs on the Cart page only, once on mount — no polling, no Checkout-page duplication.
+- Validation runs on the Cart page only, once on mount - no polling, no Checkout-page duplication.
 - Four states collapse to three detectable ones: 404/not-started/deleted/archived → `"unavailable"`; `status: "closed"` (manual close or real `end_at` expiry) → `"ended"`; found but sold out → `"sold_out"`.
-- An invalid line stays visible with a reason badge and disabled quantity controls — never auto-removed.
+- An invalid line stays visible with a reason badge and disabled quantity controls - never auto-removed.
 - Comments terse, single-line, only for non-obvious rationale, matching this codebase's existing style.
 
 ---
@@ -27,7 +27,7 @@
 
 **Interfaces:**
 - Consumes: `fetchCollection(slug)` from `frontend/src/api/shop.js` (existing, unchanged).
-- Produces: `checkCartAvailability(cart)` — async, returns `Map<number, "unavailable" | "ended" | "sold_out">` containing only the cart's invalid `variant_id`s. `isSoldOut(variant)` — now exported from `ProductCard.jsx` alongside the already-exported `isProductSoldOut`.
+- Produces: `checkCartAvailability(cart)` - async, returns `Map<number, "unavailable" | "ended" | "sold_out">` containing only the cart's invalid `variant_id`s. `isSoldOut(variant)` - now exported from `ProductCard.jsx` alongside the already-exported `isProductSoldOut`.
 
 - [ ] **Step 1: Export `isSoldOut` from `ProductCard.jsx`**
 
@@ -43,7 +43,7 @@ to:
 export const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 ```
 
-No other change in this file — every internal usage of `isSoldOut` already refers to the same identifier, exporting it doesn't change local behavior.
+No other change in this file - every internal usage of `isSoldOut` already refers to the same identifier, exporting it doesn't change local behavior.
 
 - [ ] **Step 2: Add one test confirming the export**
 
@@ -60,7 +60,7 @@ describe("isSoldOut (per-variant)", () => {
 })
 ```
 
-Add `isSoldOut` to this test file's existing import line for `ProductCard.jsx` (it already imports `isProductSoldOut` from the same file — add `isSoldOut` alongside it in the same import statement).
+Add `isSoldOut` to this test file's existing import line for `ProductCard.jsx` (it already imports `isProductSoldOut` from the same file - add `isSoldOut` alongside it in the same import statement).
 
 - [ ] **Step 3: Run to verify it passes**
 
@@ -135,7 +135,7 @@ describe("checkCartAvailability", () => {
     expect(problems.size).toBe(0)
   })
 
-  it("flags a line as unavailable when the collection fetch fails (404 — hidden, deleted, or not started)", async () => {
+  it("flags a line as unavailable when the collection fetch fails (404 - hidden, deleted, or not started)", async () => {
     fetchCollection.mockRejectedValue(new Error("not found"))
     const cart = [{ variant_id: 1, collection_slug: "gone" }]
 
@@ -196,7 +196,7 @@ describe("checkCartAvailability", () => {
 - [ ] **Step 5: Run to verify they fail**
 
 Run: `cd frontend && npx vitest run src/shop/cartAvailability.test.js`
-Expected: FAIL — `./cartAvailability` doesn't exist yet.
+Expected: FAIL - `./cartAvailability` doesn't exist yet.
 
 - [ ] **Step 6: Implement `cartAvailability.js`**
 
@@ -206,7 +206,7 @@ Create `frontend/src/shop/cartAvailability.js`:
 import { fetchCollection } from "../api/shop"
 import { isProductSoldOut, isSoldOut } from "../components/shop/ProductCard"
 
-/** Finds this cart line's product within a fetched collection — digital products are flattened (variant_id lives on the product itself), physical products carry a real variants array. */
+/** Finds this cart line's product within a fetched collection - digital products are flattened (variant_id lives on the product itself), physical products carry a real variants array. */
 function findProduct(collection, variantId) {
   return collection.products.find((p) =>
     p.type === "digital" ? p.variant_id === variantId : p.variants?.some((v) => v.id === variantId)
@@ -215,7 +215,7 @@ function findProduct(collection, variantId) {
 
 /**
  * Classifies every cart line into valid or one of three reasons a buyer
- * can't actually check out with it — a 404 collapses not-started, deleted,
+ * can't actually check out with it - a 404 collapses not-started, deleted,
  * and archived into one bucket since the public API deliberately can't
  * (and shouldn't) tell those apart from the outside.
  */
@@ -301,7 +301,7 @@ In `frontend/src/i18n/translations.js`, `en` block near the existing `cart*` key
 
 - [ ] **Step 2: Read the current `Cart.test.jsx` in full**
 
-This file has no `vi.mock("../api/shop", ...)` today (`Cart.jsx` makes no API calls yet). Adding `checkCartAvailability` means every existing test that adds a cart item with a real `collection_slug` will now trigger a `fetchCollection` call on render. Before writing new tests, read every existing `it(...)` block in this file and note, for each one that sets a non-null `collection_slug`, the exact `variant_id`(s) it adds to the cart — you'll need this in Step 4.
+This file has no `vi.mock("../api/shop", ...)` today (`Cart.jsx` makes no API calls yet). Adding `checkCartAvailability` means every existing test that adds a cart item with a real `collection_slug` will now trigger a `fetchCollection` call on render. Before writing new tests, read every existing `it(...)` block in this file and note, for each one that sets a non-null `collection_slug`, the exact `variant_id`(s) it adds to the cart - you'll need this in Step 4.
 
 - [ ] **Step 3: Write the failing tests for the new behavior**
 
@@ -319,7 +319,7 @@ Add `fetchCollection.mockReset()` to the existing `beforeEach`.
 Add a new `describe` block:
 
 ```js
-describe("Cart — early availability validation", () => {
+describe("Cart - early availability validation", () => {
   it("shows a sold-out badge, disables quantity controls, and disables checkout for a sold-out line", async () => {
     fetchCollection.mockResolvedValue({
       status: "active",
@@ -375,11 +375,11 @@ describe("Cart — early availability validation", () => {
 })
 ```
 
-Cross-check the exact button label text (`"Proceed to checkout"`, `"✕"`, `"Remove"`) against this file's own `t(...)`/English-mode rendering convention (the existing "removing an item" test already uses `"Cancel"`/`"Remove"` as literal English strings, confirming the test environment renders `en` translations) before relying on it — adjust only if it's actually different.
+Cross-check the exact button label text (`"Proceed to checkout"`, `"✕"`, `"Remove"`) against this file's own `t(...)`/English-mode rendering convention (the existing "removing an item" test already uses `"Cancel"`/`"Remove"` as literal English strings, confirming the test environment renders `en` translations) before relying on it - adjust only if it's actually different.
 
 - [ ] **Step 4: Fix every pre-existing test's `fetchCollection` mock so they still pass**
 
-For each pre-existing test noted in Step 2 that sets a non-null `collection_slug`, add (or extend) a `fetchCollection.mockResolvedValue(...)` — either as a shared default in `beforeEach` if every one of those tests can share the same shape, or per-test if their `variant_id`s differ — returning `{ status: "active", products: [{ type: "physical", variants: [{ id: <that test's own variant_id>, stock_qty: null }] }] }` (unlimited stock, always valid) so `checkCartAvailability` resolves those lines as fully valid and none of this task's new behavior (badges, disabled controls, disabled checkout) interferes with what those tests actually check. A test whose cart line has `collection_slug: null` needs no mock at all — `checkCartAvailability` skips it entirely (see Task 1's "never flags a line with no collection_slug" test).
+For each pre-existing test noted in Step 2 that sets a non-null `collection_slug`, add (or extend) a `fetchCollection.mockResolvedValue(...)` - either as a shared default in `beforeEach` if every one of those tests can share the same shape, or per-test if their `variant_id`s differ - returning `{ status: "active", products: [{ type: "physical", variants: [{ id: <that test's own variant_id>, stock_qty: null }] }] }` (unlimited stock, always valid) so `checkCartAvailability` resolves those lines as fully valid and none of this task's new behavior (badges, disabled controls, disabled checkout) interferes with what those tests actually check. A test whose cart line has `collection_slug: null` needs no mock at all - `checkCartAvailability` skips it entirely (see Task 1's "never flags a line with no collection_slug" test).
 
 - [ ] **Step 5: Run to verify the new tests fail and the pre-existing ones still pass once mocked**
 
@@ -417,7 +417,7 @@ Right after the `change`/`confirmRemove` functions, add:
 
 ```js
   // Recomputed from the current cart on every render (not pruned on
-  // removal) — removing the one bad line already makes it disappear here
+  // removal) - removing the one bad line already makes it disappear here
   // for free, no re-fetch needed.
   const activeProblems = cart.filter((c) => problems.has(c.variant_id))
   const hasProblems = checking || activeProblems.length > 0
@@ -613,4 +613,4 @@ cd /Users/phucth/vibes/cosplay-portfolio && bash scripts/build-push.sh staging >
 
 - [ ] **Step 3: Report to the user**
 
-Confirm the suite passed and the staging push, and remind the user this is frontend-only (no migration, no backend change) — pulling/restarting the frontend container is enough to see it.
+Confirm the suite passed and the staging push, and remind the user this is frontend-only (no migration, no backend change) - pulling/restarting the frontend container is enough to see it.

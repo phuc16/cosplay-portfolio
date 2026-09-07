@@ -8,8 +8,8 @@ import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import FitTitle from "../components/shop/FitTitle"
 
-// Sold-out products always sink to the end, under every sort mode — not
-// just the default — so switching to "Price: low to high" etc. never mixes
+// Sold-out products always sink to the end, under every sort mode - not
+// just the default - so switching to "Price: low to high" etc. never mixes
 // an unbuyable item back in among available ones.
 function sortProducts(list, sortBy) {
   const sorted = [...list]
@@ -30,7 +30,7 @@ export default function Collection() {
   const [stockFilter, setStockFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
 
-  // Brief inline confirmation, matching this codebase's no-toast-library style —
+  // Brief inline confirmation, matching this codebase's no-toast-library style -
   // cleared automatically a couple seconds after each add.
   const handleAdded = (label) => {
     setAddedMsg(t("shopAddedToCart", { item: label }))

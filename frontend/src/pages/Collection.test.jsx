@@ -11,7 +11,7 @@ vi.mock("../api/shop", () => ({
   fetchCollection: (...args) => fetchCollection(...args),
 }))
 
-// ShopFooter (rendered on every shop page) fetches /api/settings — mocked
+// ShopFooter (rendered on every shop page) fetches /api/settings - mocked
 // here so tests don't attempt a real network call.
 vi.mock("axios", async (importOriginal) => {
   const actual = await importOriginal()
@@ -62,7 +62,7 @@ beforeEach(() => {
   fetchCollection.mockReset()
 })
 
-describe("Collection — product ordering", () => {
+describe("Collection - product ordering", () => {
   it("sinks fully sold-out products after available ones, without reordering within each group", async () => {
     fetchCollection.mockResolvedValue(baseCollection({
       products: [
@@ -79,7 +79,7 @@ describe("Collection — product ordering", () => {
   })
 })
 
-describe("Collection — search, filter, sort", () => {
+describe("Collection - search, filter, sort", () => {
   function twoProducts(over1 = {}, over2 = {}) {
     return baseCollection({
       products: [
@@ -153,7 +153,7 @@ describe("Collection — search, filter, sort", () => {
 
   it("keeps a sold-out product sunk to the end even under a non-default sort (name A-Z)", async () => {
     // "Photocard" would sort before "Zebra Poster" alphabetically, but it's
-    // sold out — it must still land last.
+    // sold out - it must still land last.
     fetchCollection.mockResolvedValue(twoProducts(
       { name: "Photocard", variants: [{ id: 1, label: "A1", stock_qty: 0 }] },
       { name: "Zebra Poster" }
@@ -172,7 +172,7 @@ describe("Collection — search, filter, sort", () => {
   })
 })
 
-describe("Collection — add-to-cart toast", () => {
+describe("Collection - add-to-cart toast", () => {
   it("shows a toast linking to /cart after adding an item", async () => {
     fetchCollection.mockResolvedValue(baseCollection())
     const container = await renderCollection()

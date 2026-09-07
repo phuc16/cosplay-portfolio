@@ -19,7 +19,7 @@ describe("isPrepaid", () => {
 // prepaid   awaiting_payment      received            received    lost
 // cod       other                 to_collect          received    lost
 //
-// Every one of the 20 combinations is asserted explicitly — this is the
+// Every one of the 20 combinations is asserted explicitly - this is the
 // highest-value test in the whole phase, per the spec's Testing section.
 const PREPAID_METHODS = ["bank", "momo", "paypal"]
 const CASES = []

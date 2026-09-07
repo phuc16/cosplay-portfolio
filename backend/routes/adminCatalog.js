@@ -10,7 +10,7 @@ const STATUSES = ["draft", "active", "closed", "archived"]
 // and comes back as an unhandled ER_DATA_TOO_LONG 500.
 //
 // collections.title itself is varchar(255), but every title is also turned into
-// collections.slug (varchar(191)) via slugify() — for a plain-ASCII title, slug
+// collections.slug (varchar(191)) via slugify() - for a plain-ASCII title, slug
 // generation is length-preserving (spaces collapse to single hyphens, so the
 // slug is never longer than the title). A title between 192 and 255 chars can
 // therefore still crash the same INSERT/UPDATE on the slug column even though
@@ -59,7 +59,7 @@ function validateProduct(body) {
       if (!Number.isInteger(stock) || stock < 0) return "Số lượng phải là số nguyên không âm, hoặc để trống nếu không giới hạn"
     }
     // The link is snapshotted at order-creation time, not looked up live at
-    // fulfillment — an admin filling it in later never reaches buyers who
+    // fulfillment - an admin filling it in later never reaches buyers who
     // already ordered, so a blank link must be rejected up front, not just
     // an overlong one.
     const link = body.delivery_link === undefined || body.delivery_link === null
@@ -233,7 +233,7 @@ module.exports = function adminCatalogRoutes() {
     console.log(`[ADMIN/CATALOG] upload ảnh shop size≈${Math.round(buffer.length / 1024)}KB`)
 
     // Decoding/processing failures mean the input itself is bad (corrupt, truncated,
-    // too large, or an unsupported format) — always a 400. InvalidImageError's message
+    // too large, or an unsupported format) - always a 400. InvalidImageError's message
     // is written for the end user (e.g. "too large, max 50MB") and safe to show as-is;
     // any other error is an unexpected sharp failure, so it falls back to a generic
     // message rather than leaking internals.

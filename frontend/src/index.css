@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ===========================================================================
-   DESIGN TOKENS — ported from design_handoff tokens/*.css (authoritative).
+   DESIGN TOKENS - ported from design_handoff tokens/*.css (authoritative).
    Signature look: neon pink on near-black. Light mode is a clean gray/white.
    =========================================================================== */
 :root {
@@ -41,7 +41,7 @@
   --amber-400: #fbbf24;
   --amber-500: #f59e0b;
 
-  /* --- Semantic aliases — LIGHT MODE (defaults = green scheme; settings may override via applyColorScheme) --- */
+  /* --- Semantic aliases - LIGHT MODE (defaults = green scheme; settings may override via applyColorScheme) --- */
   --brand: #6BBF59;
   --brand-hover: #84cf74;
   --brand-strong: #54a344;
@@ -65,7 +65,7 @@
   --text-link: #6BBF59;
   --text-error: var(--red-500);
 
-  /* --- Semantic state tokens — success / danger / warning / neutral ---
+  /* --- Semantic state tokens - success / danger / warning / neutral ---
      Added for the admin UI & shop state indicators. Deliberately not
      derived from --brand: --brand is admin-configurable via site settings
      (applyColorScheme), and state colour must never depend on the seller's
@@ -104,7 +104,7 @@
   --radius-lg: 0.75rem;    /* large cards, dialogs */
   --radius-full: 9999px;
 
-  /* --- Shadows (signature glow — defaults follow the green scheme) --- */
+  /* --- Shadows (signature glow - defaults follow the green scheme) --- */
   --shadow-pink-glow: 0 0 20px rgba(107, 191, 89, 0.30);
   --shadow-pink-soft: 0 4px 14px rgba(107, 191, 89, 0.15);
   --shadow-pink-hover: 0 20px 25px -5px rgba(107, 191, 89, 0.20), 0 8px 10px -6px rgba(107, 191, 89, 0.20);
@@ -112,7 +112,7 @@
   --grad2: #4ade80;
 }
 
-/* --- Semantic aliases — DARK MODE (the signature aesthetic) --- */
+/* --- Semantic aliases - DARK MODE (the signature aesthetic) --- */
 .dark {
   --brand-soft: rgba(107, 191, 89, 0.15);
 
@@ -177,7 +177,7 @@
 @keyframes hero-slide-cl { from { opacity: 0; transform: translateX(-50%) translateX(-70px); } to { opacity: 1; transform: translateX(-50%); } }
 
 /* Casual download deterrent: images can't be dragged out or long-press-saved
-   easily. Purely a speed bump — determined users can always use DevTools.
+   easily. Purely a speed bump - determined users can always use DevTools.
    Scoped to the public site so admin drag-to-reorder keeps working. */
 .portfolio-root img { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
@@ -197,9 +197,9 @@
 .reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
-/* ── Responsive (portfolio page) — mirrors the reference breakpoints ── */
+/* ── Responsive (portfolio page) - mirrors the reference breakpoints ── */
 /* Tablet (761-980px) gets its own 2-column treatment for the 3-card info
-   grid, instead of falling all the way to mobile's single column — the
+   grid, instead of falling all the way to mobile's single column - the
    extra width over a phone was otherwise going unused. */
 @media (min-width: 761px) and (max-width: 980px) {
   .info-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -227,7 +227,7 @@
   .footer-admin { display: none !important; }
 }
 @media (max-width: 460px) {
-  /* Narrower than the width shrinking justifies a flat 300px — scaled down
+  /* Narrower than the width shrinking justifies a flat 300px - scaled down
      further so a 375px-wide phone doesn't get the same hero height as a
      750px-wide one. */
   .hero-card { height: 240px !important; }

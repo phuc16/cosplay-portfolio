@@ -52,7 +52,7 @@ export const translations = {
     shopQtyIncrease: "Increase quantity",
     shopFaqLink: "FAQ",
     shopFaqTitle: "Frequently asked questions",
-    shopFaqDesc: "Payment, shipping, pickup — answers to what buyers ask most.",
+    shopFaqDesc: "Payment, shipping, pickup - answers to what buyers ask most.",
 
     // Cart & Checkout
     cart: "Cart", cartEmpty: "Your cart is empty.", cartTotal: "Total",
@@ -92,12 +92,12 @@ export const translations = {
     orderSaveLink: "Save this link to check your order later. We also emailed it to you.",
     orderCodeLabel: "Order code",
     orderDeadline: "Payment deadline: {time} ({remaining})",
-    orderDeadlinePassed: "The payment deadline has passed — this order is being cancelled automatically.",
+    orderDeadlinePassed: "The payment deadline has passed - this order is being cancelled automatically.",
     orderManualConfirmNote: "Payments are checked manually by the seller, which can take a little time. Uploading a screenshot of your transfer helps confirm it faster.",
-    orderAwaitingConfirmNote: "We've received your payment screenshot. The seller checks payments manually, so this can take a little time — no need for a new deadline, you're just waiting on them now.",
+    orderAwaitingConfirmNote: "We've received your payment screenshot. The seller checks payments manually, so this can take a little time - no need for a new deadline, you're just waiting on them now.",
     orderShowPaymentInfoAgain: "Need to pay again? View payment details",
     orderHidePaymentInfo: "Hide payment details",
-    orderTransferNoteExplain: "Please include the exact transfer note above — without it, we can't match your payment to this order.",
+    orderTransferNoteExplain: "Please include the exact transfer note above - without it, we can't match your payment to this order.",
     orderPinTitle: "Enter your PIN",
     orderPinSubtitle: "For your privacy, we sent a 6-digit PIN to your email when you placed this order. Enter it to view your order.",
     orderPinSubmit: "View order", orderPinVerifying: "Checking...",
@@ -117,7 +117,7 @@ export const translations = {
     paymentAccountHolder: "Account holder", paymentTransferNote: "Transfer note",
     paymentMomoPhone: "Momo phone", paymentCopy: "Copy", paymentCopied: "Copied",
     paymentScanQr: "Scan to pay", paymentScanQrHint: "Scan with your banking app",
-    paymentQrUnavailable: "The QR code is unavailable right now — please use the details above to transfer manually.",
+    paymentQrUnavailable: "The QR code is unavailable right now - please use the details above to transfer manually.",
     paymentPaypalPay: "Pay with PayPal", paymentCodNote: "Pay in cash when you receive the order.",
 
     // Proof upload
@@ -235,7 +235,7 @@ export const translations = {
     shopQtyIncrease: "Tăng số lượng",
     shopFaqLink: "Hỏi đáp",
     shopFaqTitle: "Câu hỏi thường gặp",
-    shopFaqDesc: "Thanh toán, vận chuyển, nhận hàng — giải đáp những câu hỏi phổ biến nhất.",
+    shopFaqDesc: "Thanh toán, vận chuyển, nhận hàng - giải đáp những câu hỏi phổ biến nhất.",
 
     // Cart & Checkout
     cart: "Giỏ hàng", cartEmpty: "Giỏ hàng của bạn đang trống.", cartTotal: "Tổng cộng",
@@ -275,12 +275,12 @@ export const translations = {
     orderSaveLink: "Lưu lại đường dẫn này để kiểm tra đơn hàng sau. Chúng tôi cũng đã gửi đường dẫn này qua email cho bạn.",
     orderCodeLabel: "Mã đơn hàng",
     orderDeadline: "Hạn thanh toán: {time} ({remaining})",
-    orderDeadlinePassed: "Đã quá hạn thanh toán — đơn hàng đang được tự động hủy.",
+    orderDeadlinePassed: "Đã quá hạn thanh toán - đơn hàng đang được tự động hủy.",
     orderManualConfirmNote: "Người bán kiểm tra chuyển khoản thủ công nên có thể mất chút thời gian. Tải lên ảnh chụp màn hình chuyển khoản sẽ giúp xác nhận nhanh hơn.",
-    orderAwaitingConfirmNote: "Mình đã nhận được ảnh chuyển khoản của bạn. Người bán kiểm tra thủ công nên có thể mất chút thời gian — không còn tính hạn thanh toán nữa, bạn chỉ cần chờ xác nhận.",
+    orderAwaitingConfirmNote: "Mình đã nhận được ảnh chuyển khoản của bạn. Người bán kiểm tra thủ công nên có thể mất chút thời gian - không còn tính hạn thanh toán nữa, bạn chỉ cần chờ xác nhận.",
     orderShowPaymentInfoAgain: "Cần chuyển khoản lại? Xem thông tin thanh toán",
     orderHidePaymentInfo: "Ẩn thông tin thanh toán",
-    orderTransferNoteExplain: "Vui lòng ghi đúng nội dung chuyển khoản ở trên — nếu không, chúng tôi sẽ không thể đối chiếu thanh toán với đơn hàng này.",
+    orderTransferNoteExplain: "Vui lòng ghi đúng nội dung chuyển khoản ở trên - nếu không, chúng tôi sẽ không thể đối chiếu thanh toán với đơn hàng này.",
     orderPinTitle: "Nhập mã PIN",
     orderPinSubtitle: "Để bảo mật, chúng tôi đã gửi mã PIN gồm 6 chữ số qua email khi bạn đặt đơn này. Nhập mã để xem đơn hàng.",
     orderPinSubmit: "Xem đơn hàng", orderPinVerifying: "Đang kiểm tra...",
@@ -300,7 +300,7 @@ export const translations = {
     paymentAccountHolder: "Chủ tài khoản", paymentTransferNote: "Nội dung chuyển khoản",
     paymentMomoPhone: "Số điện thoại Momo", paymentCopy: "Sao chép", paymentCopied: "Đã sao chép",
     paymentScanQr: "Quét để thanh toán", paymentScanQrHint: "Quét bằng ứng dụng ngân hàng",
-    paymentQrUnavailable: "Mã QR hiện chưa dùng được — vui lòng dùng thông tin phía trên để chuyển khoản thủ công.",
+    paymentQrUnavailable: "Mã QR hiện chưa dùng được - vui lòng dùng thông tin phía trên để chuyển khoản thủ công.",
     paymentPaypalPay: "Thanh toán qua PayPal", paymentCodNote: "Thanh toán tiền mặt khi nhận hàng.",
 
     // Proof upload

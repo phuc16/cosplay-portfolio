@@ -5,7 +5,7 @@ const { buildVietQrPayload } = require("./vietqr")
  * receives bank account details, so a leaked order page exposes the minimum.
  */
 function buildInstructions(order, settings) {
-  // Admin-authored, shared across every payment method — not per-order, by
+  // Admin-authored, shared across every payment method - not per-order, by
   // design (the seller matches transfers by amount/timing/buyer contact
   // instead of a unique code).
   const note = settings.payment_note || null
@@ -21,7 +21,7 @@ function buildInstructions(order, settings) {
         addInfo: note,
       })
     } catch (err) {
-      // Misconfiguration must not blank the page — the buyer can still
+      // Misconfiguration must not blank the page - the buyer can still
       // transfer manually using the printed details below.
       console.warn("[PAYMENTS] Không tạo được VietQR:", err.message)
     }

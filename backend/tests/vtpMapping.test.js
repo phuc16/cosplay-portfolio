@@ -51,7 +51,7 @@ describe("resolveCod", () => {
     expect(resolveCod({ payment_method: "cod", cod_amount: undefined }).ok).toBe(false)
   })
 
-  it("returns 0 (not an error) for a COD order collecting zero — a legitimate zero-collection instruction, distinct from null (export error)", () => {
+  it("returns 0 (not an error) for a COD order collecting zero - a legitimate zero-collection instruction, distinct from null (export error)", () => {
     // Zero is intentionally collected money (perhaps a return or reversal).
     // Null/undefined is a missing field (export error). If this were a falsy check
     // instead of strict null/undefined, zero would wrongly be treated as missing data.
@@ -75,7 +75,7 @@ describe("selectPayer", () => {
   })
 })
 
-describe("mapOrderToRow — success paths", () => {
+describe("mapOrderToRow - success paths", () => {
   it("maps a prepaid intra-HCM freeship order to the exact expected row", () => {
     const result = mapOrderToRow(baseOrder({ shipping_payer: "seller" }))
     expect(result.ok).toBe(true)
@@ -115,7 +115,7 @@ describe("mapOrderToRow — success paths", () => {
   })
 })
 
-describe("mapOrderToRow — error paths", () => {
+describe("mapOrderToRow - error paths", () => {
   it("rejects an order with no usable address, never exporting a blank column E", () => {
     const result = mapOrderToRow(baseOrder({
       address_street: null, address_ward: null, address_district: null,
@@ -134,7 +134,7 @@ describe("mapOrderToRow — error paths", () => {
   })
 })
 
-describe("mapOrderToRow — security: order_token never appears in the mapped row", () => {
+describe("mapOrderToRow - security: order_token never appears in the mapped row", () => {
   it("does not include order_token as a key or leak its value into any field", () => {
     const order = baseOrder()
     const result = mapOrderToRow(order)

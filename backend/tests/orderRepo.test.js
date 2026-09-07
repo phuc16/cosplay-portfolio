@@ -287,7 +287,7 @@ describe("createOrder", () => {
   })
 
   // A cart item can be added while its collection is "active" and then
-  // outlive that — the seller closes the drop before the buyer checks out.
+  // outlive that - the seller closes the drop before the buyer checks out.
   // Without this guard, createOrder never looked at collection.status at
   // all, so a stale cart could still place an order against an ended drop.
   it("refuses an order for a closed collection, leaving stock untouched", async () => {
@@ -300,7 +300,7 @@ describe("createOrder", () => {
     expect(orders).toHaveLength(0)
   })
 
-  it("refuses an order for a draft collection (defense in depth — never publicly listed anyway)", async () => {
+  it("refuses an order for a draft collection (defense in depth - never publicly listed anyway)", async () => {
     const { variantId } = await seedVariant(5, { status: "draft" })
     await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
   })
@@ -320,7 +320,7 @@ describe("createOrder", () => {
       "SELECT c.status FROM product_variants v JOIN products p ON p.id = v.product_id JOIN collections c ON c.id = p.collection_id WHERE v.id = ?",
       [variantId]
     )
-    expect(row.status).toBe("active") // createOrder itself never writes the transition — see Task 2 for that
+    expect(row.status).toBe("active") // createOrder itself never writes the transition - see Task 2 for that
   })
 
   it("still allows an order when end_at is in the future", async () => {
@@ -861,7 +861,7 @@ describe("getOrderByToken", () => {
     void pid
   })
 
-  it("keeps the item photo after its variant is deleted — the live join degrades to null, but the snapshot taken at order time does not", async () => {
+  it("keeps the item photo after its variant is deleted - the live join degrades to null, but the snapshot taken at order time does not", async () => {
     const { pid, variantId } = await seedVariant(5)
     await catalog.replaceVariants(pid, [{ id: variantId, label: "A1", image_url: "/api/storage/shop/variants/a1.webp", stock_qty: 5 }])
     const res = await repo.createOrder(order(variantId, 1))
@@ -892,7 +892,7 @@ describe("getOrderByToken", () => {
   })
 })
 
-describe("createOrder — digital items", () => {
+describe("createOrder - digital items", () => {
   it("rejects COD when the cart has any digital item", async () => {
     const { variantId } = await seedDigitalVariant(10)
     await expect(

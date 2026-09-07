@@ -21,7 +21,7 @@ async function claimPending(limit = 10) {
 }
 
 async function markSent(id) {
-  // payload cleared here too — once sent, nothing still needs the plaintext
+  // payload cleared here too - once sent, nothing still needs the plaintext
   // it carried (e.g. the access PIN), so it shouldn't keep sitting in the row.
   await db.query(
     "UPDATE email_queue SET status = 'sent', sent_at = NOW(), payload = NULL WHERE id = ?", [id]

@@ -16,8 +16,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const bad = (res, message) => res.status(400).json({ error: "invalid_input", message })
 
 // The DB row (and repo.getOrderByToken) carries internal fields the buyer has
-// no use for and no business seeing — request_key (the idempotency key) and
-// stock_released_at (an internal reservation flag) — plus PII the order page
+// no use for and no business seeing - request_key (the idempotency key) and
+// stock_released_at (an internal reservation flag) - plus PII the order page
 // doesn't render. Project down to exactly what Order.jsx reads.
 function toPublicOrder(order) {
   const {
@@ -25,13 +25,13 @@ function toPublicOrder(order) {
     // When the current status was reached, so the order page can show a
     // timestamp next to it (e.g. "Đã xác nhận · 14/08/2026, 13:00") instead
     // of leaving the buyer to guess how long ago it happened. Same fields
-    // the admin's OrderTimeline already reads — no new data, just exposed
+    // the admin's OrderTimeline already reads - no new data, just exposed
     // here too.
     confirmed_at, shipped_at, completed_at, cancelled_at,
     // Spec (Fulfillment): pickup location/note must be shown on the order
     // page, not just the pre-purchase collection browse page. Sourced from
     // the order's own collection (joined in getOrderByToken), same content
-    // that is already public on the collection page — no new exposure.
+    // that is already public on the collection page - no new exposure.
     pickup_location, pickup_note,
     // Spec (Buyer Onboarding, Phase 6): the payment deadline the reservation
     // and the expiry sweep already enforce, but never told to the buyer
@@ -43,12 +43,12 @@ function toPublicOrder(order) {
     // network. Always null for a ship order.
     pickup_code,
     // The proof screenshot itself, so the buyer sees what they uploaded on
-    // every visit, not just the one where they uploaded it — same trust
+    // every visit, not just the one where they uploaded it - same trust
     // boundary as the rest of this response, which already requires the
     // order_token to reach.
     payment_proof_url,
     // Receiver info, so the buyer can double-check who/where this ships to
-    // (same "Thông tin nhận hàng" pattern as Shopee's order confirmation) —
+    // (same "Thông tin nhận hàng" pattern as Shopee's order confirmation) -
     // an earlier phase deliberately kept these off this response as a
     // privacy default; showing them is now an explicit, later decision, not
     // an oversight. The order page's only protection is still the
@@ -56,18 +56,18 @@ function toPublicOrder(order) {
     // buyer being able to catch a typo'd address/phone before it ships.
     buyer_name, phone, address_raw,
     // Shown in place of the generic "save this link" note once an order is
-    // cancelled — the buyer lands here wanting to know why, not to be told
+    // cancelled - the buyer lands here wanting to know why, not to be told
     // to bookmark an order that's already dead. Same field the admin's own
     // view and the cancellation email already show.
     cancel_reason,
   } = order
-  // The code is only meaningful once the order is actually paid for — an
+  // The code is only meaningful once the order is actually paid for - an
   // unpaid pending order (or one that got cancelled after confirming) has
   // nothing to hand over, and showing the code that early lets a buyer treat
   // "I placed an order" as "I can collect it" before the seller ever
   // verified payment.
   const paidPickupCode = ["confirmed", "completed"].includes(status) ? pickup_code : null
-  // Same trust boundary as pickup_code above — a link that's fixed on the
+  // Same trust boundary as pickup_code above - a link that's fixed on the
   // product for every buyer is only worth showing once the seller has
   // actually accepted (confirmed) the order, never for pending/cancelled.
   const showDelivery = ["confirmed", "shipped", "completed"].includes(status)
@@ -82,7 +82,7 @@ function toPublicOrder(order) {
     has_payment_proof: Boolean(payment_proof_url),
     payment_proof_url: payment_proof_url || null,
     buyer_name, phone, address_raw: address_raw || null,
-    // The human-readable code shown everywhere else (admin, emails) — the
+    // The human-readable code shown everywhere else (admin, emails) - the
     // order page never surfaced it before, leaving a buyer with no code to
     // reference when contacting support, only the opaque URL token.
     order_code: formatOrderCode(id, created_at),
@@ -101,14 +101,14 @@ function validate(body) {
   }
 
   // A physical line requires ship/pickup; an all-digital cart may omit it
-  // entirely — orderRepo.createOrder is the only place that knows a cart's
+  // entirely - orderRepo.createOrder is the only place that knows a cart's
   // item types, so it does the real requiredness check and throws
   // FulfillmentRequiredError if a physical line has none.
   if (fulfillment_method !== undefined && fulfillment_method !== null && !FULFILLMENT.includes(fulfillment_method)) {
     return "Hình thức nhận hàng không hợp lệ"
   }
   if (!PAYMENT_METHODS.includes(payment_method)) return "Phương thức thanh toán không hợp lệ"
-  // Pickup orders require prepayment — COD only applies when there is a
+  // Pickup orders require prepayment - COD only applies when there is a
   // delivery to collect cash at. A crafted request could otherwise bypass
   // the checkout UI's own filter (added alongside this).
   if (payment_method === "cod" && fulfillment_method === "pickup") {
@@ -150,7 +150,7 @@ module.exports = function orderRoutes() {
       // email the first time around, so it does not do so again.
       if (!order.reused) {
         try {
-          // access_pin only goes to the buyer's own copy — admin already
+          // access_pin only goes to the buyer's own copy - admin already
           // bypasses the PIN gate via their own login, so their copy has no
           // use for it and shouldn't carry it into an inbox that doesn't need it.
           await emailQueue.enqueue(order.id, "order_placed", req.body.buyer.email, { access_pin: order.access_pin })
@@ -163,7 +163,7 @@ module.exports = function orderRoutes() {
       }
 
       // Lets the buyer's own browser skip the PIN gate for the order page it's
-      // about to navigate straight to — see orderAccess.js's
+      // about to navigate straight to - see orderAccess.js's
       // issueOrderSessionToken for why this is safe (same request/browser
       // that just placed the order, not a link being opened by someone else).
       res.status(201).json({
@@ -177,7 +177,7 @@ module.exports = function orderRoutes() {
       if (err instanceof repo.NoCodForDigitalError) return bad(res, err.message)
       if (err instanceof repo.FulfillmentRequiredError) return bad(res, err.message)
       // A cart line's variant_id matches no row at all (deleted, or a stale
-      // cart carrying an id that never existed) — distinct from a real
+      // cart carrying an id that never existed) - distinct from a real
       // OutOfStockError, which always has an actual product label to quote.
       if (err instanceof repo.VariantNotFoundError) {
         return res.status(409).json({
@@ -195,7 +195,7 @@ module.exports = function orderRoutes() {
       }
       // A cart line's collection stopped being "active" between add-to-cart
       // and checkout (most commonly: the seller closed the drop, or its
-      // scheduled end_at just passed) — a race the client cannot retry
+      // scheduled end_at just passed) - a race the client cannot retry
       // unchanged, same as OutOfStockError.
       if (err instanceof repo.CollectionNotActiveError) {
         return res.status(409).json({
@@ -206,7 +206,7 @@ module.exports = function orderRoutes() {
       }
       // A colliding request_key belonging to a different buyer: the unique
       // index refused the insert, and the shared key cannot be reused for this
-      // buyer's order either — a distinct code so the client does not treat it
+      // buyer's order either - a distinct code so the client does not treat it
       // like an ordinary validation error or retry with the same key.
       if (err instanceof repo.RequestKeyConflictError) {
         return res.status(409).json({ error: "request_key_conflict", message: err.message })
@@ -215,14 +215,14 @@ module.exports = function orderRoutes() {
       // interpolated failing SQL (every bound parameter, including the
       // buyer's full name/phone/address/email and the generated
       // order_token) in err.sql, and console.error(err) prints that. Log
-      // only the message (plus the code, useful for triage) — never err,
+      // only the message (plus the code, useful for triage) - never err,
       // err.sql, or anything from req.body.
       console.error("[ORDERS] Lỗi tạo đơn:", err.message, err.code || "")
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
 
-  // Deliberately NOT behind orderAccess — this is how a buyer earns the
+  // Deliberately NOT behind orderAccess - this is how a buyer earns the
   // session token orderAccess checks below. 5 wrong PINs locks this specific
   // order_token for 15 minutes (see orderAccess.js's verifyPin), independent
   // of the general publicLimiter this router already sits behind.
@@ -240,7 +240,7 @@ module.exports = function orderRoutes() {
       if (result.locked) {
         return res.status(429).json({
           error: "too_many_attempts",
-          // message is Vietnamese-only, kept for API completeness/logging —
+          // message is Vietnamese-only, kept for API completeness/logging -
           // the frontend builds its own localized string from
           // retry_after_seconds instead of displaying this verbatim, so an
           // English-language buyer never sees Vietnamese text here.
@@ -303,8 +303,8 @@ module.exports = function orderRoutes() {
   })
 
   // Renders the VietQR payload (not the order URL) as an SVG so the buyer's
-  // banking app can scan it. Built the same way as /qr.svg — locally, on
-  // demand, never stored — so the account details never transit a third
+  // banking app can scan it. Built the same way as /qr.svg - locally, on
+  // demand, never stored - so the account details never transit a third
   // party image service. 404 when the method isn't bank or the payload
   // could not be built (misconfiguration); the caller falls back to the
   // printed account details in that case.
@@ -346,7 +346,7 @@ module.exports = function orderRoutes() {
       }
 
       // Decoding/processing failures mean the input itself is bad (corrupt,
-      // truncated, too large, or an unsupported format) — always a 400.
+      // truncated, too large, or an unsupported format) - always a 400.
       // InvalidImageError's message is written for the buyer (e.g. "too
       // large, max 50MB") and safe to show as-is; any other error is an
       // unexpected sharp failure, so it falls back to a generic message

@@ -1,5 +1,5 @@
 // crypto.randomUUID() only exists in secure contexts (HTTPS or localhost). Over
-// plain HTTP on a LAN IP — a realistic device-testing setup during development —
+// plain HTTP on a LAN IP - a realistic device-testing setup during development -
 // it's undefined, and calling it would throw during render since this feeds a
 // useState initializer, blanking the whole page. Production is HTTPS so this
 // isn't a live production risk, just a confusing dev-mode failure. The fallback

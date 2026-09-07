@@ -499,7 +499,7 @@ describe("POST /api/admin/shop/image", () => {
   })
 
   it("returns 400 invalid_input for a truncated/corrupted image buffer (not a 500)", async () => {
-    // A genuine JPEG with a valid-looking header, truncated mid-body — this is what a
+    // A genuine JPEG with a valid-looking header, truncated mid-body - this is what a
     // partial upload / network truncation actually produces, and sharp reports it as
     // "Input buffer has corrupt header: ..." rather than "unsupported image format".
     const realJpeg = await sharp({
@@ -519,7 +519,7 @@ describe("POST /api/admin/shop/image", () => {
     const oversized = Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0)
     oversized[0] = 0xff
     oversized[1] = 0xd8
-    oversized[2] = 0xff // valid jpeg magic bytes — this must fail on size, not type
+    oversized[2] = 0xff // valid jpeg magic bytes - this must fail on size, not type
 
     const res = await authed(request(app).post("/api/admin/shop/image"))
       .send({ base64: oversized.toString("base64"), folder: "misc" })

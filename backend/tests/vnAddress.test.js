@@ -51,7 +51,7 @@ describe("getProvinces", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
 
     await vnAddress.getProvinces()
-    expect(fetchSpy).toHaveBeenCalledTimes(1) // still 1 — second call was cached
+    expect(fetchSpy).toHaveBeenCalledTimes(1) // still 1 - second call was cached
   })
 
   it("throws (surfaces as a 500, not a silent empty list) when the upstream API errors", async () => {
@@ -89,7 +89,7 @@ describe("getWards", () => {
     ])
   })
 
-  it("caches per province code — a different province is a cache miss", async () => {
+  it("caches per province code - a different province is a cache miss", async () => {
     fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({ wards: [{ code: 1, name: "Phường A" }] }),

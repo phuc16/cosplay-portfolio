@@ -1,7 +1,7 @@
 const KEY = "shop_cart"
 
 // Every write (add/update/remove/clear) goes through writeCart, so notifying
-// there is the one place that reaches every subscriber — no poller needed.
+// there is the one place that reaches every subscriber - no poller needed.
 const listeners = new Set()
 
 /** Subscribe to cart writes. Returns an unsubscribe function. */

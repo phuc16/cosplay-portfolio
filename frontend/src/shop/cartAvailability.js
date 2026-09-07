@@ -1,7 +1,7 @@
 import { fetchCollection } from "../api/shop"
 import { isProductSoldOut, isSoldOut } from "../components/shop/ProductCard"
 
-/** Finds this cart line's product within a fetched collection — digital products are flattened (variant_id lives on the product itself), physical products carry a real variants array. */
+/** Finds this cart line's product within a fetched collection - digital products are flattened (variant_id lives on the product itself), physical products carry a real variants array. */
 function findProduct(collection, variantId) {
   return collection.products.find((p) =>
     p.type === "digital" ? p.variant_id === variantId : p.variants?.some((v) => v.id === variantId)
@@ -10,7 +10,7 @@ function findProduct(collection, variantId) {
 
 /**
  * Classifies every cart line into valid or one of three reasons a buyer
- * can't actually check out with it — a 404 collapses not-started, deleted,
+ * can't actually check out with it - a 404 collapses not-started, deleted,
  * and archived into one bucket since the public API deliberately can't
  * (and shouldn't) tell those apart from the outside.
  */

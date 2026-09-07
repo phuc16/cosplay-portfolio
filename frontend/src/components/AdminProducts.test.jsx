@@ -39,7 +39,7 @@ async function renderProducts(collection = { id: 1 }) {
 async function flush() { await act(async () => {}) }
 
 // jsdom doesn't implement HTML5 drag-and-drop, so DragEvent isn't a real
-// class there — a plain object with the handler-required shape (dataTransfer
+// class there - a plain object with the handler-required shape (dataTransfer
 // with the methods the component calls, preventDefault/stopPropagation) is
 // dispatched directly at the handler instead of through a real drag gesture.
 function fireDrag(el, type, dataTransfer) {
@@ -68,7 +68,7 @@ beforeEach(() => {
   adminSaveVariants.mockReset()
 })
 
-describe("AdminProducts — reordering via drag and drop", () => {
+describe("AdminProducts - reordering via drag and drop", () => {
   it("shows a drag hint only when there is more than one product", async () => {
     adminGetCollection.mockResolvedValue({ products: [product()] })
     const container = await renderProducts()
@@ -138,7 +138,7 @@ describe("AdminProducts — reordering via drag and drop", () => {
   })
 })
 
-describe("AdminProducts — digital products", () => {
+describe("AdminProducts - digital products", () => {
   it("creates a digital product with stock_qty and delivery_link, no variant button", async () => {
     adminGetCollection.mockResolvedValue({ products: [] })
     adminCreateProduct.mockResolvedValue({ id: 1 })
@@ -216,7 +216,7 @@ describe("AdminProducts — digital products", () => {
   })
 })
 
-describe("AdminProducts — search, filter, sort", () => {
+describe("AdminProducts - search, filter, sort", () => {
   it("filters the list by name, case-insensitively", async () => {
     adminGetCollection.mockResolvedValue({
       products: [product({ id: 1, name: "Photocard" }), product({ id: 2, name: "Poster" })],

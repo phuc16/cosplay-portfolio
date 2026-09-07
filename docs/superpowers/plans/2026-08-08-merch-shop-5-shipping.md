@@ -1,16 +1,16 @@
-# Merch Shop — Plan 5: ViettelPost Export & Shipping Handoff
+# Merch Shop - Plan 5: ViettelPost Export & Shipping Handoff
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the seller's manual ViettelPost data entry with a "Vận chuyển" admin tab: select confirmed ship orders and download a ready-to-import VTP spreadsheet, paste or upload VTP's result file to bulk-apply tracking codes (with a mandatory preview step), and print a pickup roster for in-person collection events.
 
-**Architecture:** Pure mapping logic (`vtpMapping.js`) — order code, address assembly, service selection, COD/payer resolution — is isolated from all I/O and exhaustively tested, mirroring Plan 4's `money.js` split: this is the file where a silently-wrong shipment or a silently-wrong COD amount would originate, so it is the single highest-value test target in the phase. `vtpWorkbook.js` is the only file that touches `exceljs`, loading a bundled copy of ViettelPost's own template and filling it from row 8. `trackingImport.js` parses and resolves tracking pairs against already-fetched order rows without doing any I/O itself — the route layer does the fetching and the `exceljs`/upload parsing, keeping the resolution logic (idempotency, unmatched codes, already-shipped skip) unit-testable in isolation. `roster.js` shapes already-fetched order+item rows into the printable pickup list. All writes to order status flow through the existing `transitionOrder()` — nothing in this phase bypasses the order state machine.
+**Architecture:** Pure mapping logic (`vtpMapping.js`) - order code, address assembly, service selection, COD/payer resolution - is isolated from all I/O and exhaustively tested, mirroring Plan 4's `money.js` split: this is the file where a silently-wrong shipment or a silently-wrong COD amount would originate, so it is the single highest-value test target in the phase. `vtpWorkbook.js` is the only file that touches `exceljs`, loading a bundled copy of ViettelPost's own template and filling it from row 8. `trackingImport.js` parses and resolves tracking pairs against already-fetched order rows without doing any I/O itself - the route layer does the fetching and the `exceljs`/upload parsing, keeping the resolution logic (idempotency, unmatched codes, already-shipped skip) unit-testable in isolation. `roster.js` shapes already-fetched order+item rows into the printable pickup list. All writes to order status flow through the existing `transitionOrder()` - nothing in this phase bypasses the order state machine.
 
-**Tech Stack:** As Plans 1–4, plus `exceljs` (new backend dependency) for reading/writing `.xlsx`. No PDF library — the pickup roster is browser-printed HTML.
+**Tech Stack:** As Plans 1–4, plus `exceljs` (new backend dependency) for reading/writing `.xlsx`. No PDF library - the pickup roster is browser-printed HTML.
 
 **Depends on:** Plans 1–4 complete, `feature/order` branch, HEAD includes commit `b5b5a57` (Plan 4's drop-view component, the last Plan 4 commit).
 
-**Spec:** `docs/superpowers/specs/2026-08-08-viettelpost-export-design.md` — read it before touching this plan; the Template — Verified Facts, Order Code — a Security Decision, and Edge Cases sections are the source of truth for every branch below.
+**Spec:** `docs/superpowers/specs/2026-08-08-viettelpost-export-design.md` - read it before touching this plan; the Template - Verified Facts, Order Code - a Security Decision, and Edge Cases sections are the source of truth for every branch below.
 
 ## Global Constraints
 
@@ -23,13 +23,13 @@
 - **Mobile:** usable at 375px; wide tables scroll inside their own `overflow-x-auto` container, never causing the page to scroll sideways.
 - **Frontend fetches go through `frontend/src/api/shop.js`** client functions, which use the auth-interceptor-wired axios instance. A hand-rolled `fetch`/bare-axios call 401s at runtime.
 - **State is cleared in the event handler that triggers a refetch, never inside the fetch effect itself** (lint rule `react-hooks/set-state-in-effect` plus a stale-data-flash bug this codebase has hit before). Guard out-of-order responses with a request-generation ref where a component's fetch can be re-triggered by user action while a previous request is still in flight.
-- **`order_token` must never appear in any exported artifact** — spreadsheet, CSV, roster HTML, or any admin API response this phase adds. It is a bearer credential granting access to a buyer's order page; column B of the VTP template carries `DH<orders.id>` instead. This is the phase's single non-negotiable security property — see Task 3's Step 1.
-- **Test commands:** backend `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test` (420 passing before this phase starts); frontend `cd frontend && npm test && npm run build && npm run lint` (88 passing before this phase starts). `npm run lint` has 3 known pre-existing problems in `Portfolio.jsx`/`AdminAlbumImages.jsx` (2 warnings, 1 error) from earlier phases — not this plan's problem; do not fix them here, and do not let a new task introduce a fourth.
+- **`order_token` must never appear in any exported artifact** - spreadsheet, CSV, roster HTML, or any admin API response this phase adds. It is a bearer credential granting access to a buyer's order page; column B of the VTP template carries `DH<orders.id>` instead. This is the phase's single non-negotiable security property - see Task 3's Step 1.
+- **Test commands:** backend `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test` (420 passing before this phase starts); frontend `cd frontend && npm test && npm run build && npm run lint` (88 passing before this phase starts). `npm run lint` has 3 known pre-existing problems in `Portfolio.jsx`/`AdminAlbumImages.jsx` (2 warnings, 1 error) from earlier phases - not this plan's problem; do not fix them here, and do not let a new task introduce a fourth.
 - **Commits:** Conventional Commits, descriptive body, **no `Co-Authored-By` trailer**.
 - **The bundled VTP template ships inside the repo** at `backend/shop/shipping/templates/VTP_mau_excel_don_hang_o.xlsx` so an export never depends on a path outside the repository (`/Users/phucth/vibes/vtp` is a local-machine-only workaround directory, not something a deployed container has access to).
 - **Verified template facts** (read directly from the file, not assumed): data sheet is `Danh sách`, header row **7**, data begins **row 8**. Column letters: A=STT, B=Mã đơn hàng, C=Tên người nhận(\*), D=Số ĐT(\*), E=Địa chỉ nhận(\*), F=Tên hàng hóa(\*), G=Số lượng, H=Trọng lượng gram(\*), I=Giá trị hàng VND(\*), J=Tiền thu hộ COD, K=Loại hàng hóa(\*), L=Tính chất đặc biệt, M=Dịch vụ(\*), N=Dịch vụ cộng thêm, O=Thu tiền xem hàng, P/Q/R=Dài/Rộng/Cao, S=Người trả cước, T=Yêu cầu khác, U=Thời gian hẹn lấy, V=Thời gian giao. Exact service strings: `PHS - Nội tỉnh tiết kiệm thỏa thuận` (intra-HCM), `VTK - CP tiết kiệm thỏa thuận` (inter-province). Exact payer strings: `Người gửi trả` (seller pays), `Người nhận trả` (buyer pays). `Loai hang hoa` reference sheet has exactly two values: `Bưu kiện`, `Tài liệu`.
-- **`Thời gian hẹn lấy` (column U) is a `<select>` over the exact 11 values transcribed verbatim from the template's own reference sheet:** `Hôm nay - Sáng (7h30 - 12h00)`, `Hôm nay - Chiều (13h30 - 18h00)`, `Hôm nay - Tối (18h30 - 21h00)`, `Ngày mai - Cả ngày`, `Ngày mai - Sáng (7h30 - 12h00)`, `Ngày mai - Chiều (13h30 - 18h00)`, `Ngày mai - Tối (18h30 - 21h00)`, `Ngày kia - Cả ngày`, `Ngày kia - Sáng (7h30 - 12h00)`, `Ngày kia - Chiều (13h30 - 18h00)`, `Ngày kia - Tối (18h30 - 21h00)`. VTP validates this field server-side on import, so free text would let a typo produce a file rejected only at upload time. Do not invent, reorder or "tidy" these strings — they must match byte-for-byte.
-- **`Số lượng` (column G) is not a batch-level input.** The spec's Batch-level fields section lists only F, H, K, U. G is filled as a fixed `1` (one parcel per order row) — `orders.total`/`cod_amount` already reflect the whole order's merch value, and per-order-item quantity has no defensible single number to put in a column that describes package count, not merchandise count. See Task 5.
+- **`Thời gian hẹn lấy` (column U) is a `<select>` over the exact 11 values transcribed verbatim from the template's own reference sheet:** `Hôm nay - Sáng (7h30 - 12h00)`, `Hôm nay - Chiều (13h30 - 18h00)`, `Hôm nay - Tối (18h30 - 21h00)`, `Ngày mai - Cả ngày`, `Ngày mai - Sáng (7h30 - 12h00)`, `Ngày mai - Chiều (13h30 - 18h00)`, `Ngày mai - Tối (18h30 - 21h00)`, `Ngày kia - Cả ngày`, `Ngày kia - Sáng (7h30 - 12h00)`, `Ngày kia - Chiều (13h30 - 18h00)`, `Ngày kia - Tối (18h30 - 21h00)`. VTP validates this field server-side on import, so free text would let a typo produce a file rejected only at upload time. Do not invent, reorder or "tidy" these strings - they must match byte-for-byte.
+- **`Số lượng` (column G) is not a batch-level input.** The spec's Batch-level fields section lists only F, H, K, U. G is filled as a fixed `1` (one parcel per order row) - `orders.total`/`cod_amount` already reflect the whole order's merch value, and per-order-item quantity has no defensible single number to put in a column that describes package count, not merchandise count. See Task 5.
 
 ---
 
@@ -41,7 +41,7 @@
 - Test: `backend/tests/vtpTemplate.test.js`
 
 **Interfaces:**
-- Produces: the bundled template file at a stable repo path, and confirms `exceljs` is importable and can read it. No JS module is created by this task — Task 5 (`vtpWorkbook.js`) is the first to `require("exceljs")` in application code.
+- Produces: the bundled template file at a stable repo path, and confirms `exceljs` is importable and can read it. No JS module is created by this task - Task 5 (`vtpWorkbook.js`) is the first to `require("exceljs")` in application code.
 
 - [ ] **Step 1: Copy the template into the repo**
 
@@ -106,7 +106,7 @@ describe("the bundled VTP template", () => {
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- vtpTemplate`
-Expected: PASS, 4 tests. (If it fails, the file did not copy correctly or `exceljs` did not install — fix before continuing; every later task depends on this file being present and loadable.)
+Expected: PASS, 4 tests. (If it fails, the file did not copy correctly or `exceljs` did not install - fix before continuing; every later task depends on this file being present and loadable.)
 
 - [ ] **Step 5: Commit**
 
@@ -122,13 +122,13 @@ at /Users/phucth/vibes/vtp, which a deployed container cannot see).
 
 exceljs is added as the xlsx read/write dependency for the writer built in
 Task 5. This task only proves the bundled copy loads and has the sheets and
-header cells the rest of the phase assumes — no application code yet.
+header cells the rest of the phase assumes - no application code yet.
 EOF
 ```
 
 ---
 
-### Task 2: `vtpMapping.js` — order code, address assembly, service selection
+### Task 2: `vtpMapping.js` - order code, address assembly, service selection
 
 **Files:**
 - Create: `backend/shop/shipping/vtpMapping.js`
@@ -137,12 +137,12 @@ EOF
 **Interfaces:**
 - Produces `vtpMapping.js` exporting:
   - `ORDER_CODE_PREFIX = "DH"`
-  - `orderCode(orderId: number): string` — `"DH" + orderId`
+  - `orderCode(orderId: number): string` - `"DH" + orderId`
   - `SERVICE_INTRA_HCM = "PHS - Nội tỉnh tiết kiệm thỏa thuận"`
   - `SERVICE_INTER_PROVINCE = "VTK - CP tiết kiệm thỏa thuận"`
   - `isHoChiMinh(province: string | null | undefined): boolean`
-  - `selectService(province: string | null | undefined): string` — returns `SERVICE_INTRA_HCM` or `SERVICE_INTER_PROVINCE`
-  - `assembleAddress(order: {address_street, address_ward, address_district, address_province, address_raw}): string | null` — `null` means no usable address
+  - `selectService(province: string | null | undefined): string` - returns `SERVICE_INTRA_HCM` or `SERVICE_INTER_PROVINCE`
+  - `assembleAddress(order: {address_street, address_ward, address_district, address_province, address_raw}): string | null` - `null` means no usable address
 - Task 3 extends this same file with COD/payer resolution and `mapOrderToRow`, and imports `orderCode`, `ORDER_CODE_PREFIX`, `selectService`, `assembleAddress` from it.
 
 - [ ] **Step 1: Write the failing test**
@@ -262,7 +262,7 @@ describe("assembleAddress", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- vtpMappingAddress`
-Expected: FAIL — `backend/shop/shipping/vtpMapping.js` does not exist.
+Expected: FAIL - `backend/shop/shipping/vtpMapping.js` does not exist.
 
 - [ ] **Step 3: Implement**
 
@@ -271,7 +271,7 @@ Create `backend/shop/shipping/vtpMapping.js`:
 ```js
 const ORDER_CODE_PREFIX = "DH"
 
-/** Column B (Mã đơn hàng). Never order_token — see this plan's Global
+/** Column B (Mã đơn hàng). Never order_token - see this plan's Global
  * Constraints and Task 3's security test. orders.id is already the
  * admin-facing identifier, stable, unique, and discloses nothing sensitive
  * to a courier who already receives the buyer's name, phone, and address. */
@@ -287,7 +287,7 @@ const HCM_KEYWORDS = [
 ]
 
 /** Strips diacritics and lowercases so "Hồ Chí Minh", "HCM", and "Sài Gòn"
- * all match the same keyword list the seller's existing script used —
+ * all match the same keyword list the seller's existing script used -
  * applied only to the structured address_province field, never the whole
  * address string (the spec's stated departure from the old script). */
 function normalize(s) {
@@ -305,7 +305,7 @@ function isHoChiMinh(province) {
   return HCM_KEYWORDS.some((kw) => n.includes(kw))
 }
 
-/** Unknown/empty province defaults to the inter-province service — the
+/** Unknown/empty province defaults to the inter-province service - the
  * safe direction: a wrongly-inter-province shipment costs more, a
  * wrongly-intra-province one fails outright. */
 function selectService(province) {
@@ -315,7 +315,7 @@ function selectService(province) {
 /** Column E (Địa chỉ nhận). Structured fields take priority (they came
  * through address autocomplete and are more reliable); address_raw is the
  * fallback for a buyer who skipped autocomplete. Returns null when neither
- * source has anything usable — the caller must treat that as an export
+ * source has anything usable - the caller must treat that as an export
  * error, never a blank column E (a shipment that cannot be delivered). */
 function assembleAddress(order) {
   const parts = [order.address_street, order.address_ward, order.address_district, order.address_province]
@@ -347,21 +347,21 @@ git commit -F - <<'EOF'
 feat(shipping): add order code, address assembly, and service selection
 
 orderCode() derives the VTP order-code column from orders.id (never
-order_token — see the plan's Global Constraints). assembleAddress() prefers
+order_token - see the plan's Global Constraints). assembleAddress() prefers
 the structured address fields over address_raw and returns null when
 neither is usable, so a caller can reject the order rather than export a
 blank, undeliverable address column.
 
 selectService() reads the structured address_province field (not the whole
 address string, unlike the seller's existing script) and defaults to the
-inter-province service for an unrecognised or empty province — the safer of
+inter-province service for an unrecognised or empty province - the safer of
 the two possible wrong guesses.
 EOF
 ```
 
 ---
 
-### Task 3: `vtpMapping.js` — COD, payer, and per-order row composition
+### Task 3: `vtpMapping.js` - COD, payer, and per-order row composition
 
 **Files:**
 - Modify: `backend/shop/shipping/vtpMapping.js`
@@ -448,7 +448,7 @@ describe("selectPayer", () => {
   })
 })
 
-describe("mapOrderToRow — success paths", () => {
+describe("mapOrderToRow - success paths", () => {
   it("maps a prepaid intra-HCM freeship order to the exact expected row", () => {
     const result = mapOrderToRow(baseOrder({ shipping_payer: "seller" }))
     expect(result.ok).toBe(true)
@@ -488,7 +488,7 @@ describe("mapOrderToRow — success paths", () => {
   })
 })
 
-describe("mapOrderToRow — error paths", () => {
+describe("mapOrderToRow - error paths", () => {
   it("rejects an order with no usable address, never exporting a blank column E", () => {
     const result = mapOrderToRow(baseOrder({
       address_street: null, address_ward: null, address_district: null,
@@ -507,7 +507,7 @@ describe("mapOrderToRow — error paths", () => {
   })
 })
 
-describe("mapOrderToRow — security: order_token never appears in the mapped row", () => {
+describe("mapOrderToRow - security: order_token never appears in the mapped row", () => {
   it("does not include order_token as a key or leak its value into any field", () => {
     const order = baseOrder()
     const result = mapOrderToRow(order)
@@ -530,7 +530,7 @@ describe("mapOrderToRow — security: order_token never appears in the mapped ro
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- tests/vtpMapping.test.js`
-Expected: FAIL — `resolveCod`, `selectPayer`, `mapOrderToRow`, `PAYER_BUYER`, `PAYER_SELLER`, `LOAI_HANG_HOA_VALUES` are not exported.
+Expected: FAIL - `resolveCod`, `selectPayer`, `mapOrderToRow`, `PAYER_BUYER`, `PAYER_SELLER`, `LOAI_HANG_HOA_VALUES` are not exported.
 
 - [ ] **Step 3: Implement**
 
@@ -540,10 +540,10 @@ In `backend/shop/shipping/vtpMapping.js`, add after `assembleAddress`:
 const PAYER_BUYER = "Người nhận trả"
 const PAYER_SELLER = "Người gửi trả"
 
-// Verified from the template's "Loai hang hoa" reference sheet — exactly two values.
+// Verified from the template's "Loai hang hoa" reference sheet - exactly two values.
 const LOAI_HANG_HOA_VALUES = ["Bưu kiện", "Tài liệu"]
 
-/** Column J (Tiền thu hộ COD). Blank (null) for any prepaid order — VTP
+/** Column J (Tiền thu hộ COD). Blank (null) for any prepaid order - VTP
  * should never be told to collect money that was already paid. A COD order
  * with no recorded cod_amount is an export ERROR, not a blank cell: a COD
  * shipment that collects nothing is money lost, and must be caught before
@@ -561,7 +561,7 @@ function resolveCod(order) {
 }
 
 /** Column S (Người trả cước). Defaults to buyer-pays, matching migration
- * 017's column default — an order that predates the shipping_payer column
+ * 017's column default - an order that predates the shipping_payer column
  * being set explicitly is never silently treated as freeship. */
 function selectPayer(order) {
   return order.shipping_payer === "seller" ? PAYER_SELLER : PAYER_BUYER
@@ -569,14 +569,14 @@ function selectPayer(order) {
 
 /**
  * Map one order to its per-order VTP row values (columns B, C, D, E, I, J,
- * M, S — the batch-level columns F, G, H, K, U are filled by the caller,
+ * M, S - the batch-level columns F, G, H, K, U are filled by the caller,
  * see vtpWorkbook.js). Returns an explicit ok:false with a reason rather
  * than throwing, so a caller can skip one bad order without aborting a
- * whole export — the same per-row-isolation principle as the admin
+ * whole export - the same per-row-isolation principle as the admin
  * bulk-cancel endpoint.
  *
- * Deliberately reads only the specific fields it needs off `order` — never
- * `order.order_token` — so a caller accidentally passing the full order row
+ * Deliberately reads only the specific fields it needs off `order` - never
+ * `order.order_token` - so a caller accidentally passing the full order row
  * (including order_token) can never leak it into the mapped row. See this
  * plan's Global Constraints.
  */
@@ -639,7 +639,7 @@ git commit -F - <<'EOF'
 feat(shipping): add COD/payer resolution and per-order row mapping
 
 resolveCod() blanks column J for any prepaid order and treats a COD order
-with a null cod_amount as an export error, never a blank cell — a COD
+with a null cod_amount as an export error, never a blank cell - a COD
 shipment that collects nothing is money lost. selectPayer() reads the new
 shipping_payer column (migration 017, Task 4), defaulting to buyer-pays.
 
@@ -649,7 +649,7 @@ explicit {ok:false, reason} for a bad order rather than throwing, so a
 caller can skip it without aborting the whole export.
 
 A dedicated test asserts order_token never appears as a key or a
-substring anywhere in a mapped row's serialized output — the phase's single
+substring anywhere in a mapped row's serialized output - the phase's single
 non-negotiable security property, since order_token is a bearer credential
 and column B must never carry it.
 EOF
@@ -657,7 +657,7 @@ EOF
 
 ---
 
-### Task 4: Migration 017 — per-order shipping payer
+### Task 4: Migration 017 - per-order shipping payer
 
 **Files:**
 - Create: `backend/migrations/017_add_order_shipping_payer.js`
@@ -735,7 +735,7 @@ describe("orders.shipping_payer", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- migrationShippingPayer`
-Expected: FAIL — `Unknown column 'shipping_payer' in 'field list'`.
+Expected: FAIL - `Unknown column 'shipping_payer' in 'field list'`.
 
 - [ ] **Step 3: Write the migration**
 
@@ -745,7 +745,7 @@ Create `backend/migrations/017_add_order_shipping_payer.js`:
 exports.up = function (knex) {
   return knex.schema.alterTable("orders", (table) => {
     // Replaces the old convention of typing "freeship" into the buyer's
-    // name (parsed out by the seller's pre-shop script) — that hack
+    // name (parsed out by the seller's pre-shop script) - that hack
     // pollutes the printed shipping label and lets a buyer trigger free
     // shipping by typing a word into their own name field.
     table.enu("shipping_payer", ["buyer", "seller"]).notNullable().defaultTo("buyer")
@@ -771,7 +771,7 @@ Expected: migration applies with no error; test PASS, 3 tests.
 - [ ] **Step 5: Run the full backend suite**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test`
-Expected: PASS, no regressions — `orderRepo.createOrder` does not set `shipping_payer` explicitly, so every existing order-creation test continues to get the column's default.
+Expected: PASS, no regressions - `orderRepo.createOrder` does not set `shipping_payer` explicitly, so every existing order-creation test continues to get the column's default.
 
 - [ ] **Step 6: Commit**
 
@@ -782,7 +782,7 @@ feat(shipping): add orders.shipping_payer for the freeship toggle
 
 New enum('buyer','seller') column, default 'buyer', backing column S
 (Người trả cước) of the ViettelPost export. Replaces the previous
-convention of typing "freeship" into the buyer's name field — a hack that
+convention of typing "freeship" into the buyer's name field - a hack that
 polluted the printed shipping label and let a buyer self-grant free
 shipping by editing their own name.
 
@@ -794,7 +794,7 @@ EOF
 
 ---
 
-### Task 5: `vtpWorkbook.js` — the xlsx writer
+### Task 5: `vtpWorkbook.js` - the xlsx writer
 
 **Files:**
 - Create: `backend/shop/shipping/vtpWorkbook.js`
@@ -942,7 +942,7 @@ describe("buildExportWorkbook", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- vtpWorkbook`
-Expected: FAIL — `backend/shop/shipping/vtpWorkbook.js` does not exist.
+Expected: FAIL - `backend/shop/shipping/vtpWorkbook.js` does not exist.
 
 - [ ] **Step 3: Implement**
 
@@ -965,11 +965,11 @@ async function loadTemplateWorkbook() {
 
 /**
  * Fill the bundled VTP template from row 8 with one row per exportable
- * order. Column G (Số lượng) is fixed at 1 — one parcel per order row, not
+ * order. Column G (Số lượng) is fixed at 1 - one parcel per order row, not
  * a batch-level input (see this plan's Global Constraints); F, H, K, U are
  * entered once and repeated for every row, matching the seller's existing
  * script's interactive prompts. Data validation on the template's dropdown
- * columns is not preserved by this write path — openpyxl already drops it
+ * columns is not preserved by this write path - openpyxl already drops it
  * in the seller's current script and that output imports successfully
  * today, so ViettelPost validates server-side regardless.
  */
@@ -1039,7 +1039,7 @@ feat(shipping): add the xlsx writer for the ViettelPost export
 buildExportWorkbook() loads the bundled template, fills batch-level columns
 (F, H, K, U) once and per-order columns from mapOrderToRow() starting at row
 8, and returns a buffer plus which orders were exported vs excluded (with a
-reason) — an excluded order (bad address, missing COD amount) is skipped,
+reason) - an excluded order (bad address, missing COD amount) is skipped,
 not silently written blank.
 
 A dedicated security test scans the raw generated buffer (the xlsx zip's
@@ -1050,7 +1050,7 @@ EOF
 
 ---
 
-### Task 6: `trackingImport.js` — parsing and resolution
+### Task 6: `trackingImport.js` - parsing and resolution
 
 **Files:**
 - Create: `backend/shop/shipping/trackingImport.js`
@@ -1062,8 +1062,8 @@ EOF
   - `MAX_IMPORT_ROWS = 200`
   - `parseOrderCode(raw: string): number | null`
   - `parsePastedText(text: string): {order_code: string, tracking_code: string}[]`
-  - `extractPairsFromSheetRows(rows2D: any[][]): {order_code: string, tracking_code: string}[]` — `rows2D[0]` is a header row; finds the order-code and tracking-code columns by header text so it survives VTP re-ordering or renaming columns in its own result export.
-  - `resolvePreview(rows: {order_code, tracking_code}[], ordersById: Map<number, {id, status}>): {toApply: {order_id, order_code, tracking_code}[], skipped: {order_code, tracking_code, reason, message}[]}` — pure; does not touch the database. `reason` is one of `"invalid_code" | "missing_tracking_code" | "duplicate_tracking_code" | "not_found" | "already_shipped" | "not_confirmed"`.
+  - `extractPairsFromSheetRows(rows2D: any[][]): {order_code: string, tracking_code: string}[]` - `rows2D[0]` is a header row; finds the order-code and tracking-code columns by header text so it survives VTP re-ordering or renaming columns in its own result export.
+  - `resolvePreview(rows: {order_code, tracking_code}[], ordersById: Map<number, {id, status}>): {toApply: {order_id, order_code, tracking_code}[], skipped: {order_code, tracking_code, reason, message}[]}` - pure; does not touch the database. `reason` is one of `"invalid_code" | "missing_tracking_code" | "duplicate_tracking_code" | "not_found" | "already_shipped" | "not_confirmed"`.
 - Consumed by: `backend/routes/adminShipping.js` (Task 9), which fetches `ordersById` from the database and does any `.xlsx` parsing (via `exceljs`) before calling into this pure module.
 
 - [ ] **Step 1: Write the failing test**
@@ -1214,7 +1214,7 @@ describe("resolvePreview", () => {
     expect(skipped[1].reason).toBe("not_confirmed")
   })
 
-  it("rejects duplicate tracking codes within the same file — neither row is applied", () => {
+  it("rejects duplicate tracking codes within the same file - neither row is applied", () => {
     const { toApply, skipped } = resolvePreview(
       [
         { order_code: "DH1", tracking_code: "SAME" },
@@ -1230,14 +1230,14 @@ describe("resolvePreview", () => {
   it("idempotency: re-running preview against orders already moved to shipped changes nothing", () => {
     // Simulates re-uploading the same file after a successful import: every
     // order is now 'shipped', so every row is skipped as already_shipped,
-    // and toApply is empty — a second confirm would send no new emails.
+    // and toApply is empty - a second confirm would send no new emails.
     const rows = [{ order_code: "DH2", tracking_code: "VTP001" }]
     const { toApply, skipped } = resolvePreview(rows, byId(shippedOrder))
     expect(toApply).toEqual([])
     expect(skipped[0].reason).toBe("already_shipped")
   })
 
-  it("processes multiple valid rows independently — one bad row does not affect a good one", () => {
+  it("processes multiple valid rows independently - one bad row does not affect a good one", () => {
     const { toApply, skipped } = resolvePreview(
       [
         { order_code: "DH1", tracking_code: "VTP001" },
@@ -1260,7 +1260,7 @@ describe("MAX_IMPORT_ROWS", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- trackingImport`
-Expected: FAIL — `backend/shop/shipping/trackingImport.js` does not exist.
+Expected: FAIL - `backend/shop/shipping/trackingImport.js` does not exist.
 
 - [ ] **Step 3: Implement**
 
@@ -1292,7 +1292,7 @@ function parsePastedText(text) {
 }
 
 /**
- * `rows2D` is a raw 2D array read from an uploaded VTP result sheet — the
+ * `rows2D` is a raw 2D array read from an uploaded VTP result sheet - the
  * route layer does the exceljs reading, this function stays pure. Finds the
  * order-code and tracking-code columns by matching header text rather than
  * a fixed position, so a result file with reordered or renamed-but-similar
@@ -1316,7 +1316,7 @@ function extractPairsFromSheetRows(rows2D) {
 
 /**
  * Resolve a batch of {order_code, tracking_code} pairs against already-
- * fetched order rows, WITHOUT writing anything — this is the preview step
+ * fetched order rows, WITHOUT writing anything - this is the preview step
  * the spec requires before any order is touched.
  *
  * Four properties this function guarantees, per the spec's Tracking-Code
@@ -1330,7 +1330,7 @@ function extractPairsFromSheetRows(rows2D) {
  *  - Never guesses a match: an order code that resolves to no known order
  *    (not_found) or fails to parse (invalid_code) is reported, never
  *    applied to the nearest order.
- *  - Duplicate tracking codes within one file are rejected outright — ALL
+ *  - Duplicate tracking codes within one file are rejected outright - ALL
  *    rows sharing a duplicated tracking code are skipped, since which one
  *    is correct cannot be determined.
  */
@@ -1422,7 +1422,7 @@ feat(shipping): add tracking-code import parsing and resolution
 
 Pure parsing (pasted rows, or a 2D array already extracted from an uploaded
 VTP result sheet by header-text column matching) and resolution against
-already-fetched order rows. No I/O and no writes — this is the preview step
+already-fetched order rows. No I/O and no writes - this is the preview step
 the spec requires before anything changes.
 
 resolvePreview() guarantees the four properties the spec calls out: an
@@ -1436,14 +1436,14 @@ EOF
 
 ---
 
-### Task 7: `roster.js` — pickup roster assembly
+### Task 7: `roster.js` - pickup roster assembly
 
 **Files:**
 - Create: `backend/shop/shipping/roster.js`
 - Test: `backend/tests/roster.test.js`
 
 **Interfaces:**
-- Consumes: nothing from earlier tasks — takes already-fetched order+item data as plain objects.
+- Consumes: nothing from earlier tasks - takes already-fetched order+item data as plain objects.
 - Produces `roster.js` exporting:
   - `buildRoster(orders: {id, buyer_name, phone, payment_method, cod_amount, items: {product_name_snapshot, variant_label_snapshot, qty}[]}[]): {rows: RosterRow[], excluded: {order_id, reason, message}[]}`
 
@@ -1476,7 +1476,7 @@ function order(over = {}) {
   }
 }
 
-describe("buildRoster — paid vs collect-at-handover", () => {
+describe("buildRoster - paid vs collect-at-handover", () => {
   it("marks a prepaid order as paid with amount_due 0", () => {
     const { rows } = buildRoster([order({ payment_method: "momo" })])
     expect(rows[0].paid).toBe(true)
@@ -1496,7 +1496,7 @@ describe("buildRoster — paid vs collect-at-handover", () => {
   })
 })
 
-describe("buildRoster — items", () => {
+describe("buildRoster - items", () => {
   it("maps each order's item snapshots to product_name/variant_label/qty", () => {
     const { rows } = buildRoster([order({
       items: [
@@ -1516,7 +1516,7 @@ describe("buildRoster — items", () => {
   })
 })
 
-describe("buildRoster — sorting", () => {
+describe("buildRoster - sorting", () => {
   it("sorts rows by buyer_name ascending, Vietnamese-locale aware", () => {
     const { rows } = buildRoster([
       order({ id: 1, buyer_name: "Trần Văn B" }),
@@ -1527,7 +1527,7 @@ describe("buildRoster — sorting", () => {
   })
 })
 
-describe("buildRoster — empty input", () => {
+describe("buildRoster - empty input", () => {
   it("returns empty rows and excluded for no orders", () => {
     expect(buildRoster([])).toEqual({ rows: [], excluded: [] })
   })
@@ -1537,7 +1537,7 @@ describe("buildRoster — empty input", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- tests/roster.test.js`
-Expected: FAIL — `backend/shop/shipping/roster.js` does not exist.
+Expected: FAIL - `backend/shop/shipping/roster.js` does not exist.
 
 - [ ] **Step 3: Implement**
 
@@ -1551,7 +1551,7 @@ const PREPAID_METHODS = new Set(["bank", "momo", "paypal"])
 /**
  * Shape already-fetched confirmed pickup orders (plus their order_items)
  * into the printable pickup roster. The whole point of this document is the
- * paid-vs-collect-at-handover distinction — a COD order with no recorded
+ * paid-vs-collect-at-handover distinction - a COD order with no recorded
  * cod_amount cannot be shown as "collect ₫0" (that would let a buyer walk
  * away having paid nothing, when the seller intended to charge them), so it
  * is excluded and reported instead, mirroring the export's same guard.
@@ -1615,7 +1615,7 @@ feat(shipping): add pickup-roster assembly
 
 buildRoster() shapes confirmed pickup orders into the printable roster:
 order code, buyer, phone, items handed over, and the paid-vs-collect-at-
-handover distinction with the amount — the reason the document exists,
+handover distinction with the amount - the reason the document exists,
 since prepaid and COD pickup orders are otherwise indistinguishable in a
 queue. Sorted by buyer name, since at a booth the seller looks a person up
 by name, not order code.
@@ -1628,7 +1628,7 @@ EOF
 
 ---
 
-### Task 8: Admin shipping routes — export listing, payer toggle, and export generation
+### Task 8: Admin shipping routes - export listing, payer toggle, and export generation
 
 **Files:**
 - Create: `backend/routes/adminShipping.js`
@@ -1638,7 +1638,7 @@ EOF
 **Interfaces:**
 - Consumes: `orderRepo.listOrders`, `orderRepo.getOrderById` (existing); `vtpMapping.LOAI_HANG_HOA_VALUES` (Task 3); `vtpWorkbook.buildExportWorkbook` (Task 5).
 - Produces:
-  - `GET /api/admin/shipping/export/orders` → `200 ExportOrderRow[]` — confirmed ship orders with no tracking code yet.
+  - `GET /api/admin/shipping/export/orders` → `200 ExportOrderRow[]` - confirmed ship orders with no tracking code yet.
 
     `ExportOrderRow` shape: `{ id, order_code, buyer_name, phone, address_province, total, cod_amount, payment_method, shipping_payer }`
   - `PATCH /api/admin/shipping/export/orders/:id/payer` → body `{shipping_payer: "buyer" | "seller"}` → `200 {ok: true}` or `400`/`404`.
@@ -1796,7 +1796,7 @@ describe("POST /api/admin/shipping/export", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- adminShippingExport`
-Expected: FAIL — `backend/routes/adminShipping.js` does not exist, routes 404.
+Expected: FAIL - `backend/routes/adminShipping.js` does not exist, routes 404.
 
 - [ ] **Step 3: Create the router with the export endpoints**
 
@@ -1869,7 +1869,7 @@ module.exports = function adminShippingRoutes() {
       }
 
       // Re-fetch and re-check eligibility server-side rather than trusting
-      // the client's snapshot — an order may have been cancelled or already
+      // the client's snapshot - an order may have been cancelled or already
       // exported by another admin action between listing and generating.
       const ids = orderIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
       const eligible = []
@@ -1922,7 +1922,7 @@ feat(shipping): expose the export listing, payer toggle, and export routes
 GET /shipping/export/orders lists confirmed ship orders with no tracking
 code yet. PATCH .../payer flips one order's freeship flag. POST
 /shipping/export re-validates every requested order's eligibility
-server-side (never trusts the client's snapshot — another admin action may
+server-side (never trusts the client's snapshot - another admin action may
 have raced it) before generating the xlsx, and returns it base64-encoded
 alongside which orders were excluded and why, matching the codebase's
 existing base64-transfer convention for binary payloads.
@@ -1934,7 +1934,7 @@ EOF
 
 ---
 
-### Task 9: Admin shipping routes — tracking-code import preview and confirm
+### Task 9: Admin shipping routes - tracking-code import preview and confirm
 
 **Files:**
 - Modify: `backend/routes/adminShipping.js`
@@ -2090,7 +2090,7 @@ describe("POST /api/admin/shipping/tracking-import/confirm", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- adminShippingTrackingImport`
-Expected: FAIL — the two routes 404.
+Expected: FAIL - the two routes 404.
 
 - [ ] **Step 3: Add the tracking-import routes**
 
@@ -2143,7 +2143,7 @@ Then add, above `return router`:
         })
       }
 
-      // Each row goes through transitionOrder() individually — the order
+      // Each row goes through transitionOrder() individually - the order
       // state machine's guards (confirmed -> shipped only), the shipped-
       // email dispatch, and the confirmed status check (expectedFromStatus)
       // all stay in force. One order's failure never stops the rest.
@@ -2193,7 +2193,7 @@ toApply/skipped without writing anything. Confirm applies exactly the rows
 the preview approved (re-validated per-row against transitionOrder's own
 state-machine guard via expectedFromStatus: "confirmed"), one order at a
 time, so a single order that changed status between preview and confirm
-never blocks the rest of the batch — the same per-order-isolation principle
+never blocks the rest of the batch - the same per-order-isolation principle
 as the existing admin bulk-cancel endpoint.
 
 Nothing in this task bypasses transitionOrder: the shipped-email dispatch,
@@ -2205,7 +2205,7 @@ EOF
 
 ---
 
-### Task 10: Admin shipping routes — pickup roster
+### Task 10: Admin shipping routes - pickup roster
 
 **Files:**
 - Modify: `backend/routes/adminShipping.js`
@@ -2319,7 +2319,7 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- adminShippingRoster`
-Expected: FAIL — the route 404s.
+Expected: FAIL - the route 404s.
 
 - [ ] **Step 3: Add the roster route**
 
@@ -2375,7 +2375,7 @@ Expected: PASS, 7 tests.
 - [ ] **Step 5: Run the full backend suite**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test`
-Expected: PASS, no regressions. This is the last backend task in the phase — confirm the total test count grew as expected (see the test strategy's regression-suite section for the running total).
+Expected: PASS, no regressions. This is the last backend task in the phase - confirm the total test count grew as expected (see the test strategy's regression-suite section for the running total).
 
 - [ ] **Step 6: Commit**
 
@@ -2387,10 +2387,10 @@ feat(shipping): expose the pickup-roster route
 GET /shipping/roster/:collectionId fetches confirmed pickup orders for one
 collection plus their order_items and hands them to buildRoster() for
 shaping and sorting. Non-numeric collectionId 400s; an empty result is a
-normal 200 with empty rows, not an error — a collection can legitimately
+normal 200 with empty rows, not an error - a collection can legitimately
 have no pickup orders yet.
 
-This is the last backend route in Plan 5 — the full shipping API surface
+This is the last backend route in Plan 5 - the full shipping API surface
 (export, tracking import, roster) is now complete pending the frontend
 (Tasks 11-14).
 EOF
@@ -2475,7 +2475,7 @@ import { describe, it, expect, vi } from "vitest"
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- AdminShipping`
-Expected: FAIL — `./AdminShipping` and `./shipping/*` do not exist.
+Expected: FAIL - `./AdminShipping` and `./shipping/*` do not exist.
 
 - [ ] **Step 3: Append the API calls**
 
@@ -2613,8 +2613,8 @@ git add frontend/src/api/shop.js frontend/src/components/AdminShipping.jsx \
 git commit -F - <<'EOF'
 feat(shipping): add the Vận chuyển admin tab shell
 
-AdminShipping.jsx switches between three placeholder views — export,
-tracking-code import, pickup roster — matching the existing admin tab
+AdminShipping.jsx switches between three placeholder views - export,
+tracking-code import, pickup roster - matching the existing admin tab
 pattern (Plan 4's AdminStats.jsx) exactly. The three view components are
 stubs here; Tasks 12-14 replace each with its real implementation
 independently.
@@ -2787,7 +2787,7 @@ describe("ShippingExport", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- shipping/ShippingExport`
-Expected: FAIL — the placeholder component has none of the expected markup.
+Expected: FAIL - the placeholder component has none of the expected markup.
 
 - [ ] **Step 3: Implement the component**
 
@@ -2917,7 +2917,7 @@ export default function ShippingExport() {
                   </td>
                   <td className="pr-2 py-1">{o.order_code}</td>
                   <td className="pr-2 py-1">{o.buyer_name}</td>
-                  <td className="pr-2 py-1">{o.address_province || "—"}</td>
+                  <td className="pr-2 py-1">{o.address_province || "-"}</td>
                   <td className="pr-2 py-1">{formatVnd(o.total)}</td>
                   <td className="py-1">
                     <input
@@ -3009,7 +3009,7 @@ Blob download and shows which orders were excluded and why.
 Thời gian hẹn lấy is a <select> over the 11 values transcribed verbatim
 from the template's own reference sheet, not free text: VTP validates the
 field server-side, so a typo would produce a file rejected only at upload
-time — after the seller has planned their day around that pickup slot.
+time - after the seller has planned their day around that pickup slot.
 EOF
 ```
 
@@ -3130,7 +3130,7 @@ describe("ShippingTrackingImport", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- shipping/ShippingTrackingImport`
-Expected: FAIL — the placeholder component has no textarea or buttons.
+Expected: FAIL - the placeholder component has no textarea or buttons.
 
 - [ ] **Step 3: Implement the component**
 
@@ -3259,7 +3259,7 @@ Paste rows -> "Xem trước" calls the preview endpoint and renders toApply
 (what will change) and skipped (with a reason each) without writing
 anything. "Xác nhận" sends exactly the previewed toApply rows to the
 confirm endpoint and shows per-order results, never a blanket success
-message — the failure this prevents is half the rows silently failing to
+message - the failure this prevents is half the rows silently failing to
 match while the seller believes every buyer was notified.
 EOF
 ```
@@ -3274,7 +3274,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `adminListCollections` (existing), `adminGetPickupRoster` (Task 11); `formatVnd` (existing).
-- No new exports consumed by later tasks — last task in the plan.
+- No new exports consumed by later tasks - last task in the plan.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3381,7 +3381,7 @@ describe("ShippingRoster", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- shipping/ShippingRoster`
-Expected: FAIL — the placeholder component has no select, no table.
+Expected: FAIL - the placeholder component has no select, no table.
 
 - [ ] **Step 3: Implement the component**
 
@@ -3421,7 +3421,7 @@ export default function ShippingRoster() {
             onChange={(e) => setCollectionId(e.target.value)}
             className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
           >
-            <option value="">— Chọn một bộ sưu tập —</option>
+            <option value="">- Chọn một bộ sưu tập -</option>
             {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
         </label>
@@ -3474,7 +3474,7 @@ export default function ShippingRoster() {
                           {r.items.map((i) => `${i.product_name} (${i.variant_label}) x${i.qty}`).join(", ")}
                         </td>
                         <td className="pr-2 py-1">{r.paid ? "Đã thanh toán" : "Thu khi giao"}</td>
-                        <td className="py-1">{r.paid ? "—" : formatVnd(r.amount_due)}</td>
+                        <td className="py-1">{r.paid ? "-" : formatVnd(r.amount_due)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -3499,7 +3499,7 @@ Run:
 ```bash
 cd frontend && npm test && npm run build && npm run lint
 ```
-Expected: `npm test` PASS with no regressions. `npm run build` succeeds. `npm run lint` shows exactly the 3 pre-existing problems noted in Global Constraints — no new errors from any file this plan touched.
+Expected: `npm test` PASS with no regressions. `npm run build` succeeds. `npm run lint` shows exactly the 3 pre-existing problems noted in Global Constraints - no new errors from any file this plan touched.
 
 - [ ] **Step 6: Run the full backend suite one final time**
 
@@ -3516,12 +3516,12 @@ feat(shipping): implement the printable pickup-roster view
 Collection picker driving getPickupRoster, sorted by buyer name (the seller
 looks a person up by name at a booth, not by order code). Each row shows
 what to hand over and, distinctly, "Đã thanh toán" vs "Thu khi giao" with
-the amount — the reason this document exists, since prepaid and COD pickup
+the amount - the reason this document exists, since prepaid and COD pickup
 orders are otherwise indistinguishable in a queue. "In" triggers the
 browser's own print dialog; the picker and buttons are hidden via
 print:hidden so only the roster table prints.
 
-This is the last task in Plan 5 — the full Vận chuyển tab (export, tracking
+This is the last task in Plan 5 - the full Vận chuyển tab (export, tracking
 import, roster) is now feature-complete pending manual acceptance per
 2026-08-08-merch-shop-5-verification.md.
 EOF

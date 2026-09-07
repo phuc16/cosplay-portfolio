@@ -3,7 +3,7 @@ const { classify, isPrepaid, isExpired } = require("./money")
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-/** Thrown for a missing, unparsable, or backwards date range — the bookkeeping
+/** Thrown for a missing, unparsable, or backwards date range - the bookkeeping
  * view rejects these with a clear message rather than silently returning
  * every order, unlike the admin orders list's tolerant date filter, because
  * a money view that misinterprets its own range is a bookkeeping error. */
@@ -25,7 +25,7 @@ function localDayStartUtc(dateStr) {
 
   // `new Date(...)` silently rolls calendar-invalid dates over into the next
   // valid one (e.g. "2026-02-30" becomes March 2nd), so the shape check above
-  // is not enough — a typo would otherwise query a wrong-but-valid day with no
+  // is not enough - a typo would otherwise query a wrong-but-valid day with no
   // error. Re-derive the year/month/day the constructed instant actually
   // represents at UTC+7 (the same offset used to build it, not the server's
   // local timezone, which would make this check itself TZ-dependent) and
@@ -60,8 +60,8 @@ function parseLocalDateRange(dateFrom, dateTo) {
 /**
  * Sell-through and time-to-sellout for one row of a drop's per-variant
  * table. Deleted variants (product_variant_id NULL after ON DELETE SET
- * NULL) have no product_variants row to join — remaining is null, displayed
- * as "—" by the frontend, never 0, which would falsely read as sold out.
+ * NULL) have no product_variants row to join - remaining is null, displayed
+ * as "-" by the frontend, never 0, which would falsely read as sold out.
  */
 function buildVariantSummary(row, collectionCreatedAt) {
   const sold = Number(row.sold)
@@ -104,7 +104,7 @@ function buildVariantSummary(row, collectionCreatedAt) {
  * (`WHERE collection_id = ?`, served by the orders_collection_id_foreign
  * index MySQL creates for the foreign key) rather than as a SQL CASE
  * expression, so the exhaustively-tested classify() from money.js is what
- * actually computes every number here — see this plan's Architecture note
+ * actually computes every number here - see this plan's Architecture note
  * for why that trumps a "SQL only" rule.
  */
 async function getDropStats(collectionId) {
@@ -196,7 +196,7 @@ async function getDropStats(collectionId) {
  * Velocity = units sold ÷ days on sale, where days-on-sale runs from the
  * variant's collection's created_at to either its last sale (if it has sold
  * out) or now. This gives one comparable number for both sold-out and
- * still-available variants — time-to-sellout alone is undefined for
+ * still-available variants - time-to-sellout alone is undefined for
  * anything that has never sold out.
  *
  * Deleted variants are absent by construction: this query starts from
@@ -240,7 +240,7 @@ async function getRestockStats(collectionId) {
       (saleEnd.getTime() - new Date(v.collection_created_at).getTime()) / MS_PER_DAY,
       // Floored at one day. Besides preventing a divide-by-zero on a drop
       // created today, this stops a brand-new collection's first sale from
-      // reporting an absurd per-day rate — an hour-based floor made a single
+      // reporting an absurd per-day rate - an hour-based floor made a single
       // sale read as 24/day and vaulted fresh drops above real bestsellers,
       // in the one view whose whole job is ranking what to restock.
       1
@@ -283,7 +283,7 @@ async function getRestockStats(collectionId) {
 /**
  * Bookkeeping totals across every collection for a date range, plus an
  * explicit "no collection" bucket (orders.collection_id is nullable) so
- * per-collection sums always reconcile with the top-level totals — both are
+ * per-collection sums always reconcile with the top-level totals - both are
  * computed from the same fetched rows in the same pass, by construction.
  */
 async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {

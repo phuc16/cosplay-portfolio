@@ -9,7 +9,7 @@ const trackingImport = require("../shop/shipping/trackingImport")
 const { buildRoster } = require("../shop/shipping/roster")
 
 // The admin-recognisable code everywhere else in the app (AdminOrders, the
-// buyer's own order page/emails) is domain.formatOrderCode — never the "DH"
+// buyer's own order page/emails) is domain.formatOrderCode - never the "DH"
 // + id code, which exists only as the literal Column B value VTP's own
 // import/export files round-trip on (see vtpMapping.js). Screens the admin
 // reads before/after that round-trip should show the code they actually
@@ -65,7 +65,7 @@ module.exports = function adminShippingRoutes() {
   }
 
   // Ship orders ready to book: confirmed, ship fulfillment, no tracking code yet.
-  // collection_id is optional — omitted, this still lists every eligible ship
+  // collection_id is optional - omitted, this still lists every eligible ship
   // order across collections, same as before this filter existed.
   router.get("/shipping/export/orders", async (req, res) => {
     try {
@@ -109,7 +109,7 @@ module.exports = function adminShippingRoutes() {
     } catch (err) { oops(res, err, "Lỗi cập nhật người trả cước") }
   })
 
-  // Purely informational "have I packed this" checkbox — never gates export/tracking.
+  // Purely informational "have I packed this" checkbox - never gates export/tracking.
   router.patch("/shipping/export/orders/:id/prepared", async (req, res) => {
     try {
       const { prepared } = req.body
@@ -147,10 +147,10 @@ module.exports = function adminShippingRoutes() {
       }
 
       // Re-fetch and re-check eligibility server-side rather than trusting
-      // the client's snapshot — an order may have been cancelled or already
+      // the client's snapshot - an order may have been cancelled or already
       // exported by another admin action between listing and generating.
       // Rejects here are attributed into the same `excluded` array as
-      // mapOrderToRow's rejects (never dropped silently) — a seller who
+      // mapOrderToRow's rejects (never dropped silently) - a seller who
       // submits 30 order_ids must always be able to reconcile
       // exported_count + excluded.length back to 30, or a raced/unknown
       // order vanishes with only a smaller count as the only clue, and a
@@ -158,7 +158,7 @@ module.exports = function adminShippingRoutes() {
       //
       // Non-integer ids are routed into preExcluded here rather than being
       // silently `.filter()`ed out, and a repeated id is deduped (first
-      // occurrence kept, later ones reported as duplicate_order_id) —
+      // occurrence kept, later ones reported as duplicate_order_id) -
       // otherwise the same order would be written into the xlsx twice,
       // booking two parcels for one buyer when only one tracking code can
       // ever come back to match against it. Both cases still count toward
@@ -282,14 +282,14 @@ module.exports = function adminShippingRoutes() {
         })
       }
 
-      // Each row goes through transitionOrder() individually — the order
+      // Each row goes through transitionOrder() individually - the order
       // state machine's guards (confirmed -> shipped only), the shipped-
       // email dispatch, and the confirmed status check (expectedFromStatus)
       // all stay in force. One order's failure never stops the rest.
       //
       // A repeated order_id within one request is deduped up front, keeping
       // only the first occurrence, so each order appears EXACTLY ONCE in
-      // `results` — otherwise the second row's no-op (correctly rejected by
+      // `results` - otherwise the second row's no-op (correctly rejected by
       // expectedFromStatus) would show up as ok:false alongside the first
       // row's ok:true for the SAME order_id, and a UI keyed by order_id
       // could display the failure and hide the success, telling the seller
@@ -299,7 +299,7 @@ module.exports = function adminShippingRoutes() {
       // never confused with a genuine "not_confirmed".
       //
       // A row with an invalid order_id or a blank tracking_code is rejected
-      // here, before it ever reaches transitionOrder — the preview step
+      // here, before it ever reaches transitionOrder - the preview step
       // (resolvePreview) already rejects exactly this shape of row as
       // missing_tracking_code, and confirm must not silently accept what
       // preview refused. Without this, an order with no tracking code would
@@ -363,7 +363,7 @@ module.exports = function adminShippingRoutes() {
   // Pickup roster: confirmed pickup orders for one collection, shaped by
   // buildRoster() into the paid-vs-collect-at-handover printable list. The
   // WHERE clause below is the primary filter, but `status` is still selected
-  // and passed through to buildRoster() — its internal completed-order guard
+  // and passed through to buildRoster() - its internal completed-order guard
   // is defense in depth and silently no-ops without a real status value, so
   // this query must never drop that column (see roster.js for why).
   // order_token is deliberately never selected: this document gets printed
@@ -385,7 +385,7 @@ module.exports = function adminShippingRoutes() {
       let itemRows = []
       if (orderRows.length > 0) {
         // Same variant-thumbnail-with-fallback join as orderRepo.attachItems
-        // — staff packing at the roster need to see the item, not just its name.
+        // - staff packing at the roster need to see the item, not just its name.
         [itemRows] = await db.query(
           `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty, oi.image_url_snapshot,
                   pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images

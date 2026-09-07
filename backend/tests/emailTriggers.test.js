@@ -66,7 +66,7 @@ describe("order placed", () => {
     // batch in ascending (not reverse) order, so any later migration that
     // touches email_queue a second time (e.g. adding a column) has its own
     // rollback fail against an already-dropped table. Renaming sidesteps
-    // migration state entirely — enqueue's INSERT still fails the same way
+    // migration state entirely - enqueue's INSERT still fails the same way
     // (unknown table), and undoing it is just renaming back.
     await db.query("RENAME TABLE email_queue TO email_queue_disabled_for_test")
     try {

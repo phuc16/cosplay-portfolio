@@ -56,7 +56,7 @@ async function sweepExpiredOrders() {
 
 /**
  * When SMTP isn't configured, sendQueued() no-ops without touching the queue
- * at all — so with no signal here, email_queue grows forever and nobody
+ * at all - so with no signal here, email_queue grows forever and nobody
  * finds out until a buyer complains. This is the one cheap check
  * (COUNT only, not claimPending's full row fetch) needed to surface that.
  */
@@ -65,7 +65,7 @@ async function warnIfMailStuckUnconfigured() {
     "SELECT COUNT(*) AS count FROM email_queue WHERE status = 'pending'"
   )
   if (count > 0) {
-    console.warn(`[WORKER] SMTP chưa cấu hình — ${count} email đang chờ gửi bị bỏ qua`)
+    console.warn(`[WORKER] SMTP chưa cấu hình - ${count} email đang chờ gửi bị bỏ qua`)
   }
 }
 
@@ -142,8 +142,8 @@ const lease = createLease()
  * anyway whenever Redis hiccups reintroduces precisely that risk at the one
  * moment (a Redis blip, often correlated with a deploy) it is most likely to
  * coincide with another instance also being up. So: if the lease cannot be
- * acquired *or* renewed for any reason — another holder, or Redis itself
- * being unreachable — this tick is skipped entirely (no sweep, no dispatch,
+ * acquired *or* renewed for any reason - another holder, or Redis itself
+ * being unreachable - this tick is skipped entirely (no sweep, no dispatch,
  * no thumbnails) rather than proceeding unguarded.
  *
  * Skip vs. exit: retry-and-log, not exit. This runs under a process manager
@@ -154,7 +154,7 @@ const lease = createLease()
  * and manually restarts it. Retrying every tick lets that ordinary race
  * self-resolve as soon as the old holder's lease clears, while the loud
  * warning below still makes a *genuine* stale-process conflict impossible to
- * miss in the logs — which is the whole point of this guard.
+ * miss in the logs - which is the whole point of this guard.
  */
 async function tick() {
   try {
@@ -162,7 +162,7 @@ async function tick() {
       const acquired = await lease.acquire()
       if (!acquired) {
         console.warn(
-          "[WORKER] SINGLETON LEASE HELD BY ANOTHER INSTANCE — refusing to poll this tick. " +
+          "[WORKER] SINGLETON LEASE HELD BY ANOTHER INSTANCE - refusing to poll this tick. " +
           "If this persists, a stale/duplicate worker process is running and must be stopped " +
           "(see .superpowers/sdd/f14-reinvestigation-report.md)."
         )
@@ -173,7 +173,7 @@ async function tick() {
       const renewed = await lease.renew()
       if (!renewed) {
         console.warn(
-          "[WORKER] LOST SINGLETON LEASE (expired or taken by another instance) — " +
+          "[WORKER] LOST SINGLETON LEASE (expired or taken by another instance) - " +
           "skipping this tick and will attempt to re-acquire on the next one."
         )
         return
@@ -181,7 +181,7 @@ async function tick() {
     }
   } catch (err) {
     console.warn(
-      "[WORKER] Redis unavailable — cannot verify/renew the singleton lease, " +
+      "[WORKER] Redis unavailable - cannot verify/renew the singleton lease, " +
       "skipping this tick (failing closed) to avoid running unguarded:", err.message
     )
     return

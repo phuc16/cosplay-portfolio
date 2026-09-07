@@ -48,7 +48,7 @@ describe("enabledMethods", () => {
 })
 
 describe("publicSettings", () => {
-  it("passes settings through unchanged — there are no secret fields to strip", () => {
+  it("passes settings through unchanged - there are no secret fields to strip", () => {
     const pub = repo.publicSettings({
       bank_enabled: true, bank_name: "ACB", bank_account_number: "123",
     })

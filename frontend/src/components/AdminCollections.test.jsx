@@ -53,7 +53,7 @@ beforeEach(() => {
   adminUploadImage.mockReset()
 })
 
-describe("AdminCollections — edit", () => {
+describe("AdminCollections - edit", () => {
   it("scrolls the shared edit form into view when 'Sửa' is clicked, so it isn't left invisible below a long list", async () => {
     adminListCollections.mockResolvedValue([
       collection({ id: 1, title: "First" }),
@@ -92,7 +92,7 @@ describe("AdminCollections — edit", () => {
   })
 })
 
-describe("AdminCollections — scheduling", () => {
+describe("AdminCollections - scheduling", () => {
   it("creates a collection with start_at and end_at", async () => {
     adminListCollections.mockResolvedValue([])
     adminCreateCollection.mockResolvedValue({ id: 1 })
@@ -124,7 +124,7 @@ describe("AdminCollections — scheduling", () => {
     const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Tạo")
     await act(async () => { saveButton.click() })
 
-    // The naive datetime-local string is ambiguous without a timezone — it
+    // The naive datetime-local string is ambiguous without a timezone - it
     // must be converted to an unambiguous UTC instant (ISO string with a Z
     // suffix), interpreted as the browser's own local time, before being
     // sent to the backend.
@@ -190,7 +190,7 @@ describe("AdminCollections — scheduling", () => {
   })
 })
 
-describe("AdminCollections — search, filter, sort", () => {
+describe("AdminCollections - search, filter, sort", () => {
   it("filters the list by title or slug, case-insensitively", async () => {
     adminListCollections.mockResolvedValue([
       collection({ id: 1, title: "Hobby Horizon", slug: "hobby-horizon" }),

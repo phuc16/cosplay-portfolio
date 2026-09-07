@@ -1,6 +1,6 @@
-# Production compose — pulls pre-built images from Docker Hub.
+# Production compose - pulls pre-built images from Docker Hub.
 # Security: no service port is exposed publicly. Only the frontend is
-# published, and only on 127.0.0.1 — host Nginx terminates SSL and proxies
+# published, and only on 127.0.0.1 - host Nginx terminates SSL and proxies
 # to it. MySQL/Redis/MinIO/backend are reachable solely on the compose
 # network (also prevents X-Forwarded-For spoofing straight at the backend).
 services:

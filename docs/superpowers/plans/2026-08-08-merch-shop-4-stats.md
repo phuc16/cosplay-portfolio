@@ -1,30 +1,30 @@
-# Merch Shop — Plan 4: Admin Statistics Dashboard
+# Merch Shop - Plan 4: Admin Statistics Dashboard
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A read-only "Thống kê" admin tab with three views — per-collection drop retrospective, cross-drop restock velocity, and a date-ranged bookkeeping view with CSV export — computed live from the existing `orders`/`order_items`/`product_variants` tables, with no new writes and no schema changes.
+**Goal:** A read-only "Thống kê" admin tab with three views - per-collection drop retrospective, cross-drop restock velocity, and a date-ranged bookkeeping view with CSV export - computed live from the existing `orders`/`order_items`/`product_variants` tables, with no new writes and no schema changes.
 
-**Architecture:** Money classification (`received` / `awaiting_payment` / `to_collect` / `lost` / `other`) lives in one pure, exhaustively-tested module (`money.js`) keyed only on `(status, payment_method)`. `statsRepo.js` fetches the minimal order/item rows a view needs with a scoped, indexed SQL query (`WHERE collection_id = ?` or `WHERE created_at BETWEEN ...`) and reduces them in JavaScript using `classify()` from `money.js`. This is a deliberate divergence from "SQL only": duplicating the classification's five-way `(status × payment_method)` logic as a second, untested `CASE` expression in every query would let the two silently drift — the single worst failure mode for a money dashboard. Aggregations that don't depend on money classification (units sold per variant, order counts per status) use plain SQL `GROUP BY`. No rollup tables, no caching — see the spec's Architecture section for why.
+**Architecture:** Money classification (`received` / `awaiting_payment` / `to_collect` / `lost` / `other`) lives in one pure, exhaustively-tested module (`money.js`) keyed only on `(status, payment_method)`. `statsRepo.js` fetches the minimal order/item rows a view needs with a scoped, indexed SQL query (`WHERE collection_id = ?` or `WHERE created_at BETWEEN ...`) and reduces them in JavaScript using `classify()` from `money.js`. This is a deliberate divergence from "SQL only": duplicating the classification's five-way `(status × payment_method)` logic as a second, untested `CASE` expression in every query would let the two silently drift - the single worst failure mode for a money dashboard. Aggregations that don't depend on money classification (units sold per variant, order counts per status) use plain SQL `GROUP BY`. No rollup tables, no caching - see the spec's Architecture section for why.
 
-**Tech Stack:** As Plans 1–3. No new npm packages, no new migrations — this phase is entirely new files plus one router mount and one Admin tab.
+**Tech Stack:** As Plans 1–3. No new npm packages, no new migrations - this phase is entirely new files plus one router mount and one Admin tab.
 
 **Depends on:** Plans 1–3 complete, `feature/order` branch, HEAD includes commit `356d774` (order filters/bulk-cancel/timeline).
 
-**Spec:** `docs/superpowers/specs/2026-08-08-admin-stats-dashboard-design.md` — read it before touching this plan; the Money Definitions and Edge Cases sections are the source of truth for every branch below.
+**Spec:** `docs/superpowers/specs/2026-08-08-admin-stats-dashboard-design.md` - read it before touching this plan; the Money Definitions and Edge Cases sections are the source of truth for every branch below.
 
 ## Global Constraints
 
 - **Live aggregate queries only. No rollup tables. No caching.** A stats endpoint queries the real tables on every request. (Spec: Architecture.)
 - **All money is integer VND.** Never introduce a float; sums are plain integer addition. (Spec: Money Definitions.)
-- **Backend implementation files are CommonJS** (`module.exports` / `require`). **Test files are Vitest 3 ESM** (`import { describe, it, expect } from "vitest"`, `import x from "../y.js"` with the `.js` extension even though `y.js` is CommonJS — Vitest 3's default-import interop handles this). Vitest 3 refuses `require("vitest")` inside a test file.
-- **Queries use the raw `mysql2` pool via `backend/db.js`** (`db.query(sql, params)` resolving to `[rows]` or `[rows, fields]` for a plain query, `[result]` with `.insertId`/`.affectedRows` for a write). **Knex is used only for migrations** — this phase needs no migration, since it reads existing tables only.
+- **Backend implementation files are CommonJS** (`module.exports` / `require`). **Test files are Vitest 3 ESM** (`import { describe, it, expect } from "vitest"`, `import x from "../y.js"` with the `.js` extension even though `y.js` is CommonJS - Vitest 3's default-import interop handles this). Vitest 3 refuses `require("vitest")` inside a test file.
+- **Queries use the raw `mysql2` pool via `backend/db.js`** (`db.query(sql, params)` resolving to `[rows]` or `[rows, fields]` for a plain query, `[result]` with `.insertId`/`.affectedRows` for a write). **Knex is used only for migrations** - this phase needs no migration, since it reads existing tables only.
 - **Admin routes live in `backend/routes/`, exported as a router-factory function** (`module.exports = function xRoutes() { ... return router }`), and are mounted in `backend/server.js` behind the existing `auth` middleware: `app.use(\`${API_PREFIX}/admin\`, auth, require("./routes/adminStats")())`.
 - **The admin panel is hardcoded Vietnamese.** It has never used the i18n system (`frontend/src/i18n/translations.js`); only buyer-facing UI is bilingual. This phase adds **zero** translation keys.
-- **Never invent a CSS variable.** The real tokens used throughout the admin panel include `--border-brand`, `--surface-card`, `--bg-page`, `--bg-sunken`, `--text-muted`, `--text-strong`, `--text-body`, `--radius-lg`, `--radius-md`. This project has shipped a non-existent `--bg-card` twice — grep `frontend/src` yourself before adding a new class if a task's JSX needs one not listed here. Every class used in this plan's JSX is plain Tailwind utilities (matching `AdminOrders.jsx`) plus `border-[var(--border-brand)]`, which is the one custom-property class the existing admin components actually use.
+- **Never invent a CSS variable.** The real tokens used throughout the admin panel include `--border-brand`, `--surface-card`, `--bg-page`, `--bg-sunken`, `--text-muted`, `--text-strong`, `--text-body`, `--radius-lg`, `--radius-md`. This project has shipped a non-existent `--bg-card` twice - grep `frontend/src` yourself before adding a new class if a task's JSX needs one not listed here. Every class used in this plan's JSX is plain Tailwind utilities (matching `AdminOrders.jsx`) plus `border-[var(--border-brand)]`, which is the one custom-property class the existing admin components actually use.
 - **Test DB commands:** `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test`. Frontend: `cd frontend && npm test && npm run build && npm run lint`.
-- **`npm run lint` has ONE pre-existing failure** in `frontend/src/pages/Portfolio.jsx` (`react-hooks` `set-state-in-effect`, line 563), from Plan 1, untouched by this phase. Do not try to fix it as part of this plan; do not let it block a task's own lint run — only new errors in files this plan touches are this plan's problem.
+- **`npm run lint` has ONE pre-existing failure** in `frontend/src/pages/Portfolio.jsx` (`react-hooks` `set-state-in-effect`, line 563), from Plan 1, untouched by this phase. Do not try to fix it as part of this plan; do not let it block a task's own lint run - only new errors in files this plan touches are this plan's problem.
 - **Test fixtures** reset tables via `resetTables(...)` from `backend/tests/helpers/db.js`, always in this order when orders are involved: `"order_items", "orders", "product_variants", "products", "collections"`.
-- **Timezone.** The seller is in Asia/Ho_Chi_Minh, fixed UTC+7 (Vietnam has no DST). `orders.created_at` is stored UTC. Any date-range boundary in this phase is parsed as `${dateStr}T00:00:00+07:00` before being compared against `created_at` — never compared as a bare UTC string.
+- **Timezone.** The seller is in Asia/Ho_Chi_Minh, fixed UTC+7 (Vietnam has no DST). `orders.created_at` is stored UTC. Any date-range boundary in this phase is parsed as `${dateStr}T00:00:00+07:00` before being compared against `created_at` - never compared as a bare UTC string.
 - **Deleted variants:** `order_items.product_variant_id` is `SET NULL` when a variant is deleted, so a deleted variant's sales become indistinguishable from any other deleted variant sharing the same `product_variant_id` (`NULL`) unless grouped by the snapshot columns too. Always `GROUP BY product_variant_id, product_name_snapshot, variant_label_snapshot` when aggregating `order_items`, never `product_variant_id` alone.
 - **Commits:** Conventional Commits, descriptive body, **no `Co-Authored-By` trailer**.
 
@@ -32,7 +32,7 @@
 
 ### Task 1: Money classification
 
-Pure functions over `(status, payment_method)`. No I/O. This is the single highest-value file in the phase — every other task's money numbers are only as correct as this one.
+Pure functions over `(status, payment_method)`. No I/O. This is the single highest-value file in the phase - every other task's money numbers are only as correct as this one.
 
 **Files:**
 - Create: `backend/shop/stats/money.js`
@@ -71,7 +71,7 @@ describe("isPrepaid", () => {
 // prepaid   awaiting_payment      received            received    lost
 // cod       other                 to_collect          received    lost
 //
-// Every one of the 20 combinations is asserted explicitly — this is the
+// Every one of the 20 combinations is asserted explicitly - this is the
 // highest-value test in the whole phase, per the spec's Testing section.
 const PREPAID_METHODS = ["bank", "momo", "paypal"]
 const CASES = []
@@ -139,7 +139,7 @@ describe("isExpired", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- statsMoney`
-Expected: FAIL — `backend/shop/stats/money.js` does not exist.
+Expected: FAIL - `backend/shop/stats/money.js` does not exist.
 
 - [ ] **Step 3: Implement the classifier**
 
@@ -163,7 +163,7 @@ function isPrepaid(paymentMethod) {
  * cod       other                 to_collect          received    lost
  *
  * "other" (a pending COD order) is neither money in hand nor a committed
- * promise to collect — the seller has not even confirmed the order yet — so
+ * promise to collect - the seller has not even confirmed the order yet - so
  * it is deliberately excluded from Received, Outstanding, and Lost. It is
  * still a real return value, never undefined, so every input is accounted
  * for and a caller cannot silently drop an order by forgetting a branch.
@@ -184,7 +184,7 @@ function classify(order) {
 /**
  * An order counts as expired when it was cancelled at or after its own
  * deadline. An admin who manually cancels an already-overdue order is
- * indistinguishable from the automatic sweep and is counted as expired too —
+ * indistinguishable from the automatic sweep and is counted as expired too -
  * accepted per spec rather than adding a `cancel_reason` column for one
  * statistic. COD orders never have `expires_at` and are never expired.
  */
@@ -210,7 +210,7 @@ git commit -F - <<'EOF'
 feat(stats): add money classification for the admin dashboard
 
 classify() maps every (status, payment_method) combination to exactly one
-bucket — received, awaiting_payment, to_collect, lost, or other (a pending
+bucket - received, awaiting_payment, to_collect, lost, or other (a pending
 COD order, committed to neither side yet). All 20 combinations are asserted
 explicitly in the test, because a wrong money number that looks authoritative
 is the single worst outcome this phase can produce.
@@ -232,7 +232,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `classify`, `isPrepaid`, `isExpired` from `backend/shop/stats/money.js` (Task 1).
-- Produces `statsRepo.js` exporting `getDropStats(collectionId: number): Promise<DropStats | null>`, plus the internal helper `buildVariantSummary(row, collectionCreatedAt)` (not exported — Task 3 does not import it, it has its own inline logic; see Task 3's Interfaces).
+- Produces `statsRepo.js` exporting `getDropStats(collectionId: number): Promise<DropStats | null>`, plus the internal helper `buildVariantSummary(row, collectionCreatedAt)` (not exported - Task 3 does not import it, it has its own inline logic; see Task 3's Interfaces).
 
   `DropStats` shape:
   ```
@@ -404,7 +404,7 @@ describe("getDropStats", () => {
     expect(v.sell_through).toBeNull()
   })
 
-  it("shows a deleted variant's revenue via order_items snapshots, remaining as null (displayed '—')", async () => {
+  it("shows a deleted variant's revenue via order_items snapshots, remaining as null (displayed '-')", async () => {
     const { collectionId, productId, variantId } = await seed({ stock: 3 })
     const o = await placeOrder(variantId)
     await orders.transitionOrder(o.id, "confirmed")
@@ -440,7 +440,7 @@ describe("getDropStats", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- statsRepoDrop`
-Expected: FAIL — `backend/shop/stats/statsRepo.js` does not exist.
+Expected: FAIL - `backend/shop/stats/statsRepo.js` does not exist.
 
 - [ ] **Step 3: Implement the drop view query**
 
@@ -455,8 +455,8 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
 /**
  * Sell-through and time-to-sellout for one row of a drop's per-variant
  * table. Deleted variants (product_variant_id NULL after ON DELETE SET
- * NULL) have no product_variants row to join — remaining is null, displayed
- * as "—" by the frontend, never 0, which would falsely read as sold out.
+ * NULL) have no product_variants row to join - remaining is null, displayed
+ * as "-" by the frontend, never 0, which would falsely read as sold out.
  */
 function buildVariantSummary(row, collectionCreatedAt) {
   const sold = Number(row.sold)
@@ -498,7 +498,7 @@ function buildVariantSummary(row, collectionCreatedAt) {
  * Money classification happens in JavaScript over a scoped fetch
  * (`WHERE collection_id = ?`, using idx_orders_status_created's leading
  * column) rather than as a SQL CASE expression, so the exhaustively-tested
- * classify() from money.js is what actually computes every number here —
+ * classify() from money.js is what actually computes every number here -
  * see this plan's Architecture note for why that trumps a "SQL only" rule.
  */
 async function getDropStats(collectionId) {
@@ -598,15 +598,15 @@ feat(stats): add the drop-view aggregate query
 
 getDropStats(collectionId) is the per-collection retrospective: money by
 classify() bucket (received split per payment method), order counts, units
-sold (cancelled orders excluded — their items were never actually sold),
+sold (cancelled orders excluded - their items were never actually sold),
 expiry rate over prepaid orders only, ship/pickup mix, and a per-variant
 sell-through table.
 
 Deleted variants are grouped by (variant_id, product_name_snapshot,
 variant_label_snapshot) rather than variant_id alone, since ON DELETE SET
-NULL collapses every deleted variant's product_variant_id to the same NULL —
+NULL collapses every deleted variant's product_variant_id to the same NULL -
 grouping by id alone would merge unrelated deleted variants' sales into one
-row. Their remaining stock is null (displayed as "—"), never 0, which would
+row. Their remaining stock is null (displayed as "-"), never 0, which would
 falsely read as sold out.
 
 Unlimited variants (stock_qty IS NULL) get a null sell-through rather than a
@@ -638,7 +638,7 @@ EOF
     time_to_sellout_days, // null unless sold out (remaining === 0)
   }
   ```
-  Deleted variants are absent from this list entirely (the query starts from `product_variants`, which no longer has their row) — restock decisions are about what can still be made, and a deleted variant cannot be restocked.
+  Deleted variants are absent from this list entirely (the query starts from `product_variants`, which no longer has their row) - restock decisions are about what can still be made, and a deleted variant cannot be restocked.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -776,7 +776,7 @@ describe("getRestockStats", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- statsRepoRestock`
-Expected: FAIL — `getRestockStats` is not exported.
+Expected: FAIL - `getRestockStats` is not exported.
 
 - [ ] **Step 3: Implement the restock view query**
 
@@ -789,7 +789,7 @@ In `backend/shop/stats/statsRepo.js`, add above `module.exports`:
  * Velocity = units sold ÷ days on sale, where days-on-sale runs from the
  * variant's collection's created_at to either its last sale (if it has sold
  * out) or now. This gives one comparable number for both sold-out and
- * still-available variants — time-to-sellout alone is undefined for
+ * still-available variants - time-to-sellout alone is undefined for
  * anything that has never sold out.
  *
  * Deleted variants are absent by construction: this query starts from
@@ -885,7 +885,7 @@ feat(stats): add the restock-view aggregate query
 
 getRestockStats() ranks every current variant by sales velocity (units sold
 ÷ days on sale), where days-on-sale runs to the variant's last sale once it
-sells out, or to now otherwise — one comparable number across sold-out and
+sells out, or to now otherwise - one comparable number across sold-out and
 still-available stock.
 
 Deleted variants are absent by construction, since the query starts from the
@@ -906,8 +906,8 @@ EOF
 **Interfaces:**
 - Consumes: `classify` from `money.js` (Task 1); `getDropStats` from Task 2 (used only by this task's reconciliation test, not by the implementation).
 - Produces:
-  - `class InvalidRangeError extends Error {}` — thrown by malformed or backwards date ranges.
-  - `parseLocalDateRange(dateFrom: string, dateTo: string): {from: Date, toExclusive: Date}` — `dateFrom`/`dateTo` are `YYYY-MM-DD` strings interpreted in Asia/Ho_Chi_Minh; throws `InvalidRangeError` on missing, unparsable, or backwards input.
+  - `class InvalidRangeError extends Error {}` - thrown by malformed or backwards date ranges.
+  - `parseLocalDateRange(dateFrom: string, dateTo: string): {from: Date, toExclusive: Date}` - `dateFrom`/`dateTo` are `YYYY-MM-DD` strings interpreted in Asia/Ho_Chi_Minh; throws `InvalidRangeError` on missing, unparsable, or backwards input.
   - `getBookkeepingStats({date_from: string, date_to: string}): Promise<BookkeepingStats>`
 
   `BookkeepingStats` shape:
@@ -981,7 +981,7 @@ describe("parseLocalDateRange / statsRepo.InvalidRangeError", () => {
   })
 })
 
-describe("getBookkeepingStats — timezone boundaries", () => {
+describe("getBookkeepingStats - timezone boundaries", () => {
   it("counts an order placed just after local midnight into that local day", async () => {
     const { variantId } = await seedVariant()
     // 2026-08-01T00:05:00+07:00 == 2026-07-31T17:05:00Z
@@ -1007,7 +1007,7 @@ describe("getBookkeepingStats — timezone boundaries", () => {
   })
 })
 
-describe("getBookkeepingStats — money and buckets", () => {
+describe("getBookkeepingStats - money and buckets", () => {
   it("splits received by payment method", async () => {
     const { variantId } = await seedVariant()
     const today = new Date()
@@ -1057,7 +1057,7 @@ describe("getBookkeepingStats — money and buckets", () => {
   })
 })
 
-describe("reconciliation — the highest-value test in this phase", () => {
+describe("reconciliation - the highest-value test in this phase", () => {
   it("per-collection sums (plus the no-collection bucket) equal the bookkeeping total for the same range", async () => {
     const today = new Date()
     const dateStr = today.toISOString().slice(0, 10)
@@ -1098,14 +1098,14 @@ describe("reconciliation — the highest-value test in this phase", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- statsRepoBookkeeping`
-Expected: FAIL — `parseLocalDateRange`, `InvalidRangeError`, `getBookkeepingStats` are not exported.
+Expected: FAIL - `parseLocalDateRange`, `InvalidRangeError`, `getBookkeepingStats` are not exported.
 
 - [ ] **Step 3: Implement the timezone helper and bookkeeping query**
 
 In `backend/shop/stats/statsRepo.js`, add near the top (after the `MS_PER_DAY` constant):
 
 ```js
-/** Thrown for a missing, unparsable, or backwards date range — the bookkeeping
+/** Thrown for a missing, unparsable, or backwards date range - the bookkeeping
  * view rejects these with a clear message rather than silently returning
  * every order, unlike the admin orders list's tolerant date filter, because
  * a money view that misinterprets its own range is a bookkeeping error. */
@@ -1148,7 +1148,7 @@ Then add, above `module.exports`:
 /**
  * Bookkeeping totals across every collection for a date range, plus an
  * explicit "no collection" bucket (orders.collection_id is nullable) so
- * per-collection sums always reconcile with the top-level totals — both are
+ * per-collection sums always reconcile with the top-level totals - both are
  * computed from the same fetched rows in the same pass, by construction.
  */
 async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
@@ -1244,7 +1244,7 @@ August rather than misfiling every order placed between local midnight and
 7am UTC.
 
 A malformed or backwards range throws InvalidRangeError with a Vietnamese
-message, rejected rather than silently returning every order — a deliberate
+message, rejected rather than silently returning every order - a deliberate
 departure from the admin orders list's tolerant date filter, justified here
 because a bookkeeping view that silently widens its own range is itself a
 bookkeeping error.
@@ -1272,7 +1272,7 @@ EOF
 - Produces `csv.js` exporting:
   - `csvEscape(value: any): string`
   - `toCsvRow(values: any[]): string`
-  - `toCsv(headers: string[], rows: any[][]): string` — prefixed with a UTF-8 BOM.
+  - `toCsv(headers: string[], rows: any[][]): string` - prefixed with a UTF-8 BOM.
   - `bookkeepingToCsv(stats: BookkeepingStats): string`
 
 - [ ] **Step 1: Write the failing test**
@@ -1350,7 +1350,7 @@ describe("bookkeepingToCsv", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- statsCsv`
-Expected: FAIL — `backend/shop/stats/csv.js` does not exist.
+Expected: FAIL - `backend/shop/stats/csv.js` does not exist.
 
 - [ ] **Step 3: Implement CSV serialization**
 
@@ -1383,7 +1383,7 @@ function toCsv(headers, rows) {
 
 /**
  * Serialize a bookkeeping-view result (see statsRepo.getBookkeepingStats)
- * into the exact CSV the admin downloads — built server-side, so the export
+ * into the exact CSV the admin downloads - built server-side, so the export
  * is guaranteed identical to what the screen displayed.
  */
 function bookkeepingToCsv(stats) {
@@ -1558,7 +1558,7 @@ describe("GET /api/admin/stats/bookkeeping/export.csv", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test -- adminStatsRoutes`
-Expected: FAIL — `backend/routes/adminStats.js` does not exist, and the routes 404.
+Expected: FAIL - `backend/routes/adminStats.js` does not exist, and the routes 404.
 
 - [ ] **Step 3: Create the router**
 
@@ -1733,7 +1733,7 @@ describe("AdminStats", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- AdminStats`
-Expected: FAIL — `./AdminStats` and `./stats/StatsDrop` etc. do not exist.
+Expected: FAIL - `./AdminStats` and `./stats/StatsDrop` etc. do not exist.
 
 - [ ] **Step 3: Append the API calls**
 
@@ -1798,7 +1798,7 @@ export default function AdminStats() {
 }
 ```
 
-This imports `./stats/StatsDrop`, `./stats/StatsRestock`, and `./stats/StatsBookkeeping`, which do not exist yet — Tasks 8–10 create them. This task's own test mocks all three (Step 1), so it does not depend on their real implementation; it only fails to *build* until they exist as files, which the next three tasks provide. To keep this task's test runnable in isolation before those files exist, create minimal placeholder files now (Tasks 8–10 replace their contents):
+This imports `./stats/StatsDrop`, `./stats/StatsRestock`, and `./stats/StatsBookkeeping`, which do not exist yet - Tasks 8–10 create them. This task's own test mocks all three (Step 1), so it does not depend on their real implementation; it only fails to *build* until they exist as files, which the next three tasks provide. To keep this task's test runnable in isolation before those files exist, create minimal placeholder files now (Tasks 8–10 replace their contents):
 
 Create `frontend/src/components/stats/StatsDrop.jsx`:
 
@@ -1868,8 +1868,8 @@ git add frontend/src/api/shop.js frontend/src/components/AdminStats.jsx \
 git commit -F - <<'EOF'
 feat(stats): add the Thống kê admin tab shell
 
-AdminStats.jsx switches between three placeholder views — Theo đợt bán,
-Restock, Sổ quỹ — matching the existing admin tab pattern in Admin.jsx
+AdminStats.jsx switches between three placeholder views - Theo đợt bán,
+Restock, Sổ quỹ - matching the existing admin tab pattern in Admin.jsx
 exactly. The three view components are stubs here; Tasks 8–10 replace each
 with its real implementation independently.
 
@@ -1982,7 +1982,7 @@ describe("StatsDrop", () => {
     expect(container.textContent).toContain("không giới hạn")
   })
 
-  it("shows '—' for a deleted variant's remaining stock, never 0", async () => {
+  it("shows '-' for a deleted variant's remaining stock, never 0", async () => {
     adminGetDropStats.mockResolvedValue(dropStats({
       variants: [{ variant_id: null, product_name: "Old card", variant_label: "B2", sold: 2, deleted: true, unlimited: false, remaining: null, sell_through: null, time_to_sellout_days: null }],
     }))
@@ -1992,7 +1992,7 @@ describe("StatsDrop", () => {
     await flush()
 
     const table = container.querySelector("table")
-    expect(table.textContent).toContain("—")
+    expect(table.textContent).toContain("-")
     expect(table.textContent).not.toMatch(/\b0\b.*Old card|Old card.*\b0\b/)
   })
 
@@ -2011,7 +2011,7 @@ describe("StatsDrop", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- stats/StatsDrop`
-Expected: FAIL — the placeholder component has no select, no collection list, no variant table.
+Expected: FAIL - the placeholder component has no select, no collection list, no variant table.
 
 - [ ] **Step 3: Implement the component**
 
@@ -2028,7 +2028,7 @@ const STATUS_LABELS = {
 }
 
 function formatPercent(ratio) {
-  if (ratio === null || ratio === undefined) return "—"
+  if (ratio === null || ratio === undefined) return "-"
   return `${Math.round(ratio * 1000) / 10}%`
 }
 
@@ -2060,7 +2060,7 @@ export default function StatsDrop() {
           onChange={(e) => setCollectionId(e.target.value)}
           className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
         >
-          <option value="">— Chọn một bộ sưu tập —</option>
+          <option value="">- Chọn một bộ sưu tập -</option>
           {collections.map((c) => (
             <option key={c.id} value={c.id}>{c.title}</option>
           ))}
@@ -2104,12 +2104,12 @@ export default function StatsDrop() {
             <p className="mb-4 text-sm">
               Tỷ lệ hết hạn:{" "}
               {stats.expiry_rate === null
-                ? "— (không có đơn trả trước)"
+                ? "- (không có đơn trả trước)"
                 : `${formatPercent(stats.expiry_rate)} (${stats.expired_order_count}/${stats.prepaid_order_count} đơn trả trước)`}
             </p>
 
             <p className="mb-2 text-xs opacity-60">
-              Tỷ lệ bán hết được tính trên số lượng tồn kho hiện tại, không phải tồn kho gốc — nếu
+              Tỷ lệ bán hết được tính trên số lượng tồn kho hiện tại, không phải tồn kho gốc - nếu
               admin đã nhập thêm hàng giữa đợt bán, tỷ lệ này sẽ thay đổi theo.
             </p>
 
@@ -2131,13 +2131,13 @@ export default function StatsDrop() {
                     <td className="pr-2 py-1">{v.variant_label}</td>
                     <td className="pr-2 py-1">{v.sold}</td>
                     <td className="pr-2 py-1">
-                      {v.deleted ? "—" : v.unlimited ? "không giới hạn" : v.remaining}
+                      {v.deleted ? "-" : v.unlimited ? "không giới hạn" : v.remaining}
                     </td>
                     <td className="pr-2 py-1">
-                      {v.unlimited || v.deleted ? "—" : formatPercent(v.sell_through)}
+                      {v.unlimited || v.deleted ? "-" : formatPercent(v.sell_through)}
                     </td>
                     <td className="py-1">
-                      {v.time_to_sellout_days === null ? "—" : `${Math.ceil(v.time_to_sellout_days)} ngày`}
+                      {v.time_to_sellout_days === null ? "-" : `${Math.ceil(v.time_to_sellout_days)} ngày`}
                     </td>
                   </tr>
                 ))}
@@ -2165,8 +2165,8 @@ feat(stats): implement the drop-view component
 
 Collection picker feeding a real-time load of getDropStats. Unlimited
 variants render "không giới hạn" rather than a stock number or a percentage,
-and deleted variants render "—" for remaining stock rather than 0, which
-would falsely read as sold out — both mirrored exactly from the backend's
+and deleted variants render "-" for remaining stock rather than 0, which
+would falsely read as sold out - both mirrored exactly from the backend's
 DropStats null-vs-flag contract established in statsRepo.js.
 EOF
 ```
@@ -2256,7 +2256,7 @@ describe("StatsRestock", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- stats/StatsRestock`
-Expected: FAIL — the placeholder component has no table.
+Expected: FAIL - the placeholder component has no table.
 
 - [ ] **Step 3: Implement the component**
 
@@ -2267,7 +2267,7 @@ import { useEffect, useState } from "react"
 import { adminGetRestockStats } from "../../api/shop"
 
 function formatPercent(ratio) {
-  if (ratio === null || ratio === undefined) return "—"
+  if (ratio === null || ratio === undefined) return "-"
   return `${Math.round(ratio * 1000) / 10}%`
 }
 
@@ -2283,7 +2283,7 @@ export default function StatsRestock() {
     <div>
       <p className="text-sm opacity-70 mb-3">
         Vận tốc bán = số lượng đã bán ÷ số ngày mở bán. Một khi một phân loại đã bán hết, nhu cầu
-        thực tế sau đó không còn hiển thị được — thời gian bán hết là ước lượng tốt nhất, không
+        thực tế sau đó không còn hiển thị được - thời gian bán hết là ước lượng tốt nhất, không
         phải nhu cầu thật.
       </p>
       {error && <p className="text-red-500 mb-3">{error}</p>}
@@ -2355,7 +2355,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `adminGetBookkeepingStats`, `adminDownloadBookkeepingCsv` (Task 7), `formatVnd` (existing).
-- No new exports consumed by later tasks — last task in the plan.
+- No new exports consumed by later tasks - last task in the plan.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2460,7 +2460,7 @@ describe("StatsBookkeeping", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd frontend && npm test -- stats/StatsBookkeeping`
-Expected: FAIL — the placeholder component has no date inputs, no buttons.
+Expected: FAIL - the placeholder component has no date inputs, no buttons.
 
 - [ ] **Step 3: Implement the component**
 
@@ -2608,7 +2608,7 @@ Run:
 ```bash
 cd frontend && npm test && npm run build && npm run lint
 ```
-Expected: `npm test` PASS with no regressions. `npm run build` succeeds (a pre-existing >500KB chunk-size warning is fine). `npm run lint` shows exactly the one pre-existing `Portfolio.jsx` error noted in Global Constraints — no new errors from any file this plan touched.
+Expected: `npm test` PASS with no regressions. `npm run build` succeeds (a pre-existing >500KB chunk-size warning is fine). `npm run lint` shows exactly the one pre-existing `Portfolio.jsx` error noted in Global Constraints - no new errors from any file this plan touched.
 
 - [ ] **Step 6: Commit**
 
@@ -2624,7 +2624,7 @@ explicitly. "Xuất CSV" downloads the server-generated CSV as a blob using
 the exact same date params the screen is showing, so the file can never
 describe a different range than what's displayed.
 
-This is the last task in Plan 4 — the full Thống kê tab (drop, restock,
+This is the last task in Plan 4 - the full Thống kê tab (drop, restock,
 bookkeeping) is now feature-complete pending manual acceptance per
 2026-08-08-merch-shop-4-verification.md.
 EOF

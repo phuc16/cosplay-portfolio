@@ -59,7 +59,7 @@ beforeEach(() => {
   searchAddress.mockResolvedValue({ predictions: [] })
 })
 
-describe("AddressFields — province/ward picker (no live per-keystroke autocomplete)", () => {
+describe("AddressFields - province/ward picker (no live per-keystroke autocomplete)", () => {
   it("loads the province list on mount, through our own backend proxy", async () => {
     const { container } = await renderField()
 
@@ -136,7 +136,7 @@ describe("AddressFields — province/ward picker (no live per-keystroke autocomp
   })
 })
 
-describe("AddressFields — street field requires province + ward first", () => {
+describe("AddressFields - street field requires province + ward first", () => {
   it("starts disabled, with a hint placeholder, before province/ward are picked", async () => {
     const { container } = await renderField()
     const streetInput = container.querySelector("input[type='text']")
@@ -173,7 +173,7 @@ describe("AddressFields — street field requires province + ward first", () => 
   })
 })
 
-describe("AddressFields — debounced auto-search (not per-keystroke, not button-gated)", () => {
+describe("AddressFields - debounced auto-search (not per-keystroke, not button-gated)", () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -190,7 +190,7 @@ describe("AddressFields — debounced auto-search (not per-keystroke, not button
     expect(searchAddress).not.toHaveBeenCalled()
   })
 
-  it("does not call searchAddress immediately on keystroke — only after the debounce settles", async () => {
+  it("does not call searchAddress immediately on keystroke - only after the debounce settles", async () => {
     const { container } = await renderField()
     await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
     await pickOption(container, wardTrigger(container), "Hiệp Bình")
@@ -202,7 +202,7 @@ describe("AddressFields — debounced auto-search (not per-keystroke, not button
     expect(searchAddress).toHaveBeenCalledWith("66B Nguyen Si Sach", "Hiệp Bình", "Hồ Chí Minh")
   })
 
-  it("restarts the debounce on every keystroke — a fast typing burst fires only once, for the final text", async () => {
+  it("restarts the debounce on every keystroke - a fast typing burst fires only once, for the final text", async () => {
     const { container } = await renderField()
     await pickOption(container, provinceTrigger(container), "Hồ Chí Minh")
     await pickOption(container, wardTrigger(container), "Hiệp Bình")
@@ -235,7 +235,7 @@ describe("AddressFields — debounced auto-search (not per-keystroke, not button
       predictions: [{
         place_id: "1",
         description: "Sảnh chính S3.01, CC Vinhomes Grand Park, Nguyễn Xiển, Hiệp Bình, Hồ Chí Minh",
-        // main_text alone would lose "CC Vinhomes Grand Park" — the real
+        // main_text alone would lose "CC Vinhomes Grand Park" - the real
         // bug this test guards against.
         structured_formatting: { main_text: "Sảnh chính S3.01" },
       }],

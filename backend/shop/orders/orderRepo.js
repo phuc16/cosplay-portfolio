@@ -45,7 +45,7 @@ class RequestKeyConflictError extends Error {
 }
 
 /**
- * The buyer asked for ship/pickup on a collection that never offered it —
+ * The buyer asked for ship/pickup on a collection that never offered it -
  * e.g. "pickup" against a ship-only collection. Distinct from OutOfStockError:
  * this is a request-shape problem the client should not retry unchanged, not
  * a stock race, so the route maps it to 400 rather than 409.
@@ -62,7 +62,7 @@ class FulfillmentNotOfferedError extends Error {
 }
 
 /**
- * A cart line's collection is no longer "active" — most commonly, it was
+ * A cart line's collection is no longer "active" - most commonly, it was
  * open when the item was added to the buyer's cart but the seller ended the
  * drop (status -> "closed") before checkout. Mirrors OutOfStockError's shape
  * (a real product/variant to quote) so the route can map it the same way:
@@ -79,7 +79,7 @@ class CollectionNotActiveError extends Error {
   }
 }
 
-/** COD collects cash at physical delivery — nothing to collect once a digital good has already been emailed out. */
+/** COD collects cash at physical delivery - nothing to collect once a digital good has already been emailed out. */
 class NoCodForDigitalError extends Error {
   constructor() {
     super("Không hỗ trợ thanh toán COD cho đơn có sản phẩm số")
@@ -87,7 +87,7 @@ class NoCodForDigitalError extends Error {
   }
 }
 
-/** A cart with at least one physical line must pick ship/pickup — only an all-digital cart may omit it. */
+/** A cart with at least one physical line must pick ship/pickup - only an all-digital cart may omit it. */
 class FulfillmentRequiredError extends Error {
   constructor() {
     super("Hình thức nhận hàng không hợp lệ")
@@ -101,7 +101,7 @@ class FulfillmentRequiredError extends Error {
  * request_key is client-supplied and unique across ALL buyers, so a bare key
  * match is not proof the same person is retrying. The caller must confirm the
  * stored row belongs to the buyer making the current request before treating
- * it as a replay — handing back a stranger's order_token would give them the
+ * it as a replay - handing back a stranger's order_token would give them the
  * order page, and with it that buyer's name, phone, email and address.
  */
 async function findByRequestKey(conn, requestKey) {
@@ -131,7 +131,7 @@ const replayResult = (row) => ({
 /**
  * Create an order and reserve its stock in one transaction.
  *
- * Prices come from the catalog inside the transaction — never from the client,
+ * Prices come from the catalog inside the transaction - never from the client,
  * which sends only {variant_id, qty}. Only product_variants rows are locked,
  * and always in ascending id order, so two concurrent orders touching the same
  * variants cannot deadlock by grabbing them in opposite orders.
@@ -149,7 +149,7 @@ async function createOrder(input) {
     // Idempotency: a retried submit must not reserve stock a second time.
     // Only this buyer's own earlier order counts as a retry. If the key is
     // taken by someone else it is a coincidental collision between two
-    // unrelated buyers, and this buyer is still entitled to their order — so
+    // unrelated buyers, and this buyer is still entitled to their order - so
     // fall through and create it. The unique index then rejects the insert and
     // the catch below turns that into a visible RequestKeyConflictError rather
     // than silently returning the other buyer's order.
@@ -168,16 +168,16 @@ async function createOrder(input) {
       wanted.set(id, (wanted.get(id) || 0) + qty)
     }
     // This sort is what makes the locking safe: it produces an ascending id
-    // list that drives both the IN (...) below — InnoDB walks the primary key
-    // in index order, so it takes the row locks ascending — and the check and
+    // list that drives both the IN (...) below - InnoDB walks the primary key
+    // in index order, so it takes the row locks ascending - and the check and
     // decrement loops further down. The SQL ORDER BY only orders the result
     // set; it does not govern lock acquisition.
     const ids = [...wanted.keys()].sort((a, b) => a - b)
 
     // FOR UPDATE OF v locks only the product_variants rows. A bare FOR UPDATE
     // would also lock the joined products rows, and it would take those locks
-    // in variant-id order — an order with no consistent relationship to product
-    // ids — so two orders buying from the same two products via differently
+    // in variant-id order - an order with no consistent relationship to product
+    // ids - so two orders buying from the same two products via differently
     // ordered variants could deadlock on the parent rows. Verified on MySQL
     // 8.4: with OF v, a concurrent SELECT ... FROM products FOR UPDATE does not
     // block, while the same on product_variants does.
@@ -211,8 +211,8 @@ async function createOrder(input) {
     }
     const fulfillmentMethod = allDigital ? "digital" : input.fulfillment_method
 
-    // Every line's collection must still be open for ordering, and — for a
-    // physical line — must actually offer the requested fulfillment method.
+    // Every line's collection must still be open for ordering, and - for a
+    // physical line - must actually offer the requested fulfillment method.
     // A digital line is never checked against allow_ship/allow_pickup: those
     // flags describe how a collection ships/hands over physical goods, and
     // have nothing to say about a line that was never going to be shipped.
@@ -220,15 +220,15 @@ async function createOrder(input) {
     // collection rather than assuming a single one for the whole order.
     // Checked with the same row lock as the stock check below, so a cart
     // item added while a collection was "active" cannot slip through a race
-    // against the admin closing it — see CollectionNotActiveError.
+    // against the admin closing it - see CollectionNotActiveError.
     const now = new Date()
     for (const row of rows) {
       // A collection whose end_at has already passed is rejected here even
-      // if its stored status still says "active" — the real transition to
+      // if its stored status still says "active" - the real transition to
       // "closed" only happens lazily on a read path (see catalogRepo.js's
       // closeExpiredCollections), which this write path never calls. A
       // collection whose start_at hasn't arrived yet is rejected the same
-      // way — catalogRepo hides it from listing/lookup, but a buyer who
+      // way - catalogRepo hides it from listing/lookup, but a buyer who
       // already has the variant_id (an old cart, a stale page, a crafted
       // request) must not be able to check out before it's actually live.
       const collectionNotStarted = row.collection_start_at && new Date(row.collection_start_at) > now
@@ -289,7 +289,7 @@ async function createOrder(input) {
     // Neither a pickup nor an all-digital order has anywhere to ship to.
     const skipAddress = isPickup || fulfillmentMethod === "digital"
     const pickupCode = isPickup ? domain.generatePickupCode() : null
-    // Only the hash is ever persisted (see migration 021) — accessPin itself
+    // Only the hash is ever persisted (see migration 021) - accessPin itself
     // is returned once here so the caller can email it, same lifecycle as
     // order_token except accessPin is never stored in plaintext anywhere.
     const accessPin = domain.generateAccessPin()
@@ -365,7 +365,7 @@ function firstImage(value) {
 
 async function attachItems(order) {
   if (!order) return null
-  // image_url_snapshot (taken at order-creation time) wins — it survives the
+  // image_url_snapshot (taken at order-creation time) wins - it survives the
   // variant/product being deleted later, which a completed order's own
   // history must not depend on. The live join is a fallback only for orders
   // placed before this snapshot column existed.
@@ -401,7 +401,7 @@ async function getOrderByToken(token) {
 }
 
 async function getOrderById(id) {
-  // Same LEFT JOIN as getOrderByToken — the email sender needs
+  // Same LEFT JOIN as getOrderByToken - the email sender needs
   // pickup_location/pickup_note too, to tell a pickup buyer where to go.
   const [[row]] = await db.query(
     `SELECT o.*, c.pickup_location, c.pickup_note
@@ -447,11 +447,11 @@ async function listOrders(filter = {}) {
   // when looking up a specific order: its numeric id, the buyer's name,
   // phone, or email. order_code (the Shopee-style display code) is a
   // computed value, not a column, so an id search only matches the raw
-  // numeric id — a buyer quoting their display code would need it decoded
+  // numeric id - a buyer quoting their display code would need it decoded
   // first, same as everywhere else order_code isn't the DB key.
   // Capped rather than left unbounded: buyer_name/phone/email have no index,
   // so an admin session (or a compromised admin token) pasting in a huge
-  // string would otherwise cost a full-table LIKE scan for no added value —
+  // string would otherwise cost a full-table LIKE scan for no added value -
   // no real name/phone/email is anywhere close to this long.
   const search = String(filter.search || "").trim().slice(0, 100)
   if (search) {
@@ -496,7 +496,7 @@ async function releaseStock(conn, orderId) {
 
 /**
  * Move an order to a new status. Cancelling returns reserved stock, guarded by
- * stock_released_at so a double cancel — or a cancel racing the expiry sweep —
+ * stock_released_at so a double cancel - or a cancel racing the expiry sweep -
  * cannot credit the same stock twice.
  *
  * `extra.expectedFromStatus` and `extra.expiredBefore` let a caller that
@@ -589,7 +589,7 @@ async function transitionOrder(id, toStatus, extra = {}) {
   }
 
   // The email enqueue below runs only after the connection above has been
-  // released (see `finally`) — it may not hold a pool connection while
+  // released (see `finally`) - it may not hold a pool connection while
   // doing follow-up work (see commit 58dad02). It is best-effort: a mail
   // failure must never fail or roll back a status change the seller
   // already made.
@@ -616,7 +616,7 @@ async function transitionOrder(id, toStatus, extra = {}) {
  * Cancel pending prepaid orders past their deadline. COD orders have a NULL
  * expires_at and are excluded by the query itself, not by a code path that
  * could be forgotten. An order that already has a payment_proof_url is also
- * excluded — the buyer already did their part (paid and uploaded proof) and
+ * excluded - the buyer already did their part (paid and uploaded proof) and
  * is now only waiting on the seller to confirm, so the payment deadline no
  * longer applies to them; auto-cancelling here would punish the buyer for
  * the seller's own delay.

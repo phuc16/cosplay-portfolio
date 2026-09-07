@@ -37,7 +37,7 @@ describe("concurrent reservation", () => {
     const losers = results.filter((r) => !r.ok)
     expect(losers).toHaveLength(19)
     // stock_qty is an unsigned column, so "stock never went negative" is also
-    // true of an implementation with no locking and no check at all — MySQL
+    // true of an implementation with no locking and no check at all - MySQL
     // would reject the underflowing UPDATE itself. Asserting the *error type*
     // is what proves the application detected the shortage under its own row
     // lock and threw the contracted domain error, rather than letting the
@@ -107,8 +107,8 @@ describe("concurrent reservation", () => {
 
     // Exactly one call may report that it performed the cancel; the other two
     // must refuse and say so. Asserting only the final stock leaves the
-    // return-value contract — which callers use to decide whether they were
-    // the one that acted — completely unchecked.
+    // return-value contract - which callers use to decide whether they were
+    // the one that acted - completely unchecked.
     expect(outcomes.filter((ok) => ok === true)).toHaveLength(1)
     expect(outcomes.filter((ok) => ok === false)).toHaveLength(2)
 
@@ -121,7 +121,7 @@ describe("concurrent reservation", () => {
     expect(o.status).toBe("cancelled")
     expect(o.stock_released_at).not.toBeNull()
 
-    // This proves a losing cancel call returns false and writes nothing — not
+    // This proves a losing cancel call returns false and writes nothing - not
     // that it defends against a restamp: canTransition already refuses
     // cancelled -> cancelled one layer up, so transitionOrder returning false
     // is why stock_released_at below is unchanged, not evidence of a guard
@@ -150,7 +150,7 @@ describe("concurrent reservation", () => {
   })
 
   // The test above races the sweep against a cancel of a *pending* order, where
-  // both paths want the same outcome — so it cannot detect a regression in the
+  // both paths want the same outcome - so it cannot detect a regression in the
   // expectedFromStatus guard. This one covers the case the guard exists for: an
   // order that is confirmed (paid) after the sweep's unlocked read selected it
   // as overdue. The sweep must re-verify status under the row lock and back off
@@ -212,7 +212,7 @@ describe("concurrent reservation", () => {
   // averts the deadlock. Mutation testing shows why: reversing that sort, or
   // dropping it entirely, does not make this test fail. One locking statement
   // takes its row locks in InnoDB's own primary-key index order, whatever the
-  // literal order of the IN list or of any ORDER BY clause — so opposite-order
+  // literal order of the IN list or of any ORDER BY clause - so opposite-order
   // submissions already converge on the same lock order for free.
   //
   // The property that does matter, and that this test guards, is the batching:
@@ -247,7 +247,7 @@ describe("concurrent reservation", () => {
 
     // Final state, not just "nothing threw": each fulfilled order took exactly
     // one unit of each variant, so a double decrement on this multi-item path
-    // — which zero-rejections alone would never notice — shows up here.
+    // - which zero-rejections alone would never notice - shows up here.
     const fulfilled = results.filter((r) => r.status === "fulfilled").length
     expect(fulfilled).toBe(20)
 

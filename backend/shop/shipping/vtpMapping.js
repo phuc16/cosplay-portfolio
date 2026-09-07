@@ -2,7 +2,7 @@ const domain = require("../orders/domain")
 
 const ORDER_CODE_PREFIX = "DH"
 
-/** Column B (Mã đơn hàng). Never order_token — see this plan's Global
+/** Column B (Mã đơn hàng). Never order_token - see this plan's Global
  * Constraints and Task 3's security test. orders.id is already the
  * admin-facing identifier, stable, unique, and discloses nothing sensitive
  * to a courier who already receives the buyer's name, phone, and address. */
@@ -17,11 +17,11 @@ const HCM_ACCEPTED_FORMS = new Set(["ho chi minh", "hcm", "hcmc", "sai gon"])
 
 /** Matches a leading administrative prefix ("TP", "TP.", "T.P", "Thành phố")
  * so it can be stripped before the equality check below. Deliberately does
- * NOT match anywhere else in the string — a prefix only counts at position 0. */
+ * NOT match anywhere else in the string - a prefix only counts at position 0. */
 const HCM_PREFIX_RE = /^(thanh\s*pho|t\.?\s*p\.?)\s*\.?\s*/
 
 /** Strips diacritics and lowercases so "Hồ Chí Minh", "HCM", and "Sài Gòn"
- * all match the same keyword list the seller's existing script used —
+ * all match the same keyword list the seller's existing script used -
  * applied only to the structured address_province field, never the whole
  * address string (the spec's stated departure from the old script). */
 function normalize(s) {
@@ -34,7 +34,7 @@ function normalize(s) {
 }
 
 /** Requires the whole (prefix-stripped) province field to BE a Ho Chi Minh
- * City designation, not merely contain one as a substring — "Đường Hồ Chí
+ * City designation, not merely contain one as a substring - "Đường Hồ Chí
  * Minh" (a highway running through several other provinces) would otherwise
  * falsely match intra-city service for a parcel nowhere near HCMC. */
 function isHoChiMinh(province) {
@@ -45,7 +45,7 @@ function isHoChiMinh(province) {
   return HCM_ACCEPTED_FORMS.has(withoutTrailingPunct)
 }
 
-/** Unknown/empty province defaults to the inter-province service — the
+/** Unknown/empty province defaults to the inter-province service - the
  * safe direction: a wrongly-inter-province shipment costs more, a
  * wrongly-intra-province one fails outright. */
 function selectService(province) {
@@ -55,7 +55,7 @@ function selectService(province) {
 /** Column E (Địa chỉ nhận). Structured fields take priority (they came
  * through address autocomplete and are more reliable); address_raw is the
  * fallback for a buyer who skipped autocomplete. Returns null when neither
- * source has anything usable — the caller must treat that as an export
+ * source has anything usable - the caller must treat that as an export
  * error, never a blank column E (a shipment that cannot be delivered). */
 function assembleAddress(order) {
   const parts = [order.address_street, order.address_ward, order.address_district, order.address_province]
@@ -70,10 +70,10 @@ function assembleAddress(order) {
 const PAYER_BUYER = "Người nhận trả"
 const PAYER_SELLER = "Người gửi trả"
 
-// Verified from the template's "Loai hang hoa" reference sheet — exactly two values.
+// Verified from the template's "Loai hang hoa" reference sheet - exactly two values.
 const LOAI_HANG_HOA_VALUES = ["Bưu kiện", "Tài liệu"]
 
-/** Column J (Tiền thu hộ COD). Blank (null) for any prepaid order — VTP
+/** Column J (Tiền thu hộ COD). Blank (null) for any prepaid order - VTP
  * should never be told to collect money that was already paid. A COD order
  * with no recorded cod_amount is an export ERROR, not a blank cell: a COD
  * shipment that collects nothing is money lost, and must be caught before
@@ -91,7 +91,7 @@ function resolveCod(order) {
 }
 
 /** Column S (Người trả cước). Defaults to buyer-pays, matching migration
- * 017's column default — an order that predates the shipping_payer column
+ * 017's column default - an order that predates the shipping_payer column
  * being set explicitly is never silently treated as freeship. */
 function selectPayer(order) {
   return order.shipping_payer === "seller" ? PAYER_SELLER : PAYER_BUYER
@@ -99,14 +99,14 @@ function selectPayer(order) {
 
 /**
  * Map one order to its per-order VTP row values (columns B, C, D, E, I, J,
- * M, S — the batch-level columns F, G, H, K, U are filled by the caller,
+ * M, S - the batch-level columns F, G, H, K, U are filled by the caller,
  * see vtpWorkbook.js). Returns an explicit ok:false with a reason rather
  * than throwing, so a caller can skip one bad order without aborting a
- * whole export — the same per-row-isolation principle as the admin
+ * whole export - the same per-row-isolation principle as the admin
  * bulk-cancel endpoint.
  *
- * Deliberately reads only the specific fields it needs off `order` — never
- * `order.order_token` — so a caller accidentally passing the full order row
+ * Deliberately reads only the specific fields it needs off `order` - never
+ * `order.order_token` - so a caller accidentally passing the full order row
  * (including order_token) can never leak it into the mapped row. See this
  * plan's Global Constraints.
  */

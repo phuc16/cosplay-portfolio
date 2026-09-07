@@ -17,7 +17,7 @@ function CopyButton({ value }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      // Clipboard permission denied or unavailable — the value is still
+      // Clipboard permission denied or unavailable - the value is still
       // visible on screen for a manual copy, so this is not fatal.
     }
   }
@@ -45,13 +45,13 @@ function Row({ label, value, copyable }) {
 
 /**
  * Renders method-specific payment instructions. Only the details for the
- * order's own method ever arrive here — the shape comes straight from
+ * order's own method ever arrive here - the shape comes straight from
  * GET /api/orders/:token/payment (backend/shop/payments/instructions.js).
  */
 export default function PaymentInstructions({ instructions, token }) {
   const { t } = useLanguage()
   // /payment/qr.svg is behind the same PIN/admin gate as the rest of the
-  // order — a plain <img src="..."> can't carry the Authorization header
+  // order - a plain <img src="..."> can't carry the Authorization header
   // that requires, so it's fetched as a blob instead (see useBlobUrl).
   const showQr = Boolean(instructions?.method === "bank" && instructions?.vietqr_payload)
   const qrSrc = useBlobUrl(

@@ -3,7 +3,7 @@ import { adminListCollections, adminGetPickupRoster, adminSetOrderPrepared } fro
 import { formatVnd } from "../../utils/money"
 
 // Hides a non-matching row on screen (className "hidden") but forces it back
-// with "print:table-row" when actually printing — this is a physical
+// with "print:table-row" when actually printing - this is a physical
 // checklist staff hand out at the event door, so filtering it for a quick
 // on-screen lookup must never also silently drop people from the printed
 // page.
@@ -31,7 +31,7 @@ export default function ShippingRoster() {
     })
   }
 
-  // Purely informational — never gates handover, just lets a seller tick off
+  // Purely informational - never gates handover, just lets a seller tick off
   // orders they've already packed while working through the roster. Same
   // toggle/endpoint as the shipping queue's "Đã chuẩn bị" checkbox.
   const togglePrepared = async (row) => {
@@ -86,7 +86,7 @@ export default function ShippingRoster() {
             onChange={(e) => selectCollection(e.target.value)}
             className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
           >
-            <option value="">— Chọn một bộ sưu tập —</option>
+            <option value="">- Chọn một bộ sưu tập -</option>
             {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
         </label>
@@ -174,7 +174,7 @@ export default function ShippingRoster() {
                               {r.paid ? "Đã thanh toán" : "Thu khi giao"}
                             </td>
                             <td className="pr-2 py-1 font-bold text-base">
-                              {r.paid ? "—" : formatVnd(r.amount_due)}
+                              {r.paid ? "-" : formatVnd(r.amount_due)}
                             </td>
                             <td className="py-1 print:hidden">
                               <button
@@ -192,7 +192,7 @@ export default function ShippingRoster() {
                             </td>
                           </tr>
                           {/* Own full-width row rather than crammed into the narrow
-                              "Sản phẩm" cell — collapsed by default on screen so a long
+                              "Sản phẩm" cell - collapsed by default on screen so a long
                               cart doesn't blow out the row, but always shown in full
                               when printed, since this is the physical checklist staff
                               hand items off against at the door. */}

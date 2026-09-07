@@ -125,7 +125,7 @@ export default function ShippingExport() {
     }
   }
 
-  // Purely informational — never gates export/tracking, just lets a seller
+  // Purely informational - never gates export/tracking, just lets a seller
   // tick off orders they've already packed while working through the queue.
   const togglePrepared = async (order) => {
     const next = !order.prepared
@@ -186,7 +186,7 @@ export default function ShippingExport() {
           onChange={(e) => selectCollection(e.target.value)}
           className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
         >
-          <option value="">— Tất cả bộ sưu tập —</option>
+          <option value="">- Tất cả bộ sưu tập -</option>
           {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
         </select>
       </label>
@@ -238,7 +238,7 @@ export default function ShippingExport() {
                         <td className="pr-2 py-1">{o.order_code}</td>
                         <td className="pr-2 py-1">{o.buyer_name}</td>
                         <td className="pr-2 py-1">{o.phone}</td>
-                        <td className="pr-2 py-1">{o.address_province || "—"}</td>
+                        <td className="pr-2 py-1">{o.address_province || "-"}</td>
                         <td className="pr-2 py-1">{formatVnd(o.total)}</td>
                         <td className="pr-2 py-1">
                           <input

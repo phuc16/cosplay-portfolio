@@ -3,7 +3,7 @@ import { useLanguage } from "../../contexts/LanguageContext"
 import { fetchProvinces, fetchWards, searchAddress } from "../../api/shop"
 import SearchableSelect from "./SearchableSelect"
 
-// Fires this long after the buyer stops typing, not on every keystroke — a
+// Fires this long after the buyer stops typing, not on every keystroke - a
 // fast typist still costs one Goong call per pause, not one per character.
 const STREET_SEARCH_DEBOUNCE_MS = 400
 
@@ -14,7 +14,7 @@ const STREET_SEARCH_DEBOUNCE_MS = 400
  * for 30 days.
  *
  * Street/house-number search auto-fires (debounced, see
- * STREET_SEARCH_DEBOUNCE_MS) once BOTH province and ward are picked — the
+ * STREET_SEARCH_DEBOUNCE_MS) once BOTH province and ward are picked - the
  * street field itself is disabled until then, keeping every query scoped to
  * one ward and cheap enough to run per typing pause.
  */
@@ -38,7 +38,7 @@ export default function AddressFields({ value, onChange }) {
   useEffect(() => {
     // No provinceCode means "reset to no wards", already handled by
     // onProvinceChange (a real event handler, not this effect) clearing
-    // wards synchronously — this effect only ever needs to fetch.
+    // wards synchronously - this effect only ever needs to fetch.
     if (!provinceCode) return
     fetchWards(provinceCode)
       .then(setWards)
@@ -56,7 +56,7 @@ export default function AddressFields({ value, onChange }) {
       address_raw: parts.join(", "),
       address_street: next.street,
       address_ward: wardName || null,
-      // No district level in the current administrative structure — kept
+      // No district level in the current administrative structure - kept
       // in the schema only because existing pre-2025-merger orders have it.
       address_district: null,
       address_province: provinceName || null,
@@ -103,7 +103,7 @@ export default function AddressFields({ value, onChange }) {
   const pickStreetSuggestion = (s) => {
     // s.structured_formatting.main_text is too short for anything Goong
     // treats as a named place (e.g. an apartment block: "Sảnh chính S3.01"
-    // alone, dropping "CC Vinhomes Grand Park" entirely) — the full
+    // alone, dropping "CC Vinhomes Grand Park" entirely) - the full
     // description carries the detail. It also repeats the ward/province we
     // already sent it (and already have from our own pickers), so that
     // known suffix is stripped rather than duplicated into address_street.
@@ -153,7 +153,7 @@ export default function AddressFields({ value, onChange }) {
             value={street}
             onChange={(e) => onStreetChange(e.target.value)}
             onKeyDown={(e) => {
-              // This field lives inside the checkout form — without
+              // This field lives inside the checkout form - without
               // preventDefault, Enter would submit the whole order instead
               // of just continuing to type.
               if (e.key === "Enter") e.preventDefault()

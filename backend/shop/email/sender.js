@@ -27,7 +27,7 @@ function getTransport() {
 /**
  * Dispatch queued mail. Rendering happens at send time so a template edit
  * applies to anything still queued. Every failure is contained to its own
- * message — one bad address must not stall the rest of the queue.
+ * message - one bad address must not stall the rest of the queue.
  */
 async function sendQueued(limit = 10) {
   if (!isConfigured()) return { sent: 0, failed: 0, skipped: true }
@@ -51,7 +51,7 @@ async function sendQueued(limit = 10) {
       )
 
       const isPickup = order.fulfillment_method === "pickup"
-      // The code is only meaningful once the order is actually paid for —
+      // The code is only meaningful once the order is actually paid for -
       // matches the same gate toPublicOrder applies to the buyer's order
       // page, so an unpaid pending order's confirmation email never reveals
       // it early. Read at send time (not enqueue time), so an order
@@ -94,12 +94,12 @@ async function sendQueued(limit = 10) {
       // Spliced right after the greeting paragraph (not appended at the end)
       // rather than a template placeholder: the cancelled template is static
       // and shared by every cancellation, most of which have no reason at
-      // all (admin skipped the prompt, or the order predates this field) —
+      // all (admin skipped the prompt, or the order predates this field) -
       // a placeholder would either always show an empty "Lý do hủy:" label
       // or need its own conditional the substitution engine can't express,
       // same reasoning as the QR block below. wrap()'s own "Mã đơn hàng:"
       // line is always the first <p> in the card, so the SECOND </p> is the
-      // greeting's close — inserting there puts the reason where a buyer's
+      // greeting's close - inserting there puts the reason where a buyer's
       // eye actually lands first, ahead of the item list/total, without
       // depending on the greeting's exact (admin-editable) wording.
       if (order.status === "cancelled" && order.cancel_reason) {
@@ -119,7 +119,7 @@ async function sendQueued(limit = 10) {
         // cid: attachment rather than a data URI (Gmail strips those) or a
         // remote URL (blocked by default in many clients).
         const png = await qr.qrPngBuffer(qr.orderUrl(order.order_token))
-        // A ship order's QR is just a convenient link to the order page — no
+        // A ship order's QR is just a convenient link to the order page - no
         // pickup instructions apply, so it gets a plain, ungated caption.
         const caption = !isPickup
           ? `<p style="font-size:12px;color:#888">Mã QR đơn hàng</p>`
@@ -133,7 +133,7 @@ async function sendQueued(limit = 10) {
             <p style="font-size:12px;color:#888">
               Nếu không quét được mã QR (mạng yếu tại sự kiện), hãy đọc mã này cho nhân viên.
             </p>` : ""}`
-            : `<p style="font-size:12px;color:#888">Mã QR đơn hàng — hướng dẫn nhận hàng sẽ hiển thị sau khi đơn được xác nhận thanh toán.</p>`
+            : `<p style="font-size:12px;color:#888">Mã QR đơn hàng - hướng dẫn nhận hàng sẽ hiển thị sau khi đơn được xác nhận thanh toán.</p>`
         html += `
           <div style="text-align:center;margin-top:16px">
             <img src="cid:orderqr" alt="QR đơn hàng" width="160" height="160">
@@ -142,7 +142,7 @@ async function sendQueued(limit = 10) {
         attachments.push({ filename: "order-qr.png", content: png, cid: "orderqr" })
       }
 
-      // Always last — below the QR block above, whether or not it rendered.
+      // Always last - below the QR block above, whether or not it rendered.
       html += templates.footerHtml()
 
       await getTransport().sendMail({

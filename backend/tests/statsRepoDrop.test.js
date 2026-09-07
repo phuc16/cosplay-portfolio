@@ -167,7 +167,7 @@ describe("getDropStats", () => {
     expect(v.sell_through).toBeNull()
   })
 
-  it("shows a deleted variant's revenue via order_items snapshots, remaining as null (displayed '—')", async () => {
+  it("shows a deleted variant's revenue via order_items snapshots, remaining as null (displayed '-')", async () => {
     const { collectionId, productId, variantId } = await seed({ stock: 3 })
     const o = await placeOrder(variantId)
     await orders.transitionOrder(o.id, "confirmed")

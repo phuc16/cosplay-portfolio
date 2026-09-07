@@ -7,7 +7,7 @@ export const fetchCollections = () =>
 export const fetchCollection = (slug) =>
   api.get(`/api/shop/collections/${slug}`).then((r) => r.data)
 
-// Province/ward reference data — proxied + cached server-side (30 days,
+// Province/ward reference data - proxied + cached server-side (30 days,
 // see backend/shop/vnAddress.js), not a live per-keystroke lookup.
 export const fetchProvinces = () =>
   api.get("/api/shop/provinces").then((r) => r.data)
@@ -15,7 +15,7 @@ export const fetchProvinces = () =>
 export const fetchWards = (provinceCode) =>
   api.get(`/api/shop/wards/${provinceCode}`).then((r) => r.data)
 
-// On-demand street search — only called from an explicit search-button
+// On-demand street search - only called from an explicit search-button
 // click (see AddressFields.jsx), never per keystroke.
 export const searchAddress = (input, ward, province) =>
   api.get("/api/shop/address-search", { params: { input, ward, province } }).then((r) => r.data)

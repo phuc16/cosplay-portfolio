@@ -14,7 +14,7 @@ function stockLabel(variant, t) {
 export const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 
 /** A product with no variants isn't a purchasable stock item, so it's never "sold out".
- *  A digital product has no variant list — its stock lives on the flattened product.stock_qty instead. */
+ *  A digital product has no variant list - its stock lives on the flattened product.stock_qty instead. */
 export const isProductSoldOut = (p) => {
   if (p.type === "digital") return p.stock_qty !== null && p.stock_qty !== undefined && p.stock_qty <= 0
   return p.variants?.length > 0 && p.variants.every(isSoldOut)
@@ -26,19 +26,19 @@ function variantImages(v) {
   return v.image_url ? [v.image_url] : []
 }
 
-/** A variant's own thumbnail_image wins as its grid cover — it's never part of variantImages() above (the detail carousel). */
+/** A variant's own thumbnail_image wins as its grid cover - it's never part of variantImages() above (the detail carousel). */
 function variantCover(v) {
   return v.thumbnail_image || variantImages(v)[0]
 }
 
-/** null/undefined stock_qty means unlimited — clamp only when a real ceiling exists. */
+/** null/undefined stock_qty means unlimited - clamp only when a real ceiling exists. */
 const clampQty = (n, v) => {
   const max = v.stock_qty === null || v.stock_qty === undefined ? Infinity : v.stock_qty
   return Math.min(Math.max(1, n), max)
 }
 
 /**
- * Column count scales with how many variants there are to show — a 2-code
+ * Column count scales with how many variants there are to show - a 2-code
  * product stretched across 8 columns leaves the thumbnails huge and the
  * layout mostly empty, while a 40+ code photocard sheet needs every column
  * it can get. A real grid (not CSS columns) so cells fill left-to-right
@@ -57,11 +57,11 @@ function galleryGridClasses(count) {
 export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
   const { t } = useLanguage()
   const isDigital = product.type === "digital"
-  // A digital product is treated exactly like a product with one variant —
+  // A digital product is treated exactly like a product with one variant -
   // the same single-variant code path below (no picker, straight to detail)
   // already does the right thing; this just supplies that one "variant".
   // A digital product should always have a variant_id (createProduct always
-  // creates the hidden variant) — but if one somehow doesn't, treat it as
+  // creates the hidden variant) - but if one somehow doesn't, treat it as
   // having no variants at all, same as a physical product with zero
   // variants, rather than letting it submit variant_id: null to the cart.
   const variants = isDigital
@@ -96,7 +96,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
     })
     onAdded?.(v.label)
     // A multi-variant product's buyer is often picking up several codes in
-    // one visit — dropping them back into the picker grid lets them add the
+    // one visit - dropping them back into the picker grid lets them add the
     // next one immediately, instead of re-opening the whole product from
     // the collection page for every single code.
     setView(variants.length > 1 ? "grid" : null)
@@ -104,9 +104,9 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
 
   const openPicker = () => {
     if (!hasVariants) return
-    // A closed collection still lets a buyer browse what was in it — only
+    // A closed collection still lets a buyer browse what was in it - only
     // adding to cart is blocked (see the "Add to cart" button below).
-    // A single-variant product has nothing to "browse" — go straight to its detail.
+    // A single-variant product has nothing to "browse" - go straight to its detail.
     if (variants.length === 1) openDetail(variants[0])
     else setView("grid")
   }
@@ -220,7 +220,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
             {(detailImages[activeImage] || cover) && (
               <img
                 src={detailImages[activeImage] || cover}
-                alt={`${product.name} — ${detail.label}`}
+                alt={`${product.name} - ${detail.label}`}
                 className="w-full h-auto block"
               />
             )}

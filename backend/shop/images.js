@@ -5,7 +5,7 @@ const storage = require("./../storage")
 const MAX_WIDTH = 1920
 const WEBP_QUALITY = 82
 
-// Matches server.js's UPLOAD_LIMIT (the request body ceiling) — every
+// Matches server.js's UPLOAD_LIMIT (the request body ceiling) - every
 // uploaded image is re-encoded to WebP right away (processShopImage), so a
 // large *input* never becomes a large stored file; this constant only bounds
 // what a single sharp decode has to handle per request, not disk usage.
@@ -104,7 +104,7 @@ function watermarkSvg(text, width, height) {
  * Same pipeline as the portfolio uploads in server.js: auto-orient from EXIF,
  * cap the width, and encode WebP (smaller than JPEG and keeps alpha).
  * `watermark: true` stamps the shop name over buyer-facing product/variant
- * photos — never used for the buyer's private payment-proof upload.
+ * photos - never used for the buyer's private payment-proof upload.
  */
 async function processShopImage(buffer, { watermark = false } = {}) {
   validateImageBuffer(buffer)
@@ -129,7 +129,7 @@ async function processShopImage(buffer, { watermark = false } = {}) {
 /**
  * Store an already-processed (webp) buffer under shop/<folder>/, returning the proxy URL.
  * Split out from `uploadShopImage` so callers can catch decode failures (processShopImage)
- * separately from storage failures (this) — see adminCatalog.js, which maps the former
+ * separately from storage failures (this) - see adminCatalog.js, which maps the former
  * to 400 (bad input) and the latter to 500 (real server error).
  */
 async function storeShopImage(folder, processed) {

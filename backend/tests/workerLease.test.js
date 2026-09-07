@@ -8,7 +8,7 @@ afterEach(async () => {
   await redis.del(TEST_KEY)
 })
 
-describe("workerLease — multi-process singleton guard", () => {
+describe("workerLease - multi-process singleton guard", () => {
   it("a second instance cannot acquire the lease while the first holds it (mutual exclusion)", async () => {
     const first = createLease({ key: TEST_KEY, ttlMs: 5000 })
     const second = createLease({ key: TEST_KEY, ttlMs: 5000 })
@@ -51,7 +51,7 @@ describe("workerLease — multi-process singleton guard", () => {
     // While the lease is still live, the contender is correctly refused.
     expect(await contender.acquire()).toBe(false)
 
-    // Simulate the dead worker: no renew(), no release() — just wait out the TTL.
+    // Simulate the dead worker: no renew(), no release() - just wait out the TTL.
     await new Promise((r) => setTimeout(r, 250))
 
     const revived = await contender.acquire()

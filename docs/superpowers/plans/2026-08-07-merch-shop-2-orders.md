@@ -1,10 +1,10 @@
-# Merch Shop — Plan 2: Cart, Checkout & Orders
+# Merch Shop - Plan 2: Cart, Checkout & Orders
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A buyer can add merch to a cart, check out without an account, and receive an order page; stock is reserved atomically at order placement; the seller can move orders through their lifecycle in the admin; abandoned prepaid orders expire and return their stock.
 
-**Architecture:** Two new tables (`orders`, `order_items`) plus a `backend/shop/orders/` module holding pure domain logic (totals, status machine, tokens) separately from the transactional repository. Reservation happens inside a single MySQL transaction using `SELECT ... FOR UPDATE` on variant rows locked in deterministic id order. The cart is client-side only. The expiry sweep extends the existing `worker.js` loop — no new process.
+**Architecture:** Two new tables (`orders`, `order_items`) plus a `backend/shop/orders/` module holding pure domain logic (totals, status machine, tokens) separately from the transactional repository. Reservation happens inside a single MySQL transaction using `SELECT ... FOR UPDATE` on variant rows locked in deterministic id order. The cart is client-side only. The expiry sweep extends the existing `worker.js` loop - no new process.
 
 **Tech Stack:** As Plan 1, plus `crypto` (Node built-in) for order tokens and Goong.io for address autocomplete.
 
@@ -20,7 +20,7 @@ Everything in Plan 1's Global Constraints still applies (raw mysql2 queries, `{e
 - **`stock_qty IS NULL` means unlimited** and is never decremented, never checked against, and never released.
 - **COD orders never get an `expires_at`** and must be invisible to the expiry sweep.
 - **Stock is released exactly once per order**, guarded by `orders.stock_released_at`.
-- **Order tokens** come from `crypto.randomBytes(16).toString("hex")` — 128 bits, no sequential component.
+- **Order tokens** come from `crypto.randomBytes(16).toString("hex")` - 128 bits, no sequential component.
 - **Payment instructions, proof upload, emails, and QR are Plan 3.** Plan 2 records `payment_method` on the order and shows a placeholder on the order page. This plan ships a complete, testable order lifecycle without them.
 
 ---
@@ -128,7 +128,7 @@ describe("order_items schema", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- orderSchema`
-Expected: FAIL — tables do not exist.
+Expected: FAIL - tables do not exist.
 
 - [ ] **Step 3: Create the orders migration**
 
@@ -275,7 +275,7 @@ Pure functions, no I/O. This is where the money and lifecycle rules live, so the
 
 **Interfaces:**
 - Produces `backend/shop/orders/domain.js` exporting:
-  - `generateOrderToken(): string` — 32 hex chars.
+  - `generateOrderToken(): string` - 32 hex chars.
   - `computeTotal(items: {unit_price_snapshot:number, qty:number}[]): number`
   - `canTransition(from: string, to: string, fulfillment: string): boolean`
   - `computeExpiry(paymentMethod: string, now: Date, hours: number): Date|null`
@@ -533,8 +533,8 @@ The heart of the feature. Everything else can be repaired by hand; overselling c
   - `getOrderByToken(token): Promise<Order & {items: []}|null>`
   - `listOrders(filter): Promise<Order[]>`
   - `getOrderById(id): Promise<Order & {items: []}|null>`
-  - `transitionOrder(id, toStatus, extra): Promise<boolean>` — releases stock on `cancelled`, exactly once.
-  - `releaseExpiredOrders(now): Promise<number>` — returns how many were expired.
+  - `transitionOrder(id, toStatus, extra): Promise<boolean>` - releases stock on `cancelled`, exactly once.
+  - `releaseExpiredOrders(now): Promise<number>` - returns how many were expired.
   - `OutOfStockError`, `EmptyCartError`
 
 - [ ] **Step 1: Write the failing test**
@@ -850,7 +850,7 @@ async function findByRequestKey(conn, requestKey) {
 /**
  * Create an order and reserve its stock in one transaction.
  *
- * Prices come from the catalog inside the transaction — never from the client,
+ * Prices come from the catalog inside the transaction - never from the client,
  * which sends only {variant_id, qty}. Variant rows are locked FOR UPDATE in
  * ascending id order so two concurrent orders touching the same variants
  * cannot deadlock by grabbing them in opposite orders.
@@ -1039,7 +1039,7 @@ async function releaseStock(conn, orderId) {
 
 /**
  * Move an order to a new status. Cancelling returns reserved stock, guarded by
- * stock_released_at so a double cancel — or a cancel racing the expiry sweep —
+ * stock_released_at so a double cancel - or a cancel racing the expiry sweep -
  * cannot credit the same stock twice.
  */
 async function transitionOrder(id, toStatus, extra = {}) {
@@ -1160,7 +1160,7 @@ Reservation correctness cannot be established by reading code. These tests exist
 
 **Interfaces:**
 - Consumes: `orderRepo` (Task 3).
-- Produces: no source changes — this task proves Task 3 and may expose bugs requiring fixes there.
+- Produces: no source changes - this task proves Task 3 and may expose bugs requiring fixes there.
 
 - [ ] **Step 1: Write the concurrency tests**
 
@@ -1321,7 +1321,7 @@ Run:
 ```bash
 cd backend && for i in $(seq 1 20); do DB_PORT=3307 npm test -- orderConcurrency || break; done
 ```
-Expected: 20 consecutive passes. **A single failure across these runs is a blocking defect** — do not proceed, fix the locking in Task 3 first. Record the number of runs completed.
+Expected: 20 consecutive passes. **A single failure across these runs is a blocking defect** - do not proceed, fix the locking in Task 3 first. Record the number of runs completed.
 
 - [ ] **Step 4: Commit**
 
@@ -1359,7 +1359,7 @@ EOF
 **Interfaces:**
 - Consumes: `orderRepo` (Task 3).
 - Produces:
-  - `POST /api/orders` — body `{items, buyer, fulfillment_method, payment_method, note, request_key}` → `201 {order_token, total}`; `400 invalid_input`; `409 out_of_stock`; `429` when rate limited.
+  - `POST /api/orders` - body `{items, buyer, fulfillment_method, payment_method, note, request_key}` → `201 {order_token, total}`; `400 invalid_input`; `409 out_of_stock`; `429` when rate limited.
   - `GET /api/orders/:token` → `200` order with items, or `404`. Sets `X-Robots-Tag: noindex`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1500,7 +1500,7 @@ describe("GET /api/orders/:token", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- orderRoutes`
-Expected: FAIL — routes return the catch-all 404.
+Expected: FAIL - routes return the catch-all 404.
 
 - [ ] **Step 3: Create the router**
 
@@ -1612,7 +1612,7 @@ app.use(`${API_PREFIX}/orders`, (req, res, next) =>
   require("./routes/orders")())
 ```
 
-Reading an order page is not rate-limited like creation — a buyer refreshing to check status must not be locked out.
+Reading an order page is not rate-limited like creation - a buyer refreshing to check status must not be locked out.
 
 - [ ] **Step 5: Run to verify it passes**
 
@@ -1629,7 +1629,7 @@ feat(orders): add public order API
 POST /api/orders creates an order and GET /api/orders/:token reads it back.
 
 Validation rejects blank names, malformed emails, non-integer or non-positive
-quantities, unknown payment methods, and a shipping order with no address —
+quantities, unknown payment methods, and a shipping order with no address -
 while deliberately allowing a pickup order without one, since there is nothing
 to deliver.
 
@@ -1659,7 +1659,7 @@ EOF
 - Produces, all behind `auth`:
   - `GET /api/admin/orders?status=&collection_id=` → list
   - `GET /api/admin/orders/:id` → order with items
-  - `POST /api/admin/orders/:id/transition` — body `{to, tracking_code?, shipping_fee?}` → `200 {ok:true}` or `409 invalid_transition`
+  - `POST /api/admin/orders/:id/transition` - body `{to, tracking_code?, shipping_fee?}` → `200 {ok:true}` or `409 invalid_transition`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1959,7 +1959,7 @@ describe("sweepExpiredOrders", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 npm test -- expirySweep`
-Expected: FAIL — `sweepExpiredOrders is not a function`.
+Expected: FAIL - `sweepExpiredOrders is not a function`.
 
 - [ ] **Step 3: Extend the worker**
 
@@ -2033,8 +2033,8 @@ COD orders are excluded: they have a NULL expires_at because there is no
 payment to wait for, and cancelling one would destroy a legitimate order that
 is simply waiting on seller approval.
 
-The sweep is idempotent — running it repeatedly credits stock once, guarded by
-stock_released_at — and it swallows its own errors so a database blip cannot
+The sweep is idempotent - running it repeatedly credits stock once, guarded by
+stock_released_at - and it swallows its own errors so a database blip cannot
 kill the worker and stop thumbnail generation with it.
 
 worker.js now only self-starts when run directly, so tests can import the sweep
@@ -2193,7 +2193,7 @@ describe("cart", () => {
 - [ ] **Step 3: Run to verify it fails**
 
 Run: `cd frontend && npm test -- cart`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 4: Implement the cart**
 
@@ -2289,7 +2289,7 @@ round-trip or an account.
 
 Everything read back is treated as untrusted input. localStorage is
 user-writable and survives deploys, so corrupt JSON, a non-array, and entries
-with missing ids or negative prices are all dropped rather than trusted — a
+with missing ids or negative prices are all dropped rather than trusted - a
 malformed cart returns empty instead of crashing checkout.
 
 cartTotal is for display only. The server recomputes the authoritative total
@@ -2466,7 +2466,7 @@ const GOONG_KEY = import.meta.env.VITE_GOONG_API_KEY
 /**
  * Goong is Vietnam-specific and handles ward/district/province properly.
  * When no key is configured, or the lookup fails, this degrades to a plain
- * textarea — a buyer must never be blocked from ordering by a third party.
+ * textarea - a buyer must never be blocked from ordering by a third party.
  */
 export default function AddressFields({ value, onChange }) {
   const { t } = useLanguage()
@@ -2885,7 +2885,7 @@ export default function AdminOrders() {
               <ul className="mt-2">
                 {detail.items.map((i) => (
                   <li key={i.id}>
-                    {i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty} —{" "}
+                    {i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty} -{" "}
                     {formatVnd(i.unit_price_snapshot * i.qty)}
                   </li>
                 ))}
@@ -2971,6 +2971,6 @@ EOF
 
 Plan complete and saved to `docs/superpowers/plans/2026-08-07-merch-shop-2-orders.md`. Two execution options:
 
-**1. Subagent-Driven (recommended)** — a fresh subagent per task, review between tasks, fast iteration.
+**1. Subagent-Driven (recommended)** - a fresh subagent per task, review between tasks, fast iteration.
 
-**2. Inline Execution** — execute tasks in this session using executing-plans, batch execution with checkpoints.
+**2. Inline Execution** - execute tasks in this session using executing-plans, batch execution with checkpoints.

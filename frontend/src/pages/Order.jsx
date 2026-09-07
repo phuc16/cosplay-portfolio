@@ -20,7 +20,7 @@ const STATUS_KEY = {
   completed: "orderCompleted", cancelled: "orderCancelled",
 }
 
-// The big page heading — distinct per status, unlike STATUS_KEY's compact badge text.
+// The big page heading - distinct per status, unlike STATUS_KEY's compact badge text.
 const ORDER_TITLE_KEY = {
   confirmed: "orderPlaced", shipped: "orderShippedTitle",
   completed: "orderCompletedTitle", cancelled: "orderCancelledTitle",
@@ -45,14 +45,14 @@ function readFileAsBase64(file) {
   })
 }
 
-// Well under the backend's 50MB limit — rejects an oversized photo before it burns a retry against the proof rate limiter.
+// Well under the backend's 50MB limit - rejects an oversized photo before it burns a retry against the proof rate limiter.
 const MAX_PROOF_BYTES = 8 * 1024 * 1024
 
 function ProofUpload({ token, existingProofUrl, onUploaded }) {
   const { t } = useLanguage()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
-  // Picking a file only stages it — nothing sends until proofSubmit is pressed.
+  // Picking a file only stages it - nothing sends until proofSubmit is pressed.
   const [pendingFile, setPendingFile] = useState(null)
   const [pendingPreviewUrl, setPendingPreviewUrl] = useState(null)
   // Overrides existingProofUrl so a fresh upload updates the preview without a refetch.
@@ -185,7 +185,7 @@ function PinGate({ token, onVerified }) {
       onVerified()
     } catch (err) {
       if (err.response?.status === 429) {
-        // Built from the server's retry_after_seconds, not its message —
+        // Built from the server's retry_after_seconds, not its message -
         // that message is Vietnamese-only, and would show up untranslated
         // for a buyer on the English UI otherwise.
         const seconds = err.response?.data?.retry_after_seconds
@@ -243,7 +243,7 @@ export default function Order() {
   const [showPaymentAgain, setShowPaymentAgain] = useState(false)
 
   useEffect(() => {
-    // Belt and braces with the server's X-Robots-Tag — must never be indexed.
+    // Belt and braces with the server's X-Robots-Tag - must never be indexed.
     const meta = document.createElement("meta")
     meta.name = "robots"
     meta.content = "noindex, nofollow"
@@ -257,7 +257,7 @@ export default function Order() {
           setOrder(null)
           return
         }
-        // admin_token can be merely expired (24h) while its refresh token (30d) is still good — redeem and retry once.
+        // admin_token can be merely expired (24h) while its refresh token (30d) is still good - redeem and retry once.
         if (await refreshAdminSession()) {
           try {
             const data = await fetchOrder(token, orderAuthHeaders(token))
@@ -321,7 +321,7 @@ export default function Order() {
     <>
       <ShopHeader />
       <main className="max-w-2xl mx-auto px-4 py-10">
-      {/* "Order placed" is reserved for once the seller has confirmed it — the other phases get their own titles. */}
+      {/* "Order placed" is reserved for once the seller has confirmed it - the other phases get their own titles. */}
       <h1 className="text-2xl font-bold mb-1">
         {t(awaitingPayment ? "orderAwaitingPaymentTitle" : (isPending ? "orderReceivedTitle" : (ORDER_TITLE_KEY[order.status] ?? "orderPlaced")))}
       </h1>
@@ -351,7 +351,7 @@ export default function Order() {
             <p className="text-sm font-medium">#{order.tracking_code}</p>
           </div>
         )}
-        {/* Deadline only applies before proof is submitted/confirmed — the backend stops enforcing it too. */}
+        {/* Deadline only applies before proof is submitted/confirmed - the backend stops enforcing it too. */}
         {awaitingPayment && <DeadlineBlock expiresAt={order.expires_at} />}
         {showManualConfirmNote && <p className="text-sm opacity-70 mt-1">{t("orderManualConfirmNote")}</p>}
         {awaitingConfirmation && (

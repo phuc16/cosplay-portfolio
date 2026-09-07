@@ -61,7 +61,7 @@ describe("checkCartAvailability", () => {
     expect(problems.size).toBe(0)
   })
 
-  it("flags a line as unavailable when the collection fetch fails (404 — hidden, deleted, or not started)", async () => {
+  it("flags a line as unavailable when the collection fetch fails (404 - hidden, deleted, or not started)", async () => {
     fetchCollection.mockRejectedValue(new Error("not found"))
     const cart = [{ variant_id: 1, collection_slug: "gone" }]
 

@@ -13,7 +13,7 @@ import { resetTables } from "./helpers/db.js"
 // sender.js does `const nodemailer = require("nodemailer")` (CommonJS) and
 // lazily memoizes a real `nodemailer.createTransport(...)` transport on first
 // send. A bare `vi.mock("nodemailer", factory)` from this ESM test file does
-// NOT intercept that require — it was tried once and produced a genuine ~20s
+// NOT intercept that require - it was tried once and produced a genuine ~20s
 // SMTP connection timeout, because vi.mock only patches the module graph
 // vitest resolves for *this* file, not the separate CJS require cache entry
 // sender.js reads from.
@@ -24,7 +24,7 @@ import { resetTables } from "./helpers/db.js"
 // `nodemailer === require("nodemailer")` is true under vitest/vite-node for
 // this CJS dependency). So mutating `nodemailer.createTransport` here mutates
 // the only copy that exists, before sender.js's own getTransport() ever runs.
-// Do not reintroduce vi.mock("nodemailer", ...) — it will hang for ~20s.
+// Do not reintroduce vi.mock("nodemailer", ...) - it will hang for ~20s.
 let sendMailMock
 nodemailer.createTransport = () => ({
   sendMail: (...args) => sendMailMock(...args),
@@ -262,7 +262,7 @@ describe("sendQueued: order QR gating", () => {
     expect(sentArg.html).toContain("cid:orderqr")
     expect(sentArg.html).not.toContain("Mã xác nhận")
     // "Bring this code at pickup" is premature instruction before the seller
-    // has actually confirmed the payment — same gate as the code itself.
+    // has actually confirmed the payment - same gate as the code itself.
     expect(sentArg.html).not.toContain("nhận hàng tại sự kiện")
   })
 
@@ -282,7 +282,7 @@ describe("sendQueued: order QR gating", () => {
   it("cancelled pickup order: includes the QR image/attachment, but no pickup caption (nothing to collect)", async () => {
     const o = await seedOrder("pickup")
     // transitionOrder already auto-enqueues the "cancelled" email itself
-    // (TRANSITION_EMAILS) — no need to enqueue a second one here.
+    // (TRANSITION_EMAILS) - no need to enqueue a second one here.
     await orders.transitionOrder(o.id, "cancelled")
 
     await sender.sendQueued()
@@ -315,7 +315,7 @@ describe("sendQueued: order QR gating", () => {
     expect(sentArg.html).not.toContain("Lý do hủy")
   })
 
-  it("places cancel_reason right after the greeting, ahead of the item list/total — not down by the QR/link", async () => {
+  it("places cancel_reason right after the greeting, ahead of the item list/total - not down by the QR/link", async () => {
     const o = await seedOrder("ship")
     await orders.transitionOrder(o.id, "cancelled", { cancel_reason: "Hết hàng thực tế" })
 
@@ -485,7 +485,7 @@ describe("sendQueued: access PIN in order_placed", () => {
     const pinIndex = html.indexOf("482913")
     // The PIN must appear after the link (same reading order as the card)...
     expect(pinIndex).toBeGreaterThan(linkIndex)
-    // ...but before the card's own closing </div>, i.e. still inside it — not
+    // ...but before the card's own closing </div>, i.e. still inside it - not
     // appended after the whole rendered HTML like the QR/footer blocks. The
     // link itself sits inside its own centered <div>, so the card's real
     // close is the SECOND </div> after the link text, not the first.
@@ -517,7 +517,7 @@ describe("sendQueued: footer (automated-email notice)", () => {
     expect(html.indexOf("cid:orderqr")).toBeLessThan(html.indexOf("email tự động"))
   })
 
-  it("no longer renders any social-link badges — cut per explicit feedback (fake-looking letter badges were worse than none)", async () => {
+  it("no longer renders any social-link badges - cut per explicit feedback (fake-looking letter badges were worse than none)", async () => {
     const o = await seedOrder("ship")
     await queue.enqueue(o.id, "order_placed", "a@example.com")
 

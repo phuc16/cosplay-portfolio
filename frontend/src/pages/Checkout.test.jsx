@@ -10,7 +10,7 @@ const fetchPaymentMethods = vi.fn()
 const createOrder = vi.fn()
 const fetchCollection = vi.fn()
 // AddressFields.jsx (rendered when fulfillment === "ship") calls these on
-// mount — must resolve, not just exist, or its effect throws synchronously.
+// mount - must resolve, not just exist, or its effect throws synchronously.
 const fetchProvinces = vi.fn().mockResolvedValue([])
 const fetchWards = vi.fn().mockResolvedValue([])
 const searchAddress = vi.fn().mockResolvedValue({ predictions: [] })
@@ -24,7 +24,7 @@ vi.mock("../api/shop", () => ({
   searchAddress: (...args) => searchAddress(...args),
 }))
 
-// ShopFooter (rendered on every shop page) fetches /api/settings — mocked
+// ShopFooter (rendered on every shop page) fetches /api/settings - mocked
 // here so tests don't attempt a real network call.
 vi.mock("axios", async (importOriginal) => {
   const actual = await importOriginal()
@@ -167,7 +167,7 @@ describe("Checkout fulfillment filtering", () => {
   })
 })
 
-describe("Checkout — payment window notice (Phase 6)", () => {
+describe("Checkout - payment window notice (Phase 6)", () => {
   it("shows the payment-window notice when a non-COD payment method is selected", async () => {
     seedCart()
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
@@ -189,7 +189,7 @@ describe("Checkout — payment window notice (Phase 6)", () => {
   })
 })
 
-describe("Checkout — COD restricted to ship orders (Event Pickup Verification plan)", () => {
+describe("Checkout - COD restricted to ship orders (Event Pickup Verification plan)", () => {
   it("hides COD from the payment picker when pickup is selected", async () => {
     seedCart()
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
@@ -231,7 +231,7 @@ describe("Checkout — COD restricted to ship orders (Event Pickup Verification 
   })
 })
 
-describe("Checkout — order-page PIN bypass for this session", () => {
+describe("Checkout - order-page PIN bypass for this session", () => {
   it("seeds the order session token from the create-order response before navigating, so the PIN gate is skipped this once", async () => {
     seedCart()
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
@@ -257,7 +257,7 @@ describe("Checkout — order-page PIN bypass for this session", () => {
   })
 })
 
-describe("Checkout — digital cart", () => {
+describe("Checkout - digital cart", () => {
   const digitalCartItem = { variant_id: 1, qty: 1, price: 99000, product_name: "Digital Album", variant_label: "", is_digital: true }
   const physicalCartItem = { variant_id: 2, qty: 1, price: 35000, product_name: "Card", variant_label: "A1", is_digital: false }
 
@@ -308,7 +308,7 @@ describe("Checkout — digital cart", () => {
   })
 })
 
-describe("Checkout — variant_not_found recovery", () => {
+describe("Checkout - variant_not_found recovery", () => {
   it("removes the stale line(s) from the cart itself, not just shows an error", async () => {
     localStorage.setItem("shop_cart", JSON.stringify([
       { variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop" },
@@ -354,7 +354,7 @@ describe("Checkout — variant_not_found recovery", () => {
   })
 })
 
-describe("Checkout — out_of_stock / collection_not_active recovery", () => {
+describe("Checkout - out_of_stock / collection_not_active recovery", () => {
   it("removes the offending line when the server reports out_of_stock at submit time", async () => {
     localStorage.setItem("shop_cart", JSON.stringify([
       { variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop" },

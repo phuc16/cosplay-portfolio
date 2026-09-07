@@ -1,5 +1,5 @@
 // Every class string here references only tokens asserted to exist by
-// frontend/src/utils/semanticTokens.test.js — do not add a variant or
+// frontend/src/utils/semanticTokens.test.js - do not add a variant or
 // token name here without adding it there first.
 const VARIANT_CLASSES = {
   success: "bg-[var(--surface-success)] border-[var(--border-success)] text-[var(--text-success)]",
@@ -10,7 +10,7 @@ const VARIANT_CLASSES = {
 
 /**
  * A small coloured pill for a status/payment/fulfilment label. Carries no
- * language logic — the caller passes the already-resolved label string
+ * language logic - the caller passes the already-resolved label string
  * (Vietnamese in the admin, translated via t() in the shop) and a variant
  * from frontend/src/constants/statusVariant.js. An unrecognized variant
  * renders with the neutral tokens rather than an invented or empty class.

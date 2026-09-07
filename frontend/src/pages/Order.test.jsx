@@ -21,7 +21,7 @@ vi.mock("../api/shop", () => ({
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings via `get`
-// — mocked here alongside `post` so tests don't attempt a real network call.
+// - mocked here alongside `post` so tests don't attempt a real network call.
 vi.mock("axios", async (importOriginal) => {
   const actual = await importOriginal()
   return { default: { ...actual.default, post: vi.fn(), get: vi.fn().mockResolvedValue({ data: {} }) } }
@@ -88,7 +88,7 @@ function pastIso(hours) {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
 }
 
-describe("Order — order code", () => {
+describe("Order - order code", () => {
   it("shows the human-readable order code near the top of the page", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ order_code: "2609015VR0F1LR" }))
 
@@ -99,7 +99,7 @@ describe("Order — order code", () => {
   })
 })
 
-describe("Order — QR caption differs by fulfillment method", () => {
+describe("Order - QR caption differs by fulfillment method", () => {
   it("shows both the pickup-flavored caption and the reopen-page caption for a pickup order", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", status: "confirmed" }))
 
@@ -119,7 +119,7 @@ describe("Order — QR caption differs by fulfillment method", () => {
   })
 })
 
-describe("Order — item photos", () => {
+describe("Order - item photos", () => {
   it("shows the variant's photo for an item that has one", async () => {
     fetchOrder.mockResolvedValue(baseOrder({
       items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1, image_url: "/api/storage/shop/a.webp" }],
@@ -142,7 +142,7 @@ describe("Order — item photos", () => {
   })
 })
 
-describe("Order — digital items download link", () => {
+describe("Order - digital items download link", () => {
   it("shows a download button for a digital item once the order is confirmed", async () => {
     fetchOrder.mockResolvedValue({
       ...baseOrder(),
@@ -156,7 +156,7 @@ describe("Order — digital items download link", () => {
   })
 })
 
-describe("Order — tracking code", () => {
+describe("Order - tracking code", () => {
   it("labels the tracking code as a ViettelPost code, not just a bare number", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "shipped", tracking_code: "151045353461" }))
 
@@ -175,7 +175,7 @@ describe("Order — tracking code", () => {
   })
 })
 
-describe("Order — receiver info", () => {
+describe("Order - receiver info", () => {
   it("shows the buyer's name, phone, and address for a ship order", async () => {
     fetchOrder.mockResolvedValue(baseOrder({
       fulfillment_method: "ship", buyer_name: "Trần Thị B", phone: "0909999999", address_raw: "10 Điện Biên Phủ, Q1",
@@ -236,7 +236,7 @@ describe("Order pickup info", () => {
   })
 })
 
-describe("Order — pickup code (Event Pickup Verification plan)", () => {
+describe("Order - pickup code (Event Pickup Verification plan)", () => {
   it("shows the pickup code for a pickup order", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", pickup_code: "482913" }))
     const container = await renderOrder()
@@ -250,7 +250,7 @@ describe("Order — pickup code (Event Pickup Verification plan)", () => {
   })
 })
 
-describe("Order — payment deadline (Phase 6)", () => {
+describe("Order - payment deadline (Phase 6)", () => {
   it("renders the deadline block for a pending, prepaid order with a future expires_at", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
@@ -340,7 +340,7 @@ describe("Order — payment deadline (Phase 6)", () => {
   })
 })
 
-describe("Order — payment instructions/deadline are only for the pre-proof phase", () => {
+describe("Order - payment instructions/deadline are only for the pre-proof phase", () => {
   it("shows the deadline and bank/QR instructions before proof is submitted", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3), has_payment_proof: false }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
@@ -405,7 +405,7 @@ describe("Order — payment instructions/deadline are only for the pre-proof pha
   })
 })
 
-describe("Order — Vietnamese countdown copy", () => {
+describe("Order - Vietnamese countdown copy", () => {
   afterEach(() => {
     localStorage.removeItem("lang")
   })
@@ -421,7 +421,7 @@ describe("Order — Vietnamese countdown copy", () => {
   })
 })
 
-describe("Order — semantic status colour (Admin UI plan)", () => {
+describe("Order - semantic status colour (Admin UI plan)", () => {
   it("renders the order status as a StatusBadge with the warning variant while pending", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: null }))
     fetchPaymentInstructions.mockResolvedValue({ method: "cod", amount: 35000 })
@@ -456,7 +456,7 @@ describe("Order — semantic status colour (Admin UI plan)", () => {
   })
 })
 
-describe("Order — awaiting-payment vs awaiting-confirmation status text", () => {
+describe("Order - awaiting-payment vs awaiting-confirmation status text", () => {
   it("shows 'awaiting your payment' for a pending prepaid order with no proof yet", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
@@ -510,7 +510,7 @@ describe("Order — awaiting-payment vs awaiting-confirmation status text", () =
   })
 })
 
-describe("Order — page heading reserves 'Order placed' for a confirmed order", () => {
+describe("Order - page heading reserves 'Order placed' for a confirmed order", () => {
   it("shows 'Your order is awaiting payment' while pending with no proof yet, on a prepaid order", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", has_payment_proof: false }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
@@ -573,7 +573,7 @@ describe("Order — page heading reserves 'Order placed' for a confirmed order",
   })
 })
 
-describe("Order — cancel reason", () => {
+describe("Order - cancel reason", () => {
   it("shows the cancel reason inside the status card when the order was cancelled with one", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "cancelled", cancel_reason: "Hết hàng thực tế" }))
 
@@ -600,7 +600,7 @@ describe("Order — cancel reason", () => {
   })
 })
 
-describe("Order — payment proof upload styling", () => {
+describe("Order - payment proof upload styling", () => {
   it("renders the file input inside a styled, button-looking label, not a bare native input", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
     fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
@@ -741,7 +741,7 @@ describe("Order — payment proof upload styling", () => {
   })
 })
 
-describe("Order — PIN gate", () => {
+describe("Order - PIN gate", () => {
   function setInputValue(el, value) {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
     setter.call(el, value)
@@ -831,7 +831,7 @@ describe("Order — PIN gate", () => {
   it("shows a lockout message, not the generic wrong-PIN error, after too many attempts (429)", async () => {
     fetchOrder.mockRejectedValue({ response: { status: 401, data: { error: "pin_required" } } })
     verifyOrderPin.mockRejectedValue({
-      // message is Vietnamese-only (server-side, for logging) — the UI must
+      // message is Vietnamese-only (server-side, for logging) - the UI must
       // build its own localized string from retry_after_seconds instead of
       // displaying this verbatim, so an English-language buyer never sees it.
       response: { status: 429, data: { error: "too_many_attempts", message: "Sai mã PIN quá nhiều lần. Thử lại sau 15 phút.", retry_after_seconds: 900 } },
@@ -877,7 +877,7 @@ describe("statusTimestamp", () => {
   })
 })
 
-describe("Order — status timestamp", () => {
+describe("Order - status timestamp", () => {
   it("shows the timestamp for the order's current status", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed", confirmed_at: "2026-08-14T06:00:00Z" }))
 
@@ -891,7 +891,7 @@ describe("Order — status timestamp", () => {
 
     const container = await renderOrder()
 
-    // Just confirms no stray "Invalid Date" text renders — the absence of a
+    // Just confirms no stray "Invalid Date" text renders - the absence of a
     // specific timestamp string isn't otherwise assertable here.
     expect(container.textContent).not.toContain("Invalid Date")
   })

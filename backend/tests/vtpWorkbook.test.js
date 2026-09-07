@@ -20,7 +20,7 @@ const batch = {
   ten_hang_hoa: "Photocard", trong_luong: 50, loai_hang_hoa: "Bưu kiện", thoi_gian_hen_lay: "Cả ngày",
 }
 
-// An .xlsx is a deflated zip of XML parts — cell text never appears as
+// An .xlsx is a deflated zip of XML parts - cell text never appears as
 // plaintext in the raw buffer, whether it landed in a cell, a shared
 // string, or anywhere else. A raw buffer/string scan for a canary can
 // never fail, even if the canary was actually written into a cell, so it
@@ -196,7 +196,7 @@ describe("buildExportWorkbook", () => {
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer)
     // Decode and walk every cell of every worksheet (data sheet + reference
-    // sheets) rather than scanning the raw compressed bytes — see the
+    // sheets) rather than scanning the raw compressed bytes - see the
     // comment above workbookText().
     expect(workbookText(wb)).not.toContain(secretToken)
   })

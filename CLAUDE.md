@@ -39,11 +39,11 @@ npm run lint                  # ESLint
 Frontend (React/Vite :5173)
     ↓ axios /api/*
 Backend (Express :5000)
-    ├── MySQL  — albums, images, site_settings
-    ├── Redis  — gallery cache (1h TTL), settings cache (1h TTL), rate-limit counters
-    └── MinIO  — original images (images/{album_id}/*.jpg) + thumbnails (thumbs/{album_id}/*.jpg)
+    ├── MySQL  - albums, images, site_settings
+    ├── Redis  - gallery cache (1h TTL), settings cache (1h TTL), rate-limit counters
+    └── MinIO  - original images (images/{album_id}/*.jpg) + thumbnails (thumbs/{album_id}/*.jpg)
 
-Worker (node worker.js)  — polls every 5s for images with thumb_url IS NULL, generates 400px thumbnails
+Worker (node worker.js)  - polls every 5s for images with thumb_url IS NULL, generates 400px thumbnails
 ```
 
 **Image upload flow:** Frontend → Base64 POST → Backend sharp (resize ≤1920px, JPEG 85%, auto-rotate EXIF) → MinIO → MySQL row → invalidate Redis "gallery" key → Worker picks up → uploads thumbnail → updates `thumb_url`.
@@ -86,9 +86,9 @@ ADMIN_EMAIL
 
 ## Database Schema
 
-- `albums` — id, title, description, sort_order, created_at
-- `images` — id, album_id, url, thumb_url, width, height, sort_order, created_at
-- `site_settings` — id, config (JSON blob), updated_at
+- `albums` - id, title, description, sort_order, created_at
+- `images` - id, album_id, url, thumb_url, width, height, sort_order, created_at
+- `site_settings` - id, config (JSON blob), updated_at
 
 ## Deployment
 

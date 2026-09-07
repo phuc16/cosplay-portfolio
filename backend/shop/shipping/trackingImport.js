@@ -22,12 +22,12 @@ function parsePastedText(text) {
 }
 
 /**
- * `rows2D` is a raw 2D array read from an uploaded VTP result sheet — the
+ * `rows2D` is a raw 2D array read from an uploaded VTP result sheet - the
  * route layer does the exceljs reading, this function stays pure. Finds the
  * order-code and tracking-code columns by matching header text rather than
  * a fixed position, so a result file with reordered or renamed-but-similar
  * columns still resolves correctly. The header row itself is also found by
- * scanning, not assumed to be row 0 — VTP's own "Danh sách vận đơn" export
+ * scanning, not assumed to be row 0 - VTP's own "Danh sách vận đơn" export
  * has several rows of company letterhead/title block above its real header.
  */
 function extractPairsFromSheetRows(rows2D) {
@@ -54,7 +54,7 @@ function extractPairsFromSheetRows(rows2D) {
 
 /**
  * Resolve a batch of {order_code, tracking_code} pairs against already-
- * fetched order rows, WITHOUT writing anything — this is the preview step
+ * fetched order rows, WITHOUT writing anything - this is the preview step
  * the spec requires before any order is touched.
  *
  * Four properties this function guarantees, per the spec's Tracking-Code
@@ -68,10 +68,10 @@ function extractPairsFromSheetRows(rows2D) {
  *  - Never guesses a match: an order code that resolves to no known order
  *    (not_found) or fails to parse (invalid_code) is reported, never
  *    applied to the nearest order.
- *  - Duplicate tracking codes within one file are rejected outright — ALL
+ *  - Duplicate tracking codes within one file are rejected outright - ALL
  *    rows sharing a duplicated tracking code are skipped, since which one
  *    is correct cannot be determined.
- *  - Duplicate order codes within one file are rejected the same way — ALL
+ *  - Duplicate order codes within one file are rejected the same way - ALL
  *    rows sharing a duplicated order code are skipped, since which tracking
  *    code actually belongs to that order cannot be determined (a seller
  *    pasting overlapping ranges, or duplicating a row while editing, must
@@ -79,7 +79,7 @@ function extractPairsFromSheetRows(rows2D) {
  *  - A pickup order is skipped as not_shippable, never toApply: confirm
  *    would then reject it via canTransition(confirmed, shipped, "pickup")
  *    and report "không còn ở trạng thái confirmed" about an order that IS
- *    confirmed — factually wrong, since the real reason is that it is a
+ *    confirmed - factually wrong, since the real reason is that it is a
  *    pickup order that was never meant to get a tracking code. `order`
  *    comes from orderRepo.getOrderById()'s `SELECT *`, so fulfillment_method
  *    is already present without any extra plumbing.

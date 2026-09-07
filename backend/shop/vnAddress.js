@@ -1,6 +1,6 @@
 const redis = require("./../redis")
 
-// Free, no-key-required public API — reflects Vietnam's post-July-2025
+// Free, no-key-required public API - reflects Vietnam's post-July-2025
 // administrative restructuring (34 provinces, no district level). See
 // https://provinces.open-api.vn/. Proxied through our own backend (rather
 // than fetched directly from the browser) so every visitor shares one
@@ -9,7 +9,7 @@ const redis = require("./../redis")
 const BASE_URL = "https://provinces.open-api.vn/api/v2"
 
 // Administrative boundaries change rarely (the 2025 merger was a once-in-
-// decades event) — 30 days balances staleness risk against load on a free
+// decades event) - 30 days balances staleness risk against load on a free
 // third-party service.
 const CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 

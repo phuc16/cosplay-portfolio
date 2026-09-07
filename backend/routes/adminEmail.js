@@ -9,7 +9,7 @@ module.exports = function adminEmailRoutes() {
 
   router.get("/email-templates", async (req, res) => {
     try {
-      // default_subject/default_body_html let the UI offer "restore default" — once overridden, getTemplate() no longer returns the shipped default.
+      // default_subject/default_body_html let the UI offer "restore default" - once overridden, getTemplate() no longer returns the shipped default.
       const rows = await Promise.all(TYPES.map(async (type) => ({
         type,
         ...(await templates.getTemplate(type)),
@@ -47,7 +47,7 @@ module.exports = function adminEmailRoutes() {
     }
   })
 
-  // Surfaces sender.js's listFailed() — a row that exhausted its retries
+  // Surfaces sender.js's listFailed() - a row that exhausted its retries
   // otherwise sits in email_queue with nothing to tell the seller a buyer
   // never got their confirmation.
   router.get("/email-queue/failed", async (req, res) => {

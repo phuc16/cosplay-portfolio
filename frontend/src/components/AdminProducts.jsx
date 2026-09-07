@@ -17,7 +17,7 @@ const SORTS = [
 ]
 
 // A product with no variants isn't a purchasable stock item, so it's never "sold out".
-// A digital product has no variant list — its stock lives on the flattened product.stock_qty instead.
+// A digital product has no variant list - its stock lives on the flattened product.stock_qty instead.
 const isProductSoldOut = (p) => {
   if (p.type === "digital") return p.stock_qty !== null && p.stock_qty !== undefined && p.stock_qty <= 0
   return p.variants?.length > 0 && p.variants.every(
@@ -304,7 +304,7 @@ export default function AdminProducts({ collection }) {
       {products.length > 1 && (
         isDefaultView
           ? <p className="text-xs opacity-60 mb-2">Kéo thả sản phẩm để đổi thứ tự.{reorderPending ? " Đang lưu thứ tự..." : ""}</p>
-          : <p className="text-xs opacity-60 mb-2">Đang lọc/sắp xếp — kéo thả để đổi thứ tự chỉ khả dụng ở chế độ mặc định.</p>
+          : <p className="text-xs opacity-60 mb-2">Đang lọc/sắp xếp - kéo thả để đổi thứ tự chỉ khả dụng ở chế độ mặc định.</p>
       )}
 
       {products.length > 0 && visibleProducts.length === 0 && (

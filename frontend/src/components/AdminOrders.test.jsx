@@ -199,7 +199,7 @@ describe("AdminOrders bulk cancel", () => {
   })
 })
 
-describe("AdminOrders — bulk complete (Event Pickup Verification plan)", () => {
+describe("AdminOrders - bulk complete (Event Pickup Verification plan)", () => {
   it("renders a bulk-complete button beside bulk-cancel, disabled with nothing selected", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     const { container } = await renderAdminOrders()
@@ -281,7 +281,7 @@ describe("AdminOrders — bulk complete (Event Pickup Verification plan)", () =>
   })
 })
 
-describe("AdminOrders — semantic status/action styling (Admin UI plan)", () => {
+describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
   it("renders the status as a Vietnamese-labelled badge, not the raw enum", async () => {
     adminListOrders.mockResolvedValue([order({ status: "confirmed" })])
     const { container } = await renderAdminOrders()

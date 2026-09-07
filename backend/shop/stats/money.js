@@ -15,7 +15,7 @@ function isPrepaid(paymentMethod) {
  * cod       other                 to_collect          received    lost
  *
  * "other" (a pending COD order) is neither money in hand nor a committed
- * promise to collect — the seller has not even confirmed the order yet — so
+ * promise to collect - the seller has not even confirmed the order yet - so
  * it is deliberately excluded from Received, Outstanding, and Lost. It is
  * still a real return value, never undefined, so every input is accounted
  * for and a caller cannot silently drop an order by forgetting a branch.
@@ -36,7 +36,7 @@ function classify(order) {
 /**
  * An order counts as expired when it was cancelled at or after its own
  * deadline. An admin who manually cancels an already-overdue order is
- * indistinguishable from the automatic sweep and is counted as expired too —
+ * indistinguishable from the automatic sweep and is counted as expired too -
  * accepted per spec rather than adding a `cancel_reason` column for one
  * statistic. COD orders never have `expires_at` and are never expired.
  */

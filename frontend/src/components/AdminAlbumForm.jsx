@@ -31,7 +31,7 @@ export default function AdminAlbumForm({ album, onSave, onCancel, title }) {
           value={titleVal}
           onChange={(e) => setTitleVal(e.target.value)}
           className="w-full border border-gray-300 dark:border-cosplay-border bg-gray-50 dark:bg-cosplay-darker rounded-md p-2 text-gray-900 dark:text-slate-200"
-          placeholder="VD: Genshin — Keqing"
+          placeholder="VD: Genshin - Keqing"
           required
         />
       </div>

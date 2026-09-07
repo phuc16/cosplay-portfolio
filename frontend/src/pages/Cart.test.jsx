@@ -6,7 +6,7 @@ import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
 import { addToCart, readCart } from "../shop/cart"
 
-// ShopFooter (rendered on every shop page) fetches /api/settings — mocked
+// ShopFooter (rendered on every shop page) fetches /api/settings - mocked
 // here so tests don't attempt a real network call.
 vi.mock("axios", async (importOriginal) => {
   const actual = await importOriginal()
@@ -47,7 +47,7 @@ beforeEach(() => {
   fetchCollection.mockReset()
 })
 
-describe("Cart — clicking an item goes to its product", () => {
+describe("Cart - clicking an item goes to its product", () => {
   it("links the item to its collection page", async () => {
     fetchCollection.mockResolvedValue({
       status: "active",
@@ -77,7 +77,7 @@ describe("Cart — clicking an item goes to its product", () => {
   })
 })
 
-describe("Cart — removing an item", () => {
+describe("Cart - removing an item", () => {
   it("shows a confirm popup naming the item, and keeps it when Cancel is clicked", async () => {
     fetchCollection.mockResolvedValue({
       status: "active",
@@ -126,7 +126,7 @@ describe("Cart — removing an item", () => {
   })
 })
 
-describe("Cart — early availability validation", () => {
+describe("Cart - early availability validation", () => {
   it("shows a sold-out badge, disables quantity controls, and disables checkout for a sold-out line", async () => {
     fetchCollection.mockResolvedValue({
       status: "active",

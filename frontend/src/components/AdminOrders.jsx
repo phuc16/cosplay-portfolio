@@ -13,7 +13,7 @@ import {
 
 // Statically importing this would ship the scanner/camera component code to
 // every buyer, even though only the admin route ever renders it (the jsqr
-// library itself was already dynamically imported inside the component —
+// library itself was already dynamically imported inside the component -
 // this closes the remaining gap: the component's own code).
 const AdminQrScanner = lazy(() => import("./AdminQrScanner"))
 
@@ -21,7 +21,7 @@ const STATUSES = ["", "pending", "confirmed", "shipped", "completed", "cancelled
 
 // The legal next-statuses come straight from the API's allowed_transitions
 // field (computed server-side from the real canTransition state machine in
-// backend/shop/orders/domain.js) — the frontend keeps zero independent copy
+// backend/shop/orders/domain.js) - the frontend keeps zero independent copy
 // of the transition rules.
 const nextStatuses = (order) => order.allowed_transitions || []
 
@@ -35,7 +35,7 @@ const ACTION_BUTTON_CLASSES = {
 
 /** Orders with at least one legal transition surface first, so the seller
  * doesn't have to scan a full list to find what needs attention. Stable
- * sort (Array.prototype.sort is stable since ES2019) — orders within each
+ * sort (Array.prototype.sort is stable since ES2019) - orders within each
  * group keep the API's original relative order. */
 function byActionableFirst(a, b) {
   const aRank = nextStatuses(a).length > 0 ? 0 : 1
@@ -64,7 +64,7 @@ export default function AdminOrders() {
   const [dateTo, setDateTo] = useState("")
   // Debounced separately from the other filters (which apply immediately on
   // change) so typing a name/phone/email doesn't fire a request per
-  // keystroke — only once the seller pauses for 400ms.
+  // keystroke - only once the seller pauses for 400ms.
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function AdminOrders() {
   }, [searchInput])
   const [detail, setDetail] = useState(null)
   // The transfer note is derived (backend/shop/payments/instructions.js
-  // transferNote), not stored on the order row — reused via the same public
+  // transferNote), not stored on the order row - reused via the same public
   // endpoint the buyer's order page calls rather than re-deriving it here.
   const [paymentInfo, setPaymentInfo] = useState(null)
   const [error, setError] = useState("")
@@ -127,7 +127,7 @@ export default function AdminOrders() {
     }
     if (to === "cancelled") {
       if (!confirm("Hủy đơn này? Kho sẽ được hoàn lại.")) return
-      // Included in the buyer's cancellation email when present — see
+      // Included in the buyer's cancellation email when present - see
       // sender.js. Cancelling the prompt itself (Escape/Cancel) just skips
       // the reason, not the cancellation already confirmed above.
       const reason = prompt("Lý do hủy đơn (có thể bỏ trống, sẽ gửi kèm email cho khách):")
@@ -174,7 +174,7 @@ export default function AdminOrders() {
 
   const bulkCancel = async () => {
     if (selected.size === 0) return
-    if (!confirm(`Hủy ${selected.size} đơn đã chọn? Thao tác này không thể hoàn tác — kho sẽ được hoàn lại cho những đơn hủy thành công.`)) {
+    if (!confirm(`Hủy ${selected.size} đơn đã chọn? Thao tác này không thể hoàn tác - kho sẽ được hoàn lại cho những đơn hủy thành công.`)) {
       return
     }
 
@@ -182,7 +182,7 @@ export default function AdminOrders() {
     setBulkResults(null)
     setBulkAction("cancel")
     try {
-      // A 200 here only means the request was well-formed — each order's own
+      // A 200 here only means the request was well-formed - each order's own
       // ok/error must be read individually; some may fail (e.g. an order
       // that was already completed cannot legally move to cancelled).
       const { results } = await adminBulkCancelOrders([...selected])
@@ -199,7 +199,7 @@ export default function AdminOrders() {
   // For staff who verified pickup buyers offline via the printed roster's
   // pickup_code (weak event-venue connectivity), applying the actual
   // completed status can happen later, in one batch, instead of one order
-  // at a time. Same shape as bulkCancel — a 200 only means the request was
+  // at a time. Same shape as bulkCancel - a 200 only means the request was
   // well-formed, each order's own ok/error must be read individually.
   const bulkComplete = async () => {
     if (selected.size === 0) return
@@ -388,13 +388,13 @@ export default function AdminOrders() {
               <ul className="mt-2">
                 {detail.items.map((i) => (
                   <li key={i.id}>
-                    {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty} —{" "}
+                    {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty} -{" "}
                     {formatVnd(i.unit_price_snapshot * i.qty)}
                     {i.delivery_link_snapshot && (
                       <>
                         {" "}
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">Số</span>
-                        {" — "}
+                        {" - "}
                         <a href={i.delivery_link_snapshot} target="_blank" rel="noreferrer" className="text-[var(--text-link)]">
                           {i.delivery_link_snapshot}
                         </a>

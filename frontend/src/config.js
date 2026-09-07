@@ -27,7 +27,7 @@ export function applyColorScheme(name) {
   r.style.setProperty("--pink-500",          sc.brand)
 }
 
-// Empty skeleton only — ALL content comes from the backend (/api/settings).
+// Empty skeleton only - ALL content comes from the backend (/api/settings).
 // Used solely as a shape-safe fallback while loading or if the API is down.
 export const SITE_CONFIG = {
   colorScheme: "green",

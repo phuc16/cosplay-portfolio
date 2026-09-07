@@ -3,7 +3,7 @@ import { adminGetBookkeepingStats, adminDownloadBookkeepingCsv } from "../../api
 import { formatVnd } from "../../utils/money"
 
 /** "Today" in Asia/Ho_Chi_Minh (fixed UTC+7), not the browser's local
- * timezone — the bookkeeping range is interpreted server-side in
+ * timezone - the bookkeeping range is interpreted server-side in
  * Asia/Ho_Chi_Minh, so a UTC-derived default could hand the seller the
  * wrong day near midnight. */
 function todayInHoChiMinh() {
@@ -11,7 +11,7 @@ function todayInHoChiMinh() {
 }
 
 /** Blob.text() is standard in browsers but jsdom's Blob (used under test)
- * doesn't implement it, so fall back to FileReader — both environments end
+ * doesn't implement it, so fall back to FileReader - both environments end
  * up going through this one path. */
 function readBlobAsText(blob) {
   if (typeof blob.text === "function") return blob.text()
@@ -24,7 +24,7 @@ function readBlobAsText(blob) {
 }
 
 /** The CSV client call uses responseType: "blob", so a 400 error body
- * arrives as an opaque Blob rather than parsed JSON — err.response.data is
+ * arrives as an opaque Blob rather than parsed JSON - err.response.data is
  * a Blob, not { message }. Read it back as text and parse it to recover
  * the server's actual Vietnamese message. */
 async function extractErrorMessage(err, fallback) {
@@ -68,7 +68,7 @@ export default function StatsBookkeeping() {
   }
 
   /** Exports the range that produced the currently-displayed `stats`, not
-   * the live date-input values — the inputs can be edited after "Xem" is
+   * the live date-input values - the inputs can be edited after "Xem" is
    * clicked without clearing `stats` (the button is gated only on `stats &&`),
    * so using them here could silently download a different range than the
    * one on screen. The backend echoes `date_from`/`date_to` back in its

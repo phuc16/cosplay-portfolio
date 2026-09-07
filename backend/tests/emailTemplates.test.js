@@ -71,7 +71,7 @@ describe("shipping_fee_note", () => {
     expect(out.html).toContain("Phí ship trả cho shipper khi nhận hàng")
   })
 
-  it("omits the shipper-fee note in order_placed for a pickup order — there is no shipper to pay", () => {
+  it("omits the shipper-fee note in order_placed for a pickup order - there is no shipper to pay", () => {
     const pickupOrder = { ...order, fulfillment_method: "pickup" }
     const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(pickupOrder))
     expect(out.html).not.toContain("Phí ship trả cho shipper khi nhận hàng")
@@ -79,7 +79,7 @@ describe("shipping_fee_note", () => {
 })
 
 describe("payment_note", () => {
-  it("does not appear in order_placed — the transfer instructions/QR already carry it, a second copy in the pending-payment email read strangely out of context", () => {
+  it("does not appear in order_placed - the transfer instructions/QR already carry it, a second copy in the pending-payment email read strangely out of context", () => {
     const orderWithNote = { ...order, payment_note: "chuc be Tai hay an mau lon" }
     const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(orderWithNote))
     expect(out.html).not.toContain("chuc be Tai hay an mau lon")

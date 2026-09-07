@@ -1,9 +1,9 @@
 # Payment Deep Links (Bank) Implementation Plan
 
-> **STATUS (2026-08-10): DEFERRED — NOT IMPLEMENTED.** After writing this
+> **STATUS (2026-08-10): DEFERRED - NOT IMPLEMENTED.** After writing this
 > plan, further real-world verification (VietQR's own app-deeplink registry)
 > found that a single "Open banking app" button tied to the seller's own
-> bank doesn't match what the user actually wants — a picker of the
+> bank doesn't match what the user actually wants - a picker of the
 > *buyer's* bank apps (like Messenger's payment sheet), each opening
 > targeted at the seller's fixed account. That's achievable via the same
 > `dl.vietqr.io` mechanism (confirmed: `app=<buyer's chosen bank>` +
@@ -11,29 +11,29 @@
 > but sizing the picker (6 banks? 12? all ~36?) turned out to be a genuinely
 > hard call with no clearly-right answer, and the user chose to skip this
 > feature for now rather than force a decision. Kept here, unexecuted, as a
-> record of the investigation and a starting point if revisited — the
+> record of the investigation and a starting point if revisited - the
 > task-by-task detail below assumes the single-button design that was
 > superseded and would need reworking into a picker before use.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a "tap to open your bank app, pre-filled" deep-link button alongside the existing bank-transfer QR on the buyer's order page, so a mobile buyer can pay without a second device or manual retyping. Momo and PayPal are unchanged (see spec's Out of Scope — Momo was cut after verification found no prefillable link exists without full Momo Business API onboarding).
+**Goal:** Add a "tap to open your bank app, pre-filled" deep-link button alongside the existing bank-transfer QR on the buyer's order page, so a mobile buyer can pay without a second device or manual retyping. Momo and PayPal are unchanged (see spec's Out of Scope - Momo was cut after verification found no prefillable link exists without full Momo Business API onboarding).
 
 **Architecture:** Two new backend files (`bankCodes.js`, a static BIN→VietQR-app-code table; `deepLinks.js`, the pure URL builder consuming it), wired into the existing `buildInstructions()` in `backend/shop/payments/instructions.js`, surfaced as one new button in `frontend/src/components/shop/PaymentInstructions.jsx`. No migration, no new admin field, no new dependency.
 
-**Tech Stack:** CommonJS backend, Vitest 3 ESM `import` for backend tests, React 18 frontend, `createRoot`/`act` component-test pattern (no Testing Library), `dl.vietqr.io`'s public redirector (confirmed real via direct doc verification — see spec).
+**Tech Stack:** CommonJS backend, Vitest 3 ESM `import` for backend tests, React 18 frontend, `createRoot`/`act` component-test pattern (no Testing Library), `dl.vietqr.io`'s public redirector (confirmed real via direct doc verification - see spec).
 
-**Spec:** `docs/superpowers/specs/2026-08-10-payment-deep-links-design.md` — read it before touching this plan; every design decision below traces back to it, including the two corrections made after real-world verification (bank-code mapping needed; Momo cut).
+**Spec:** `docs/superpowers/specs/2026-08-10-payment-deep-links-design.md` - read it before touching this plan; every design decision below traces back to it, including the two corrections made after real-world verification (bank-code mapping needed; Momo cut).
 
 ## Global Constraints
 
 - **Scope**: only `backend/shop/payments/`, `backend/shop/payments/instructions.js`, `frontend/src/components/shop/PaymentInstructions.jsx`, and `frontend/src/i18n/translations.js`. No migration, no new `payment_settings` column, no new admin route/field, no change to Momo/PayPal/COD.
 - Backend implementation files stay CommonJS (`require`/`module.exports`); backend test files use Vitest 3 ESM `import` (Vitest 3 refuses `require("vitest")`).
-- Every deep-link builder must **never throw** — missing or unmapped input returns `null`, exactly matching the existing `vietqr_payload: null` degradation pattern already in `instructions.js`.
-- `dl.vietqr.io/pay` confirmed real parameters (from VietQR's own documentation): `app` (VietQR's short bank code, lowercase in the documented example — e.g. `vcb`), `ba` (`<accountNumber>@<appCode>`, lowercase), `am` (amount), `tn` (note). Do not invent additional parameters.
-- The BIN→code table (`bankCodes.js`) is a **static, baked-in snapshot** sourced from `api.vietqr.io/v2/banks` on 2026-08-10 — not fetched at runtime. Do not add a runtime fetch to this or any other external service in this plan.
+- Every deep-link builder must **never throw** - missing or unmapped input returns `null`, exactly matching the existing `vietqr_payload: null` degradation pattern already in `instructions.js`.
+- `dl.vietqr.io/pay` confirmed real parameters (from VietQR's own documentation): `app` (VietQR's short bank code, lowercase in the documented example - e.g. `vcb`), `ba` (`<accountNumber>@<appCode>`, lowercase), `am` (amount), `tn` (note). Do not invent additional parameters.
+- The BIN→code table (`bankCodes.js`) is a **static, baked-in snapshot** sourced from `api.vietqr.io/v2/banks` on 2026-08-10 - not fetched at runtime. Do not add a runtime fetch to this or any other external service in this plan.
 - Commits: Conventional Commits, descriptive bodies, **no `Co-Authored-By` trailer**.
-- Test commands: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test` (**595 passing** before this plan starts) and `cd frontend && npm test && npm run build && npm run lint` (**214 passing**, lint has exactly 3 pre-existing problems in `Portfolio.jsx`/`AdminAlbumImages.jsx` — not this plan's problem, do not fix or add a fourth).
+- Test commands: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test` (**595 passing** before this plan starts) and `cd frontend && npm test && npm run build && npm run lint` (**214 passing**, lint has exactly 3 pre-existing problems in `Portfolio.jsx`/`AdminAlbumImages.jsx` - not this plan's problem, do not fix or add a fourth).
 
 ---
 
@@ -80,7 +80,7 @@ describe("BANK_CODE_BY_BIN", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/bankCodes.test.js`
-Expected: FAIL — `backend/shop/payments/bankCodes.js` does not exist.
+Expected: FAIL - `backend/shop/payments/bankCodes.js` does not exist.
 
 - [ ] **Step 3: Implement `bankCodes.js`**
 
@@ -91,14 +91,14 @@ Create `backend/shop/payments/bankCodes.js`:
  * Static snapshot of VietQR's own BIN -> short app-code mapping, sourced
  * from api.vietqr.io/v2/banks on 2026-08-10. dl.vietqr.io/pay's `app`
  * parameter needs this short code (e.g. "VCB"), not the numeric BIN
- * (e.g. "970436") payment_settings.bank_bin already stores — the two are
+ * (e.g. "970436") payment_settings.bank_bin already stores - the two are
  * different identifier namespaces VietQR maintains in parallel.
  *
  * Baked in rather than fetched at runtime: this list changes rarely (a
  * handful of times a year at most), and a second live external dependency
  * for a table this stable is unwarranted complexity. A BIN not in this
  * table (a very new or obscure bank/e-wallet) simply means the deep-link
- * button doesn't appear for that seller — the QR and manual details are
+ * button doesn't appear for that seller - the QR and manual details are
  * unaffected.
  */
 const BANK_CODE_BY_BIN = {
@@ -230,7 +230,7 @@ describe("buildBankDeepLink", () => {
 - [ ] **Step 6: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/deepLinks.test.js`
-Expected: FAIL — `backend/shop/payments/deepLinks.js` does not exist.
+Expected: FAIL - `backend/shop/payments/deepLinks.js` does not exist.
 
 - [ ] **Step 7: Implement `deepLinks.js`**
 
@@ -243,10 +243,10 @@ const { BANK_CODE_BY_BIN } = require("./bankCodes")
  * Builds a dl.vietqr.io/pay deep link that opens the buyer's own banking
  * app with the transfer pre-filled. Parameters confirmed against VietQR's
  * own documentation: app (short bank code), ba (account@appCode), am
- * (amount), tn (note) — all lowercase per the documented example.
+ * (amount), tn (note) - all lowercase per the documented example.
  *
  * Returns null, never throws, when bankBin/accountNumber are missing or
- * bankBin isn't in BANK_CODE_BY_BIN — an unmapped or misconfigured bank
+ * bankBin isn't in BANK_CODE_BY_BIN - an unmapped or misconfigured bank
  * loses only this convenience button; the existing QR and manual details
  * (built elsewhere in instructions.js) are unaffected.
  */
@@ -285,14 +285,14 @@ feat(shop): add the bank-code table and dl.vietqr.io deep-link builder
 
 dl.vietqr.io/pay's `app` parameter needs VietQR's own short bank code
 (e.g. "VCB"), not the numeric BIN payment_settings.bank_bin already
-stores — different identifier namespaces VietQR maintains in parallel.
+stores - different identifier namespaces VietQR maintains in parallel.
 bankCodes.js bakes in a static BIN->code snapshot sourced from
 api.vietqr.io/v2/banks (2026-08-10) rather than adding a second runtime
 external dependency for a table that's stable for months at a time.
 
 buildBankDeepLink() is pure and isolated: it returns null, never throws,
 for a missing account/bank or an unmapped BIN, so a misconfigured or
-obscure bank just loses this one convenience button — the existing QR
+obscure bank just loses this one convenience button - the existing QR
 and manual account details are unaffected either way.
 EOF
 ```
@@ -342,7 +342,7 @@ function buildInstructions(order, settings) {
         addInfo: note,
       })
     } catch (err) {
-      // Misconfiguration must not blank the page — the buyer can still
+      // Misconfiguration must not blank the page - the buyer can still
       // transfer manually using the printed details below.
       console.warn("[PAYMENTS] Không tạo được VietQR:", err.message)
     }
@@ -426,7 +426,7 @@ Add, inside `describe("buildInstructions", ...)`:
 - [ ] **Step 2: Run to verify the new tests fail**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/paymentInstructions.test.js`
-Expected: FAIL — `bank_deeplink` doesn't exist on the returned object yet.
+Expected: FAIL - `bank_deeplink` doesn't exist on the returned object yet.
 
 - [ ] **Step 3: Implement**
 
@@ -475,7 +475,7 @@ Replace with:
     }
 ```
 
-No other branch (`momo`, `paypal`, `cod`) changes — `buildBankDeepLink` is only called inside the `bank` branch, so those objects never gain a `bank_deeplink` key at all (not even `undefined` as an explicit key — the tests assert `toBeUndefined()`, which passes whether the key is absent or explicitly `undefined`).
+No other branch (`momo`, `paypal`, `cod`) changes - `buildBankDeepLink` is only called inside the `bank` branch, so those objects never gain a `bank_deeplink` key at all (not even `undefined` as an explicit key - the tests assert `toBeUndefined()`, which passes whether the key is absent or explicitly `undefined`).
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -497,12 +497,12 @@ feat(shop): surface bank_deeplink from buildInstructions
 buildInstructions() now includes bank_deeplink (from buildBankDeepLink,
 Task 1) on bank-transfer orders, built from the same transfer_note
 reference code the VietQR payload already uses. Momo/paypal/cod orders
-are untouched — they never gain the key at all, matching the existing
+are untouched - they never gain the key at all, matching the existing
 principle that only the ordering method's own method's details are ever
 returned.
 
 A misconfigured or unmapped bank yields bank_deeplink: null, same shape
-as the existing vietqr_payload degradation — the printed account details
+as the existing vietqr_payload degradation - the printed account details
 stay usable regardless.
 EOF
 ```
@@ -518,7 +518,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `instructions.bank_deeplink` (Task 2, may be `undefined` for non-bank orders or `null` for a bank order with no mapped deep link).
-- Produces: no new exports — this task changes only `PaymentInstructions.jsx`'s rendered output and adds two i18n keys.
+- Produces: no new exports - this task changes only `PaymentInstructions.jsx`'s rendered output and adds two i18n keys.
 
 The relevant current section of `frontend/src/components/shop/PaymentInstructions.jsx` (inside the `method === "bank"` block):
 
@@ -581,7 +581,7 @@ In `frontend/src/components/shop/PaymentInstructions.test.jsx`, add inside `desc
 - [ ] **Step 2: Run to verify the new tests fail**
 
 Run: `cd frontend && npm test -- PaymentInstructions`
-Expected: FAIL — no `dl.vietqr.io` link is rendered yet.
+Expected: FAIL - no `dl.vietqr.io` link is rendered yet.
 
 - [ ] **Step 3: Add the i18n keys**
 
@@ -658,7 +658,7 @@ Replace with:
       )}
 ```
 
-`instructions.bank_deeplink` is only ever present on a `bank`-method payload (Task 2), so no method-check is needed here — this JSX only executes inside the existing `method === "bank" && (...)` block.
+`instructions.bank_deeplink` is only ever present on a `bank`-method payload (Task 2), so no method-check is needed here - this JSX only executes inside the existing `method === "bank" && (...)` block.
 
 - [ ] **Step 5: Run to verify it passes**
 
@@ -672,7 +672,7 @@ cd frontend && npm test && npm run build && npm run lint
 cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test
 ```
 
-Expected: frontend suite passes (216 tests: 214 baseline + 2 new), no new lint problems beyond the 3 pre-existing ones; backend suite passes at 607 (Task 2's count) with **zero** files changed under `backend/` in this task's diff — this task touches only frontend files, and this run exists only to prove that.
+Expected: frontend suite passes (216 tests: 214 baseline + 2 new), no new lint problems beyond the 3 pre-existing ones; backend suite passes at 607 (Task 2's count) with **zero** files changed under `backend/` in this task's diff - this task touches only frontend files, and this run exists only to prove that.
 
 - [ ] **Step 7: Commit**
 
@@ -682,22 +682,22 @@ git commit -F - <<'EOF'
 feat(shop): show a bank-app deep-link button on the order payment page
 
 A buyer checking out on their own phone can't scan a QR shown on that
-same screen — their only option was retyping account/amount/note by
+same screen - their only option was retyping account/amount/note by
 hand. The order page now shows an "Open banking app" button beside the
 existing QR whenever bank_deeplink is present, opening the buyer's bank
 app pre-filled via dl.vietqr.io. The QR is unchanged and still works for
 a second-device scan; this is a pure addition.
 
 No button renders when bank_deeplink is null (unmapped or misconfigured
-bank) — same fallback shape as the existing QR-unavailable notice.
+bank) - same fallback shape as the existing QR-unavailable notice.
 EOF
 ```
 
 ---
 
-## Out of Scope (carried from the spec — do not implement)
+## Out of Scope (carried from the spec - do not implement)
 
-- Momo deep link — cut after verification found no prefillable link exists without full Momo Business API onboarding (see spec).
+- Momo deep link - cut after verification found no prefillable link exists without full Momo Business API onboarding (see spec).
 - PayPal deep-link/amount pre-fill.
 - A new admin toggle for the deep link specifically.
 - Device/viewport detection.

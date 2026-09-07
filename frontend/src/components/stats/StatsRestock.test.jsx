@@ -81,7 +81,7 @@ describe("StatsRestock", () => {
     const sellThroughCell = cells[6]
     expect(remainingCell.textContent).toBe("không giới hạn")
     expect(sellThroughCell.textContent).toBe("không giới hạn")
-    expect(sellThroughCell.textContent).not.toBe("—")
+    expect(sellThroughCell.textContent).not.toBe("-")
     expect(sellThroughCell.textContent).not.toBe("0%")
   })
 
@@ -95,7 +95,7 @@ describe("StatsRestock", () => {
     const row = container.querySelector("tbody tr")
     const timeCell = row.querySelectorAll("td")[7]
     expect(timeCell.textContent).toContain("ngày")
-    expect(timeCell.textContent).not.toBe("—")
+    expect(timeCell.textContent).not.toBe("-")
   })
 
   it("renders no time-to-sellout value when time_to_sellout_days is null", async () => {
@@ -108,10 +108,10 @@ describe("StatsRestock", () => {
     const row = container.querySelector("tbody tr")
     const timeCell = row.querySelectorAll("td")[7]
     expect(timeCell.textContent).not.toMatch(/ngày/)
-    expect(timeCell.textContent).toBe("—")
+    expect(timeCell.textContent).toBe("-")
   })
 
-  it("renders a velocity of 0 as 0, not blank or '—'", async () => {
+  it("renders a velocity of 0 as 0, not blank or '-'", async () => {
     adminGetRestockStats.mockResolvedValue([
       { variant_id: 6, label: "F1", product_name: "Dead stock", collection_id: 1, collection_title: "Drop", stock_qty: 50, unlimited: false, remaining: 50, sold: 0, velocity: 0, sell_through: 0, time_to_sellout_days: null },
     ])

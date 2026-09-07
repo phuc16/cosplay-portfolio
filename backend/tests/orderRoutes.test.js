@@ -11,7 +11,7 @@ import { formatOrderCode } from "../shop/orders/domain.js"
 import { resetTables } from "./helpers/db.js"
 
 // GET /api/orders/:token now requires either an admin session or a
-// PIN-verified order-access session (see shop/orders/orderAccess.js) — the
+// PIN-verified order-access session (see shop/orders/orderAccess.js) - the
 // admin JWT is the simplest bypass for tests that don't care about the PIN
 // flow itself (that's covered separately in orderAccess.test.js).
 const adminToken = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
@@ -21,7 +21,7 @@ async function seed(stock = 5, collectionOver = {}) {
   const cid = await catalog.createCollection({ title: "Drop", status: "active", ...collectionOver })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 35000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: stock }])
-  // Scoped to this product's own row — a bare LIMIT 1 would grab whichever
+  // Scoped to this product's own row - a bare LIMIT 1 would grab whichever
   // variant happens to sort first in the table, wrong the moment a test
   // (e.g. the digital-cart tests below) seeds more than one product before
   // calling this helper.
@@ -84,7 +84,7 @@ describe("POST /api/orders", () => {
   })
 
   // The buyer's own browser skips the PIN gate for the order page it's about
-  // to load, exactly once, right after checkout — see orderAccess.js's
+  // to load, exactly once, right after checkout - see orderAccess.js's
   // issueOrderSessionToken.
   it("also returns an access_token that unlocks this order's own page, immediately", async () => {
     const v = await seed()
@@ -96,7 +96,7 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(200)
   })
 
-  it("the access_token is scoped to THIS order — it does not unlock a different one", async () => {
+  it("the access_token is scoped to THIS order - it does not unlock a different one", async () => {
     const v1 = await seed()
     const v2 = await seed()
     const first = await request(app).post("/api/orders").send(body(v1))
@@ -194,7 +194,7 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(409)
     expect(res.body.error).toBe("out_of_stock")
     // A cart can hold the same variant label ("A1") across different
-    // products — the product name disambiguates which one is out of stock.
+    // products - the product name disambiguates which one is out of stock.
     expect(res.body.message).toContain("Card")
     expect(res.body.message).toContain("A1")
     // Lets the client auto-drop exactly this line, same as variant_not_found.
@@ -202,7 +202,7 @@ describe("POST /api/orders", () => {
   })
 
   // A cart item can be added while its collection is "active" and then
-  // outlive that — the seller closes the drop before the buyer checks out.
+  // outlive that - the seller closes the drop before the buyer checks out.
   it("returns 409 collection_not_active when the item's collection was closed after being added to cart", async () => {
     const v = await seed(5, { status: "closed" })
     const res = await request(app).post("/api/orders").send(body(v))
@@ -226,7 +226,7 @@ describe("POST /api/orders", () => {
     expect(res.body.message).not.toContain('"không tồn tại"')
     expect(res.body.message).not.toContain("vừa hết hàng")
     // The client needs this to actually remove the stale line from the
-    // cart itself — "refresh the page" alone does nothing for a bad id
+    // cart itself - "refresh the page" alone does nothing for a bad id
     // sitting in localStorage.
     expect(res.body.variant_ids).toEqual([999999])
   })
@@ -266,10 +266,10 @@ describe("POST /api/orders", () => {
   })
 })
 
-describe("POST /api/orders — rate limiting", () => {
+describe("POST /api/orders - rate limiting", () => {
   it("blocks the 11th request within an hour with a readable, actionable message", async () => {
     // Any POST to /api/orders counts against the limiter before the route
-    // handler runs, so a body that 400s still consumes budget — no need to
+    // handler runs, so a body that 400s still consumes budget - no need to
     // seed a real variant or place 10 real orders.
     for (let i = 0; i < 10; i += 1) {
       // eslint-disable-next-line no-await-in-loop
@@ -279,14 +279,14 @@ describe("POST /api/orders — rate limiting", () => {
 
     expect(res.status).toBe(429)
     expect(res.body.error).toBe("too_many_requests")
-    // The old message was just "Quá nhiều đơn. Thử lại sau." — no count, no
+    // The old message was just "Quá nhiều đơn. Thử lại sau." - no count, no
     // wait time, nothing actionable.
     expect(res.body.message).toContain("10 đơn")
     expect(res.body.message).toMatch(/\d+ phút/)
   })
 })
 
-describe("POST /api/orders — digital items", () => {
+describe("POST /api/orders - digital items", () => {
   it("accepts an all-digital cart with no fulfillment_method or address", async () => {
     const v = await seedDigital()
     const res = await request(app).post("/api/orders").send({
@@ -319,7 +319,7 @@ describe("POST /api/orders — digital items", () => {
   })
 })
 
-describe("GET /api/orders/:token — digital delivery link exposure", () => {
+describe("GET /api/orders/:token - digital delivery link exposure", () => {
   it("hides delivery_link_snapshot while pending", async () => {
     const v = await seedDigital(5, "https://drive.google.com/hidden")
     const created = await request(app).post("/api/orders").send({
@@ -407,16 +407,16 @@ describe("GET /api/orders/:token", () => {
     const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).toHaveProperty("expires_at")
     // order_token IS present on this response by design (the buyer already
-    // holds it — it's in the URL they just requested).
+    // holds it - it's in the URL they just requested).
     // buyer_name/phone/address_raw were deliberately kept off this response
     // by an earlier privacy default; showing a "Thông tin nhận hàng" block
     // (matching Shopee's order confirmation) is a later, explicit decision
     // to trade some of that safety for letting a buyer catch a typo'd
-    // address/phone — this is not a regression.
+    // address/phone - this is not a regression.
     expect(res.body.buyer_name).toBe("Nguyễn Văn A")
     expect(res.body.phone).toBe("0900000000")
     expect(res.body.address_raw).toBe("1 ABC, Q1, TP.HCM")
-    // email is still never exposed here — the buyer already has it (they
+    // email is still never exposed here - the buyer already has it (they
     // typed it at checkout), so there's nothing for this page to confirm,
     // only more PII to leak if the link is ever forwarded.
     expect(res.body).not.toHaveProperty("request_key")

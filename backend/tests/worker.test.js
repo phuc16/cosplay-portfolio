@@ -87,7 +87,7 @@ describe("worker run(): overlapping ticks", () => {
 })
 
 describe("worker dispatchEmails(): SMTP unconfigured", () => {
-  // sendQueued() no-ops entirely when SMTP isn't set — it never touches the
+  // sendQueued() no-ops entirely when SMTP isn't set - it never touches the
   // queue, so without this warning email_queue silently grows forever and
   // the seller has zero signal that mail is stuck.
   it("logs a warning when SMTP is unconfigured and mail is pending", async () => {

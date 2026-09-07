@@ -18,7 +18,7 @@ export default function Admin() {
   const { theme, toggleTheme } = useTheme()
   const [tab, setTab] = useState("albums")
   // Read once at mount, applying the saved token to axios immediately so the
-  // very first admin API call (before any effect runs) still authenticates —
+  // very first admin API call (before any effect runs) still authenticates -
   // without this, a page refresh loses the session even though the JWT
   // (8h expiry) is still valid.
   const [token, setToken] = useState(() => {
@@ -45,7 +45,7 @@ export default function Admin() {
     setToken(data.token)
   }
 
-  // Access token can be entirely missing on mount while the refresh token is still good — redeem it before showing login
+  // Access token can be entirely missing on mount while the refresh token is still good - redeem it before showing login
   useEffect(() => {
     if (token) return
     const refreshToken = localStorage.getItem(REFRESH_KEY)
@@ -113,7 +113,7 @@ export default function Admin() {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-cosplay-dark">
         <header className="bg-white dark:bg-cosplay-card border-b border-gray-200 dark:border-cosplay-border px-3 sm:px-4 py-3 flex flex-wrap justify-between items-center gap-2">
-          <h1 className="font-bold text-base sm:text-lg text-gray-900 dark:text-slate-100 truncate min-w-0">Admin — Cosplay Portfolio</h1>
+          <h1 className="font-bold text-base sm:text-lg text-gray-900 dark:text-slate-100 truncate min-w-0">Admin - Cosplay Portfolio</h1>
           <div className="flex flex-wrap gap-2 sm:gap-4 items-center shrink-0">
             <button
               onClick={() => setTab("albums")}

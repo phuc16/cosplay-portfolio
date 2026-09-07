@@ -38,7 +38,7 @@ function mapCollection(row) {
   }
 }
 
-/** Normalizes a start_at/end_at value to a Date mysql2 can serialize correctly — a raw ISO string with milliseconds/Z (e.g. from .toISOString()) otherwise throws ER_TRUNCATED_WRONG_VALUE. */
+/** Normalizes a start_at/end_at value to a Date mysql2 can serialize correctly - a raw ISO string with milliseconds/Z (e.g. from .toISOString()) otherwise throws ER_TRUNCATED_WRONG_VALUE. */
 function normalizeDatetime(value) {
   if (!value) return null
   if (value instanceof Date) return value
@@ -69,9 +69,9 @@ async function nextSortOrder(table, whereSql = "", params = []) {
 }
 
 /**
- * Real, persisted transition — not a display-only computed value. Called by
+ * Real, persisted transition - not a display-only computed value. Called by
  * every collection-read path below, so the first read after end_at (by
- * anyone — admin or a buyer) is what flips it; there is no separate
+ * anyone - admin or a buyer) is what flips it; there is no separate
  * sweep/cron. The `AND status = 'active'` guard makes concurrent calls
  * from simultaneous requests safely idempotent.
  */
@@ -142,7 +142,7 @@ async function nestCollectionDetail(collection) {
     ...mapCollection(collection),
     products: products.map((p) => {
       const productVariants = byProduct.get(p.id) || []
-      // Digital products have no variant list in any UI — the one hidden
+      // Digital products have no variant list in any UI - the one hidden
       // variant they do have is flattened onto the product itself here so
       // nothing downstream needs to know it secretly exists.
       if (p.type === "digital") {
@@ -174,7 +174,7 @@ async function getPublicCollectionBySlug(slug) {
   const [updated] = await closeExpiredCollections([collection])
   const detail = await nestCollectionDetail(updated)
   // delivery_link is only trustworthy once an order is confirmed/shipped/completed
-  // (see routes/orders.js and email templates.js) — nestCollectionDetail is shared
+  // (see routes/orders.js and email templates.js) - nestCollectionDetail is shared
   // with the admin-only getCollectionDetailById, which legitimately needs the link,
   // so it is stripped here, on the public path only. stock_qty stays: buyers
   // legitimately need to see stock/sold-out state before ever placing an order.
@@ -243,7 +243,7 @@ async function insertCollection(data, slug, sortOrder) {
 async function updateCollection(id, data, attempt = 0) {
   // The slug is re-derived from the title on every edit (not just at
   // creation) so a renamed collection's URL always matches its current
-  // name — otherwise a copy renamed away from "X (Copy)" would keep the
+  // name - otherwise a copy renamed away from "X (Copy)" would keep the
   // stale "-copy" slug forever. Other collections' slugs are the collision
   // set; excluding this row's own current slug means an unchanged title
   // never gets needlessly bumped to "-2".
@@ -286,11 +286,11 @@ async function updateCollection(id, data, attempt = 0) {
 }
 
 /**
- * Duplicate a collection along with every product and variant inside it —
+ * Duplicate a collection along with every product and variant inside it -
  * saves re-entering a large photocard sheet from scratch for a similar
  * drop. The copy always starts as `draft` regardless of the source's
  * status, since it still needs review/edits (dates, title) before it should
- * be orderable. Images are referenced, not re-uploaded — both collections
+ * be orderable. Images are referenced, not re-uploaded - both collections
  * point at the same MinIO objects.
  */
 async function copyCollection(id) {
@@ -338,7 +338,7 @@ async function copyCollection(id) {
 
 /**
  * Guards a cascading DELETE against silently wiping variants (and nulling
- * their order_items) still referenced by a live order — same shape as the
+ * their order_items) still referenced by a live order - same shape as the
  * live-order check in replaceVariants, run on the same connection/transaction
  * that holds the row locks so a concurrent checkout can't slip in between.
  */
@@ -398,7 +398,7 @@ async function createProduct(data) {
     ]
   )
   const productId = res.insertId
-  // Digital products have no admin-managed variant list — this single
+  // Digital products have no admin-managed variant list - this single
   // hidden row (no label) carries stock_qty/delivery_link through the same
   // variant_id-based cart/order_items/stock-decrement pipeline unchanged.
   if (type === "digital") {
@@ -421,7 +421,7 @@ async function updateProduct(id, data) {
   )
 
   if (existing.type === "digital") {
-    // Reuses the hidden variant's own id — replaceVariants must UPDATE it,
+    // Reuses the hidden variant's own id - replaceVariants must UPDATE it,
     // never delete-and-recreate: order_items.product_variant_id would SET
     // NULL on every edit, and a live order referencing it would make
     // replaceVariants throw VariantInUseError on an ordinary product edit.
@@ -430,7 +430,7 @@ async function updateProduct(id, data) {
       [id]
     )
     // A field omitted from the request body (undefined) falls back to the
-    // current value instead of being coerced to null by replaceVariants — an
+    // current value instead of being coerced to null by replaceVariants - an
     // explicit null/"" is still honored as "clear the field". Otherwise a
     // partial-payload caller (a script, a future partial-update form) would
     // silently blank the product's entire deliverable.
@@ -500,7 +500,7 @@ async function replaceVariants(productId, variants) {
 
     // Lock the product's full current variant set before deciding what to
     // remove. Row locks acquired in ascending id order, same convention as
-    // orderRepo.createOrder's `FOR UPDATE OF v` — so a concurrent checkout
+    // orderRepo.createOrder's `FOR UPDATE OF v` - so a concurrent checkout
     // locking the same variant rows (also ascending) can never grab them in
     // the opposite order and deadlock against this save.
     const [current] = await conn.query(
@@ -553,7 +553,7 @@ async function replaceVariants(productId, variants) {
       if (v.id) {
         // The product_id guard stops one product's request editing another's variant.
         // If `id` does not belong to `productId`, this matches zero rows and the
-        // variant is silently dropped from the result — this is intentional
+        // variant is silently dropped from the result - this is intentional
         // isolation between products' variant lists, not a bug, but callers must
         // not rely on this update succeeding without checking product ownership
         // themselves.

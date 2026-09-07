@@ -12,7 +12,7 @@ function generateOrderToken() {
  * to read aloud or match by eye against the printed pickup roster when
  * event-venue connectivity is too weak for the QR-scan flow (which needs a
  * live full order-list fetch). Unlike order_token, this is never accepted
- * as a credential anywhere — it only ever gets compared visually.
+ * as a credential anywhere - it only ever gets compared visually.
  */
 function generatePickupCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0")
@@ -20,19 +20,19 @@ function generatePickupCode() {
 
 /**
  * 6-digit numeric PIN gating the public order page (routes/orders.js's
- * orderAccess middleware) — guards against anyone who only has the order
+ * orderAccess middleware) - guards against anyone who only has the order
  * link, since the PIN travels via a separate channel (email).
  */
 function generateAccessPin() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0")
 }
 
-/** SHA-256 hex digest — the only thing ever stored for an access PIN. */
+/** SHA-256 hex digest - the only thing ever stored for an access PIN. */
 function hashAccessPin(pin) {
   return crypto.createHash("sha256").update(String(pin)).digest("hex")
 }
 
-/** Constant-time comparison against the stored hash — same reasoning as
+/** Constant-time comparison against the stored hash - same reasoning as
  * server.js's safeEqual for admin credentials: a PIN is short (6 digits,
  * 1e6 possibilities) so timing leaks matter more here, not less. */
 function verifyAccessPin(pin, storedHash) {
@@ -45,15 +45,15 @@ function verifyAccessPin(pin, storedHash) {
 
 /**
  * Human-facing order code shown in emails/admin instead of the raw
- * sequential `id` — a plain "#12" both leaks order volume to anyone who
+ * sequential `id` - a plain "#12" both leaks order volume to anyone who
  * compares two numbers and reads as less polished than most storefronts'
  * opaque order codes. Matches the length/shape of Shopee's own example
  * ("2608137A69U181"): a YYMMDD date prefix (from when the order was
  * placed) plus an 8-character alphanumeric suffix. The suffix is a hash of
- * the id, not randomness — deterministic and derived, so it needs no new
+ * the id, not randomness - deterministic and derived, so it needs no new
  * column/migration/uniqueness bookkeeping and can never drift out of sync
  * with the real id, while still not reading as an obviously-padded small
- * number the way a raw base-36 id would. Display-only, like pickup_code —
+ * number the way a raw base-36 id would. Display-only, like pickup_code -
  * not a credential, so it doesn't need to be unguessable, only to look
  * like it isn't just the sequential id.
  */
@@ -69,7 +69,7 @@ function formatOrderCode(id, createdAt) {
 
 const ORDER_CODE_RE = /^(\d{2})(\d{2})(\d{2})[0-9A-Z]{8}$/
 
-/** Recovers the YYMMDD date embedded in a formatOrderCode() output — the suffix is a one-way hash, so this is the only part that's recoverable. */
+/** Recovers the YYMMDD date embedded in a formatOrderCode() output - the suffix is a one-way hash, so this is the only part that's recoverable. */
 function parseOrderCodeDate(code) {
   const m = ORDER_CODE_RE.exec(String(code || "").trim().toUpperCase())
   if (!m) return null

@@ -2,7 +2,7 @@ const crypto = require("crypto")
 const redis = require("./redis")
 
 // Singleton lease guarding against multiple worker processes (e.g. a stale
-// deploy left running) double-processing the same rows — see
+// deploy left running) double-processing the same rows - see
 // .superpowers/sdd/f14-reinvestigation-report.md. Independent of worker.js's
 // `running` flag, which only guards overlapping ticks within one process.
 // A Redis key (`SET key holder PX ttl NX`) renewed each tick via a
@@ -52,7 +52,7 @@ function createLease({ key = LEASE_KEY, ttlMs = LEASE_TTL_MS } = {}) {
 
   /**
    * Extend the lease's TTL, but only if this handle is still the current
-   * holder (compare-and-extend). Returns false — without throwing — if the
+   * holder (compare-and-extend). Returns false - without throwing - if the
    * lease was lost (expired and/or taken by another holder), so the caller
    * can treat that as "no longer safe to keep polling" rather than an error.
    */

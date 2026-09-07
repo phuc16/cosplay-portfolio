@@ -24,7 +24,7 @@ function toCsv(headers, rows) {
 
 /**
  * Serialize a bookkeeping-view result (see statsRepo.getBookkeepingStats)
- * into the exact CSV the admin downloads — built server-side, so the export
+ * into the exact CSV the admin downloads - built server-side, so the export
  * is guaranteed identical to what the screen displayed.
  */
 function bookkeepingToCsv(stats) {
@@ -40,7 +40,7 @@ function bookkeepingToCsv(stats) {
 
 /**
  * Serialize a single collection's drop-stats view (see
- * statsRepo.getDropStats) into its per-variant CSV — the same table
+ * statsRepo.getDropStats) into its per-variant CSV - the same table
  * rendered on screen, one row per variant.
  */
 function dropStatsToCsv(stats) {

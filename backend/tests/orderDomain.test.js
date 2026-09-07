@@ -164,7 +164,7 @@ describe("canTransition", () => {
     expect(d.canTransition("confirmed", "shipped", "pickup")).toBe(false)
   })
 
-  it("never lets a digital order reach 'shipped' — there is nothing to ship", () => {
+  it("never lets a digital order reach 'shipped' - there is nothing to ship", () => {
     expect(d.canTransition("confirmed", "shipped", "digital")).toBe(false)
     expect(d.canTransition("confirmed", "completed", "digital")).toBe(true)
   })

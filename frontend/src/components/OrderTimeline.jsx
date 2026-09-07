@@ -12,14 +12,14 @@ export function buildTimelineSteps(order) {
   ]
 
   // Pickup orders never touch "shipped" at all (spec: they go straight from
-  // confirmed to completed) — that is a correct skip, not a missing step, so
+  // confirmed to completed) - that is a correct skip, not a missing step, so
   // it is left out of the timeline entirely rather than shown as unreached.
   if (order.fulfillment_method !== "pickup") {
     steps.push({ key: "shipped", label: "Đã giao vận", at: order.shipped_at })
   }
 
   // Cancelled is a distinct terminal branch from completed, not an extra
-  // step after it — an order shows exactly one of the two, whichever
+  // step after it - an order shows exactly one of the two, whichever
   // actually applies (or completed-not-reached-yet, while still open).
   steps.push(
     order.status === "cancelled"

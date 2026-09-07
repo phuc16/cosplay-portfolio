@@ -39,7 +39,7 @@ function lastLoggedRequestLine(logSpy) {
   return line ? JSON.parse(line) : null
 }
 
-describe("request logger — order_token redaction", () => {
+describe("request logger - order_token redaction", () => {
   it("redacts the 32-hex-char order_token from a buyer order-page request's logged path", async () => {
     const created = await seedOrder()
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})

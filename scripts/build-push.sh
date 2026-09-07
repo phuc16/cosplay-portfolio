@@ -12,7 +12,7 @@ echo "Building and pushing with tag: $TAG (platform: $PLATFORM)"
 
 # buildx --platform forces a plain linux/amd64 manifest. Plain `docker build`
 # on an Apple Silicon host stamps the pushed image with the build VM's
-# detected CPU microarchitecture level (e.g. amd64/v3) instead — a cloud VPS
+# detected CPU microarchitecture level (e.g. amd64/v3) instead - a cloud VPS
 # whose CPU doesn't support that exact level then fails to pull it with
 # "no matching manifest", even though it's a completely ordinary amd64 box.
 docker buildx build --platform "$PLATFORM" --provenance=false \

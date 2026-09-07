@@ -48,7 +48,7 @@ beforeEach(() => {
   axios.get.mockReset()
 })
 
-describe("Shop — collection ordering", () => {
+describe("Shop - collection ordering", () => {
   it("sinks closed (ended) collections after active ones, without reordering within each group", async () => {
     fetchCollections.mockResolvedValue([
       { id: 1, slug: "ended-a", title: "Ended A", status: "closed", product_count: 0 },
@@ -66,7 +66,7 @@ describe("Shop — collection ordering", () => {
   })
 })
 
-describe("Shop — search, filter, sort", () => {
+describe("Shop - search, filter, sort", () => {
   it("filters collections by title, case-insensitively", async () => {
     fetchCollections.mockResolvedValue([
       { id: 1, slug: "hobby", title: "Hobby Horizon", status: "active", product_count: 1 },
@@ -132,7 +132,7 @@ describe("Shop — search, filter, sort", () => {
 
   it("keeps a closed (ended) collection sunk to the end even under a non-default sort (name A-Z)", async () => {
     // "Apple Drop" would sort before "Zebra Drop" alphabetically, but it's
-    // closed — it must still land last.
+    // closed - it must still land last.
     fetchCollections.mockResolvedValue([
       { id: 1, slug: "a", title: "Apple Drop", status: "closed", product_count: 1 },
       { id: 2, slug: "z", title: "Zebra Drop", status: "active", product_count: 1 },
@@ -173,7 +173,7 @@ describe("Shop — search, filter, sort", () => {
   })
 })
 
-describe("Shop — closed drop overlay", () => {
+describe("Shop - closed drop overlay", () => {
   it("shows a 'this drop has ended' overlay on the thumbnail for a closed collection", async () => {
     fetchCollections.mockResolvedValue([
       { id: 1, slug: "ended", title: "Ended", status: "closed", product_count: 0, cover_image: "https://x/cover.jpg" },
@@ -203,8 +203,8 @@ describe("Shop — closed drop overlay", () => {
   })
 })
 
-describe("Shop — footer", () => {
-  // Full footer content/behavior is covered by ShopFooter.test.jsx — this
+describe("Shop - footer", () => {
+  // Full footer content/behavior is covered by ShopFooter.test.jsx - this
   // just confirms Shop.jsx actually renders it.
   it("renders the shared ShopFooter", async () => {
     fetchCollections.mockResolvedValue([])

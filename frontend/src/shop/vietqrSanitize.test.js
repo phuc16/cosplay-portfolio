@@ -27,7 +27,7 @@ describe("willTruncateInVietQr", () => {
 
   it("accounts for diacritics/punctuation stripped before the length check", () => {
     // 30 raw chars, but stripping "!" and diacritics could bring it under
-    // the cap — this pins the check to the SANITIZED length, not the raw one.
+    // the cap - this pins the check to the SANITIZED length, not the raw one.
     const raw = "a".repeat(20) + "!!!!!" // 25 chars raw, 20 sanitized (punctuation stripped)
     expect(willTruncateInVietQr(raw)).toBe(false)
   })

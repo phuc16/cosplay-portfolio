@@ -6,7 +6,7 @@ import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 
 // Closed (ended) collections always sink to the end, under every sort mode
-// — not just the default — so switching to "Name A-Z" etc. never mixes an
+// - not just the default - so switching to "Name A-Z" etc. never mixes an
 // ended drop back in among open ones.
 function sortCollections(list, sortBy) {
   const sorted = [...list]

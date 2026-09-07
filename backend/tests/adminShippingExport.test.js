@@ -19,7 +19,7 @@ const buyer = {
   address_province: "Hồ Chí Minh", address_raw: null,
 }
 
-// An .xlsx is a deflated zip of XML parts — cell text never appears as
+// An .xlsx is a deflated zip of XML parts - cell text never appears as
 // plaintext in the raw buffer. A raw buffer scan for a canary can never
 // fail, even if the canary was actually written into a cell, so it proves
 // nothing. Decoding through exceljs and walking every cell of every
@@ -259,7 +259,7 @@ describe("POST /api/admin/shipping/export", () => {
     const res = await authed(request(app).post("/api/admin/shipping/export").send({ order_ids: [id], batch }))
     expect(res.status).toBe(200)
     const buffer = Buffer.from(res.body.file_base64, "base64")
-    // Decode the xlsx and walk every cell of every worksheet — a raw byte
+    // Decode the xlsx and walk every cell of every worksheet - a raw byte
     // scan of the compressed zip can never find text that is actually
     // present in a cell, so it would never catch a real leak.
     const wb = new ExcelJS.Workbook()

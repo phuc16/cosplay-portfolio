@@ -2,23 +2,23 @@
 # Automates DEPLOY.md's Bước 4–10 end to end: Docker install → fetch deploy
 # config → .env with generated secrets → pull/up prebuilt images → migrate
 # → host Nginx reverse proxy → Let's Encrypt TLS → firewall. Run as root on
-# a fresh Ubuntu 22.04 droplet (Bước 1–3 — creating the droplet, pointing
-# DNS at it, and SSHing in — are manual/external and stay that way; this
+# a fresh Ubuntu 22.04 droplet (Bước 1–3 - creating the droplet, pointing
+# DNS at it, and SSHing in - are manual/external and stay that way; this
 # script starts from "you're now root on the box").
 #
 # Does NOT git-clone the repo. DEPLOY.md's whole design is "prebuilt images,
-# nothing built on the server" — the server only ever needs docker-compose.
+# nothing built on the server" - the server only ever needs docker-compose.
 # pull.yml (to know what to run) and the deploy/ scripts (operational
 # tooling), never the application source. Fetches just those few files
 # directly from GitHub instead, which also sidesteps needing git installed
-# or git credentials at all — a full clone of a private repo would
+# or git credentials at all - a full clone of a private repo would
 # otherwise prompt for a username/password it has no way to answer
 # non-interactively.
 #
 # Idempotent: safe to re-run. .env is only ever created, never overwritten
 # (regenerating its secrets against an already-initialized mysql/minio
 # volume would lock the app out of its own data). The fetched config files
-# (docker-compose.pull.yml, deploy/*.sh) are only fetched if missing too —
+# (docker-compose.pull.yml, deploy/*.sh) are only fetched if missing too -
 # lets you scp them over yourself instead of dealing with a GitHub token
 # for a private repo, and means re-running this script never clobbers a
 # local edit to one of them. Delete a file first to have this pull a fresh
@@ -29,7 +29,7 @@
 #   ./deploy/auto-deploy.sh --domain shop.example.com --email you@example.com
 #
 # Optional flags:
-#   --repo URL           GitHub repo (default: this project's origin) —
+#   --repo URL           GitHub repo (default: this project's origin) -
 #                         only used to derive owner/name, never cloned
 #   --branch NAME         Branch to fetch files from (default: main)
 #   --github-token TOKEN  Needed only if --repo is private (or set the
@@ -40,13 +40,13 @@
 #   --dir PATH            Install directory (default: /opt/cosplay-portfolio)
 #   --admin-email EMAIL   Seller's own address, cc'd on every new order
 #   --shop-name NAME      Shown in email subjects/templates (default: Shop)
-#   --skip-tls            Stop after Bước 8 (migrations) — no host Nginx/certbot/
+#   --skip-tls            Stop after Bước 8 (migrations) - no host Nginx/certbot/
 #                          firewall. Use when DNS isn't pointed at this droplet
 #                          yet, or you're testing the app-layer steps only.
 #   --skip-firewall       Configure TLS but leave ufw alone (e.g. a managed
 #                         firewall already handles this at the provider level).
 #
-# Remote one-liner (curl the raw script instead of fetching it first) —
+# Remote one-liner (curl the raw script instead of fetching it first) -
 # only works if THIS script itself is reachable unauthenticated, i.e. the
 # repo is public, or you fetched this one file out-of-band already:
 #   curl -fsSL https://raw.githubusercontent.com/<you>/<repo>/main/deploy/auto-deploy.sh \
@@ -54,12 +54,12 @@
 #
 # What this script does NOT do (still manual, per DEPLOY.md):
 #   - Creating the droplet itself (Bước 1)
-#   - Pointing DNS/Cloudflare at the droplet's IP (Bước 2) — TLS issuance in
+#   - Pointing DNS/Cloudflare at the droplet's IP (Bước 2) - TLS issuance in
 #     this script WILL fail if DNS isn't already live and pointed here
-#   - Setting real SMTP credentials — .env is generated with SMTP_* blank;
+#   - Setting real SMTP credentials - .env is generated with SMTP_* blank;
 #     without them, order confirmation emails silently no-op (sender.js)
 #   - Scheduling deploy/backup.sh in cron (see DEPLOY.md's Database Backups
-#     section) — printed as a reminder at the end, not done automatically,
+#     section) - printed as a reminder at the end, not done automatically,
 #     since editing another root crontab from a script is easy to get wrong
 #     (duplicate entries on re-run, clobbering unrelated existing cron jobs)
 set -euo pipefail
@@ -111,7 +111,7 @@ REPO_SLUG="${REPO_URL#https://github.com/}"
 REPO_SLUG="${REPO_SLUG%.git}"
 
 # ── Bước 4: Docker (+ openssl, the one other prerequisite a stock cloud
-# image may or may not already have. No git needed — see the file header:
+# image may or may not already have. No git needed - see the file header:
 # this script fetches individual files over HTTPS, never clones. curl
 # itself is the one thing that CAN'T be bootstrapped this way: it's what
 # fetches this script in the one-liner form, so it must already exist for
@@ -142,13 +142,13 @@ else
   log "Docker Compose plugin already installed ($(docker compose version)), skipping."
 fi
 
-# ── Bước 5: Fetch just the deploy-time files (no git clone — see header) ─
+# ── Bước 5: Fetch just the deploy-time files (no git clone - see header) ─
 mkdir -p "$INSTALL_DIR/deploy"
 cd "$INSTALL_DIR"
 
 fetch_file() {
   # $1 = path within the repo, relative to its root. Skips anything already
-  # present — lets you sidestep GitHub entirely for a private repo by
+  # present - lets you sidestep GitHub entirely for a private repo by
   # scp'ing docker-compose.pull.yml + deploy/*.sh over yourself first (no
   # --github-token needed then). Delete a file first if you want this run
   # to pull a fresh copy instead of keeping what's already there.
@@ -160,7 +160,7 @@ fetch_file() {
   local auth_header=()
   [ -n "$GITHUB_TOKEN" ] && auth_header=(-H "Authorization: token ${GITHUB_TOKEN}")
   curl -fsSL "${auth_header[@]}" "$url" -o "$1" \
-    || die "Could not fetch $1 from $REPO_SLUG@$BRANCH. If this repo is private, pass --github-token (or set \$GITHUB_TOKEN) with a read-only PAT — or scp $1 to $INSTALL_DIR/$1 yourself and re-run."
+    || die "Could not fetch $1 from $REPO_SLUG@$BRANCH. If this repo is private, pass --github-token (or set \$GITHUB_TOKEN) with a read-only PAT - or scp $1 to $INSTALL_DIR/$1 yourself and re-run."
 }
 
 log "Fetching deploy config from $REPO_SLUG@$BRANCH (docker-compose.pull.yml + deploy/*.sh)..."
@@ -170,10 +170,10 @@ fetch_file deploy/restore.sh
 fetch_file deploy/migrate-data.sh
 chmod +x deploy/*.sh
 
-[ -f docker-compose.pull.yml ] || die "docker-compose.pull.yml not found in $INSTALL_DIR after fetch — wrong --repo/--branch?"
+[ -f docker-compose.pull.yml ] || die "docker-compose.pull.yml not found in $INSTALL_DIR after fetch - wrong --repo/--branch?"
 
 # ── Bước 6: .env with generated secrets ──────────────────────────────────
-# Only ever created, never overwritten — regenerating DB_PASS/MinIO creds
+# Only ever created, never overwritten - regenerating DB_PASS/MinIO creds
 # against an already-initialized mysql/minio volume would lock the app out
 # of its own data. Re-running this script against a live deployment must be
 # safe, which is the whole point of checking first.
@@ -189,7 +189,7 @@ else
   ADMIN_PASS_GEN="$(openssl rand -base64 16)"
 
   cat > .env <<EOF
-# Generated by deploy/auto-deploy.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ) — back these up.
+# Generated by deploy/auto-deploy.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ) - back these up.
 DB_HOST=mysql
 DB_USER=root
 DB_PASS=${DB_PASS_GEN}
@@ -206,7 +206,7 @@ JWT_SECRET=${JWT_SECRET_GEN}
 ADMIN_USERNAME=${ADMIN_USER_GEN}
 ADMIN_PASSWORD=${ADMIN_PASS_GEN}
 
-# Left blank — order confirmation emails silently no-op until these are set
+# Left blank - order confirmation emails silently no-op until these are set
 # (see backend/shop/email/sender.js). Fill in and run
 # 'docker compose -f docker-compose.pull.yml up -d backend worker' to apply.
 SMTP_HOST=
@@ -219,12 +219,12 @@ SITE_URL=https://${DOMAIN:-your-domain.com}
 SHOP_NAME=${SHOP_NAME}
 ADMIN_EMAIL=${ADMIN_EMAIL}
 
-# Optional — street-address autocomplete at checkout. Blank is fine.
+# Optional - street-address autocomplete at checkout. Blank is fine.
 GOONG_API_KEY=
 EOF
   chmod 600 .env
 
-  log "Generated secrets (SAVE THESE — shown only this once):"
+  log "Generated secrets (SAVE THESE - shown only this once):"
   echo "  ADMIN_USERNAME=${ADMIN_USER_GEN}"
   echo "  ADMIN_PASSWORD=${ADMIN_PASS_GEN}"
   echo "  DB_PASS=${DB_PASS_GEN}"
@@ -240,7 +240,7 @@ docker compose -f docker-compose.pull.yml up -d
 
 # ── Bước 8: Migrations ────────────────────────────────────────────────────
 # The backend container has no explicit healthcheck of its own (only mysql
-# does, which backend's depends_on already waits on) — it can still take a
+# does, which backend's depends_on already waits on) - it can still take a
 # few seconds to finish booting after that. Retry rather than racing it.
 log "Running database migrations..."
 MIGRATE_OK=0
@@ -251,7 +251,7 @@ for _ in $(seq 1 12); do
   fi
   sleep 5
 done
-[ "$MIGRATE_OK" -eq 1 ] || die "Migrations failed after 60s of retries — check: docker compose -f docker-compose.pull.yml logs backend"
+[ "$MIGRATE_OK" -eq 1 ] || die "Migrations failed after 60s of retries - check: docker compose -f docker-compose.pull.yml logs backend"
 
 log "Stack is up. docker compose -f docker-compose.pull.yml ps:"
 docker compose -f docker-compose.pull.yml ps
@@ -293,7 +293,7 @@ nginx -t
 systemctl reload nginx
 
 log "Requesting Let's Encrypt certificate for ${DOMAIN} and www.${DOMAIN}..."
-log "(This fails if DNS isn't already pointed at this droplet's IP — see DEPLOY.md Bước 2.)"
+log "(This fails if DNS isn't already pointed at this droplet's IP - see DEPLOY.md Bước 2.)"
 certbot --nginx \
   -d "$DOMAIN" -d "www.$DOMAIN" \
   --non-interactive --agree-tos -m "$CERTBOT_EMAIL" \

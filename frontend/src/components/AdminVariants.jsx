@@ -41,7 +41,7 @@ export default function AdminVariants({ product, onSaved }) {
   const addRow = () => setRows([...rows, { label: "", stock_qty: "", images: [] }])
   const removeRow = (i) => setRows(rows.filter((_, idx) => idx !== i))
 
-  // Row order IS sort_order — save() sends `rows` in array order and
+  // Row order IS sort_order - save() sends `rows` in array order and
   // catalogRepo.replaceVariants derives sort_order from each entry's index,
   // so moving a row here is the entire reorder feature; nothing else needed.
   const moveRow = (i, dir) => {
@@ -52,7 +52,7 @@ export default function AdminVariants({ product, onSaved }) {
     setRows(next)
   }
 
-  // Drag-and-drop reorders `rows` by index, same as moveRow — nothing is
+  // Drag-and-drop reorders `rows` by index, same as moveRow - nothing is
   // persisted until "Lưu phân loại" is pressed, matching the up/down arrows.
   const handleDragStart = (e, i) => {
     setDraggedIdx(i)
@@ -83,7 +83,7 @@ export default function AdminVariants({ product, onSaved }) {
   // One image per variant code: filename (minus extension) becomes the
   // label, so a seller can select a whole folder of "A1.png, A2.png..."
   // photocards at once instead of adding rows one at a time. Uploaded rows
-  // land in the review list alongside existing ones — nothing is saved
+  // land in the review list alongside existing ones - nothing is saved
   // until the seller presses "Lưu phân loại", so this is a staging step,
   // not an immediate write.
   const batchUpload = async (files) => {
@@ -112,10 +112,10 @@ export default function AdminVariants({ product, onSaved }) {
   }
 
   // Each row's photo is uploaded on pick (same pattern as AdminProducts),
-  // rather than deferred to save time — a photocard sheet is entered one
+  // rather than deferred to save time - a photocard sheet is entered one
   // row at a time and the seller needs to see each thumbnail land before
   // moving to the next code. Most rows carry exactly one photo, but a row
-  // can hold several (e.g. a preview sheet plus a close-up) — new uploads
+  // can hold several (e.g. a preview sheet plus a close-up) - new uploads
   // append to that row's gallery instead of replacing it.
   const pickImages = async (i, files) => {
     setError("")
@@ -143,7 +143,7 @@ export default function AdminVariants({ product, onSaved }) {
     )))
   }
 
-  // Separate from `images` (the variant's own photo gallery) — never shown
+  // Separate from `images` (the variant's own photo gallery) - never shown
   // as one of the variant's pictures, only as the cover in the picker grid.
   const pickThumbnail = async (i, file) => {
     setError("")
@@ -340,7 +340,7 @@ export default function AdminVariants({ product, onSaved }) {
                   />
                 </label>
                 <span className="self-center opacity-50">
-                  (Thumbnail tuỳ chọn — nếu bỏ trống, dùng ảnh sản phẩm đầu tiên)
+                  (Thumbnail tuỳ chọn - nếu bỏ trống, dùng ảnh sản phẩm đầu tiên)
                 </span>
               </div>
 
@@ -381,7 +381,7 @@ export default function AdminVariants({ product, onSaved }) {
               <textarea
                 value={r.description || ""}
                 onChange={(e) => update(i, "description", e.target.value)}
-                placeholder="Mô tả riêng cho phân loại này (markdown, tùy chọn — ví dụ: bảng size)"
+                placeholder="Mô tả riêng cho phân loại này (markdown, tùy chọn - ví dụ: bảng size)"
                 rows={2}
                 className="w-full px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
               />

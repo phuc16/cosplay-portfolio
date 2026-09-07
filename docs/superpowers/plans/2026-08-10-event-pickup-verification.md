@@ -4,20 +4,20 @@
 
 **Goal:** Give every pickup order a short offline-verifiable pickup code (shown to the buyer, printed on the existing roster), let staff batch-mark orders completed after the event once connectivity returns, and restrict COD to ship orders only (checkout UI + server validation).
 
-**Architecture:** One migration adds `orders.pickup_code`; `domain.generatePickupCode()` generates it; `orderRepo.createOrder` stores it for pickup orders only. It flows out through the existing public-order allowlist, the existing pickup confirmation email, and the existing printable roster — no new endpoints for any of that. A new `POST /admin/orders/bulk-complete` route and matching "Hoàn tất đã chọn" button mirror the existing bulk-cancel feature exactly. COD-for-pickup is rejected in `Checkout.jsx`'s method list and `routes/orders.js`'s `validate()`.
+**Architecture:** One migration adds `orders.pickup_code`; `domain.generatePickupCode()` generates it; `orderRepo.createOrder` stores it for pickup orders only. It flows out through the existing public-order allowlist, the existing pickup confirmation email, and the existing printable roster - no new endpoints for any of that. A new `POST /admin/orders/bulk-complete` route and matching "Hoàn tất đã chọn" button mirror the existing bulk-cancel feature exactly. COD-for-pickup is rejected in `Checkout.jsx`'s method list and `routes/orders.js`'s `validate()`.
 
 **Tech Stack:** Backend CommonJS + Vitest 3 ESM test imports, Knex migrations, raw mysql2 via `backend/db.js`. Frontend React 18 + Vitest 3, `createRoot`/`act` component-test pattern (no Testing Library).
 
-**Spec:** `docs/superpowers/specs/2026-08-10-event-pickup-verification-design.md` — read it before touching this plan; every decision below traces back to it.
+**Spec:** `docs/superpowers/specs/2026-08-10-event-pickup-verification-design.md` - read it before touching this plan; every decision below traces back to it.
 
 ## Global Constraints
 
-- `pickup_code` is **never** an alternative authentication credential — no route may accept it in place of `order_token` to look up or mutate an order. It exists only for a human to visually compare against the printed roster.
+- `pickup_code` is **never** an alternative authentication credential - no route may accept it in place of `order_token` to look up or mutate an order. It exists only for a human to visually compare against the printed roster.
 - `pickup_code` is `null` for every `ship` order; only ever set for `pickup` orders.
 - Backend implementation files stay CommonJS (`require`/`module.exports`); backend test files use Vitest 3 ESM `import` (Vitest 3 refuses `require("vitest")`).
 - Bulk-complete mirrors bulk-cancel's exact shape: same per-order error containment (one order's failure never aborts the batch), same request/response contract style, same `100`-item cap.
 - Commits: Conventional Commits, descriptive bodies, **no `Co-Authored-By` trailer**.
-- Test commands: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test` (**595 passing** before this plan starts) and `cd frontend && npm test && npm run build && npm run lint` (**218 passing**, lint has exactly 3 pre-existing problems in `Portfolio.jsx`/`AdminAlbumImages.jsx` — not this plan's problem, do not fix or add a fourth).
+- Test commands: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test` (**595 passing** before this plan starts) and `cd frontend && npm test && npm run build && npm run lint` (**218 passing**, lint has exactly 3 pre-existing problems in `Portfolio.jsx`/`AdminAlbumImages.jsx` - not this plan's problem, do not fix or add a fourth).
 
 ---
 
@@ -31,7 +31,7 @@
 - Test: `backend/tests/orderRepo.test.js`
 
 **Interfaces:**
-- Produces: `domain.generatePickupCode(): string` — a 6-character all-digit string. `orders.pickup_code` column (nullable string(6)).
+- Produces: `domain.generatePickupCode(): string` - a 6-character all-digit string. `orders.pickup_code` column (nullable string(6)).
 - Consumed by: Task 2 (public order response), Task 3 (roster), Task 4 (email).
 
 - [ ] **Step 1: Write the failing test for `generatePickupCode`**
@@ -54,7 +54,7 @@ describe("generatePickupCode", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/orderDomain.test.js`
-Expected: FAIL — `d.generatePickupCode` is not a function.
+Expected: FAIL - `d.generatePickupCode` is not a function.
 
 - [ ] **Step 3: Implement `generatePickupCode`**
 
@@ -66,7 +66,7 @@ In `backend/shop/orders/domain.js`, after `generateOrderToken`:
  * to read aloud or match by eye against the printed pickup roster when
  * event-venue connectivity is too weak for the QR-scan flow (which needs a
  * live full order-list fetch). Unlike order_token, this is never accepted
- * as a credential anywhere — it only ever gets compared visually.
+ * as a credential anywhere - it only ever gets compared visually.
  */
 function generatePickupCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0")
@@ -128,7 +128,7 @@ describe("createOrder: pickup_code", () => {
 - [ ] **Step 7: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/orderRepo.test.js`
-Expected: FAIL — `pickup_code` is never inserted, so both new assertions fail (`row.pickup_code` is `undefined`/not matching).
+Expected: FAIL - `pickup_code` is never inserted, so both new assertions fail (`row.pickup_code` is `undefined`/not matching).
 
 - [ ] **Step 8: Implement**
 
@@ -204,7 +204,7 @@ Replace with:
     )
 ```
 
-No other line in `orderRepo.js` changes — `getOrderById`/`getOrderByToken` already `SELECT *` (or `SELECT o.*, ...`), so `pickup_code` reaches every read path automatically without further edits here.
+No other line in `orderRepo.js` changes - `getOrderById`/`getOrderByToken` already `SELECT *` (or `SELECT o.*, ...`), so `pickup_code` reaches every read path automatically without further edits here.
 
 - [ ] **Step 9: Run to verify it passes**
 
@@ -290,7 +290,7 @@ And inside `describe("GET /api/orders/:token", ...)`:
 - [ ] **Step 2: Run to verify the new tests fail**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/orderRoutes.test.js`
-Expected: FAIL — COD+pickup is currently accepted (201, not 400); `pickup_code` is absent from the response (`undefined`, not matching `/^\d{6}$/` or `null`).
+Expected: FAIL - COD+pickup is currently accepted (201, not 400); `pickup_code` is absent from the response (`undefined`, not matching `/^\d{6}$/` or `null`).
 
 - [ ] **Step 3: Implement**
 
@@ -303,7 +303,7 @@ function toPublicOrder(order) {
     // Spec (Fulfillment): pickup location/note must be shown on the order
     // page, not just the pre-purchase collection browse page. Sourced from
     // the order's own collection (joined in getOrderByToken), same content
-    // that is already public on the collection page — no new exposure.
+    // that is already public on the collection page - no new exposure.
     pickup_location, pickup_note,
     // Spec (Buyer Onboarding, Phase 6): the payment deadline the reservation
     // and the expiry sweep already enforce, but never told to the buyer
@@ -327,7 +327,7 @@ function toPublicOrder(order) {
     // Spec (Fulfillment): pickup location/note must be shown on the order
     // page, not just the pre-purchase collection browse page. Sourced from
     // the order's own collection (joined in getOrderByToken), same content
-    // that is already public on the collection page — no new exposure.
+    // that is already public on the collection page - no new exposure.
     pickup_location, pickup_note,
     // Spec (Buyer Onboarding, Phase 6): the payment deadline the reservation
     // and the expiry sweep already enforce, but never told to the buyer
@@ -358,7 +358,7 @@ Replace with:
 ```js
   if (!FULFILLMENT.includes(fulfillment_method)) return "Hình thức nhận hàng không hợp lệ"
   if (!PAYMENT_METHODS.includes(payment_method)) return "Phương thức thanh toán không hợp lệ"
-  // Pickup orders require prepayment — COD only applies when there is a
+  // Pickup orders require prepayment - COD only applies when there is a
   // delivery to collect cash at. A crafted request could otherwise bypass
   // the checkout UI's own filter (added alongside this).
   if (payment_method === "cod" && fulfillment_method === "pickup") {
@@ -414,7 +414,7 @@ EOF
 In `backend/tests/roster.test.js`, add a new `describe` block (using the file's existing `order()` fixture):
 
 ```js
-describe("buildRoster — pickup_code", () => {
+describe("buildRoster - pickup_code", () => {
   it("includes pickup_code on every row", () => {
     const { rows } = buildRoster([order({ pickup_code: "482913" })])
     expect(rows[0].pickup_code).toBe("482913")
@@ -425,7 +425,7 @@ describe("buildRoster — pickup_code", () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/roster.test.js`
-Expected: FAIL — `rows[0].pickup_code` is `undefined`.
+Expected: FAIL - `rows[0].pickup_code` is `undefined`.
 
 - [ ] **Step 3: Implement in `roster.js`**
 
@@ -487,7 +487,7 @@ In `backend/tests/adminShippingRoster.test.js`, add inside `describe("GET /api/a
 - [ ] **Step 6: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/adminShippingRoster.test.js`
-Expected: FAIL — `row.pickup_code` is `undefined` (the route's SELECT doesn't fetch the column yet).
+Expected: FAIL - `row.pickup_code` is `undefined` (the route's SELECT doesn't fetch the column yet).
 
 - [ ] **Step 7: Implement in `adminShipping.js`**
 
@@ -513,7 +513,7 @@ Replace with:
       )
 ```
 
-`order_token` remains deliberately absent from this SELECT — do not add it. `pickup_code` is intentionally added: it is narrow, non-bearer, and meant to be printed, per the file's existing comment about this document being carried around a public event.
+`order_token` remains deliberately absent from this SELECT - do not add it. `pickup_code` is intentionally added: it is narrow, non-bearer, and meant to be printed, per the file's existing comment about this document being carried around a public event.
 
 - [ ] **Step 8: Run to verify it passes**
 
@@ -570,12 +570,12 @@ In `backend/tests/sender.test.js`, add inside `describe("sendQueued: pickup QR g
   })
 ```
 
-(If `db` is not already imported in this test file, check its existing imports first — it very likely already is, since other tests in this suite query the database directly; use the same import it already uses rather than adding a second one.)
+(If `db` is not already imported in this test file, check its existing imports first - it very likely already is, since other tests in this suite query the database directly; use the same import it already uses rather than adding a second one.)
 
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/sender.test.js`
-Expected: FAIL — the email HTML does not contain the pickup code yet.
+Expected: FAIL - the email HTML does not contain the pickup code yet.
 
 - [ ] **Step 3: Implement**
 
@@ -651,7 +651,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `repo.transitionOrder` (existing), `repo.getOrderById` (existing).
-- Produces: `POST /api/admin/orders/bulk-complete` — same request/response shape as `bulk-cancel` (`{ ids: number[] }` → `{ results: [{ id, ok, error?, message? }] }`), transitioning each to `"completed"` instead of `"cancelled"`.
+- Produces: `POST /api/admin/orders/bulk-complete` - same request/response shape as `bulk-cancel` (`{ ids: number[] }` → `{ results: [{ id, ok, error?, message? }] }`), transitioning each to `"completed"` instead of `"cancelled"`.
 - Consumed by: Task 6 (`adminBulkCompleteOrders` API call + button).
 
 This lets staff who verified buyers offline via the roster (Task 3) batch-apply the actual `completed` status once connectivity returns, instead of clicking "Hoàn tất" on each order individually.
@@ -730,7 +730,7 @@ describe("POST /api/admin/orders/bulk-complete", () => {
 - [ ] **Step 2: Run to verify the new tests fail**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/adminOrderRoutes.test.js`
-Expected: FAIL — `POST /api/admin/orders/bulk-complete` does not exist (404s), so every test in the new block fails.
+Expected: FAIL - `POST /api/admin/orders/bulk-complete` does not exist (404s), so every test in the new block fails.
 
 - [ ] **Step 3: Implement**
 
@@ -748,17 +748,17 @@ Replace with:
 ```js
 // A griefed drop is at most a few dozen orders; this is generous headroom
 // while still bounding how many DB transactions + email enqueues one request
-// can trigger. Shared by bulk-cancel and bulk-complete — same reasoning
+// can trigger. Shared by bulk-cancel and bulk-complete - same reasoning
 // applies to both.
 const BULK_ACTION_MAX = 100
 ```
 
-Find every remaining use of `BULK_CANCEL_MAX` inside the existing `bulk-cancel` route and rename it to `BULK_ACTION_MAX` (two occurrences: the length check and the error message's `${BULK_CANCEL_MAX}` interpolation) — the bulk-cancel route's behavior is otherwise completely unchanged, only the constant's name.
+Find every remaining use of `BULK_CANCEL_MAX` inside the existing `bulk-cancel` route and rename it to `BULK_ACTION_MAX` (two occurrences: the length check and the error message's `${BULK_CANCEL_MAX}` interpolation) - the bulk-cancel route's behavior is otherwise completely unchanged, only the constant's name.
 
 After the entire existing `router.post("/orders/bulk-cancel", ...)` block (i.e. after its closing `})`), add:
 
 ```js
-  // Bulk complete — lets staff who verified pickup buyers offline (via the
+  // Bulk complete - lets staff who verified pickup buyers offline (via the
   // printed roster's pickup_code, when event-venue connectivity was too weak
   // for the live QR-scan flow) batch-apply the completed status once
   // connectivity returns, instead of one order at a time. Mirrors
@@ -813,7 +813,7 @@ After the entire existing `router.post("/orders/bulk-cancel", ...)` block (i.e. 
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npx vitest run tests/adminOrderRoutes.test.js`
-Expected: PASS, all tests in the file including the 6 new ones (bulk-cancel's own tests must still pass unchanged — confirms the `BULK_CANCEL_MAX` → `BULK_ACTION_MAX` rename didn't break it).
+Expected: PASS, all tests in the file including the 6 new ones (bulk-cancel's own tests must still pass unchanged - confirms the `BULK_CANCEL_MAX` → `BULK_ACTION_MAX` rename didn't break it).
 
 - [ ] **Step 5: Run the full backend suite**
 
@@ -873,7 +873,7 @@ export const adminBulkCompleteOrders = (ids) =>
 In `frontend/src/components/AdminOrders.test.jsx`, find how `adminBulkCancelOrders` is mocked at the top of the file (via `vi.mock("../api/shop", ...)`) and add `adminBulkCompleteOrders` to the same mock object, following the exact same pattern used for `adminBulkCancelOrders`. Then add a new `describe` block, using this file's existing `order()` fixture and `renderAdminOrders()` helper:
 
 ```js
-describe("AdminOrders — bulk complete (Event Pickup Verification plan)", () => {
+describe("AdminOrders - bulk complete (Event Pickup Verification plan)", () => {
   it("renders a bulk-complete button beside bulk-cancel, disabled with nothing selected", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     const container = await renderAdminOrders()
@@ -910,12 +910,12 @@ describe("AdminOrders — bulk complete (Event Pickup Verification plan)", () =>
 })
 ```
 
-Read the file's existing bulk-cancel tests first to confirm the exact mock-setup and helper names (`adminListOrders`, `renderAdminOrders`, `order()`, `act`) before writing these — reuse them, do not invent new ones.
+Read the file's existing bulk-cancel tests first to confirm the exact mock-setup and helper names (`adminListOrders`, `renderAdminOrders`, `order()`, `act`) before writing these - reuse them, do not invent new ones.
 
 - [ ] **Step 3: Run to verify the new tests fail**
 
 Run: `cd frontend && npm test -- AdminOrders`
-Expected: FAIL — no "Hoàn tất đã chọn" button exists yet, `adminBulkCompleteOrders` mock is never called.
+Expected: FAIL - no "Hoàn tất đã chọn" button exists yet, `adminBulkCompleteOrders` mock is never called.
 
 - [ ] **Step 4: Implement**
 
@@ -942,14 +942,14 @@ Find `bulkCancel`:
 ```js
   const bulkCancel = async () => {
     if (selected.size === 0) return
-    if (!confirm(`Hủy ${selected.size} đơn đã chọn? Thao tác này không thể hoàn tác — kho sẽ được hoàn lại cho những đơn hủy thành công.`)) {
+    if (!confirm(`Hủy ${selected.size} đơn đã chọn? Thao tác này không thể hoàn tác - kho sẽ được hoàn lại cho những đơn hủy thành công.`)) {
       return
     }
 
     setBulkBusy(true)
     setBulkResults(null)
     try {
-      // A 200 here only means the request was well-formed — each order's own
+      // A 200 here only means the request was well-formed - each order's own
       // ok/error must be read individually; some may fail (e.g. an order
       // that was already completed cannot legally move to cancelled).
       const { results } = await adminBulkCancelOrders([...selected])
@@ -969,14 +969,14 @@ Replace with (adds `bulkComplete` right after it, following the exact same shape
 ```js
   const bulkCancel = async () => {
     if (selected.size === 0) return
-    if (!confirm(`Hủy ${selected.size} đơn đã chọn? Thao tác này không thể hoàn tác — kho sẽ được hoàn lại cho những đơn hủy thành công.`)) {
+    if (!confirm(`Hủy ${selected.size} đơn đã chọn? Thao tác này không thể hoàn tác - kho sẽ được hoàn lại cho những đơn hủy thành công.`)) {
       return
     }
 
     setBulkBusy(true)
     setBulkResults(null)
     try {
-      // A 200 here only means the request was well-formed — each order's own
+      // A 200 here only means the request was well-formed - each order's own
       // ok/error must be read individually; some may fail (e.g. an order
       // that was already completed cannot legally move to cancelled).
       const { results } = await adminBulkCancelOrders([...selected])
@@ -993,7 +993,7 @@ Replace with (adds `bulkComplete` right after it, following the exact same shape
   // For staff who verified pickup buyers offline via the printed roster's
   // pickup_code (weak event-venue connectivity), applying the actual
   // completed status can happen later, in one batch, instead of one order
-  // at a time. Same shape as bulkCancel — a 200 only means the request was
+  // at a time. Same shape as bulkCancel - a 200 only means the request was
   // well-formed, each order's own ok/error must be read individually.
   const bulkComplete = async () => {
     if (selected.size === 0) return
@@ -1035,7 +1035,7 @@ Replace with:
           </button>
 ```
 
-`bulkResults`/`failedBulkResults` rendering below is already generic (keyed on `bulkResults`, not on which action produced them) — it needs no change to display either action's results correctly.
+`bulkResults`/`failedBulkResults` rendering below is already generic (keyed on `bulkResults`, not on which action produced them) - it needs no change to display either action's results correctly.
 
 - [ ] **Step 5: Run to verify it passes**
 
@@ -1109,7 +1109,7 @@ Replace with:
 In `frontend/src/pages/Order.test.jsx`, add a new `describe` block (using the file's existing `baseOrder()`/`renderOrder()` helpers):
 
 ```js
-describe("Order — pickup code (Event Pickup Verification plan)", () => {
+describe("Order - pickup code (Event Pickup Verification plan)", () => {
   it("shows the pickup code for a pickup order", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", pickup_code: "482913" }))
     const container = await renderOrder()
@@ -1127,7 +1127,7 @@ describe("Order — pickup code (Event Pickup Verification plan)", () => {
 - [ ] **Step 3: Run to verify the new tests fail**
 
 Run: `cd frontend && npm test -- Order.test`
-Expected: FAIL — the pickup code isn't rendered anywhere yet.
+Expected: FAIL - the pickup code isn't rendered anywhere yet.
 
 - [ ] **Step 4: Implement**
 
@@ -1199,14 +1199,14 @@ EOF
 - Test: `frontend/src/pages/Checkout.test.jsx`
 
 **Interfaces:**
-- Consumes: nothing new — operates on the existing `methods` (from `fetchPaymentMethods()`) and `fulfillment` state already in this component.
+- Consumes: nothing new - operates on the existing `methods` (from `fetchPaymentMethods()`) and `fulfillment` state already in this component.
 
 - [ ] **Step 1: Write the failing tests**
 
 In `frontend/src/pages/Checkout.test.jsx`, add a new `describe` block (using the file's existing `seedCart()`/`renderCheckout()` helpers and mocks):
 
 ```js
-describe("Checkout — COD restricted to ship orders (Event Pickup Verification plan)", () => {
+describe("Checkout - COD restricted to ship orders (Event Pickup Verification plan)", () => {
   it("hides COD from the payment picker when pickup is selected", async () => {
     seedCart()
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
@@ -1251,12 +1251,12 @@ describe("Checkout — COD restricted to ship orders (Event Pickup Verification 
 })
 ```
 
-Import `act` from `"react"` at the top of the file if it isn't already imported there — check first, this project's other test files (`Order.test.jsx`, `AdminOrders.test.jsx`) already do this the same way.
+Import `act` from `"react"` at the top of the file if it isn't already imported there - check first, this project's other test files (`Order.test.jsx`, `AdminOrders.test.jsx`) already do this the same way.
 
 - [ ] **Step 2: Run to verify the new tests fail**
 
 Run: `cd frontend && npm test -- Checkout`
-Expected: FAIL — COD still appears in the pickup case; switching to pickup does not reset an existing `cod` selection.
+Expected: FAIL - COD still appears in the pickup case; switching to pickup does not reset an existing `cod` selection.
 
 - [ ] **Step 3: Implement**
 
@@ -1297,7 +1297,7 @@ Replace with:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flags.loaded, offered])
 
-  // COD requires a delivery to collect cash at — it does not apply to an
+  // COD requires a delivery to collect cash at - it does not apply to an
   // event pickup, which requires prepayment. The server rejects this
   // combination too (routes/orders.js validate()); this is the UI half.
   const offeredPayment = useMemo(
@@ -1341,7 +1341,7 @@ Replace with:
         )}
 ```
 
-The submit button's `disabled={submitting || !methods || methods.length === 0}` is intentionally left reading `methods` (whether the *seller* has any method enabled at all), not `offeredPayment` — a pickup-only collection where the seller has only enabled COD is a real "cannot check out" state already surfaced by `offeredPayment` being empty and `payment` resetting to `""`, which the existing submit call already can't succeed with (an empty `payment_method` fails `validate()` server-side); no separate disabled-state wiring is needed for this task's scope.
+The submit button's `disabled={submitting || !methods || methods.length === 0}` is intentionally left reading `methods` (whether the *seller* has any method enabled at all), not `offeredPayment` - a pickup-only collection where the seller has only enabled COD is a real "cannot check out" state already surfaced by `offeredPayment` being empty and `payment` resetting to `""`, which the existing submit call already can't succeed with (an empty `payment_method` fails `validate()` server-side); no separate disabled-state wiring is needed for this task's scope.
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -1355,7 +1355,7 @@ cd frontend && npm test && npm run build && npm run lint
 cd backend && DB_PORT=3307 DB_PASS=root REDIS_PORT=6380 npm test
 ```
 
-Expected: frontend suite passes with no new lint problems beyond the 3 pre-existing ones; backend suite passes at Task 7's count with **zero** files changed under `backend/` in this task's diff — this task touches only `Checkout.jsx` and its test.
+Expected: frontend suite passes with no new lint problems beyond the 3 pre-existing ones; backend suite passes at Task 7's count with **zero** files changed under `backend/` in this task's diff - this task touches only `Checkout.jsx` and its test.
 
 - [ ] **Step 6: Commit**
 
@@ -1364,7 +1364,7 @@ git add frontend/src/pages/Checkout.jsx frontend/src/pages/Checkout.test.jsx
 git commit -F - <<'EOF'
 feat(shop): hide COD from checkout when pickup is selected
 
-COD requires a delivery to collect cash at — it doesn't apply to an
+COD requires a delivery to collect cash at - it doesn't apply to an
 event pickup, which requires prepayment. The payment picker now filters
 it out whenever fulfillment is "pickup", and resets away from cod if
 the buyer had it selected before switching fulfillment methods. Server
@@ -1376,7 +1376,7 @@ EOF
 
 ---
 
-## Out of Scope (carried from the spec — do not implement)
+## Out of Scope (carried from the spec - do not implement)
 
 - SMS delivery of the pickup code.
 - True offline database writes (service-worker-queued completions).

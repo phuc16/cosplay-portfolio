@@ -105,7 +105,7 @@ describe("ShippingRoster", () => {
     const paidRow = rows[0]
     const codRow = rows[1]
     expect(paidRow.textContent).toContain("Đã thanh toán")
-    expect(paidRow.textContent).toContain("—")
+    expect(paidRow.textContent).toContain("-")
     expect(paidRow.textContent).not.toContain("75.000₫")
     expect(codRow.textContent).toContain("Thu khi giao")
     expect(codRow.textContent).toContain("75.000₫")
@@ -160,7 +160,7 @@ describe("ShippingRoster", () => {
 
     const detail = container.querySelector('[data-testid="order-detail-1"]')
     // Its own full-width row below the order row, not crammed into the
-    // narrow "Sản phẩm" cell — collapsed by default on screen, but the print
+    // narrow "Sản phẩm" cell - collapsed by default on screen, but the print
     // override keeps it in the DOM and visible when the page is printed.
     expect(detail.className).toContain("hidden")
     expect(detail.className).toContain("print:table-row")

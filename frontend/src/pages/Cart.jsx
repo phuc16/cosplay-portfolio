@@ -31,7 +31,7 @@ export default function Cart() {
   }
 
   // Recomputed from the current cart on every render (not pruned on
-  // removal) — removing the one bad line already makes it disappear here
+  // removal) - removing the one bad line already makes it disappear here
   // for free, no re-fetch needed.
   const activeProblems = cart.filter((c) => problems.has(c.variant_id))
   const hasProblems = checking || activeProblems.length > 0
