@@ -78,6 +78,19 @@ describe("shipping_fee_note", () => {
   })
 })
 
+describe("payment_note", () => {
+  it("does not appear in order_placed — the transfer instructions/QR already carry it, a second copy in the pending-payment email read strangely out of context", () => {
+    const orderWithNote = { ...order, payment_note: "chuc be Tai hay an mau lon" }
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(orderWithNote))
+    expect(out.html).not.toContain("chuc be Tai hay an mau lon")
+  })
+
+  it("is still computed by buildVars, for a custom admin-edited template to opt back in", () => {
+    const orderWithNote = { ...order, payment_note: "chuc be Tai hay an mau lon" }
+    expect(t.buildVars(orderWithNote).payment_note).toBe("chuc be Tai hay an mau lon")
+  })
+})
+
 describe("prep_note", () => {
   it("says the item will be shipped for a ship order", () => {
     const out = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_confirmed, t.buildVars(order))

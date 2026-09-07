@@ -181,8 +181,7 @@ const DEFAULT_TEMPLATES = {
       <p style="margin:0 0 12px">Vui lòng chuyển khoản rồi tải ảnh chuyển khoản lên trang đơn hàng — đơn sẽ chuyển sang <strong>Chờ xác nhận</strong> ngay khi bạn gửi ảnh. Gửi nhầm ảnh cũng không sao, bạn có thể thay ảnh khác sau đó.</p>
       {{items}}
       ${TOTAL_ROW}
-      {{shipping_fee_note}}
-      <p style="font-size:13px;margin:8px 0 0">{{payment_note}}</p>`),
+      {{shipping_fee_note}}`),
   },
   payment_confirmed: {
     subject: "Đã xác nhận thanh toán đơn #{{order_id}}",
