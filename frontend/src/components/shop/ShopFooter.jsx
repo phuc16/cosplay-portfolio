@@ -23,12 +23,12 @@ export default function ShopFooter() {
 
   return (
     <footer className="border-t border-[var(--border-brand)] mt-10">
-      <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center text-sm opacity-70">
+      <div className="footer-bar max-w-5xl mx-auto px-4 py-4 flex justify-between items-center text-sm opacity-70">
         <span>© {new Date().getFullYear()} {artistName}. {lang === "vi" ? "Bảo lưu mọi quyền." : "All rights reserved."}</span>
         <span className="flex items-center gap-3">
           <span className="whitespace-nowrap">Made with ♥</span>
-          <span aria-hidden="true">·</span>
-          <button type="button" onClick={() => navigate("/admin")} className="hover:text-[var(--text-link)]">Admin</button>
+          <span className="footer-admin" aria-hidden="true">·</span>
+          <button type="button" onClick={() => navigate("/admin")} className="footer-admin hover:text-[var(--text-link)]">Admin</button>
         </span>
       </div>
     </footer>
