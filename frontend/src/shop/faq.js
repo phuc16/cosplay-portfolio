@@ -87,6 +87,26 @@ export const FAQ_ITEMS = [
   },
   {
     question: {
+      vi: "Sản phẩm số hoạt động như thế nào?",
+      en: "How do digital products work?",
+    },
+    answer: {
+      vi: "Sản phẩm số không có phí vận chuyển và không hỗ trợ thanh toán khi nhận hàng (COD) — chỉ thanh toán qua chuyển khoản ngân hàng hoặc Momo. Sau khi thanh toán được xác nhận, đường link tải sản phẩm sẽ hiện ngay trên trang đơn hàng của bạn và trong email xác nhận.",
+      en: "Digital products have no shipping fee and aren't available for cash on delivery (COD) — pay by bank transfer or Momo instead. Once payment is confirmed, the download link appears right on your order page and in the confirmation email.",
+    },
+  },
+  {
+    question: {
+      vi: "Vì sao tôi không thấy một đợt mở bán, hoặc không đặt được nữa?",
+      en: "Why can't I see a drop, or why can't I order from it anymore?",
+    },
+    answer: {
+      vi: "Một số đợt mở bán được người bán đặt lịch mở/đóng vào thời điểm cụ thể. Trước giờ mở, đợt đó sẽ chưa xuất hiện trên trang chủ. Sau khi đã đến giờ đóng, bạn vẫn xem được sản phẩm nhưng không đặt hàng được nữa — trang sẽ hiển thị rõ trạng thái này.",
+      en: "Some drops are scheduled by the seller to open and close at specific times. Before the opening time, that drop simply won't appear on the homepage yet. After the scheduled close time, you can still browse it, but ordering is closed — the page will clearly show this.",
+    },
+  },
+  {
+    question: {
       vi: "Tôi có thể hủy hoặc đổi đơn hàng không?",
       en: "Can I cancel or change my order?",
     },
