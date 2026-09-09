@@ -383,7 +383,7 @@ describe("Checkout - variant_not_found recovery", () => {
     ]))
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
     createOrder.mockRejectedValue({
-      response: { status: 409, data: { error: "variant_not_found", message: "x", variant_ids: [2] } },
+      response: { status: 409, data: { error: "variant_not_found", message: "Sản phẩm này không còn tồn tại", variant_ids: [2] } },
     })
 
     const container = await renderCheckout()
@@ -392,6 +392,10 @@ describe("Checkout - variant_not_found recovery", () => {
 
     expect(readCart()).toEqual([])
     expect(container.textContent).toContain("Your cart is empty")
+    // The buyer must still see WHY their (now-empty) cart lost its only
+    // item, not just a bare "cart is empty" as if they never added
+    // anything - the empty-cart branch previously never checked `error`.
+    expect(container.textContent).toContain("Sản phẩm này không còn tồn tại")
   })
 })
 
@@ -421,7 +425,7 @@ describe("Checkout - out_of_stock / collection_not_active recovery", () => {
     ]))
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
     createOrder.mockRejectedValue({
-      response: { status: 409, data: { error: "collection_not_active", message: "x", variant_id: 1 } },
+      response: { status: 409, data: { error: "collection_not_active", message: "Đợt mở bán đã kết thúc", variant_id: 1 } },
     })
 
     const container = await renderCheckout()
@@ -429,5 +433,6 @@ describe("Checkout - out_of_stock / collection_not_active recovery", () => {
     await act(async () => { placeOrderBtn.click() })
 
     expect(readCart()).toEqual([])
+    expect(container.textContent).toContain("Đợt mở bán đã kết thúc")
   })
 })

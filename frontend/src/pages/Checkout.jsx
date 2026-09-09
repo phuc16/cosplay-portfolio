@@ -212,7 +212,15 @@ export default function Checkout() {
     return (
       <>
         <ShopHeader />
-        <main className="max-w-2xl mx-auto px-4 py-10 opacity-70">{t("cartEmpty")}</main>
+        <main className="max-w-2xl mx-auto px-4 py-10">
+          {/* The cart can become empty as a side effect of onSubmit's own
+              auto-removal (the one remaining line turned out sold
+              out/closed/not-started at submit time) - the buyer must still
+              see why, not just a silent "your cart is empty" as if they
+              never added anything. */}
+          {error && <p className="text-red-500 mb-3">{error}</p>}
+          <p className="opacity-70">{t("cartEmpty")}</p>
+        </main>
         <ShopFooter />
       </>
     )
