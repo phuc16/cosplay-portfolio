@@ -63,6 +63,7 @@ export default function AdminCollections() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
+  const [uploading, setUploading] = useState(false)
   const formRef = useRef(null)
 
   const reload = () => adminListCollections().then(setCollections)
@@ -71,17 +72,14 @@ export default function AdminCollections() {
 
   const upload = async (file, field) => {
     setError("")
+    setUploading(true)
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result).split(",")[1])
-        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-        reader.readAsDataURL(file)
-      })
-      const { url } = await adminUploadImage(base64, "collections")
+      const { url } = await adminUploadImage(file, "collections")
       setDraft((d) => ({ ...d, [field]: url }))
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Tải ảnh lên thất bại")
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -295,12 +293,12 @@ export default function AdminCollections() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 text-sm">
           <label>
             Ảnh bìa (banner)
-            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], "cover_image")} className="block mt-1" />
+            <input type="file" accept="image/*" disabled={uploading} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], "cover_image")} className="block mt-1" />
             {draft.cover_image && <img src={draft.cover_image} alt="" className="mt-2 w-full h-24 object-cover rounded-lg" />}
           </label>
           <label>
             Ảnh thumbnail (danh sách, không bắt buộc)
-            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], "thumbnail_image")} className="block mt-1" />
+            <input type="file" accept="image/*" disabled={uploading} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], "thumbnail_image")} className="block mt-1" />
             {draft.thumbnail_image && <img src={draft.thumbnail_image} alt="" className="mt-2 w-full h-24 object-cover rounded-lg" />}
           </label>
         </div>

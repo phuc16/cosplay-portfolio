@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react"
 import { api } from "../api/api"
+import { uploadImage } from "../api/upload"
 import { useDropzone } from "react-dropzone"
 
 export default function AdminAlbumImages({ album, onClose }) {
   const [gallery, setGallery] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploadError, setUploadError] = useState("")
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
   const [draggedId, setDraggedId] = useState(null)
   const [reorderPending, setReorderPending] = useState(false)
@@ -22,24 +24,22 @@ export default function AdminAlbumImages({ album, onClose }) {
   }, [album.id])
 
   const onDrop = (files) => {
+    if (!files.length) return
     setUploadError("")
-    files.forEach((f) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const base64 = reader.result.split(",")[1]
-        api
-          .post("/api/image", { album_id: album.id, base64 })
-          .then(() => fetchGallery())
-          .catch((err) => {
-            const msg = err.response?.data?.message || err.message || "Upload thất bại"
-            setUploadError(msg)
-          })
-      }
-      reader.readAsDataURL(f)
-    })
+    setUploading(true)
+    Promise.all(
+      files.map((f) =>
+        uploadImage("/api/image", f, { album_id: album.id }).catch((err) => {
+          const msg = err.response?.data?.message || err.message || "Upload thất bại"
+          setUploadError(msg)
+        })
+      )
+    )
+      .then(() => fetchGallery())
+      .finally(() => setUploading(false))
   }
 
-  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { "image/*": [] } })
+  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { "image/*": [] }, disabled: uploading })
 
   const deleteImage = (id) => {
     if (!confirm("Xóa ảnh này?")) return

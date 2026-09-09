@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { api } from "../api/api"
+import { uploadImage } from "../api/upload"
 import { useDropzone } from "react-dropzone"
 import { toLocalizedObj } from "../utils/localize"
 import { COLOR_SCHEMES, applyColorScheme } from "../config"
@@ -12,16 +13,10 @@ function ImageUpload({ endpoint, imageUrl, onUpload, onRemove, label = "Kéo th�
     if (!files[0]) return
     setError("")
     setUploading(true)
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = reader.result.split(",")[1]
-      api
-        .post(endpoint, { base64 })
-        .then((r) => onUpload(r.data.url))
-        .catch((err) => setError(err.response?.data?.message || "Upload thất bại"))
-        .finally(() => setUploading(false))
-    }
-    reader.readAsDataURL(files[0])
+    uploadImage(endpoint, files[0])
+      .then((data) => onUpload(data.url))
+      .catch((err) => setError(err.response?.data?.message || "Upload thất bại"))
+      .finally(() => setUploading(false))
   }
   const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { "image/*": [] }, disabled: uploading, maxFiles: 1 })
   return (
@@ -56,16 +51,10 @@ function ClickUpload({ endpoint, onUrl, children }) {
     if (!file) return
     e.target.value = ""
     setUploading(true)
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = reader.result.split(",")[1]
-      api
-        .post(endpoint, { base64 })
-        .then((r) => onUrl(r.data.url))
-        .catch(() => {})
-        .finally(() => setUploading(false))
-    }
-    reader.readAsDataURL(file)
+    uploadImage(endpoint, file)
+      .then((data) => onUrl(data.url))
+      .catch(() => {})
+      .finally(() => setUploading(false))
   }
   return (
     <>
@@ -493,16 +482,7 @@ export default function AdminSettings() {
     setHeroImagesUploadError("")
     setHeroImagesUploading(true)
     const uploadOne = (file) =>
-      new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const base64 = reader.result.split(",")[1]
-          api.post("/api/upload/thumbnail", { base64 })
-            .then((r) => { addHeroImage(r.data.url, r.data.accentColor); resolve() })
-            .catch(reject)
-        }
-        reader.readAsDataURL(file)
-      })
+      uploadImage("/api/upload/thumbnail", file).then((data) => addHeroImage(data.url, data.accentColor))
     Promise.all(files.map(uploadOne))
       .catch((err) => setHeroImagesUploadError(err.response?.data?.message || err.message || "Upload thất bại"))
       .finally(() => setHeroImagesUploading(false))
@@ -521,14 +501,9 @@ export default function AdminSettings() {
     setLatestUploadError("")
     setLatestUploading(true)
     const uploadOne = (file) =>
-      new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          api.post("/api/upload/thumbnail", { base64: reader.result.split(",")[1] })
-            .then((r) => { setDirty(true); setConfig((prev) => ({ ...prev, latestPhotos: [...(prev.latestPhotos || []), r.data.url] })); resolve() })
-            .catch(reject)
-        }
-        reader.readAsDataURL(file)
+      uploadImage("/api/upload/thumbnail", file).then((data) => {
+        setDirty(true)
+        setConfig((prev) => ({ ...prev, latestPhotos: [...(prev.latestPhotos || []), data.url] }))
       })
     Promise.all(files.map(uploadOne))
       .catch((err) => setLatestUploadError(err.response?.data?.message || err.message || "Upload thất bại"))

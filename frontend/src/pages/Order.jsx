@@ -36,15 +36,6 @@ export function statusTimestamp(order) {
   return order[STATUS_TIMESTAMP_FIELD[order.status]] || null
 }
 
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result).split(",")[1] || "")
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
 // Well under the backend's 50MB limit - rejects an oversized photo before it burns a retry against the proof rate limiter.
 const MAX_PROOF_BYTES = 8 * 1024 * 1024
 
@@ -86,8 +77,7 @@ function ProofUpload({ token, existingProofUrl, onUploaded }) {
     setError("")
     setUploading(true)
     try {
-      const base64 = await readFileAsBase64(pendingFile)
-      const { url } = await uploadPaymentProof(token, base64, orderAuthHeaders(token))
+      const { url } = await uploadPaymentProof(token, pendingFile, orderAuthHeaders(token))
       setUploadedUrl(url)
       onUploaded?.()
       if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl)

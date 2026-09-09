@@ -513,10 +513,10 @@ describe("DELETE /api/admin/products/:id", () => {
 describe("POST /api/admin/shop/image", () => {
   it("returns 400 invalid_input for a buffer that isn't an image at all", async () => {
     const garbage = Buffer.from("not a real image, just garbage bytes that are not valid webp/jpeg/png data")
-    const base64 = garbage.toString("base64")
 
     const res = await authed(request(app).post("/api/admin/shop/image"))
-      .send({ base64, folder: "misc" })
+      .field("folder", "misc")
+      .attach("file", garbage, "garbage.jpg")
 
     expect(res.status).toBe(400)
     expect(res.body.error).toBe("invalid_input")
@@ -530,10 +530,10 @@ describe("POST /api/admin/shop/image", () => {
       create: { width: 50, height: 50, channels: 3, background: { r: 255, g: 0, b: 0 } },
     }).jpeg().toBuffer()
     const truncated = realJpeg.subarray(0, 20)
-    const base64 = truncated.toString("base64")
 
     const res = await authed(request(app).post("/api/admin/shop/image"))
-      .send({ base64, folder: "misc" })
+      .field("folder", "misc")
+      .attach("file", truncated, "truncated.jpg")
 
     expect(res.status).toBe(400)
     expect(res.body.error).toBe("invalid_input")
@@ -546,7 +546,8 @@ describe("POST /api/admin/shop/image", () => {
     oversized[2] = 0xff // valid jpeg magic bytes - this must fail on size, not type
 
     const res = await authed(request(app).post("/api/admin/shop/image"))
-      .send({ base64: oversized.toString("base64"), folder: "misc" })
+      .field("folder", "misc")
+      .attach("file", oversized, "big.jpg")
 
     expect(res.status).toBe(400)
     expect(res.body.error).toBe("invalid_input")
@@ -561,7 +562,8 @@ describe("POST /api/admin/shop/image", () => {
     }).png().toBuffer()
 
     const res = await authed(request(app).post("/api/admin/shop/image"))
-      .send({ base64: real.toString("base64"), folder: "misc" })
+      .field("folder", "misc")
+      .attach("file", real, "real.png")
 
     expect(res.status).toBe(201)
     expect(res.body.url).toBeTruthy()

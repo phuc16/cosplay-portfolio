@@ -33,7 +33,7 @@ async function seedOrder() {
 }
 
 const png = () => sharp({ create: { width: 300, height: 300, channels: 3, background: "#fff" } })
-  .png().toBuffer().then((b) => b.toString("base64"))
+  .png().toBuffer()
 
 beforeEach(async () => {
   await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections")
@@ -54,7 +54,7 @@ beforeEach(async () => {
 describe("POST /api/orders/:token/proof", () => {
   it("stores a proof image against the order", async () => {
     const o = await seedOrder()
-    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
 
     expect(res.status).toBe(201)
     expect(res.body.url).toContain("/api/storage/")
@@ -72,7 +72,7 @@ describe("POST /api/orders/:token/proof", () => {
   it("rejects a non-image payload", async () => {
     const o = await seedOrder()
     const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`))
-      .send({ base64: Buffer.from("not an image at all").toString("base64") })
+      .attach("file", Buffer.from("not an image at all"), "not-an-image.txt")
     expect(res.status).toBe(400)
   })
 
@@ -84,7 +84,7 @@ describe("POST /api/orders/:token/proof", () => {
     oversized[2] = 0xff // valid jpeg magic bytes - must fail on size, not type
 
     const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`))
-      .send({ base64: oversized.toString("base64") })
+      .attach("file", oversized, "big.jpg")
 
     expect(res.status).toBe(400)
     // The regression that matters: a buyer seeing this needs to know it was
@@ -93,14 +93,14 @@ describe("POST /api/orders/:token/proof", () => {
   })
 
   it("404s an unknown token", async () => {
-    const res = await authed(request(app).post(`/api/orders/${"a".repeat(32)}/proof`)).send({ base64: await png() })
+    const res = await authed(request(app).post(`/api/orders/${"a".repeat(32)}/proof`)).attach("file", await png(), "proof.png")
     expect(res.status).toBe(404)
   })
 
   it("refuses upload once the order is already confirmed", async () => {
     const o = await seedOrder()
     await orders.transitionOrder(o.id, "confirmed")
-    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+    const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
     expect(res.status).toBe(409)
   })
 
@@ -108,13 +108,13 @@ describe("POST /api/orders/:token/proof", () => {
     const o = await seedOrder()
 
     // First upload
-    const first = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+    const first = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
     expect(first.status).toBe(201)
     const firstUrl = first.body.url
     expect(firstUrl).toBeTruthy()
 
     // Second upload
-    const second = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+    const second = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
     expect(second.status).toBe(201)
     const secondUrl = second.body.url
     expect(secondUrl).toBeTruthy()
@@ -134,7 +134,7 @@ describe("POST /api/orders/:token/proof", () => {
   // limiter actually writes to.
   it("rate-limits proof uploads under a separate bucket from order creation", async () => {
     const o = await seedOrder()
-    await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+    await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
 
     const proofKeys = await redis.keys("rl:proof:*")
     const orderKeys = await redis.keys("rl:order:*")
@@ -153,7 +153,7 @@ describe("GET /api/orders/:token - has_payment_proof", () => {
 
   it("is true after a proof is uploaded, surviving what a page refresh would re-fetch", async () => {
     const o = await seedOrder()
-    const uploaded = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+    const uploaded = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
 
     const res = await authed(request(app).get(`/api/orders/${o.order_token}`))
     expect(res.body.has_payment_proof).toBe(true)
@@ -168,7 +168,7 @@ describe("POST /api/orders/:token/proof - admin notification", () => {
     process.env.ADMIN_EMAIL = "seller@example.com"
     try {
       const o = await seedOrder()
-      await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+      await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
 
       const [rows] = await db.query(
         "SELECT type, to_email FROM email_queue WHERE order_id = ? AND type = 'payment_proof_uploaded'",
@@ -184,7 +184,7 @@ describe("POST /api/orders/:token/proof - admin notification", () => {
   it("queues nothing when ADMIN_EMAIL is unset", async () => {
     delete process.env.ADMIN_EMAIL
     const o = await seedOrder()
-    await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+    await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
 
     const [rows] = await db.query(
       "SELECT id FROM email_queue WHERE order_id = ? AND type = 'payment_proof_uploaded'",
@@ -198,7 +198,7 @@ describe("POST /api/orders/:token/proof - admin notification", () => {
     await db.query("RENAME TABLE email_queue TO email_queue_disabled_for_test")
     try {
       const o = await seedOrder()
-      const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+      const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).attach("file", await png(), "proof.png")
       expect(res.status).toBe(201)
 
       const [[row]] = await db.query("SELECT payment_proof_url FROM orders WHERE id = ?", [o.id])

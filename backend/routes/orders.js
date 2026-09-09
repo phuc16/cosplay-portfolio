@@ -3,6 +3,7 @@ const repo = require("../shop/orders/orderRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const { buildInstructions } = require("../shop/payments/instructions")
 const { processShopImage, storeShopImage, InvalidImageError } = require("../shop/images")
+const { uploadSingleImage } = require("../shop/upload")
 const emailQueue = require("../shop/email/queue")
 const qr = require("../shop/orders/qr")
 const db = require("../db")
@@ -326,10 +327,9 @@ module.exports = function orderRoutes() {
     }
   })
 
-  router.post("/:token/proof", orderAccess, async (req, res) => {
+  router.post("/:token/proof", orderAccess, uploadSingleImage(), async (req, res) => {
     try {
-      const { base64 } = req.body
-      if (!base64) return bad(res, "Cần ảnh chuyển khoản")
+      if (!req.file) return bad(res, "Cần ảnh chuyển khoản")
 
       const order = await repo.getOrderByToken(req.params.token)
       if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
@@ -352,7 +352,7 @@ module.exports = function orderRoutes() {
       // server errors and fall through to the outer catch.
       let processed
       try {
-        processed = await processShopImage(Buffer.from(base64, "base64"))
+        processed = await processShopImage(req.file.buffer)
       } catch (err) {
         return bad(res, err instanceof InvalidImageError ? err.message : "Ảnh không hợp lệ")
       }

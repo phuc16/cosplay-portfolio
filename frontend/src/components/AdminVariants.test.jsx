@@ -50,7 +50,7 @@ describe("AdminVariants - per-row image upload", () => {
     await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })))
     await act(async () => {})
 
-    expect(adminUploadImage).toHaveBeenCalledWith(expect.any(String), "products/1/variants")
+    expect(adminUploadImage).toHaveBeenCalledWith(expect.any(File), "products/1/variants")
     const img = container.querySelector('img[src="https://x/a1.jpg"]')
     expect(img).toBeTruthy()
   })
@@ -86,7 +86,7 @@ describe("AdminVariants - per-row thumbnail upload", () => {
     await act(async () => thumbInput.dispatchEvent(new Event("change", { bubbles: true })))
     await act(async () => {})
 
-    expect(adminUploadImage).toHaveBeenCalledWith(expect.any(String), "products/1/variants")
+    expect(adminUploadImage).toHaveBeenCalledWith(expect.any(File), "products/1/variants")
     expect(container.querySelector('img[src="https://x/thumb.jpg"]')).toBeTruthy()
     // Still there, untouched - the thumbnail is separate from the gallery.
     expect(container.querySelector('img[src="https://x/a1.jpg"]')).toBeTruthy()
@@ -132,7 +132,7 @@ describe("AdminVariants - batch image upload", () => {
     })
 
     expect(adminUploadImage).toHaveBeenCalledTimes(2)
-    expect(adminUploadImage).toHaveBeenCalledWith(expect.any(String), "products/1/variants")
+    expect(adminUploadImage).toHaveBeenCalledWith(expect.any(File), "products/1/variants")
 
     const labelInputs = [...container.querySelectorAll('input[placeholder="Mã (A1) hoặc size (M)"]')]
     expect(labelInputs.map((i) => i.value)).toEqual(["A1", "A2"])

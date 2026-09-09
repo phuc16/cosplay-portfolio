@@ -27,13 +27,7 @@ export default function AdminPaymentSettings() {
     setError("")
     setUploading(true)
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result).split(",")[1])
-        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-        reader.readAsDataURL(file)
-      })
-      const { url } = await adminUploadImage(base64, "payments")
+      const { url } = await adminUploadImage(file, "payments")
       set("momo_qr_image", url)
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Tải ảnh lên thất bại")

@@ -11,29 +11,34 @@ afterAll(async () => {
   await closeDb()
 })
 
-// processImage now runs the same validateImageBuffer magic-byte/size check as
+// processImage runs the same validateImageBuffer magic-byte/size check as
 // the shop's upload routes (backend/shop/images.js), so a non-image buffer
 // must be rejected with 400 here too, not handed straight to sharp.
-const notAnImage = Buffer.from("this is plain text, not an image at all").toString("base64")
+const notAnImage = Buffer.from("this is plain text, not an image at all")
 
 describe("portfolio image uploads reject non-image input", () => {
   it("POST /api/upload/hero 400s on a non-image buffer", async () => {
-    const res = await authed(request(app).post("/api/upload/hero")).send({ base64: notAnImage })
+    const res = await authed(request(app).post("/api/upload/hero"))
+      .attach("file", notAnImage, "not-an-image.txt")
     expect(res.status).toBe(400)
   })
 
   it("POST /api/upload/thumbnail 400s on a non-image buffer", async () => {
-    const res = await authed(request(app).post("/api/upload/thumbnail")).send({ base64: notAnImage })
+    const res = await authed(request(app).post("/api/upload/thumbnail"))
+      .attach("file", notAnImage, "not-an-image.txt")
     expect(res.status).toBe(400)
   })
 
   it("POST /api/upload/event-image 400s on a non-image buffer", async () => {
-    const res = await authed(request(app).post("/api/upload/event-image")).send({ base64: notAnImage })
+    const res = await authed(request(app).post("/api/upload/event-image"))
+      .attach("file", notAnImage, "not-an-image.txt")
     expect(res.status).toBe(400)
   })
 
   it("POST /api/image 400s on a non-image buffer", async () => {
-    const res = await authed(request(app).post("/api/image")).send({ album_id: 1, base64: notAnImage })
+    const res = await authed(request(app).post("/api/image"))
+      .field("album_id", "1")
+      .attach("file", notAnImage, "not-an-image.txt")
     expect(res.status).toBe(400)
   })
 })

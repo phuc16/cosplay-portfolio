@@ -28,19 +28,14 @@ const app = express()
 // right by exactly that many hops, recovering the real client address
 // regardless of what the client prepends.
 app.set("trust proxy", 2)
-// Images are capped at 50MB decoded (shop/images.js MAX_UPLOAD_BYTES); base64
-// inflates that by ~4/3, plus a little JSON overhead - 70mb comfortably fits
-// the largest image this app will ever accept.
-const UPLOAD_LIMIT = "70mb"
 // A VTP result spreadsheet is at most MAX_IMPORT_ROWS (200) data rows of
 // plain text - a few hundred KB even with formatting. 10mb is a generous
-// ceiling for that, far below the image limit, so a malformed/huge
-// upload here can't be used to bypass the image path's specific tuning.
+// ceiling for that.
 const IMPORT_LIMIT = "10mb"
+const SMALL_LIMIT = "1mb"
 const TRACKING_IMPORT_PREVIEW_PATH = "/api/admin/shipping/tracking-import/preview"
-const largeJson = express.json({ limit: UPLOAD_LIMIT })
 const importJson = express.json({ limit: IMPORT_LIMIT })
-const smallJson = express.json({ limit: "1mb" })
+const smallJson = express.json({ limit: SMALL_LIMIT })
 
 // This server only ever returns JSON or image bytes, never HTML, so a CSP
 // (meant to constrain a page's own scripts/styles) is inert here - the real
@@ -63,9 +58,6 @@ if (!process.env.SITE_URL) {
 }
 app.use(cors(process.env.SITE_URL ? { origin: process.env.SITE_URL } : undefined))
 app.use((req, res, next) => {
-  if (req.method === "POST" && /^\/api\/(image$|upload\/|admin\/shop\/image$|orders\/[^/]+\/proof$)/.test(req.path)) {
-    return largeJson(req, res, next)
-  }
   if (req.method === "POST" && req.path === TRACKING_IMPORT_PREVIEW_PATH) {
     return importJson(req, res, next)
   }
@@ -76,10 +68,10 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
   if (err.type === "entity.too.large") {
     const isTrackingImport = req.path === TRACKING_IMPORT_PREVIEW_PATH
-    const limit = isTrackingImport ? IMPORT_LIMIT : UPLOAD_LIMIT
+    const limit = isTrackingImport ? IMPORT_LIMIT : SMALL_LIMIT
     const message = isTrackingImport
       ? `File quá lớn. Giới hạn: ${IMPORT_LIMIT}. Hãy dùng file kết quả ViettelPost nhỏ hơn.`
-      : `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
+      : `Dữ liệu gửi lên quá lớn. Giới hạn: ${SMALL_LIMIT}.`
     console.error(`[ERROR] Payload too large: ${req.url} - limit ${limit}`)
     return res.status(413).json({ error: "payload_too_large", message })
   }
@@ -711,6 +703,7 @@ app.delete(`${API_PREFIX}/albums/:id`, auth, async (req, res) => {
 // IMAGES CRUD - lưu vào MinIO, DB chỉ lưu url
 const sharp = require("sharp")
 const { validateImageBuffer, InvalidImageError } = require("./shop/images")
+const { uploadSingleImage } = require("./shop/upload")
 const MAX_FULL_WIDTH = 1920
 const JPEG_QUALITY = 85
 
@@ -757,13 +750,12 @@ async function extractAccentHex(buffer) {
 }
 
 // Upload ảnh hero/profile (không cần album)
-app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/upload/hero`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { base64 } = req.body
-    if (!base64) {
-      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    if (!req.file) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh" })
     }
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/HERO] size≈${sizeKb}KB`)
 
@@ -784,13 +776,12 @@ app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
   }
 })
 
-app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/upload/thumbnail`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { base64 } = req.body
-    if (!base64) {
-      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    if (!req.file) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh" })
     }
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/THUMB] size≈${sizeKb}KB`)
 
@@ -811,13 +802,12 @@ app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
   }
 })
 
-app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/upload/event-image`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { base64 } = req.body
-    if (!base64) {
-      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    if (!req.file) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh" })
     }
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/EVENT] size≈${sizeKb}KB`)
 
@@ -837,15 +827,15 @@ app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
   }
 })
 
-app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/image`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { album_id, base64 } = req.body
-    if (!album_id || !base64) {
-      console.warn("[IMAGE] Thiếu album_id hoặc base64")
-      return res.status(400).json({ error: "invalid_input", message: "Cần album_id và ảnh (base64)" })
+    const { album_id } = req.body
+    if (!album_id || !req.file) {
+      console.warn("[IMAGE] Thiếu album_id hoặc ảnh")
+      return res.status(400).json({ error: "invalid_input", message: "Cần album_id và ảnh" })
     }
 
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[IMAGE] Upload: album=${album_id}, size≈${sizeKb}KB`)
 
@@ -876,7 +866,7 @@ app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
       return res.status(400).json({ error: "invalid_input", message: err.message })
     }
     console.error("[IMAGE] Lỗi upload:", err.message)
-    res.status(500).json({ error: "server_error", message: `Upload thất bại. Kiểm tra kích thước ảnh (max ${UPLOAD_LIMIT}) hoặc thử lại.` })
+    res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
 })
 
@@ -952,7 +942,7 @@ if (require.main === module) {
     }).catch((e) => {
       console.warn("[SERVER] MinIO init failed:", e.message, "- uploads may fail")
     })
-    console.log(`[SERVER] Backend listening on :5000, body limit ${UPLOAD_LIMIT}`)
+    console.log(`[SERVER] Backend listening on :5000`)
   })
 }
 

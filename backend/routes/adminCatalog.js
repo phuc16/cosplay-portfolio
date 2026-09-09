@@ -1,6 +1,7 @@
 const express = require("express")
 const repo = require("../shop/catalogRepo")
 const { processShopImage, storeShopImage, InvalidImageError } = require("../shop/images")
+const { uploadSingleImage } = require("../shop/upload")
 
 const STATUSES = ["draft", "active", "closed", "archived"]
 
@@ -238,11 +239,11 @@ module.exports = function adminCatalogRoutes() {
     } catch (err) { oops(res, err, "Lỗi lưu phân loại") }
   })
 
-  router.post("/shop/image", async (req, res) => {
-    const { base64, folder } = req.body
-    if (!base64) return bad(res, "Cần ảnh (base64)")
+  router.post("/shop/image", uploadSingleImage(), async (req, res) => {
+    if (!req.file) return bad(res, "Cần ảnh")
+    const folder = req.body.folder
 
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     console.log(`[ADMIN/CATALOG] upload ảnh shop size≈${Math.round(buffer.length / 1024)}KB`)
 
     // Decoding/processing failures mean the input itself is bad (corrupt, truncated,
