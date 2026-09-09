@@ -330,7 +330,9 @@ function InfoSection({ data, onOpenPhoto, lang }) {
             <h4 style={{ margin: "0 0 10px", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-link)" }}>{L.support}</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <Link to="/merchandise"
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-brand)", color: "var(--brand)", background: "var(--brand-soft)", textDecoration: "none", fontWeight: 600 }}>
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", color: "var(--brand)", background: "transparent", textDecoration: "none", fontWeight: 600, transition: "background .15s,border-color .15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = BRAND_HEX + "18"; e.currentTarget.style.borderColor = BRAND_HEX + "70" }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "var(--border-default)" }}>
                 <span style={{ display: "flex", flexShrink: 0 }}>{icons.bag}</span>
                 <span style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>{vi ? "Cửa hàng" : "Merchandise"}</span>
               </Link>

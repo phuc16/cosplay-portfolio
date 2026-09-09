@@ -172,6 +172,7 @@ calls; this file focuses on the mechanical edge case and its guard.
 - [x] *(uncommitted)* The buyer's order QR caption was one generic string regardless of fulfillment method - split into `orderQrCaptionPickup` ("show this at pickup") and `orderQrCaptionShip` ("scan to reopen your order page"), shown together (pickup line first) only for pickup orders.
 - [x] *(uncommitted)* The shipping-cost FAQ answer stated a blanket "you pay the courier on delivery" rule that doesn't apply to event-pickup orders - answer now distinguishes ship vs. pickup orders explicitly.
 - [x] *(uncommitted)* Editing a collection far down the admin list changed the shared edit-form state invisibly, off-screen - clicking "Sửa" now scrolls the (single, shared) edit form into view.
+- [x] *(uncommitted)* `Portfolio.jsx`'s hover-only button color pattern (neutral border/background by default, brand tint only on hover) was applied to `ContactSection`'s button groups but missed the near-identical Cửa hàng link added to `InfoSection`'s support list in the same window, which kept its original always-on brand border/background - restyled to match the same `onMouseEnter`/`onMouseLeave` pattern using the existing `BRAND_HEX` constant.
 
 ## Deploy / Infra
 
