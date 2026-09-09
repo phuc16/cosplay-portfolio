@@ -89,7 +89,7 @@ async function sendQueued(limit = 10) {
                 Mã PIN xác thực đơn hàng: <strong style="color:${templates.BRAND}">${templates.escapeHtml(payload.access_pin)}</strong><br/>
                 <span style="font-size:12px;color:#888">Cần mã này để xem lại đơn hàng qua link nếu trang yêu cầu xác thực.</span>
               </p>`)
-            }
+          }
         } else {
           html = spliceBeforeCardClose(html, `
             <p style="margin:12px 0 0;font-size:12px;color:#888">
