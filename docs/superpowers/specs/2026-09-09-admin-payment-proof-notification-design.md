@@ -15,8 +15,11 @@ No other admin-notification triggers are in scope for this spec (e.g. auto-cance
 
 ## Behavior
 
+There are **two** existing admin-copy sites to remove, not one - both must go so the admin ends up with exactly the one `payment_proof_uploaded` trigger:
+
 - `routes/orders.js`'s new-order handler no longer enqueues anything to `ADMIN_EMAIL`. The buyer's own `order_placed` email (with `access_pin`) is unaffected.
-- `POST /api/orders/:token/proof` (`routes/orders.js`), immediately after successfully storing `payment_proof_url`, enqueues one `payment_proof_uploaded` email to `ADMIN_EMAIL`, guarded by the same `if (process.env.ADMIN_EMAIL)` check the old trigger used. No payload is needed (unlike `order_placed`'s `access_pin` payload) since the admin template needs no order-specific secret.
+- `shop/orders/orderRepo.js`'s `transitionOrder` also currently copies `payment_confirmed` to `ADMIN_EMAIL` on a `confirmed` transition (the `notifyAdminType`/`TRANSITION_EMAILS.confirmed` path, `orderRepo.js:539,606-610,631-637`). This whole mechanism is removed: the `notifyAdminType` variable, the block that sets it, and the block that enqueues it. The buyer's own `payment_confirmed` copy (`notifyEmailType`/`notifyAddress`) is unaffected - only the admin fork-off goes.
+- `POST /api/orders/:token/proof` (`routes/orders.js`), immediately after successfully storing `payment_proof_url`, enqueues one `payment_proof_uploaded` email to `ADMIN_EMAIL`, guarded by the same `if (process.env.ADMIN_EMAIL)` check the old triggers used. No payload is needed (unlike `order_placed`'s `access_pin` payload) since the admin template needs no order-specific secret.
 - If `ADMIN_EMAIL` is unset, this is a silent no-op, matching every other optional-notification path in the app.
 - This enqueue happens only on a successful proof upload for a `pending` order - the existing route already rejects uploads for any other status, so no extra status check is needed at the enqueue site.
 
