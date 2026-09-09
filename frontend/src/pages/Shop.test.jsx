@@ -85,6 +85,48 @@ describe("Shop - digital badge", () => {
   })
 })
 
+describe("Shop - not-started preview", () => {
+  it("badges a not-yet-started collection with its open date, distinct from the closed overlay", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "upcoming", title: "Upcoming Drop", status: "active", product_count: 2, not_started_yet: true, start_at: "2026-12-25T13:00:00.000Z" },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    expect(container.textContent).toContain("Not started yet")
+    expect(container.textContent).not.toContain("This drop has ended")
+  })
+
+  it("does not badge a started, active collection", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "live", title: "Live Drop", status: "active", product_count: 2, not_started_yet: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    expect(container.textContent).not.toContain("Not started yet")
+  })
+
+  it("sorts not-started collections between live and closed ones", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "ended", title: "Ended", status: "closed", product_count: 0, not_started_yet: false },
+      { id: 2, slug: "live", title: "Live", status: "active", product_count: 1, not_started_yet: false },
+      { id: 3, slug: "upcoming", title: "Upcoming", status: "active", product_count: 1, not_started_yet: true, start_at: "2026-12-25T13:00:00.000Z" },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    expect(titles).toEqual(["Live", "Upcoming", "Ended"])
+  })
+})
+
 describe("Shop - search, filter, sort", () => {
   it("filters collections by title, case-insensitively", async () => {
     fetchCollections.mockResolvedValue([

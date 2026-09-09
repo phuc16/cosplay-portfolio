@@ -4,17 +4,25 @@ import { fetchCollections } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
+import { formatVnDateTime } from "../utils/orderDeadline"
 
-// Closed (ended) collections always sink to the end, under every sort mode
-// - not just the default - so switching to "Name A-Z" etc. never mixes an
-// ended drop back in among open ones.
+// Live/orderable first, then a not-yet-started preview, then closed (ended)
+// last - an upcoming drop is still worth surfacing prominently (that's the
+// whole point of previewing it), so it must not sink to the same tier as
+// something that's already over.
+function collectionTier(c) {
+  if (c.status === "closed") return 2
+  if (c.not_started_yet) return 1
+  return 0
+}
+
 function sortCollections(list, sortBy) {
   const sorted = [...list]
   if (sortBy === "name_asc") sorted.sort((a, b) => a.title.localeCompare(b.title, "vi"))
   else if (sortBy === "name_desc") sorted.sort((a, b) => b.title.localeCompare(a.title, "vi"))
   else if (sortBy === "newest") sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   else if (sortBy === "oldest") sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-  sorted.sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
+  sorted.sort((a, b) => collectionTier(a) - collectionTier(b))
   return sorted
 }
 
@@ -107,6 +115,14 @@ export default function Shop() {
                     {t("shopClosed")}
                   </span>
                 )}
+                {c.status !== "closed" && c.not_started_yet && (
+                  <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 text-white font-semibold text-center px-2">
+                    <span>{t("shopNotStarted")}</span>
+                    {c.start_at && (
+                      <span className="text-xs font-normal">{t("shopOpensAt", { date: formatVnDateTime(c.start_at) })}</span>
+                    )}
+                  </span>
+                )}
               </div>
             )}
             <div className="p-4">
@@ -121,6 +137,9 @@ export default function Shop() {
               <p className="text-sm opacity-70">{t("productsCount", { n: c.product_count })}</p>
               {c.status === "closed" && (
                 <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopClosed")}</p>
+              )}
+              {c.status !== "closed" && c.not_started_yet && (
+                <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopNotStarted")}</p>
               )}
             </div>
           </Link>
