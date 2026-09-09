@@ -50,12 +50,12 @@ describe("order placed", () => {
     expect(rows.some((r) => r.type === "order_placed" && r.to_email === "buyer@example.com")).toBe(true)
   })
 
-  it("queues a copy to the admin when ADMIN_EMAIL is set", async () => {
+  it("does not copy order_placed to the admin, even when ADMIN_EMAIL is set", async () => {
     process.env.ADMIN_EMAIL = "seller@example.com"
     const v = await seedVariant()
     await request(app).post("/api/orders").send(body(v))
 
-    expect((await queued()).some((r) => r.to_email === "seller@example.com")).toBe(true)
+    expect((await queued()).some((r) => r.to_email === "seller@example.com")).toBe(false)
     delete process.env.ADMIN_EMAIL
   })
 
@@ -89,7 +89,7 @@ describe("lifecycle transitions", () => {
     void created
   })
 
-  it("copies payment_confirmed to the admin when ADMIN_EMAIL is set", async () => {
+  it("does not copy payment_confirmed to the admin, even when ADMIN_EMAIL is set", async () => {
     process.env.ADMIN_EMAIL = "seller@example.com"
     try {
       const v = await seedVariant()
@@ -101,7 +101,7 @@ describe("lifecycle transitions", () => {
 
       const rows = await queued()
       expect(rows.some((r) => r.type === "payment_confirmed" && r.to_email === "buyer@example.com")).toBe(true)
-      expect(rows.some((r) => r.type === "payment_confirmed" && r.to_email === "seller@example.com")).toBe(true)
+      expect(rows.some((r) => r.to_email === "seller@example.com")).toBe(false)
     } finally {
       delete process.env.ADMIN_EMAIL
     }

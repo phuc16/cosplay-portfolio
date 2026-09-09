@@ -536,7 +536,6 @@ async function transitionOrder(id, toStatus, extra = {}) {
   let ok = false
   let notifyEmailType = null
   let notifyAddress = null
-  let notifyAdminType = null
   try {
     await conn.beginTransaction()
 
@@ -603,11 +602,6 @@ async function transitionOrder(id, toStatus, extra = {}) {
       notifyEmailType = emailType
       notifyAddress = order.email
     }
-    // payment_confirmed goes to buyer + admin (spec Notifications section);
-    // shipped/cancelled/expired stay buyer-only, so this is confirmed-only.
-    if (toStatus === "confirmed" && extra.notify !== false && process.env.ADMIN_EMAIL) {
-      notifyAdminType = TRANSITION_EMAILS.confirmed
-    }
   } catch (err) {
     await conn.rollback()
     throw err
@@ -625,14 +619,6 @@ async function transitionOrder(id, toStatus, extra = {}) {
       await emailQueue.enqueue(id, notifyEmailType, notifyAddress)
     } catch (err) {
       console.error("[ORDERS] Không xếp được email:", err.message)
-    }
-  }
-
-  if (notifyAdminType) {
-    try {
-      await emailQueue.enqueue(id, notifyAdminType, process.env.ADMIN_EMAIL)
-    } catch (err) {
-      console.error("[ORDERS] Không xếp được email cho admin:", err.message)
     }
   }
 

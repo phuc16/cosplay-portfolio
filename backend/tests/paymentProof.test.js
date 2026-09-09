@@ -36,7 +36,7 @@ const png = () => sharp({ create: { width: 300, height: 300, channels: 3, backgr
   .png().toBuffer().then((b) => b.toString("base64"))
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections")
   // The order-creation limiter (POST /api/orders/*) shares one Redis key across
   // every test in this file since supertest requests all appear to come from
   // the same loopback address. Without clearing it, later tests would 429.
@@ -160,5 +160,52 @@ describe("GET /api/orders/:token - has_payment_proof", () => {
     // The buyer sees the same image on every visit, not just the upload
     // session - same URL the upload response returned.
     expect(res.body.payment_proof_url).toBe(uploaded.body.url)
+  })
+})
+
+describe("POST /api/orders/:token/proof - admin notification", () => {
+  it("queues payment_proof_uploaded to ADMIN_EMAIL on a successful upload", async () => {
+    process.env.ADMIN_EMAIL = "seller@example.com"
+    try {
+      const o = await seedOrder()
+      await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+
+      const [rows] = await db.query(
+        "SELECT type, to_email FROM email_queue WHERE order_id = ? AND type = 'payment_proof_uploaded'",
+        [o.id]
+      )
+      expect(rows).toHaveLength(1)
+      expect(rows[0].to_email).toBe("seller@example.com")
+    } finally {
+      delete process.env.ADMIN_EMAIL
+    }
+  })
+
+  it("queues nothing when ADMIN_EMAIL is unset", async () => {
+    delete process.env.ADMIN_EMAIL
+    const o = await seedOrder()
+    await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+
+    const [rows] = await db.query(
+      "SELECT id FROM email_queue WHERE order_id = ? AND type = 'payment_proof_uploaded'",
+      [o.id]
+    )
+    expect(rows).toHaveLength(0)
+  })
+
+  it("still returns 201 and stores the proof even if enqueueing the admin email fails", async () => {
+    process.env.ADMIN_EMAIL = "seller@example.com"
+    await db.query("RENAME TABLE email_queue TO email_queue_disabled_for_test")
+    try {
+      const o = await seedOrder()
+      const res = await authed(request(app).post(`/api/orders/${o.order_token}/proof`)).send({ base64: await png() })
+      expect(res.status).toBe(201)
+
+      const [[row]] = await db.query("SELECT payment_proof_url FROM orders WHERE id = ?", [o.id])
+      expect(row.payment_proof_url).toBeTruthy()
+    } finally {
+      await db.query("RENAME TABLE email_queue_disabled_for_test TO email_queue")
+      delete process.env.ADMIN_EMAIL
+    }
   })
 })

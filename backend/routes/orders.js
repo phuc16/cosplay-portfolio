@@ -151,13 +151,7 @@ module.exports = function orderRoutes() {
       // email the first time around, so it does not do so again.
       if (!order.reused) {
         try {
-          // access_pin only goes to the buyer's own copy - admin already
-          // bypasses the PIN gate via their own login, so their copy has no
-          // use for it and shouldn't carry it into an inbox that doesn't need it.
           await emailQueue.enqueue(order.id, "order_placed", req.body.buyer.email, { access_pin: order.access_pin })
-          if (process.env.ADMIN_EMAIL) {
-            await emailQueue.enqueue(order.id, "order_placed", process.env.ADMIN_EMAIL)
-          }
         } catch (err) {
           console.error("[ORDERS] Không xếp được email đơn mới:", err.message)
         }
@@ -367,6 +361,17 @@ module.exports = function orderRoutes() {
         [url, order.id]
       )
       console.log(`[ORDERS] Đã nhận ảnh chuyển khoản cho đơn ${order.id}`)
+
+      // Best-effort, after the proof is already stored: a mail failure must
+      // not fail an upload the buyer already completed successfully.
+      if (process.env.ADMIN_EMAIL) {
+        try {
+          await emailQueue.enqueue(order.id, "payment_proof_uploaded", process.env.ADMIN_EMAIL)
+        } catch (err) {
+          console.error("[ORDERS] Không xếp được email báo admin:", err.message)
+        }
+      }
+
       res.status(201).json({ url })
     } catch (err) {
       console.error("[ORDERS] Lỗi tải ảnh chuyển khoản:", err)
