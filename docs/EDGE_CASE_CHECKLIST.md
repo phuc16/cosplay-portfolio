@@ -36,6 +36,7 @@ calls; this file focuses on the mechanical edge case and its guard.
 - [x] The public collection API returned `delivery_link` for digital variants unconditionally, exposing a paid-content download link to any visitor before purchase or payment - `getPublicCollectionBySlug` now strips `delivery_link` on the public read path only (the admin path still needs it to manage the product).
 - [x] COD checkout with a digital item in the cart made no sense (nothing to hand over on delivery) - COD is now rejected outright when the cart contains a digital item, `fulfillment_method` is auto-set to `digital`, and `delivery_link` is snapshotted onto `order_items` at order-creation time so a later catalog edit can't change what a paid buyer already received.
 - [x] A confirmed digital order's delivery link needed to appear in its confirmation email, but only once actually paid, and never for a pending/cancelled order - gated on `status`, verified with dedicated template tests for pending/confirmed/cancelled and for mixed ship+digital orders.
+- [x] Collection creation/edit unconditionally required at least one of `allow_ship`/`allow_pickup`, blocking a collection made purely for digital products (which has no physical fulfillment to offer at all) from ever being saved. Dropped that requirement, moving the actual safety check to where it matters: creating a non-digital product in a collection with neither enabled is now rejected instead, since such a product would have no way to ever reach a buyer.
 
 ## Order Lifecycle / Status Transitions
 
