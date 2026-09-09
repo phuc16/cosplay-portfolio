@@ -1,18 +1,21 @@
 # Cosplay Portfolio
 
-Ứng dụng portfolio cosplay cho phép quản lý và hiển thị gallery ảnh cosplay.
+Portfolio cosplay (gallery ảnh) kèm một shop bán merch (photocard, poster, sản phẩm số...) dùng chung backend/frontend.
 
 ## Tính năng
 
 - **Gallery**: Xem ảnh dạng grid, lightbox xem phóng to
-- **Admin**: Đăng nhập, upload ảnh kéo thả, xóa/sửa ảnh
+- **Admin**: Đăng nhập, upload ảnh kéo thả, xóa/sửa ảnh, quản lý shop
+- **Shop**: Collection (đợt mở bán, có thể đặt lịch mở/đóng) → Product → Variant, giỏ hàng, checkout, thanh toán VietQR/Momo/COD, giao hàng hoặc nhận tại sự kiện, sản phẩm số (giao link tải)
+- **Đơn hàng**: Vòng đời pending → confirmed → shipped/completed (hoặc cancelled), tự hủy đơn quá hạn thanh toán và hoàn kho, email giao dịch (đặt hàng/xác nhận/giao hàng/hủy), tra cứu đơn qua link + mã PIN
+- **Vận chuyển**: Xuất/nhập file ViettelPost, danh sách nhận hàng tại sự kiện (roster)
 - **Thumbnail tự động**: Worker tạo thumbnail cho ảnh mới
-- **Cache Redis**: Cache gallery để tăng tốc truy vấn
+- **Cache Redis**: Cache gallery/settings để tăng tốc truy vấn
 
 ## Yêu cầu hệ thống
 
 - **Docker** và **Docker Compose** (khuyến nghị)
-- Hoặc: **Node.js 20+**, **MySQL 8**, **Redis 7**
+- Hoặc: **Node.js 20+**, **MySQL 8**, **Redis 7**, **MinIO** (S3-compatible object storage)
 
 ---
 
@@ -25,15 +28,13 @@ git clone <repo-url>
 cd cosplay-portfolio
 ```
 
-### 2. Tạo file cấu hình (tùy chọn)
-
-Copy `.env.example` thành `.env` nếu muốn tùy chỉnh:
+### 2. Tạo file cấu hình
 
 ```bash
 cp .env.example .env
 ```
 
-Đổi `JWT_SECRET` khi deploy production.
+Xem chi tiết từng biến trong `.env.example`. Bắt buộc phải đặt `ADMIN_USERNAME`/`ADMIN_PASSWORD` và `JWT_SECRET` - backend sẽ không khởi động nếu thiếu `ADMIN_USERNAME`/`ADMIN_PASSWORD`.
 
 ### 3. Build và chạy
 
@@ -43,23 +44,23 @@ docker compose up -d --build
 
 ### 4. Truy cập
 
-| Dịch vụ    | URL                    | Mô tả                 |
-|-----------|------------------------|------------------------|
-| Frontend  | http://localhost:5173  | Giao diện chính        |
-| Backend   | http://localhost:5000  | API server             |
-| MySQL     | localhost:3307         | Database (user: root)  |
-| Redis     | localhost:6379         | Cache                  |
+| Dịch vụ         | URL                     | Mô tả                          |
+|-----------------|-------------------------|--------------------------------|
+| Frontend        | http://localhost:5173   | Portfolio + shop               |
+| Backend         | http://localhost:5000   | API server                     |
+| MySQL           | localhost:3307          | Database (user: root)          |
+| Redis           | localhost:6380          | Cache                          |
+| MinIO API       | localhost:9000          | Object storage                 |
+| MinIO Console   | localhost:9001          | Giao diện quản lý MinIO        |
 
 ---
 
 ## Chạy development (không dùng Docker)
 
-### 1. Cài đặt MySQL & Redis
-
-Đảm bảo MySQL và Redis đang chạy local hoặc qua Docker:
+### 1. Chạy MySQL, Redis, MinIO
 
 ```bash
-docker compose up -d mysql redis
+docker compose up -d mysql redis minio
 ```
 
 ### 2. Cấu hình môi trường
@@ -68,10 +69,7 @@ docker compose up -d mysql redis
 cp .env.example .env
 ```
 
-Chỉnh `.env` nếu cần:
-- `DB_HOST=localhost` (hoặc `127.0.0.1`)
-- `DB_PASS=root`
-- `REDIS_HOST=localhost`
+Chỉnh `.env` cho phù hợp với môi trường local (host/port của MySQL, Redis, MinIO ở trên).
 
 ### 3. Backend
 
@@ -79,11 +77,10 @@ Chỉnh `.env` nếu cần:
 cd backend
 npm install
 npm run migrate
-npm run seed
 node server.js
 ```
 
-Chạy thêm worker (terminal khác):
+Chạy thêm worker (terminal khác) - xử lý thumbnail, tự hủy đơn quá hạn, gửi email hàng đợi:
 
 ```bash
 cd backend
@@ -111,44 +108,39 @@ Truy cập: http://localhost:5173
 3. Click ảnh để mở lightbox xem phóng to
 4. Đóng lightbox bằng nút X hoặc click ra ngoài
 
+### Mua hàng (shop)
+
+1. Vào `/merchandise` để xem các đợt mở bán (collection)
+2. Chọn sản phẩm/mẫu (variant), thêm vào giỏ (`/cart`)
+3. Checkout: điền thông tin nhận hàng, chọn giao hàng/nhận tại sự kiện (nếu có), chọn phương thức thanh toán
+4. Sau khi đặt hàng, được chuyển thẳng tới trang đơn hàng (`/order/:token`) - đường link này và mã PIN xác thực cũng được gửi qua email
+
 ### Quản trị (admin)
 
 1. Vào http://localhost:5173/admin
-2. Click **Login Admin**
-3. Đăng nhập với:
-   - Username: `admin`
-   - Password: `admin`
-4. Sau khi đăng nhập:
-   - **Upload ảnh**: Kéo thả file ảnh vào vùng "Drag & Drop Upload"
-   - Hỗ trợ: JPG, PNG, GIF, WebP
+2. Đăng nhập bằng `ADMIN_USERNAME`/`ADMIN_PASSWORD` đã đặt trong `.env`
+3. Sau khi đăng nhập, quản lý được: ảnh portfolio, collection/product/variant của shop, đơn hàng, cài đặt thanh toán, mẫu email, thống kê, xuất/nhập vận chuyển
 
-### Đổi mật khẩu admin
+### Đổi thông tin đăng nhập admin
 
-1. Kết nối MySQL
-2. Tạo hash bcrypt cho mật khẩu mới (ví dụ bằng Node):
-   ```js
-   const bcrypt = require('bcrypt')
-   bcrypt.hash('mat-khau-moi', 10).then(console.log)
-   ```
-3. Cập nhật bảng `admins`:
-   ```sql
-   UPDATE admins SET password = '<hash>' WHERE username = 'admin';
-   ```
+Sửa `ADMIN_USERNAME`/`ADMIN_PASSWORD` trong `.env` rồi khởi động lại backend - không có bảng `admins` hay hash mật khẩu, thông tin đăng nhập chỉ đọc trực tiếp từ biến môi trường.
 
 ---
 
 ## Biến môi trường
 
-| Biến        | Mô tả           | Mặc định       |
-|-------------|-----------------|----------------|
-| DB_HOST     | Host MySQL      | localhost      |
-| DB_USER     | User MySQL      | root           |
-| DB_PASS     | Mật khẩu MySQL  | (trống)        |
-| DB_NAME     | Tên database    | cosplay        |
-| REDIS_HOST  | Host Redis      | localhost      |
-| JWT_SECRET  | Secret cho JWT  | change-me...   |
+Xem đầy đủ và có chú thích trong [`.env.example`](.env.example). Các nhóm chính:
 
-**Lưu ý**: Đặt `JWT_SECRET` mạnh trong production.
+| Nhóm | Biến |
+|---|---|
+| Database | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` |
+| Redis | `REDIS_HOST`, `REDIS_PORT` |
+| MinIO | `MINIO_ENDPOINT`, `MINIO_PORT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` |
+| Auth | `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` (bắt buộc, không có mặc định) |
+| Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (để trống thì email không gửi, không lỗi) |
+| Shop | `SITE_URL`, `SHOP_NAME`, `ADMIN_EMAIL`, `GOONG_API_KEY` (tùy chọn, tìm địa chỉ trong checkout) |
+
+**Lưu ý**: Đặt `JWT_SECRET` mạnh và `ADMIN_USERNAME`/`ADMIN_PASSWORD` riêng khi deploy production.
 
 ---
 
@@ -156,36 +148,52 @@ Truy cập: http://localhost:5173
 
 ```
 cosplay-portfolio/
-├── backend/           # API Node.js + Express
-│   ├── migrations/    # Knex migrations
-│   ├── seeds/         # Seed data (admin mặc định)
-│   ├── server.js      # API server
-│   └── worker.js      # Worker tạo thumbnail
-├── frontend/          # React + Vite + Tailwind
+├── backend/
+│   ├── migrations/    # Knex migrations (chạy tuần tự, không sửa lại sau khi đã chạy)
+│   ├── seeds/         # Seed data
+│   ├── shop/          # Domain logic của shop: catalog, orders, payments, shipping, stats, email
+│   ├── routes/        # Router: shop, orders, admin* (catalog/orders/payments/email/stats/shipping)
+│   ├── tests/         # Vitest, chạy trên MySQL + Redis thật
+│   ├── server.js      # API server + middleware
+│   └── worker.js      # Worker: thumbnail, hết hạn đơn, hàng đợi email
+├── frontend/
 │   └── src/
-│       ├── pages/     # Portfolio, Admin
-│       └── components/# Gallery, Lightbox, AdminUpload...
-├── deploy/            # Nginx config (reverse proxy)
-├── docker-compose.yml
+│       ├── pages/       # Portfolio, Admin, Shop, Collection, Cart, Checkout, Order, Faq
+│       ├── components/  # Gallery, AdminUpload, AdminCollections/Products/Variants/Orders...
+│       └── shop/        # cart.js, faq.js, các util riêng cho shop
+├── deploy/            # Nginx config, hướng dẫn deploy
+├── docs/              # Quyết định sản phẩm (DECISIONS.md), edge case đã xử lý (EDGE_CASE_CHECKLIST.md)
+├── docker-compose.yml         # Dev (build từ source)
+├── docker-compose.pull.yml    # Production (pull image có sẵn)
 └── .env.example
 ```
 
+Xem `CLAUDE.md` để biết chi tiết kiến trúc (luồng đặt hàng, cơ chế auth, snapshot dữ liệu đơn hàng...).
+
 ---
 
-## API Reference
+## API
 
-| Method | Endpoint        | Auth | Mô tả              |
-|--------|-----------------|------|--------------------|
-| POST   | /api/login      | -    | Đăng nhập admin    |
-| GET    | /api/gallery    | -    | Lấy danh sách ảnh  |
-| POST   | /api/image      | ✓    | Thêm ảnh           |
-| PUT    | /api/image/:id  | ✓    | Cập nhật ảnh       |
-| DELETE | /api/image/:id  | ✓    | Xóa ảnh            |
+API được chia theo router, tương ứng các file trong `backend/routes/`:
 
-**Headers khi cần auth:**
+| Router | Prefix | Auth | Mô tả |
+|---|---|---|---|
+| (inline trong `server.js`) | `/api/login`, `/api/refresh`, `/api/gallery`, `/api/settings`, `/api/storage/*` | - / admin | Đăng nhập admin, gallery/settings portfolio, proxy ảnh MinIO |
+| `shop.js` | `/api/shop/*` | - | Danh sách collection/product công khai, tra cứu địa chỉ |
+| `orders.js` | `/api/orders/*` | - / PIN | Đặt hàng, tra cứu đơn, upload ảnh chuyển khoản, xác thực PIN |
+| `adminCatalog.js` | `/api/admin/collections`, `/api/admin/products` | admin | Quản lý collection/product/variant |
+| `adminOrders.js` | `/api/admin/orders` | admin | Xem/xử lý đơn hàng |
+| `adminPayments.js` | `/api/admin/payment-settings` | admin | Cấu hình thanh toán (bank/Momo/PayPal/COD) |
+| `adminEmail.js` | `/api/admin/email-templates`, `/api/admin/email-queue` | admin | Mẫu email, hàng đợi email lỗi |
+| `adminStats.js` | `/api/admin/stats/*` | admin | Thống kê bán hàng |
+| `adminShipping.js` | `/api/admin/shipping/*` | admin | Xuất/nhập ViettelPost, danh sách nhận hàng tại sự kiện |
+
+**Headers khi cần auth (admin):**
 ```
 Authorization: Bearer <token>
 ```
+
+Đơn hàng công khai (`/api/orders/:token/...`) dùng JWT xác thực PIN riêng, không dùng token admin.
 
 ---
 
@@ -201,6 +209,12 @@ docker compose build backend
 # Reset database (xóa volume MySQL)
 docker compose down -v
 docker compose up -d
+
+# Chạy test backend (cần MySQL + Redis thật, xem CLAUDE.md để set biến môi trường)
+cd backend && npm test
+
+# Chạy test frontend
+cd frontend && npm test
 ```
 
 ---
@@ -216,3 +230,6 @@ docker compose up -d
 
 **Sharp build lỗi trên Alpine**
 - Dockerfile backend dùng `node:20-slim` để tránh build sharp trên Alpine
+
+**Backend không khởi động, báo thiếu `ADMIN_USERNAME`/`ADMIN_PASSWORD`**
+- Đặt cả hai biến trong `.env` - không có mặc định, backend cố ý dừng khởi động nếu thiếu
