@@ -30,6 +30,8 @@ const socialIcons = {
 // X and TikTok are neutral brands → a mid slate grey (visible on both themes; a hex so the
 // button border/bg tints `${col}60`/`${col}10` resolve, unlike a CSS var)
 const socialColors = { facebook: "#1877F2", instagram: "#E4405F", page: "#1877F2", x: "#94a3b8", tiktok: "#94a3b8", discord: "#5865F2" }
+// Matches --brand in index.css - a hex so the same button tint math ($col + alpha suffix) works.
+const BRAND_HEX = "#6BBF59"
 const SUPPORT_META = {
   gumroad: { label: "Gumroad", color: "#FF90E8" },
   gank: { label: "Gank", color: "#E84C3D", icon: "/refassets/gank.png" },
@@ -456,8 +458,14 @@ function ContactSection({ data, lang }) {
     title: { margin: "0 0 14px", fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-link)" },
     label: { fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".06em" },
     linkVal: { fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--text-link)", marginTop: 4, textDecoration: "none", display: "block" },
-    btn: (col) => ({ display: "inline-flex", alignItems: "center", justifyContent: "flex-start", gap: 6, width: BTN_W, padding: "8px 12px", borderRadius: "var(--radius-sm)", border: `1px solid ${col}60`, color: col, fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer", background: `${col}10`, textDecoration: "none", boxSizing: "border-box" }),
+    // Neutral border/background by default - color only fills in on hover
+    // (matches InfoSection's support list, e.g. "Gank" in a screenshot review).
+    btn: (col) => ({ display: "inline-flex", alignItems: "center", justifyContent: "flex-start", gap: 6, width: BTN_W, padding: "8px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", color: col, fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer", background: "transparent", textDecoration: "none", boxSizing: "border-box", transition: "background .15s,border-color .15s" }),
   }
+  const hoverProps = (col) => ({
+    onMouseEnter: (e) => { e.currentTarget.style.background = col + "18"; e.currentTarget.style.borderColor = col + "70" },
+    onMouseLeave: (e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "var(--border-default)" },
+  })
   return (
     <div id="contact" className="sec-wrap" style={s.wrap}>
       <div className="contact-card" style={s.card}>
@@ -476,11 +484,10 @@ function ContactSection({ data, lang }) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
               {data.contact.quick.map((c) => {
                 const meta = CONTACT_META[c.type] || {}
-                const col = meta.color || "var(--brand)"
+                const col = meta.color || BRAND_HEX
                 return (
                   <a key={c.type} href={contactHref(c.type, c.value)} target="_blank" rel="noreferrer" style={s.btn(col)}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = col + "22"; e.currentTarget.style.borderColor = col + "90" }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = col + "10"; e.currentTarget.style.borderColor = col + "60" }}>
+                    {...hoverProps(col)}>
                     {meta.icon
                       ? <img src={meta.icon} alt="" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0, borderRadius: 3 }} />
                       : CONTACT_ICONS[c.type] ? <span style={{ display: "flex", flexShrink: 0, color: col }}>{CONTACT_ICONS[c.type]}</span> : null}
@@ -497,12 +504,13 @@ function ContactSection({ data, lang }) {
             {vi ? "Ủng hộ mình qua" : "Support my work via"}
           </p>
           <div className="support-row" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-            <Link to="/merchandise" style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-start", gap: 6, width: BTN_W, padding: "8px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-brand)", color: "var(--brand)", fontSize: "var(--text-sm)", fontWeight: 600, background: "var(--brand-soft)", textDecoration: "none", boxSizing: "border-box" }}>
+            <Link to="/merchandise" style={s.btn(BRAND_HEX)} {...hoverProps(BRAND_HEX)}>
               <span style={{ display: "flex", flexShrink: 0 }}>{icons.bag}</span>
               {vi ? "Cửa hàng" : "Merchandise"}
             </Link>
             {data.supports.filter((sp) => sp.platform !== "gank").map((sp) => (
-              <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer" style={s.btn(sp.color)}>
+              <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer" style={s.btn(sp.color)}
+                {...hoverProps(sp.color)}>
                 {sp.icon
                   ? <img src={sp.icon} alt="" width={16} height={16} style={{ objectFit: "contain", flexShrink: 0, borderRadius: 3 }} />
                   : socialIcons[sp.platform] ? <span style={{ display: "flex", flexShrink: 0, color: sp.color }}>{socialIcons[sp.platform]}</span> : null}
