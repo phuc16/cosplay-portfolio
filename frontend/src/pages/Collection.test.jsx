@@ -218,7 +218,7 @@ describe("Collection - not-started preview", () => {
     // LanguageProvider defaults to English (localStorage.getItem("lang") || "en"),
     // so the rendered strings are translations.en's, not the Vietnamese ones.
     expect(container.textContent).toContain("Not started yet")
-    expect(container.textContent).toContain(formatVnDateTime("2026-12-25T13:00:00.000Z"))
+    expect(container.textContent).toContain(formatVnDateTime("2026-12-25T13:00:00.000Z", { withYear: true }))
     expect(container.textContent).toContain("Card")
   })
 

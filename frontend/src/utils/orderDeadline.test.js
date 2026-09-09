@@ -1,5 +1,21 @@
 import { describe, it, expect } from "vitest"
-import { formatDeadline } from "./orderDeadline"
+import { formatDeadline, formatVnDateTime } from "./orderDeadline"
+
+describe("formatVnDateTime", () => {
+  it("omits the year by default", () => {
+    expect(formatVnDateTime("2026-12-25T13:00:00.000Z")).toBe("20:00 25/12")
+  })
+
+  it("includes the year when withYear is true - a scheduled collection can open months out, where the year is ambiguous without it", () => {
+    expect(formatVnDateTime("2026-12-25T13:00:00.000Z", { withYear: true })).toBe("20:00 25/12/2026")
+  })
+
+  it("returns null for a missing/unparsable input regardless of withYear", () => {
+    expect(formatVnDateTime(null)).toBeNull()
+    expect(formatVnDateTime(null, { withYear: true })).toBeNull()
+    expect(formatVnDateTime("not-a-date", { withYear: true })).toBeNull()
+  })
+})
 
 describe("formatDeadline", () => {
   it("returns null for a null expires_at (COD orders never expire)", () => {

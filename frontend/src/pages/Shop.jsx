@@ -119,7 +119,7 @@ export default function Shop() {
                   <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 text-white font-semibold text-center px-2">
                     <span>{t("shopNotStarted")}</span>
                     {c.start_at && (
-                      <span className="text-xs font-normal">{t("shopOpensAt", { date: formatVnDateTime(c.start_at) })}</span>
+                      <span className="text-xs font-normal">{t("shopOpensAt", { date: formatVnDateTime(c.start_at, { withYear: true }) })}</span>
                     )}
                   </span>
                 )}

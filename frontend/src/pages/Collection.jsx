@@ -136,10 +136,10 @@ export default function Collection() {
       )}
 
       {notStartedYet && (
-        <div className="mb-6 p-4 rounded-xl border border-[var(--border-brand)] opacity-80">
-          <p className="font-semibold">{t("shopNotStarted")}</p>
+        <div className="mb-6 p-4 rounded-xl border border-[var(--border-brand)] bg-[var(--brand-soft)]">
+          <p className="font-semibold text-[var(--brand)]">{t("shopNotStarted")}</p>
           {collection.start_at && (
-            <p className="text-sm">{t("shopOpensAt", { date: formatVnDateTime(collection.start_at) })}</p>
+            <p className="text-sm text-[var(--brand)] opacity-80">{t("shopOpensAt", { date: formatVnDateTime(collection.start_at, { withYear: true }) })}</p>
           )}
         </div>
       )}

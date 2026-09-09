@@ -1,9 +1,14 @@
 /**
- * "HH:mm dd/MM" in Asia/Ho_Chi_Minh, the shared display format for any
- * order-related timestamp on the buyer's order page (deadline, and the
- * per-status timestamp - see Order.jsx's statusTimestamp). Returns null
- * for a missing/unparsable input, same contract as formatDeadline, so a
- * call site never has to special-case "Invalid Date" itself.
+ * "HH:mm dd/MM" (or "HH:mm dd/MM/yyyy" with withYear) in Asia/Ho_Chi_Minh,
+ * the shared display format for any order-related timestamp on the buyer's
+ * order page (deadline, and the per-status timestamp - see Order.jsx's
+ * statusTimestamp) as well as a collection's scheduled start_at. Returns
+ * null for a missing/unparsable input, same contract as formatDeadline, so
+ * a call site never has to special-case "Invalid Date" itself.
+ *
+ * withYear defaults to false - an order timestamp is always near-term (the
+ * year is never in doubt), but a collection's start_at can be scheduled
+ * months out, where omitting the year is genuinely ambiguous.
  *
  * Reads the individual fields out of formatToParts rather than the
  * formatted string: which order ICU prints date vs. time in, and which
@@ -12,7 +17,7 @@
  * `type` sidesteps that entirely - the values are correct regardless of
  * how this environment's ICU data would have rendered the string.
  */
-export function formatVnDateTime(iso) {
+export function formatVnDateTime(iso, { withYear = false } = {}) {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
@@ -20,11 +25,14 @@ export function formatVnDateTime(iso) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Ho_Chi_Minh",
     hour: "2-digit", minute: "2-digit",
-    day: "2-digit", month: "2-digit",
+    day: "2-digit", month: "2-digit", year: "numeric",
     hour12: false,
   }).formatToParts(d)
   const part = (type) => parts.find((p) => p.type === type)?.value
-  return `${part("hour")}:${part("minute")} ${part("day")}/${part("month")}`
+  const date = withYear
+    ? `${part("day")}/${part("month")}/${part("year")}`
+    : `${part("day")}/${part("month")}`
+  return `${part("hour")}:${part("minute")} ${date}`
 }
 
 /**
