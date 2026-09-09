@@ -1,6 +1,6 @@
-# Production compose — pulls pre-built images from Docker Hub.
+# Production compose - pulls pre-built images from Docker Hub.
 # Security: no service port is exposed publicly. Only the frontend is
-# published, and only on 127.0.0.1 — host Nginx terminates SSL and proxies
+# published, and only on 127.0.0.1 - host Nginx terminates SSL and proxies
 # to it. MySQL/Redis/MinIO/backend are reachable solely on the compose
 # network (also prevents X-Forwarded-For spoofing straight at the backend).
 services:
@@ -64,6 +64,15 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:?set ADMIN_USERNAME in .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
       NODE_ENV: production
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      GOONG_API_KEY: ${GOONG_API_KEY:-}
     logging: *logging
 
   worker:
@@ -88,6 +97,14 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     logging: *logging
 
   frontend:

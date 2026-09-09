@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react"
-import axios from "axios"
+import { api } from "../api/api"
 import { useDropzone } from "react-dropzone"
 
 export default function AdminAlbumImages({ album, onClose }) {
   const [gallery, setGallery] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploadError, setUploadError] = useState("")
+  const [error, setError] = useState("")
   const [draggedId, setDraggedId] = useState(null)
   const [reorderPending, setReorderPending] = useState(false)
 
   const fetchGallery = () => {
-    axios.get("/api/gallery").then((r) => {
+    api.get("/api/gallery").then((r) => {
       const g = r.data.find((x) => x.id === album.id)
       setGallery(g?.items || [])
     }).finally(() => setLoading(false))
@@ -26,7 +27,7 @@ export default function AdminAlbumImages({ album, onClose }) {
       const reader = new FileReader()
       reader.onload = () => {
         const base64 = reader.result.split(",")[1]
-        axios
+        api
           .post("/api/image", { album_id: album.id, base64 })
           .then(() => fetchGallery())
           .catch((err) => {
@@ -42,7 +43,10 @@ export default function AdminAlbumImages({ album, onClose }) {
 
   const deleteImage = (id) => {
     if (!confirm("Xóa ảnh này?")) return
-    axios.delete(`/api/image/${id}`).then(fetchGallery)
+    setError("")
+    api.delete(`/api/image/${id}`).then(fetchGallery).catch((err) => {
+      setError(err.response?.data?.message || "Xóa ảnh thất bại")
+    })
   }
 
   const handleDragStart = (e, img) => {
@@ -76,7 +80,7 @@ export default function AdminAlbumImages({ album, onClose }) {
     setGallery(next)
     setDraggedId(null)
     setReorderPending(true)
-    axios
+    api
       .put(`/api/albums/${album.id}/images/reorder`, { imageIds: next.map((i) => i.id) })
       .then(() => setReorderPending(false))
       .catch(() => {
@@ -111,6 +115,9 @@ export default function AdminAlbumImages({ album, onClose }) {
       </div>
       {uploadError && (
         <p className="mb-4 text-sm text-red-400">{uploadError}</p>
+      )}
+      {error && (
+        <p className="mb-4 text-sm text-red-400">{error}</p>
       )}
 
       {loading ? (

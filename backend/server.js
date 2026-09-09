@@ -5,10 +5,11 @@ if (!process.env.JWT_SECRET) {
 }
 
 const express = require("express")
+const helmet = require("helmet")
 const cors = require("cors")
 const crypto = require("crypto")
 const jwt = require("jsonwebtoken")
-const { rateLimit } = require("express-rate-limit")
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit")
 const { RedisStore } = require("rate-limit-redis")
 const db = require("./db")
 const redis = require("./redis")
@@ -16,36 +17,91 @@ const auth = require("./auth")
 const storage = require("./storage")
 
 const app = express()
-const UPLOAD_LIMIT = "50mb"
+// Production path is client -> host Nginx -> frontend container's Nginx ->
+// this server (see deploy/DEPLOY.md §9.2 and frontend/nginx.conf's /api
+// block) - exactly 2 reverse proxies, each appending its own observed
+// address via $proxy_add_x_forwarded_for. Without this, Express (and every
+// req.ip-based rate limiter/lockout below) trusted the leftmost entry of
+// X-Forwarded-For, which is whatever the original client sent - fully
+// attacker-controlled, letting a single attacker get a fresh rate-limit
+// bucket on every request. `trust proxy: 2` makes req.ip walk in from the
+// right by exactly that many hops, recovering the real client address
+// regardless of what the client prepends.
+app.set("trust proxy", 2)
+// Images are capped at 50MB decoded (shop/images.js MAX_UPLOAD_BYTES); base64
+// inflates that by ~4/3, plus a little JSON overhead - 70mb comfortably fits
+// the largest image this app will ever accept.
+const UPLOAD_LIMIT = "70mb"
+// A VTP result spreadsheet is at most MAX_IMPORT_ROWS (200) data rows of
+// plain text - a few hundred KB even with formatting. 10mb is a generous
+// ceiling for that, far below the image limit, so a malformed/huge
+// upload here can't be used to bypass the image path's specific tuning.
+const IMPORT_LIMIT = "10mb"
+const TRACKING_IMPORT_PREVIEW_PATH = "/api/admin/shipping/tracking-import/preview"
 const largeJson = express.json({ limit: UPLOAD_LIMIT })
+const importJson = express.json({ limit: IMPORT_LIMIT })
 const smallJson = express.json({ limit: "1mb" })
 
-app.use(cors())
+// This server only ever returns JSON or image bytes, never HTML, so a CSP
+// (meant to constrain a page's own scripts/styles) is inert here - the real
+// value is the frame/sniff/HSTS headers, so CSP is skipped to avoid a false
+// sense of coverage or a misconfigured directive breaking the storage-proxy
+// image responses. crossOriginResourcePolicy is skipped too: its
+// "same-origin" default is enforced by the browser independently of CORS,
+// and would block <img> loads from /api/storage in local dev (frontend
+// :5173, backend :5000 - two origins) even though that route already sets
+// its own permissive Access-Control-Allow-Origin for exactly this purpose.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }))
+
+// SITE_URL is already a required env var (used for email/QR links) - reused
+// here as the CORS allowlist instead of a second var. Falls back to
+// allow-all only when unset, matching the JWT_SECRET warning above, so a
+// missing env var degrades dev ergonomics rather than silently reopening
+// this in prod (SITE_URL is always set there).
+if (!process.env.SITE_URL) {
+  console.warn("Warning: SITE_URL not set. CORS will allow all origins.")
+}
+app.use(cors(process.env.SITE_URL ? { origin: process.env.SITE_URL } : undefined))
 app.use((req, res, next) => {
-  if (req.method === "POST" && /^\/api\/(image$|upload\/)/.test(req.path)) {
+  if (req.method === "POST" && /^\/api\/(image$|upload\/|admin\/shop\/image$|orders\/[^/]+\/proof$)/.test(req.path)) {
     return largeJson(req, res, next)
+  }
+  if (req.method === "POST" && req.path === TRACKING_IMPORT_PREVIEW_PATH) {
+    return importJson(req, res, next)
   }
   return smallJson(req, res, next)
 })
 
-// Error handler for payload too large (413) — must be immediately after body-parser
+// Error handler for payload too large (413) - must be immediately after body-parser
 app.use((err, req, res, next) => {
   if (err.type === "entity.too.large") {
-    console.error(`[ERROR] Payload too large: ${req.url} - limit ${UPLOAD_LIMIT}`)
-    return res.status(413).json({
-      error: "payload_too_large",
-      message: `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
-    })
+    const isTrackingImport = req.path === TRACKING_IMPORT_PREVIEW_PATH
+    const limit = isTrackingImport ? IMPORT_LIMIT : UPLOAD_LIMIT
+    const message = isTrackingImport
+      ? `File quá lớn. Giới hạn: ${IMPORT_LIMIT}. Hãy dùng file kết quả ViettelPost nhỏ hơn.`
+      : `Ảnh quá lớn. Giới hạn: ${UPLOAD_LIMIT}. Hãy chọn ảnh nhỏ hơn hoặc nén trước khi upload.`
+    console.error(`[ERROR] Payload too large: ${req.url} - limit ${limit}`)
+    return res.status(413).json({ error: "payload_too_large", message })
   }
   next(err)
 })
 
 // Rate limiting (chống DDoS)
-const keyGen = (req) =>
-  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+// ipKeyGenerator normalizes an IPv6 address to its /56 subnet before using it
+// as a key - a bare IPv6 address varies too easily (a /64 or larger block is
+// trivial for one attacker to rotate through) to be a stable per-client key
+// on its own.
+const keyGen = (req) => (req.ip ? ipKeyGenerator(req.ip) : "unknown")
 
 const makeStore = (prefix) =>
   new RedisStore({ sendCommand: (...args) => redis.call(...args), prefix })
+
+/** express-rate-limit sets req.rateLimit.resetTime (a Date) on a blocked request. */
+const minutesUntilReset = (req) => {
+  const resetTime = req.rateLimit?.resetTime
+  const ms = resetTime instanceof Date ? resetTime.getTime() - Date.now() : 0
+  return Math.max(1, Math.ceil(ms / 60000))
+}
 
 // Public API: 120 req/phút
 const publicLimiter = rateLimit({
@@ -75,6 +131,64 @@ const storageLimiter = rateLimit({
   },
 })
 
+// Street search: debounced (~1 request per typing pause, not per
+// keystroke) from AddressFields.jsx, only once ward+province are picked.
+// 30/phút per IP is generous headroom for a buyer typing/correcting one
+// address, capped independent of whatever limit Goong itself allows in
+// case a script hits the endpoint directly - the key never reaches the
+// browser to be extracted and called that way, but the route is public.
+const addressLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:address:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Address IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều yêu cầu. Thử lại sau." })
+  },
+})
+
+// Order creation: 10/hour per IP. Reservation holds stock, so unchecked
+// submissions could exhaust a limited drop before anyone pays.
+const orderLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:order:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Order IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({
+      error: "too_many_requests",
+      message: `Bạn đã đặt quá nhiều đơn trong 1 giờ qua (tối đa 10 đơn). Vui lòng thử lại sau khoảng ${minutesUntilReset(req)} phút.`,
+    })
+  },
+})
+
+// Payment proof upload: 20/hour per IP. Deliberately separate from
+// orderLimiter - a buyer retrying a rejected/blurry proof photo must not
+// burn the budget order creation needs, and vice versa. Base64-decodes up to
+// 50MB and hands it to sharp on an unauthenticated route, so this still
+// needs its own ceiling, just a more generous one sized for a few retries.
+const proofLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:proof:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Proof IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({
+      error: "too_many_requests",
+      message: `Bạn đã tải ảnh chuyển khoản quá nhiều lần trong 1 giờ qua (tối đa 20 lần). Vui lòng thử lại sau khoảng ${minutesUntilReset(req)} phút.`,
+    })
+  },
+})
+
 // Global: 600 req/phút hard ceiling per IP
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -90,7 +204,19 @@ const globalLimiter = rateLimit({
 })
 app.use(globalLimiter)
 
-// Request logging — one structured JSON line per request
+// The buyer's order_token (crypto.randomBytes(16).toString("hex") - see
+// shop/orders/domain.js) is the sole credential protecting their order page,
+// and it rides in the URL path on every /order/:token and
+// /api/orders/:token/... request. Redact only that exact 32-hex-char segment
+// before logging - never anything shorter/longer or non-hex, like a numeric
+// order id elsewhere in the path - so this can't be widened into hiding
+// unrelated path segments.
+const ORDER_TOKEN_RE = /\b[0-9a-f]{32}\b/g
+function redactOrderToken(path) {
+  return path.replace(ORDER_TOKEN_RE, "[token]")
+}
+
+// Request logging - one structured JSON line per request
 app.use((req, res, next) => {
   const start = process.hrtime.bigint()
   res.on("finish", () => {
@@ -100,7 +226,7 @@ app.use((req, res, next) => {
       level: res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info",
       msg: "request",
       method: req.method,
-      path: req.originalUrl,
+      path: redactOrderToken(req.originalUrl),
       status: res.statusCode,
       ip: getClientIp(req),
       latency: Math.round(latency * 10) / 10,
@@ -117,16 +243,26 @@ const API_PREFIX = "/api"
 
 
 // LOGIN ADMIN - check env (RAM), no DB + brute force protection
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin"
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin"
+// No default fallback here (unlike JWT_SECRET/SITE_URL's warn-and-continue) -
+// a silently-defaulted admin/admin credential is a well-known password, not
+// a degraded-but-safe mode, so refuse to start instead.
+if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
+  console.error("Lỗi: Cần đặt ADMIN_USERNAME và ADMIN_PASSWORD trong .env hoặc environment. Không dùng giá trị mặc định.")
+  process.exit(1)
+}
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 const LOGIN_MAX_ATTEMPTS = 5
 const LOGIN_LOCKOUT_MINUTES = 15
 
+// Same IPv6-subnet normalization as keyGen above - the login lockout below
+// is a hand-rolled rate limit and needs the same protection against an
+// attacker rotating through addresses in one /64 to dodge it.
 function getClientIp(req) {
-  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+  return req.ip ? ipKeyGenerator(req.ip) : "unknown"
 }
 
-// Constant-time string comparison — prevents character-by-character timing attacks
+// Constant-time string comparison - prevents character-by-character timing attacks
 function safeEqual(a, b) {
   const ha = crypto.createHash("sha256").update(String(a)).digest()
   const hb = crypto.createHash("sha256").update(String(b)).digest()
@@ -173,14 +309,82 @@ app.post(`${API_PREFIX}/login`, async (req, res) => {
 
     await redis.del(attemptKey)
     await redis.del(lockKey)
-    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: "8h" })
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY_SECONDS })
+    const refreshToken = await issueRefreshToken()
     console.log(`[LOGIN] Đăng nhập thành công: ${username}`)
-    res.json({ token })
+    res.json({ token, refresh_token: refreshToken })
   } catch (err) {
     console.error("[LOGIN] Lỗi:", err)
     res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
   }
 })
+
+const ACCESS_TOKEN_EXPIRY_SECONDS = 24 * 60 * 60
+const REFRESH_TOKEN_EXPIRY_SECONDS = 30 * 24 * 60 * 60
+
+// Only one admin account exists (env-configured credentials, no user table),
+// so the refresh token needs no owner mapping - its mere presence in Redis
+// with a live TTL is proof it was issued by a real login. 32 random bytes:
+// same entropy floor as order_token, since this is a bearer credential too.
+async function issueRefreshToken() {
+  const refreshToken = crypto.randomBytes(32).toString("hex")
+  await redis.set(`refresh_token:${refreshToken}`, "1", "EX", REFRESH_TOKEN_EXPIRY_SECONDS)
+  return refreshToken
+}
+
+// Rotates on every use (delete-then-reissue) rather than just checking
+// validity: a stolen refresh token that gets used once is invalidated for
+// its real owner's next refresh too, which at least surfaces the theft as a
+// forced re-login rather than letting both parties ride the same token
+// silently for its whole 30-day life.
+app.post(`${API_PREFIX}/refresh`, async (req, res) => {
+  try {
+    const { refresh_token: refreshToken } = req.body
+    if (!refreshToken || typeof refreshToken !== "string") {
+      return res.status(400).json({ error: "invalid_input", message: "Cần refresh_token" })
+    }
+
+    const key = `refresh_token:${refreshToken}`
+    const exists = await redis.get(key)
+    if (!exists) {
+      return res.status(401).json({ error: "invalid_refresh_token", message: "Phiên đăng nhập hết hạn. Đăng nhập lại." })
+    }
+    await redis.del(key)
+
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY_SECONDS })
+    const newRefreshToken = await issueRefreshToken()
+    res.json({ token, refresh_token: newRefreshToken })
+  } catch (err) {
+    console.error("[REFRESH] Lỗi:", err)
+    res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+  }
+})
+
+// ── SHOP: public storefront ──
+// address-search gets its own stricter limiter ahead of the router's
+// general publicLimiter (both apply; addressLimiter's 20/min binds first).
+app.use(`${API_PREFIX}/shop/address-search`, addressLimiter)
+app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
+
+// ── ORDERS: public order creation + lookup. Creation gets its own stricter
+// limiter (reservation holds real stock); proof upload gets its own more
+// generous limiter (retrying a photo must not burn the order-creation
+// budget, or vice versa); reading an order status page uses the general
+// public limiter so a buyer refreshing it isn't locked out. ──
+const PROOF_PATH = /^\/[^/]+\/proof$/
+app.use(`${API_PREFIX}/orders`, (req, res, next) => {
+  if (req.method === "POST" && PROOF_PATH.test(req.path)) return proofLimiter(req, res, next)
+  if (req.method === "POST") return orderLimiter(req, res, next)
+  return publicLimiter(req, res, next)
+},
+  require("./routes/orders")())
+
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminCatalog")())
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminOrders")())
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminPayments")())
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminEmail")())
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminStats")())
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminShipping")())
 
 const invalidateGallery = () => redis.del("gallery")
 
@@ -239,7 +443,7 @@ const DEFAULT_SETTINGS = {
   ],
   upcomingEvents: [
     { title: { vi: "Comic Con Vietnam 2026", en: "Comic Con Vietnam 2026" }, date: { vi: "15 Th8, 2026", en: "Aug 15, 2026" }, url: "", showPopup: true, imageUrl: "" },
-    { title: { vi: "AniMate Festival — khách mời", en: "AniMate Festival — guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "", showPopup: false, imageUrl: "" },
+    { title: { vi: "AniMate Festival - khách mời", en: "AniMate Festival - guest" }, date: { vi: "02 Th9, 2026", en: "Sep 02, 2026" }, url: "", showPopup: false, imageUrl: "" },
     { title: { vi: "Studio drop (collab)", en: "Studio drop (collab)" }, date: { vi: "20 Th9, 2026", en: "Sep 20, 2026" }, url: "", showPopup: false, imageUrl: "" },
   ],
   contact: {
@@ -259,7 +463,7 @@ const DEFAULT_SETTINGS = {
 }
 
 // Favicon available straight from the HTML <link> (no waiting for the React
-// app to fetch settings). Serves a tiny 64×64 PNG generated from the logo —
+// app to fetch settings). Serves a tiny 64×64 PNG generated from the logo -
 // redirecting to the full-size image made browsers show a placeholder while
 // downloading/decoding a huge webp.
 app.get(`${API_PREFIX}/favicon.png`, publicLimiter, async (req, res) => {
@@ -506,6 +710,7 @@ app.delete(`${API_PREFIX}/albums/:id`, auth, async (req, res) => {
 
 // IMAGES CRUD - lưu vào MinIO, DB chỉ lưu url
 const sharp = require("sharp")
+const { validateImageBuffer, InvalidImageError } = require("./shop/images")
 const MAX_FULL_WIDTH = 1920
 const JPEG_QUALITY = 85
 
@@ -513,6 +718,10 @@ const JPEG_QUALITY = 85
 // images WITH an alpha channel are written as PNG so background-removed
 // (tách nền) uploads stay transparent; opaque images stay JPEG for size.
 async function processImage(buffer) {
+  // Same magic-byte/size sniff every shop upload goes through (shop/images.js)
+  // - portfolio uploads used to hand base64 straight to sharp with no check
+  // beyond the outer JSON body limit.
+  validateImageBuffer(buffer)
   const meta = await sharp(buffer).metadata()
   let pipeline = sharp(buffer).rotate()
   if (meta.width > MAX_FULL_WIDTH) {
@@ -567,6 +776,9 @@ app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
     console.log(`[UPLOAD/HERO] Đã lưu: ${key} accent=${accentColor}`)
     res.json({ url, accentColor })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[UPLOAD/HERO] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
@@ -591,6 +803,9 @@ app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
     console.log(`[UPLOAD/THUMB] Đã lưu: ${key} accent=${accentColor}`)
     res.json({ url, accentColor })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[UPLOAD/THUMB] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
@@ -614,6 +829,9 @@ app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
     console.log(`[UPLOAD/EVENT] Đã lưu: ${key}`)
     res.json({ url })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[UPLOAD/EVENT] Lỗi:", err.message)
     res.status(500).json({ error: "server_error", message: "Upload thất bại. Thử lại." })
   }
@@ -654,6 +872,9 @@ app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
     console.log(`[IMAGE] Đã lưu ảnh vào MinIO album ${album_id}`)
     res.json({ ok: true })
   } catch (err) {
+    if (err instanceof InvalidImageError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[IMAGE] Lỗi upload:", err.message)
     res.status(500).json({ error: "server_error", message: `Upload thất bại. Kiểm tra kích thước ảnh (max ${UPLOAD_LIMIT}) hoặc thử lại.` })
   }
@@ -724,11 +945,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
 })
 
-app.listen(5000, () => {
-  storage.ensureBucket().then(() => {
-    console.log(`[SERVER] MinIO bucket ready: ${storage.BUCKET}`)
-  }).catch((e) => {
-    console.warn("[SERVER] MinIO init failed:", e.message, "- uploads may fail")
+if (require.main === module) {
+  app.listen(5000, () => {
+    storage.ensureBucket().then(() => {
+      console.log(`[SERVER] MinIO bucket ready: ${storage.BUCKET}`)
+    }).catch((e) => {
+      console.warn("[SERVER] MinIO init failed:", e.message, "- uploads may fail")
+    })
+    console.log(`[SERVER] Backend listening on :5000, body limit ${UPLOAD_LIMIT}`)
   })
-  console.log(`[SERVER] Backend listening on :5000, body limit ${UPLOAD_LIMIT}`)
-})
+}
+
+module.exports = app

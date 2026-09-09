@@ -24,7 +24,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6380:6379"
     logging: *logging
 
   minio:
@@ -42,7 +42,7 @@ services:
     logging: *logging
 
   backend:
-    image: phuc16/cosplay-backend:latest
+    image: phuc16/cosplay-backend:dev
     build: ./backend
     restart: unless-stopped
     ports:
@@ -69,10 +69,19 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       NODE_ENV: production
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      GOONG_API_KEY: ${GOONG_API_KEY:-}
     logging: *logging
 
   worker:
-    image: phuc16/cosplay-backend:latest
+    image: phuc16/cosplay-backend:dev
     build: ./backend
     restart: unless-stopped
     command: node worker.js
@@ -94,10 +103,18 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-cosplay}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SITE_URL: ${SITE_URL:-}
+      SHOP_NAME: ${SHOP_NAME:-Shop}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     logging: *logging
 
   frontend:
-    image: phuc16/cosplay-frontend:latest
+    image: phuc16/cosplay-frontend:dev
     build: ./frontend
     restart: unless-stopped
     ports:

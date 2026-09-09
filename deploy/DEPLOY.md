@@ -36,7 +36,7 @@ Hướng dẫn từng bước để host project này trên VPS (DigitalOcean Dr
 
 ---
 
-## Bước 2: Trỏ domain về Droplet (qua Cloudflare — khuyến nghị)
+## Bước 2: Trỏ domain về Droplet (qua Cloudflare - khuyến nghị)
 
 Dùng Cloudflare (gói Free) làm proxy trước domain: chống DDoS, CDN cache ảnh, ẩn IP droplet, HTTP/2.
 
@@ -46,11 +46,11 @@ Dùng Cloudflare (gói Free) làm proxy trước domain: chống DDoS, CDN cache
 4. Vào nhà cung cấp domain (vd Namecheap: Domain List → Manage → **Nameservers → Custom DNS**) → dán 2 nameserver → Save.
 5. Chờ Cloudflare gửi email "**is now active**" (thường < 1h, tối đa 48h). Site vẫn chạy bình thường trong lúc chờ.
 6. Sau khi Active, trong Cloudflare dashboard:
-   - **SSL/TLS → Overview → Custom → Full (strict)** (bắt buộc — mặc định Flexible gây redirect loop với certbot).
+   - **SSL/TLS → Overview → Custom → Full (strict)** (bắt buộc - mặc định Flexible gây redirect loop với certbot).
    - **SSL/TLS → Edge Certificates → Always Use HTTPS: On**.
    - **Scrape Shield → Hotlink Protection: On** (chặn site khác nhúng thẳng ảnh).
 
-CDN cache tự hoạt động: ảnh `.webp/.png/.jpg` được cache tại edge (kiểm tra bằng `curl -sI https://domain/api/storage/... | grep cf-cache-status` — lần 2 phải là `HIT`); route API động là `DYNAMIC` (không cache).
+CDN cache tự hoạt động: ảnh `.webp/.png/.jpg` được cache tại edge (kiểm tra bằng `curl -sI https://domain/api/storage/... | grep cf-cache-status` - lần 2 phải là `HIT`); route API động là `DYNAMIC` (không cache).
 
 > Không dùng Cloudflare? Chỉ cần thêm 2 A record `@`/`www` trỏ `IP_DROPLET` tại nhà cung cấp domain.
 
@@ -130,6 +130,29 @@ JWT_SECRET=YOUR_64_CHAR_HEX_SECRET
 # Admin
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+
+# SMTP - bắt buộc phải set, nếu không email đơn hàng (và QR trong email) sẽ
+# im lặng không gửi (sender.js no-op khi thiếu SMTP_HOST/USER/PASS)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+SMTP_FROM=noreply@your-domain.com
+
+# Site URL - bắt buộc, nếu không QR nhận hàng sẽ trỏ về path tương đối và
+# không quét được bằng camera điện thoại
+SITE_URL=https://your-domain.com
+
+# Tên shop hiển thị trong email
+SHOP_NAME=Tên Shop
+
+# Email của bạn (seller) - nhận bản sao mỗi đơn hàng mới (tuỳ chọn)
+ADMIN_EMAIL=you@example.com
+
+# Goong Maps API key - tìm gợi ý số nhà/tên đường khi checkout, chỉ gọi khi
+# bấm nút tìm kiếm (không gọi khi gõ từng ký tự). Tuỳ chọn, để trống thì nút
+# tìm kiếm không trả kết quả nhưng ô nhập vẫn dùng bình thường.
+GOONG_API_KEY=
 ```
 
 Tạo secret mạnh:
@@ -157,9 +180,9 @@ docker compose -f docker-compose.pull.yml up -d
 Chỉ cần **pull** và **up** – không build trên server.
 
 **Bảo mật của compose prod:**
-- Không service nào publish port ra ngoài, trừ frontend bind `127.0.0.1:5173` (chỉ host Nginx vào được). MySQL/Redis/MinIO/backend chỉ nói chuyện trong mạng nội bộ Docker — không thể bị truy cập hoặc spoof `X-Forwarded-For` từ internet.
-- File `.env` **bắt buộc** phải có `DB_PASS`, `MINIO_ROOT_USER/PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME/PASSWORD` — thiếu là compose từ chối chạy (không còn default `admin/admin`).
-- Log tự xoay vòng (json-file, 10MB × 3 file/container) — không lo đầy đĩa.
+- Không service nào publish port ra ngoài, trừ frontend bind `127.0.0.1:5173` (chỉ host Nginx vào được). MySQL/Redis/MinIO/backend chỉ nói chuyện trong mạng nội bộ Docker - không thể bị truy cập hoặc spoof `X-Forwarded-For` từ internet.
+- File `.env` **bắt buộc** phải có `DB_PASS`, `MINIO_ROOT_USER/PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME/PASSWORD` - thiếu là compose từ chối chạy (không còn default `admin/admin`).
+- Log tự xoay vòng (json-file, 10MB × 3 file/container) - không lo đầy đĩa.
 - Khi đổi cấu hình compose (ports/logging), phải chạy `up -d --force-recreate` mới có hiệu lực.
 
 Kiểm tra:
@@ -242,7 +265,7 @@ Làm theo hướng dẫn (email, điều khoản). Certbot sẽ tự cấu hình
 
 ## Bước 10: Mở firewall
 
-Chỉ mở đúng 3 port — mọi service khác đã không publish ra ngoài (xem Bước 7):
+Chỉ mở đúng 3 port - mọi service khác đã không publish ra ngoài (xem Bước 7):
 
 ```bash
 ufw allow 22      # SSH
@@ -298,13 +321,49 @@ Images: `phuc16/cosplay-backend:latest`, `phuc16/cosplay-frontend:latest`
 
 ---
 
+## Database Backups
+
+Orders are financial and dispute-resolution records - they must survive corruption, bad migrations, and accidental deletion. The `deploy/backup.sh` script dumps the `cosplay` database nightly via `mysqldump` with `--single-transaction`, so the site remains operational and consistent snapshots are guaranteed.
+
+**What is backed up:** The entire MySQL database (schema, data, stored procedures, triggers), via `deploy/backup.sh`. That script is MySQL-only.
+
+**Known gap - MinIO is NOT backed up:** This deployment runs a single MinIO container on one droplet, backed by a local Docker volume (`minio_data`) - there is no replication or distributed redundancy. If that volume or disk is lost, every original image and thumbnail is gone, including payment proof screenshots (`proofs/`), which are dispute-resolution evidence for orders. Until a MinIO backup mechanism is added, treat this as a real gap: at minimum, take manual/periodic snapshots of the droplet's disk (DigitalOcean Droplet snapshots cover the `minio_data` volume along with everything else) and/or `rsync`/`mc mirror` the MinIO data directory offsite before relying on this deployment for anything irreplaceable.
+
+**How often:** Every night at 03:00 UTC. Set this on the server via root's crontab:
+```bash
+crontab -e
+# Add this line:
+0 3 * * * cd /opt/cosplay && DB_PASS='YOUR_PASSWORD' ./deploy/backup.sh >> /var/log/cosplay-backup.log 2>&1
+```
+
+**Where dumps live:** `/var/backups/cosplay/` on the server. Each dump is named `cosplay-YYYYMMDD-HHMMSS.sql.gz`.
+
+**Retention window:** 14 days. Older dumps are automatically pruned by the backup script, keeping ~100 MB of historical snapshots on disk.
+
+**How to restore:** In the event of data loss, restore into a scratch database first to verify:
+```bash
+cd /opt/cosplay
+./deploy/restore.sh /var/backups/cosplay/cosplay-<date>.sql.gz
+# Prints row counts and the sum of order totals. Compare against production:
+docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" cosplay -e \
+  "SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders;"
+```
+
+If counts match, restore into production:
+```bash
+docker compose -f docker-compose.pull.yml exec mysql mysql -uroot -p"$DB_PASS" cosplay < <(gunzip -c /var/backups/cosplay/cosplay-<date>.sql.gz)
+```
+
+**Quarterly drill:** A backup that has never been restored is not a backup. Run `./deploy/restore.sh <dump>` quarterly against a real backup to confirm the mechanism works.
+
+---
+
 ## Lưu ý
 
-1. **Backup**: Định kỳ backup MySQL và volume MinIO.
-2. **JWT_SECRET**: Đổi khác so với mặc định.
-3. **ADMIN_PASSWORD**: Đặt mật khẩu mạnh.
-4. **MinIO**: Đổi `MINIO_ROOT_USER` và `MINIO_ROOT_PASSWORD`.
-5. **DB_PASS**: Đặt mật khẩu mạnh cho MySQL.
+1. **JWT_SECRET**: Đổi khác so với mặc định.
+2. **ADMIN_PASSWORD**: Đặt mật khẩu mạnh.
+3. **MinIO**: Đổi `MINIO_ROOT_USER` và `MINIO_ROOT_PASSWORD`.
+4. **DB_PASS**: Đặt mật khẩu mạnh cho MySQL.
 
 ---
 
@@ -318,5 +377,6 @@ Images: `phuc16/cosplay-backend:latest`, `phuc16/cosplay-frontend:latest`
 | Upload ảnh lỗi | Kiểm tra `client_max_body_size` trong Nginx |
 | Redirect loop (quá nhiều lần chuyển hướng) | Cloudflare SSL mode đang Flexible → đổi sang **Full (strict)** |
 | Lỗi 526 Invalid SSL certificate | Chứng chỉ origin hết hạn/sai domain → `certbot renew --dry-run` trên droplet |
-| Ảnh chậm/không cache | `curl -sI .../api/storage/xxx.webp \| grep cf-cache-status` — `HIT` là qua CDN; `MISS` liên tục thì kiểm tra header `Cache-Control` từ backend |
-| Compose từ chối chạy (`required variable ... is missing`) | Thiếu biến trong `.env` — cố ý, điền đủ secrets |
+| Ảnh chậm/không cache | `curl -sI .../api/storage/xxx.webp \| grep cf-cache-status` - `HIT` là qua CDN; `MISS` liên tục thì kiểm tra header `Cache-Control` từ backend |
+| Compose từ chối chạy (`required variable ... is missing`) | Thiếu biến trong `.env` - cố ý, điền đủ secrets |
+| Danh sách tỉnh/phường ở checkout trống | `GET /api/shop/provinces` qua backend xem có lỗi không - phụ thuộc `provinces.open-api.vn` (bên thứ ba, miễn phí, không cần key); kết quả cache 30 ngày trong Redis (`vn_provinces`, `vn_wards:<code>`) |

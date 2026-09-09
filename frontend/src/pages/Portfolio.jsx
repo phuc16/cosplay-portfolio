@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import axios from "axios"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { SITE_CONFIG, applyColorScheme } from "../config"
 import { useTheme } from "../contexts/ThemeContext"
 import { useLanguage } from "../contexts/LanguageContext"
@@ -15,6 +15,7 @@ const icons = {
   cal: <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" strokeWidth="2" /><path strokeLinecap="round" strokeWidth="2" d="M16 2v4M8 2v4M3 10h18" /></svg>,
   star: <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>,
   ext: <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>,
+  bag: <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4M3 6h18M16 10a4 4 0 01-8 0" /></svg>,
 }
 const socialIcons = {
   gumroad: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1C5.92 1 1 5.92 1 12s4.92 11 11 11 11-4.92 11-11S18.08 1 12 1zm.78 15.6c-2.86 0-4.62-2.06-4.62-4.86 0-2.92 1.94-4.92 4.74-4.92 2.5 0 3.94 1.46 4.16 3.34h-2.4c-.16-.86-.74-1.42-1.74-1.42-1.4 0-2.26 1.1-2.26 2.96 0 1.84.84 2.94 2.3 2.94 1.04 0 1.78-.56 2.02-1.62h-2.02v-1.7h4.32V16.4h-1.78l-.18-1.06c-.5.78-1.36 1.26-2.56 1.26z" /></svg>,
@@ -29,13 +30,15 @@ const socialIcons = {
 // X and TikTok are neutral brands → a mid slate grey (visible on both themes; a hex so the
 // button border/bg tints `${col}60`/`${col}10` resolve, unlike a CSS var)
 const socialColors = { facebook: "#1877F2", instagram: "#E4405F", page: "#1877F2", x: "#94a3b8", tiktok: "#94a3b8", discord: "#5865F2" }
+// Matches --brand in index.css - a hex so the same button tint math ($col + alpha suffix) works.
+const BRAND_HEX = "#6BBF59"
 const SUPPORT_META = {
   gumroad: { label: "Gumroad", color: "#FF90E8" },
   gank: { label: "Gank", color: "#E84C3D", icon: "/refassets/gank.png" },
   paypal: { label: "PayPal", color: "#a2cffe" },
 }
 
-// Quick-contact channels (Zalo / WhatsApp / Messenger / Gmail) — icon + brand color.
+// Quick-contact channels (Zalo / WhatsApp / Messenger / Gmail) - icon + brand color.
 const CONTACT_ICONS = {
   whatsapp: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.002-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.892 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.463 3.488A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413" /></svg>,
   messenger: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8l3.13 3.26L19.752 8l-6.561 6.963z" /></svg>,
@@ -65,6 +68,7 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
     { label: lang === "vi" ? "Thông tin" : "Info", href: "#info" },
     { label: lang === "vi" ? "Dự án" : "Project", href: "#project" },
     { label: lang === "vi" ? "Liên hệ" : "Contact", href: "#contact" },
+    { label: lang === "vi" ? "Cửa hàng" : "Merchandise", href: "/merchandise" },
   ]
   const s = {
     header: { position: "sticky", top: 0, zIndex: 30, background: "color-mix(in srgb, var(--bg-page) 55%, transparent)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid color-mix(in srgb, var(--border-default) 40%, transparent)" },
@@ -77,7 +81,7 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
     link: { fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--text-body)", transition: "color .15s", padding: "4px 0", borderBottom: "2px solid transparent" },
     right: { display: "flex", alignItems: "center", gap: 10 },
     langBtn: (active) => ({ padding: "3px 8px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 500, background: active ? "var(--brand)" : "transparent", color: active ? "#fff" : "var(--text-muted)" }),
-    iconBtn: { width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", color: "var(--text-body)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+    iconBtn: { width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", color: "var(--text-body)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" },
   }
   return (
     <header style={s.header}>
@@ -90,7 +94,11 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
           </div>
         </div>
         <nav className="nav-links" style={s.nav}>
-          {navLinks.map((l) => (
+          {navLinks.map((l) => l.href.startsWith("/") ? (
+            <Link key={l.label} to={l.href} style={s.link}
+              onMouseEnter={(e) => (e.target.style.color = "var(--text-link)")}
+              onMouseLeave={(e) => (e.target.style.color = "var(--text-body)")}>{l.label}</Link>
+          ) : (
             <a key={l.label} href={l.href} style={s.link}
               onMouseEnter={(e) => (e.target.style.color = "var(--text-link)")}
               onMouseLeave={(e) => (e.target.style.color = "var(--text-body)")}>{l.label}</a>
@@ -110,7 +118,7 @@ function Navbar({ theme, onToggleTheme, lang, onSetLang, artistName, tagline, lo
 /* ── Hero accent ────────────────────────────────────────────────────────────
    The accent color is computed ONCE server-side at upload (see backend
    extractAccentHex) and stored in config.heroAccents[i]. The client just reads
-   it — no canvas. This only derives the glow rgba from that stored hex. ─────── */
+   it - no canvas. This only derives the glow rgba from that stored hex. ─────── */
 function hexToRgba(hex, a) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || "")
   if (!m) return `rgba(236,72,153,${a})`
@@ -163,7 +171,7 @@ function HeroBanner({ data, theme, lang }) {
   const [dir, setDir] = useState(1)   // 1 = next (slide in from right), -1 = prev (from left)
   const [aspects, setAspects] = useState({})
 
-  // Only measure aspect ratio (portrait vs landscape) — a plain image load, no canvas.
+  // Only measure aspect ratio (portrait vs landscape) - a plain image load, no canvas.
   useEffect(() => {
     imgs.forEach((src, i) => {
       const probe = new Image()
@@ -205,17 +213,17 @@ function HeroBanner({ data, theme, lang }) {
   // No drop-shadow here: tightly-cropped cutouts (opaque pixels at the image edge)
   // turn it into a visible rectangle. The soft aura comes from a radial layer behind.
   const cutout = { position: "relative", zIndex: 1, height: "auto", width: "100%", animation: slideAnim, maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)" }
-  // Lives inside the card (inset 0 + radius) — NOT inside the pop-out container,
+  // Lives inside the card (inset 0 + radius) - NOT inside the pop-out container,
   // whose clipped overflow would show the glow as a hard-edged band above the card.
   const aura = { position: "absolute", inset: 0, zIndex: 2, borderRadius: "var(--radius-lg)", background: `radial-gradient(ellipse 55% 65% at 70% 45%, ${glowColor} 0%, transparent 70%)`, pointerEvents: "none", transition: "background 0.8s ease" }
   return (
     <div className="sec-wrap" style={s.wrap}>
       <div className="hero-card" style={s.cardBg}>
-        {/* Backdrop derived from the CURRENT slide (no separate cover upload) —
+        {/* Backdrop derived from the CURRENT slide (no separate cover upload) -
             rendered exactly like the old heroCover: sharp, the muted look comes
             from the scrim/wash layers above it. */}
         {imgs[idx] && (() => {
-          // Per-slide, per-breakpoint framing set in admin (drag/zoom preview) —
+          // Per-slide, per-breakpoint framing set in admin (drag/zoom preview) -
           // same formula as the preview box. Legacy flat slots act as desktop.
           const slot = data.heroCovers?.[idx] || {}
           const flat = "zoom" in slot || "x" in slot || "y" in slot ? slot : null
@@ -226,7 +234,7 @@ function HeroBanner({ data, theme, lang }) {
             </div>
           )
         })()}
-        {/* Accent wash — cover/scrim shows on the left, soft pale accent fills the right (design look) */}
+        {/* Accent wash - cover/scrim shows on the left, soft pale accent fills the right (design look) */}
         <div style={{ position: "absolute", inset: 0, zIndex: 2, borderRadius: "var(--radius-lg)", background: `linear-gradient(to right, transparent 0%, transparent 28%, ${accent} 100%)`, transition: "background 0.8s ease" }} />
         {/* Soft glow behind the character, clipped to the card */}
         <div style={aura} />
@@ -321,6 +329,13 @@ function InfoSection({ data, onOpenPhoto, lang }) {
           <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: 14, marginTop: 14 }}>
             <h4 style={{ margin: "0 0 10px", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-link)" }}>{L.support}</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Link to="/merchandise"
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", color: "var(--brand)", background: "transparent", textDecoration: "none", fontWeight: 600, transition: "background .15s,border-color .15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = BRAND_HEX + "18"; e.currentTarget.style.borderColor = BRAND_HEX + "70" }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "var(--border-default)" }}>
+                <span style={{ display: "flex", flexShrink: 0 }}>{icons.bag}</span>
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>{vi ? "Cửa hàng" : "Merchandise"}</span>
+              </Link>
               {data.supports.map((sp) => (
                 <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer"
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", color: sp.color, textDecoration: "none", transition: "background .15s,border-color .15s" }}
@@ -445,8 +460,14 @@ function ContactSection({ data, lang }) {
     title: { margin: "0 0 14px", fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-link)" },
     label: { fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".06em" },
     linkVal: { fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--text-link)", marginTop: 4, textDecoration: "none", display: "block" },
-    btn: (col) => ({ display: "inline-flex", alignItems: "center", justifyContent: "flex-start", gap: 6, width: BTN_W, padding: "8px 12px", borderRadius: "var(--radius-sm)", border: `1px solid ${col}60`, color: col, fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer", background: `${col}10`, textDecoration: "none", boxSizing: "border-box" }),
+    // Neutral border/background by default - color only fills in on hover
+    // (matches InfoSection's support list, e.g. "Gank" in a screenshot review).
+    btn: (col) => ({ display: "inline-flex", alignItems: "center", justifyContent: "flex-start", gap: 6, width: BTN_W, padding: "8px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", color: col, fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer", background: "transparent", textDecoration: "none", boxSizing: "border-box", transition: "background .15s,border-color .15s" }),
   }
+  const hoverProps = (col) => ({
+    onMouseEnter: (e) => { e.currentTarget.style.background = col + "18"; e.currentTarget.style.borderColor = col + "70" },
+    onMouseLeave: (e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "var(--border-default)" },
+  })
   return (
     <div id="contact" className="sec-wrap" style={s.wrap}>
       <div className="contact-card" style={s.card}>
@@ -465,11 +486,10 @@ function ContactSection({ data, lang }) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
               {data.contact.quick.map((c) => {
                 const meta = CONTACT_META[c.type] || {}
-                const col = meta.color || "var(--brand)"
+                const col = meta.color || BRAND_HEX
                 return (
                   <a key={c.type} href={contactHref(c.type, c.value)} target="_blank" rel="noreferrer" style={s.btn(col)}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = col + "22"; e.currentTarget.style.borderColor = col + "90" }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = col + "10"; e.currentTarget.style.borderColor = col + "60" }}>
+                    {...hoverProps(col)}>
                     {meta.icon
                       ? <img src={meta.icon} alt="" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0, borderRadius: 3 }} />
                       : CONTACT_ICONS[c.type] ? <span style={{ display: "flex", flexShrink: 0, color: col }}>{CONTACT_ICONS[c.type]}</span> : null}
@@ -486,8 +506,13 @@ function ContactSection({ data, lang }) {
             {vi ? "Ủng hộ mình qua" : "Support my work via"}
           </p>
           <div className="support-row" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+            <Link to="/merchandise" style={s.btn(BRAND_HEX)} {...hoverProps(BRAND_HEX)}>
+              <span style={{ display: "flex", flexShrink: 0 }}>{icons.bag}</span>
+              {vi ? "Cửa hàng" : "Merchandise"}
+            </Link>
             {data.supports.filter((sp) => sp.platform !== "gank").map((sp) => (
-              <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer" style={s.btn(sp.color)}>
+              <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer" style={s.btn(sp.color)}
+                {...hoverProps(sp.color)}>
                 {sp.icon
                   ? <img src={sp.icon} alt="" width={16} height={16} style={{ objectFit: "contain", flexShrink: 0, borderRadius: 3 }} />
                   : socialIcons[sp.platform] ? <span style={{ display: "flex", flexShrink: 0, color: sp.color }}>{socialIcons[sp.platform]}</span> : null}
@@ -657,12 +682,12 @@ export default function Portfolio() {
 
   useEffect(() => { document.title = data.artistName || "Kamidayhehe" }, [data.artistName])
 
-  // Favicon comes from <link rel="icon" href="/api/favicon.png"> in index.html —
+  // Favicon comes from <link rel="icon" href="/api/favicon.png"> in index.html -
   // a server-generated 64px PNG. Don't swap it to the full-size logo here:
   // browsers cache that huge image as the site icon and show a placeholder
   // block while decoding it on the next load.
 
-  // Popup shows on every page load (F5 included) — closing only hides it until the next load
+  // Popup shows on every page load (F5 included) - closing only hides it until the next load
   useEffect(() => {
     if (!settings) return
     const events = settings.upcomingEvents || []
@@ -716,9 +741,9 @@ export default function Portfolio() {
         </footer>
         {!loading && data.footerChar && showFooterChar && (
           <div className="footer-char" style={{ position: "absolute", bottom: 0, right: 32, height: "calc(100% + 260px)", width: "auto", zIndex: 40, pointerEvents: "none", visibility: footerCharLoaded ? "visible" : "hidden" }}>
-            {/* Soft radial aura BEHIND the character — no straight edges, so a tightly-cropped
+            {/* Soft radial aura BEHIND the character - no straight edges, so a tightly-cropped
                 cutout never turns the glow into a rectangular frame (unlike a drop-shadow).
-                The whole block stays hidden until the image loads — otherwise the aura
+                The whole block stays hidden until the image loads - otherwise the aura
                 shows up alone as a floating purple blob during page load. */}
             <div style={{ position: "absolute", inset: "-40px -30px 40px", background: "radial-gradient(ellipse at 50% 55%, rgba(180,120,255,0.40) 0%, rgba(180,120,255,0.16) 45%, transparent 72%)", filter: "blur(30px)", zIndex: 0, pointerEvents: "none" }} />
             <img src={data.footerChar} alt="" loading="lazy" decoding="async" onLoad={() => setFooterCharLoaded(true)} style={{ position: "relative", zIndex: 1, height: "100%", width: "auto", objectFit: "contain", objectPosition: "bottom right", display: "block" }} />

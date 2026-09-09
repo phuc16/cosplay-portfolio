@@ -1,24 +1,108 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import axios from "axios"
+import { api } from "../api/api"
 import AdminAlbums from "../components/AdminAlbums"
 import AdminSettings from "../components/AdminSettings"
+import AdminCollections from "../components/AdminCollections"
+import AdminOrders from "../components/AdminOrders"
+import AdminPaymentSettings from "../components/AdminPaymentSettings"
+import AdminEmailTemplates from "../components/AdminEmailTemplates"
+import AdminStats from "../components/AdminStats"
+import AdminShipping from "../components/AdminShipping"
 import { useTheme } from "../contexts/ThemeContext"
+
+const TOKEN_KEY = "admin_token"
+const REFRESH_KEY = "admin_refresh_token"
 
 export default function Admin() {
   const { theme, toggleTheme } = useTheme()
   const [tab, setTab] = useState("albums")
-  const [token, setToken] = useState("")
+  // Read once at mount, applying the saved token to axios immediately so the
+  // very first admin API call (before any effect runs) still authenticates -
+  // without this, a page refresh loses the session even though the JWT
+  // (8h expiry) is still valid.
+  const [token, setToken] = useState(() => {
+    const saved = localStorage.getItem(TOKEN_KEY)
+    if (saved) axios.defaults.headers.common["Authorization"] = "Bearer " + saved
+    return saved || ""
+  })
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [checkingSession, setCheckingSession] = useState(() => !token && !!localStorage.getItem(REFRESH_KEY))
+
+  const logout = () => {
+    setToken("")
+    delete axios.defaults.headers.common["Authorization"]
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(REFRESH_KEY)
+  }
+
+  const applySession = (data) => {
+    axios.defaults.headers.common["Authorization"] = "Bearer " + data.token
+    localStorage.setItem(TOKEN_KEY, data.token)
+    if (data.refresh_token) localStorage.setItem(REFRESH_KEY, data.refresh_token)
+    setToken(data.token)
+  }
+
+  // Access token can be entirely missing on mount while the refresh token is still good - redeem it before showing login
+  useEffect(() => {
+    if (token) return
+    const refreshToken = localStorage.getItem(REFRESH_KEY)
+    if (!refreshToken) return
+    let cancelled = false
+    axios
+      .post("/api/refresh", { refresh_token: refreshToken })
+      .then((r) => {
+        if (!cancelled) applySession(r.data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          localStorage.removeItem(REFRESH_KEY)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingSession(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // On a 401/403 mid-session, try the refresh token (30d vs the access token's 8h) and retry; only log out if that also fails.
+  useEffect(() => {
+    if (!token) return
+    const id = api.interceptors.response.use(
+      (res) => res,
+      async (err) => {
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          const refreshToken = localStorage.getItem(REFRESH_KEY)
+          if (refreshToken && !err.config?._retriedAfterRefresh) {
+            try {
+              const r = await axios.post("/api/refresh", { refresh_token: refreshToken })
+              applySession(r.data)
+              err.config._retriedAfterRefresh = true
+              err.config.headers.Authorization = "Bearer " + r.data.token
+              return api.request(err.config)
+            } catch {
+              logout()
+              return Promise.reject(err)
+            }
+          }
+          logout()
+        }
+        return Promise.reject(err)
+      }
+    )
+    return () => api.interceptors.response.eject(id)
+  }, [token])
 
   const login = async (e) => {
     e?.preventDefault()
     setError("")
     try {
       const r = await axios.post("/api/login", { username, password })
-      axios.defaults.headers.common["Authorization"] = "Bearer " + r.data.token
-      setToken(r.data.token)
+      applySession(r.data)
     } catch (err) {
       const msg = err.response?.data?.message || "Sai tên đăng nhập hoặc mật khẩu"
       setError(msg)
@@ -29,7 +113,7 @@ export default function Admin() {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-cosplay-dark">
         <header className="bg-white dark:bg-cosplay-card border-b border-gray-200 dark:border-cosplay-border px-3 sm:px-4 py-3 flex flex-wrap justify-between items-center gap-2">
-          <h1 className="font-bold text-base sm:text-lg text-gray-900 dark:text-slate-100 truncate min-w-0">Admin — Cosplay Portfolio</h1>
+          <h1 className="font-bold text-base sm:text-lg text-gray-900 dark:text-slate-100 truncate min-w-0">Admin - Cosplay Portfolio</h1>
           <div className="flex flex-wrap gap-2 sm:gap-4 items-center shrink-0">
             <button
               onClick={() => setTab("albums")}
@@ -42,6 +126,42 @@ export default function Admin() {
               className={`text-sm ${tab === "settings" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
             >
               Cài đặt trang
+            </button>
+            <button
+              onClick={() => setTab("shop")}
+              className={`text-sm ${tab === "shop" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Shop
+            </button>
+            <button
+              onClick={() => setTab("orders")}
+              className={`text-sm ${tab === "orders" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Đơn hàng
+            </button>
+            <button
+              onClick={() => setTab("payments")}
+              className={`text-sm ${tab === "payments" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Thanh toán
+            </button>
+            <button
+              onClick={() => setTab("email")}
+              className={`text-sm ${tab === "email" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Email
+            </button>
+            <button
+              onClick={() => setTab("stats")}
+              className={`text-sm ${tab === "stats" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Thống kê
+            </button>
+            <button
+              onClick={() => setTab("shipping")}
+              className={`text-sm ${tab === "shipping" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Vận chuyển
             </button>
             <button
               onClick={toggleTheme}
@@ -59,19 +179,27 @@ export default function Admin() {
               )}
             </button>
             <button
-              onClick={() => {
-                setToken("")
-                delete axios.defaults.headers.common["Authorization"]
-              }}
+              onClick={logout}
               className="text-sm text-gray-600 dark:text-slate-500 hover:text-pink-500 dark:hover:text-pink-400"
             >
               Đăng xuất
             </button>
           </div>
         </header>
-        {tab === "albums" ? <AdminAlbums /> : <AdminSettings />}
+        {tab === "albums" && <AdminAlbums />}
+        {tab === "settings" && <AdminSettings />}
+        {tab === "shop" && <AdminCollections />}
+        {tab === "orders" && <AdminOrders />}
+        {tab === "payments" && <AdminPaymentSettings />}
+        {tab === "email" && <AdminEmailTemplates />}
+        {tab === "stats" && <AdminStats />}
+        {tab === "shipping" && <AdminShipping />}
       </div>
     )
+  }
+
+  if (checkingSession) {
+    return <div className="min-h-screen bg-gray-100 dark:bg-cosplay-dark" />
   }
 
   return (

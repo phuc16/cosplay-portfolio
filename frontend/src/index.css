@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ===========================================================================
-   DESIGN TOKENS — ported from design_handoff tokens/*.css (authoritative).
+   DESIGN TOKENS - ported from design_handoff tokens/*.css (authoritative).
    Signature look: neon pink on near-black. Light mode is a clean gray/white.
    =========================================================================== */
 :root {
@@ -36,8 +36,12 @@
   --slate-500: #64748b;
   --red-400: #f87171;
   --red-500: #ef4444;
+  --green-400: #4ade80;
+  --green-500: #22c55e;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
 
-  /* --- Semantic aliases — LIGHT MODE (defaults = green scheme; settings may override via applyColorScheme) --- */
+  /* --- Semantic aliases - LIGHT MODE (defaults = green scheme; settings may override via applyColorScheme) --- */
   --brand: #6BBF59;
   --brand-hover: #84cf74;
   --brand-strong: #54a344;
@@ -61,6 +65,27 @@
   --text-link: #6BBF59;
   --text-error: var(--red-500);
 
+  /* --- Semantic state tokens - success / danger / warning / neutral ---
+     Added for the admin UI & shop state indicators. Deliberately not
+     derived from --brand: --brand is admin-configurable via site settings
+     (applyColorScheme), and state colour must never depend on the seller's
+     chosen decoration. */
+  --surface-success: rgba(34, 197, 94, 0.10);
+  --border-success: rgba(34, 197, 94, 0.50);
+  --text-success: var(--green-500);
+
+  --surface-danger: rgba(239, 68, 68, 0.10);
+  --border-danger: rgba(239, 68, 68, 0.50);
+  --text-danger: var(--red-500);
+
+  --surface-warning: rgba(245, 158, 11, 0.10);
+  --border-warning: rgba(245, 158, 11, 0.50);
+  --text-warning: var(--amber-500);
+
+  --surface-neutral: var(--gray-100);
+  --border-neutral: var(--gray-300);
+  --text-neutral: var(--gray-600);
+
   /* --- Typography --- */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
@@ -79,7 +104,7 @@
   --radius-lg: 0.75rem;    /* large cards, dialogs */
   --radius-full: 9999px;
 
-  /* --- Shadows (signature glow — defaults follow the green scheme) --- */
+  /* --- Shadows (signature glow - defaults follow the green scheme) --- */
   --shadow-pink-glow: 0 0 20px rgba(107, 191, 89, 0.30);
   --shadow-pink-soft: 0 4px 14px rgba(107, 191, 89, 0.15);
   --shadow-pink-hover: 0 20px 25px -5px rgba(107, 191, 89, 0.20), 0 8px 10px -6px rgba(107, 191, 89, 0.20);
@@ -87,7 +112,7 @@
   --grad2: #4ade80;
 }
 
-/* --- Semantic aliases — DARK MODE (the signature aesthetic) --- */
+/* --- Semantic aliases - DARK MODE (the signature aesthetic) --- */
 .dark {
   --brand-soft: rgba(107, 191, 89, 0.15);
 
@@ -106,6 +131,22 @@
   --text-faint: var(--slate-500);
   --text-link: #84cf74;
   --text-error: var(--red-400);
+
+  --surface-success: rgba(34, 197, 94, 0.15);
+  --border-success: rgba(74, 222, 128, 0.50);
+  --text-success: var(--green-400);
+
+  --surface-danger: rgba(239, 68, 68, 0.15);
+  --border-danger: rgba(248, 113, 113, 0.50);
+  --text-danger: var(--red-400);
+
+  --surface-warning: rgba(245, 158, 11, 0.15);
+  --border-warning: rgba(251, 191, 36, 0.50);
+  --text-warning: var(--amber-400);
+
+  --surface-neutral: var(--cosplay-card);
+  --border-neutral: var(--cosplay-border);
+  --text-neutral: var(--slate-400);
 }
 
 @layer base {
@@ -136,7 +177,7 @@
 @keyframes hero-slide-cl { from { opacity: 0; transform: translateX(-50%) translateX(-70px); } to { opacity: 1; transform: translateX(-50%); } }
 
 /* Casual download deterrent: images can't be dragged out or long-press-saved
-   easily. Purely a speed bump — determined users can always use DevTools.
+   easily. Purely a speed bump - determined users can always use DevTools.
    Scoped to the public site so admin drag-to-reorder keeps working. */
 .portfolio-root img { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
@@ -156,32 +197,41 @@
 .reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
-/* ── Responsive (portfolio page) — mirrors the reference breakpoints ── */
+/* ── Responsive (portfolio page) - mirrors the reference breakpoints ── */
+/* Tablet (761-980px) gets its own 2-column treatment for the 3-card info
+   grid, instead of falling all the way to mobile's single column - the
+   extra width over a phone was otherwise going unused. */
+@media (min-width: 761px) and (max-width: 980px) {
+  .info-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
 @media (max-width: 980px) {
-  .info-grid { grid-template-columns: 1fr !important; }
   .proj-grid { grid-template-columns: 1fr !important; }
-  .contact-card { grid-template-columns: 1fr !important; }
 }
 @media (max-width: 760px) {
   .nav-links { display: none !important; }
   .nav-inner { padding: 0 16px !important; }
   .sec-wrap { padding-left: 16px !important; padding-right: 16px !important; }
   .album-grid { grid-template-columns: 1fr 1fr !important; }
+  .info-grid { grid-template-columns: 1fr !important; }
   .hero-card { height: 300px !important; }
   .hero-left { max-width: 100% !important; padding: 0 24px 28px !important; }
   .hero-title { font-size: 36px !important; }
   /* Cutout stays right + pops above the card, but rises less so it never
      reaches the navbar's VI/EN switch (card sits 20px below the navbar). */
   .hero-cutout { top: -18px !important; }
-  .contact-card { padding: 24px 20px !important; gap: 24px !important; }
+  .contact-card { grid-template-columns: 1fr !important; padding: 24px 20px !important; gap: 24px !important; }
   .footer-char { display: none !important; }
   .support-row { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; }
-  /* Footer: stack + center the two lines, no Admin button on mobile */
+  /* Footer: stack + center the two lines, no Admin button on mobile.
+     Shared with ShopFooter.jsx, not just the portfolio page. */
   .footer-bar { flex-direction: column !important; align-items: center !important; gap: 4px !important; text-align: center !important; }
   .footer-admin { display: none !important; }
 }
 @media (max-width: 460px) {
-  .hero-card { height: 300px !important; }
+  /* Narrower than the width shrinking justifies a flat 300px - scaled down
+     further so a 375px-wide phone doesn't get the same hero height as a
+     750px-wide one. */
+  .hero-card { height: 240px !important; }
   .hero-left { padding: 0 18px 22px !important; }
   .hero-title { font-size: 30px !important; }
   .album-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
