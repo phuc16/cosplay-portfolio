@@ -283,12 +283,66 @@ describe("listPublicCollections", () => {
     expect(collections.find((c) => c.id === cidDigital).has_digital_item).toBe(true)
     expect(collections.find((c) => c.id === cidPhysical).has_digital_item).toBe(false)
   })
+
+  it("includes a collection whose start_at hasn't arrived yet, flagged as not_started_yet", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Upcoming Drop", status: "active", start_at: future })
+
+    const collections = await repo.listPublicCollections()
+    const found = collections.find((c) => c.id === cid)
+    expect(found).toBeDefined()
+    expect(found.not_started_yet).toBe(true)
+  })
+
+  it("flags not_started_yet false for a collection that has already started", async () => {
+    const past = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Live Drop", status: "active", start_at: past })
+
+    const collections = await repo.listPublicCollections()
+    expect(collections.find((c) => c.id === cid).not_started_yet).toBe(false)
+  })
+
+  it("flags not_started_yet false for a collection with no start_at at all", async () => {
+    const cid = await repo.createCollection({ title: "No Schedule", status: "active" })
+
+    const collections = await repo.listPublicCollections()
+    expect(collections.find((c) => c.id === cid).not_started_yet).toBe(false)
+  })
+
+  it("still hides a draft collection even with a future start_at - not_started_yet does not override status visibility", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    await repo.createCollection({ title: "Draft Upcoming", status: "draft", start_at: future })
+
+    const titles = (await repo.listPublicCollections()).map((c) => c.title)
+    expect(titles).not.toContain("Draft Upcoming")
+  })
 })
 
 describe("getPublicCollectionBySlug", () => {
   it("returns null for a draft collection", async () => {
     await repo.createCollection({ title: "Secret", status: "draft" })
     expect(await repo.getPublicCollectionBySlug("secret")).toBeNull()
+  })
+
+  it("returns a collection whose start_at hasn't arrived yet, flagged as not_started_yet, instead of null", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Upcoming Drop", status: "active", start_at: future })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Photocard", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+
+    const detail = await repo.getPublicCollectionBySlug((await repo.listPublicCollections()).find((c) => c.id === cid).slug)
+    expect(detail).not.toBeNull()
+    expect(detail.not_started_yet).toBe(true)
+    expect(detail.products).toHaveLength(1)
+  })
+
+  it("flags not_started_yet false once start_at has passed", async () => {
+    const past = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const cid = await repo.createCollection({ title: "Live Drop", status: "active", start_at: past })
+    const slug = (await repo.listPublicCollections()).find((c) => c.id === cid).slug
+
+    const detail = await repo.getPublicCollectionBySlug(slug)
+    expect(detail.not_started_yet).toBe(false)
   })
 
   it("nests products and their variants", async () => {
@@ -611,13 +665,18 @@ describe("copyCollection", () => {
 })
 
 describe("collection scheduling", () => {
-  it("hides a not-yet-started collection from the public list and slug lookup", async () => {
+  it("shows a not-yet-started collection on the public list and slug lookup, flagged not_started_yet", async () => {
     const future = new Date(Date.now() + 60 * 60 * 1000)
     const cid = await repo.createCollection({ title: "Future Drop", status: "active", start_at: future })
 
     const list = await repo.listPublicCollections()
-    expect(list.find((c) => c.id === cid)).toBeUndefined()
-    expect(await repo.getPublicCollectionBySlug((await repo.getCollectionDetailById(cid)).slug)).toBeNull()
+    const found = list.find((c) => c.id === cid)
+    expect(found).toBeDefined()
+    expect(found.not_started_yet).toBe(true)
+
+    const detail = await repo.getPublicCollectionBySlug((await repo.getCollectionDetailById(cid)).slug)
+    expect(detail).not.toBeNull()
+    expect(detail.not_started_yet).toBe(true)
   })
 
   it("still shows a not-yet-started collection to the admin", async () => {

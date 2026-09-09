@@ -103,14 +103,21 @@ async function listPublicCollections() {
             EXISTS (SELECT 1 FROM products dp WHERE dp.collection_id = c.id AND dp.type = 'digital') AS has_digital_item
        FROM collections c
        LEFT JOIN products p ON p.collection_id = c.id
-      WHERE c.status IN (?, ?) AND (c.start_at IS NULL OR c.start_at <= UTC_TIMESTAMP())
+      WHERE c.status IN (?, ?)
       GROUP BY c.id
       ORDER BY c.sort_order ASC, c.id ASC`,
     PUBLIC_STATUSES
   )
   const updated = await closeExpiredCollections(rows)
+  // A collection whose start_at hasn't arrived yet is now included (buyers
+  // can preview it), flagged here so the frontend can hide ordering - same
+  // JS "now" comparison closeExpiredCollections above already uses for
+  // end_at, not a UTC_TIMESTAMP() SQL clause, since this is a display flag,
+  // not the actual order-time gate (that's createOrder's own independent check).
+  const now = new Date()
   return updated.map((r) => ({
     ...mapCollection(r), product_count: Number(r.product_count), has_digital_item: Boolean(r.has_digital_item),
+    not_started_yet: Boolean(r.start_at) && new Date(r.start_at) > now,
   }))
 }
 
@@ -170,11 +177,15 @@ async function nestCollectionDetail(collection) {
 
 async function getPublicCollectionBySlug(slug) {
   const [[collection]] = await db.query(
-    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) AND (start_at IS NULL OR start_at <= UTC_TIMESTAMP()) LIMIT 1",
+    "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) LIMIT 1",
     [slug, ...PUBLIC_STATUSES]
   )
   if (!collection) return null
   const [updated] = await closeExpiredCollections([collection])
+  // Same not_started_yet flag as listPublicCollections, computed the same
+  // way - see that function's comment for why this is a JS "now" comparison
+  // rather than a SQL clause.
+  const notStartedYet = Boolean(updated.start_at) && new Date(updated.start_at) > new Date()
   const detail = await nestCollectionDetail(updated)
   // delivery_link is only trustworthy once an order is confirmed/shipped/completed
   // (see routes/orders.js and email templates.js) - nestCollectionDetail is shared
@@ -183,6 +194,7 @@ async function getPublicCollectionBySlug(slug) {
   // legitimately need to see stock/sold-out state before ever placing an order.
   return {
     ...detail,
+    not_started_yet: notStartedYet,
     products: detail.products.map(({ delivery_link, ...rest }) => rest),
   }
 }

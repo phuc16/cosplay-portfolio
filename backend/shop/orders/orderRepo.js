@@ -228,9 +228,11 @@ async function createOrder(input) {
       // "closed" only happens lazily on a read path (see catalogRepo.js's
       // closeExpiredCollections), which this write path never calls. A
       // collection whose start_at hasn't arrived yet is rejected the same
-      // way - catalogRepo hides it from listing/lookup, but a buyer who
-      // already has the variant_id (an old cart, a stale page, a crafted
-      // request) must not be able to check out before it's actually live.
+      // way - this check is the primary defense against ordering early, not
+      // just cleanup for a stale link: catalogRepo now deliberately shows a
+      // not-yet-started collection on the public site as a browsable
+      // preview, so its variant_ids are directly visible to anyone browsing,
+      // not just someone with an old cart or a crafted request.
       const collectionNotStarted = row.collection_start_at && new Date(row.collection_start_at) > now
       const collectionExpired = row.collection_end_at && new Date(row.collection_end_at) <= now
       if (row.collection_status !== "active" || collectionNotStarted || collectionExpired) {
