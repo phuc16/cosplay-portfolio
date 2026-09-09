@@ -54,7 +54,7 @@ function galleryGridClasses(count) {
   return "grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8"
 }
 
-export default function ProductCard({ product, collectionSlug, orderable, onAdded }) {
+export default function ProductCard({ product, collectionSlug, orderable, unavailableLabel, onAdded }) {
   const { t } = useLanguage()
   const isDigital = product.type === "digital"
   // A digital product is treated exactly like a product with one variant -
@@ -270,7 +270,7 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
                 )}
               </div>
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
-              <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : t("shopClosed")}</p>
+              <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : (unavailableLabel || t("shopClosed"))}</p>
 
               {detail.description && (
                 <div

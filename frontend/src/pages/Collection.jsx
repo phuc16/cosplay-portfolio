@@ -7,6 +7,7 @@ import ProductCard, { isProductSoldOut } from "../components/shop/ProductCard"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import FitTitle from "../components/shop/FitTitle"
+import { formatVnDateTime } from "../utils/orderDeadline"
 
 // Sold-out products always sink to the end, under every sort mode - not
 // just the default - so switching to "Price: low to high" etc. never mixes
@@ -79,6 +80,8 @@ export default function Collection() {
   }
 
   const closed = collection.status === "closed"
+  const notStartedYet = !closed && collection.not_started_yet
+  const unavailableLabel = closed ? t("shopClosed") : notStartedYet ? t("shopNotStarted") : null
   const visibleProducts = sortProducts(
     collection.products.filter((p) => {
       if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
@@ -129,6 +132,15 @@ export default function Collection() {
         <div className="mb-6 p-4 rounded-xl border border-red-500/50 bg-red-500/10">
           <p className="font-semibold text-red-500">{t("shopClosed")}</p>
           <p className="text-sm text-red-500/80">{t("shopClosedNote")}</p>
+        </div>
+      )}
+
+      {notStartedYet && (
+        <div className="mb-6 p-4 rounded-xl border border-[var(--border-brand)] opacity-80">
+          <p className="font-semibold">{t("shopNotStarted")}</p>
+          {collection.start_at && (
+            <p className="text-sm">{t("shopOpensAt", { date: formatVnDateTime(collection.start_at) })}</p>
+          )}
         </div>
       )}
 
@@ -185,7 +197,8 @@ export default function Collection() {
                   key={p.id}
                   product={p}
                   collectionSlug={collection.slug}
-                  orderable={!closed}
+                  orderable={!closed && !notStartedYet}
+                  unavailableLabel={unavailableLabel}
                   onAdded={handleAdded}
                 />
               ))}

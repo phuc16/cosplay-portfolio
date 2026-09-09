@@ -492,3 +492,20 @@ describe("ProductCard - full variant gallery", () => {
     expect(grid.className).toContain("lg:grid-cols-8")
   })
 })
+
+describe("unavailableLabel", () => {
+  it("shows the custom unavailableLabel instead of the stock line when not orderable", async () => {
+    const { container } = await renderCard({
+      product: { id: 1, name: "Card", price: 35000, images: [], variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+      orderable: false,
+      unavailableLabel: "Chưa mở bán",
+    })
+    // This product has no cover image (no product.images, no variant image_url),
+    // so there's no <img> to click - open its (single-variant) detail via the
+    // card's clickable wrapper instead, same trigger the img would otherwise sit inside.
+    const card = container.querySelector('[role="button"]')
+    await act(async () => { card?.click() })
+
+    expect(container.textContent).toContain("Chưa mở bán")
+  })
+})

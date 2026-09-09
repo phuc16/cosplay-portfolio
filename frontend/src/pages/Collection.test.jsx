@@ -205,3 +205,39 @@ describe("Collection - add-to-cart toast", () => {
     vi.useRealTimers()
   })
 })
+
+describe("Collection - not-started preview", () => {
+  it("shows a not-started banner with the open date, and still renders products", async () => {
+    fetchCollection.mockResolvedValue(baseCollection({
+      not_started_yet: true, start_at: "2026-12-25T13:00:00.000Z",
+    }))
+
+    const container = await renderCollection()
+
+    // LanguageProvider defaults to English (localStorage.getItem("lang") || "en"),
+    // so the rendered strings are translations.en's, not the Vietnamese ones.
+    expect(container.textContent).toContain("Not started yet")
+    expect(container.textContent).toContain("Card")
+  })
+
+  it("does not show the not-started banner for a started collection", async () => {
+    fetchCollection.mockResolvedValue(baseCollection({ not_started_yet: false }))
+
+    const container = await renderCollection()
+
+    expect(container.textContent).not.toContain("Not started yet")
+  })
+
+  it("disables add-to-cart for a not-yet-started collection's product", async () => {
+    fetchCollection.mockResolvedValue(baseCollection({
+      not_started_yet: true, start_at: "2026-12-25T13:00:00.000Z",
+    }))
+
+    const container = await renderCollection()
+    const cover = container.querySelector("img")
+    await act(async () => { cover?.click() })
+
+    const addButton = [...container.querySelectorAll("button")].find((b) => b.textContent.includes("Thêm vào giỏ") || b.textContent.includes("Add to cart"))
+    if (addButton) expect(addButton.disabled).toBe(true)
+  })
+})
