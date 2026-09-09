@@ -379,6 +379,19 @@ describe("digital products", () => {
     const { container } = await renderCard({ product: digitalProduct() })
     expect(container.querySelector('img[src="https://x/cover.jpg"]')).toBeTruthy()
   })
+
+  it("uses thumbnail_image (not the first gallery image) as the cart line's image_url", async () => {
+    const { container } = await renderCard({
+      product: digitalProduct({ thumbnail_image: "https://x/thumb.jpg" }),
+    })
+    const cover = container.querySelector('img[src="https://x/thumb.jpg"]')
+    await act(async () => { cover.click() })
+    const addButton = [...container.querySelectorAll("button")].find((b) => /add to cart/i.test(b.textContent))
+    await act(async () => { addButton.click() })
+
+    const cart = readCart()
+    expect(cart[0].image_url).toBe("https://x/thumb.jpg")
+  })
 })
 
 describe("ProductCard - full variant gallery", () => {
