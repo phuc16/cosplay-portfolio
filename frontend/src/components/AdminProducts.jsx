@@ -42,6 +42,7 @@ export default function AdminProducts({ collection }) {
   const [draft, setDraft] = useState(blank)
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState("")
+  const [uploading, setUploading] = useState(false)
   const [expandedProductId, setExpandedProductId] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
   const [reorderPending, setReorderPending] = useState(false)
@@ -61,17 +62,14 @@ export default function AdminProducts({ collection }) {
 
   const pickImage = async (file) => {
     setError("")
+    setUploading(true)
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result).split(",")[1])
-        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-        reader.readAsDataURL(file)
-      })
-      const { url } = await adminUploadImage(base64, `products/${collection.id}`)
+      const { url } = await adminUploadImage(file, `products/${collection.id}`)
       setDraft((d) => ({ ...d, images: [...(d.images || []), url] }))
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Tải ảnh lên thất bại")
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -82,17 +80,14 @@ export default function AdminProducts({ collection }) {
   // draft.thumbnail_image instead of the images array.
   const pickThumbnail = async (file) => {
     setError("")
+    setUploading(true)
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result).split(",")[1])
-        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-        reader.readAsDataURL(file)
-      })
-      const { url } = await adminUploadImage(base64, `products/${collection.id}`)
+      const { url } = await adminUploadImage(file, `products/${collection.id}`)
       setDraft((d) => ({ ...d, thumbnail_image: url }))
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Tải ảnh đại diện thất bại")
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -256,6 +251,7 @@ export default function AdminProducts({ collection }) {
             <input
               type="file"
               accept="image/*"
+              disabled={uploading}
               onChange={(e) => e.target.files?.[0] && pickThumbnail(e.target.files[0])}
               className="text-sm"
             />
@@ -266,6 +262,7 @@ export default function AdminProducts({ collection }) {
       <input
         type="file"
         accept="image/*"
+        disabled={uploading}
         onChange={(e) => e.target.files?.[0] && pickImage(e.target.files[0])}
         className="mb-2 text-sm"
       />
