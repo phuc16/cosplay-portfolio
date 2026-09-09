@@ -90,6 +90,21 @@ describe("buildRoster - items", () => {
     expect(rows[0].items[0].delivery_link).toBe("https://drive.google.com/x")
   })
 
+  it("flags has_digital_item on the row when any item has a delivery link, same cue the export queue and orders list show", () => {
+    const withDigital = buildRoster([order({
+      items: [
+        { product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1 },
+        { product_name_snapshot: "Digital Bonus", variant_label_snapshot: "", qty: 1, delivery_link_snapshot: "https://drive.google.com/x" },
+      ],
+    })])
+    expect(withDigital.rows[0].has_digital_item).toBe(true)
+
+    const withoutDigital = buildRoster([order({
+      items: [{ product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1 }],
+    })])
+    expect(withoutDigital.rows[0].has_digital_item).toBe(false)
+  })
+
   it("gives every row the same buyer-facing order_code shown elsewhere in admin", () => {
     const { rows } = buildRoster([order({ id: 42, created_at: "2026-02-03T00:00:00.000Z" })])
     expect(rows[0].order_code).toBe(formatOrderCode(42, "2026-02-03T00:00:00.000Z"))

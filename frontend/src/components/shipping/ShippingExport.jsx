@@ -293,6 +293,11 @@ export default function ShippingExport() {
                                       ? <img src={i.image_url} alt="" className="w-6 h-6 object-cover rounded" />
                                       : <span className="w-6 h-6 rounded bg-[var(--surface-neutral)]" />}
                                     {i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty}
+                                    {i.delivery_link_snapshot && (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
+                                        Số
+                                      </span>
+                                    )}
                                   </li>
                                 ))}
                               </ul>

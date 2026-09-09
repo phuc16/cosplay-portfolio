@@ -52,6 +52,10 @@ function buildRoster(orders) {
         // sending, since nothing else about the pickup event covers it.
         delivery_link: i.delivery_link_snapshot || null,
       })),
+      // Same "+ Sản phẩm số" cue the shipping export queue and admin orders
+      // list already show next to the order code, for the same reason: the
+      // per-item badge only appears once the row is expanded.
+      has_digital_item: (order.items || []).some((i) => i.delivery_link_snapshot),
       paid,
       amount_due: amountDue,
       prepared: Boolean(order.prepared),

@@ -157,7 +157,14 @@ export default function ShippingRoster() {
                             className={`border-t border-[var(--border-brand)] ${rowVisible ? "" : "hidden print:table-row"}`}
                           >
                             <td className="pr-2 py-1">☐</td>
-                            <td className="pr-2 py-1">{r.order_code}</td>
+                            <td className="pr-2 py-1">
+                              {r.order_code}
+                              {r.has_digital_item && (
+                                <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
+                                  + Sản phẩm số
+                                </span>
+                              )}
+                            </td>
                             <td className="pr-2 py-1">{r.pickup_code}</td>
                             <td className="pr-2 py-1">{r.buyer_name}</td>
                             <td className="pr-2 py-1">{r.phone}</td>

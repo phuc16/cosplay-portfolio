@@ -220,6 +220,46 @@ describe("ShippingRoster", () => {
     expect(detail.textContent).toContain("Số")
   })
 
+  it("shows a '+ Sản phẩm số' badge next to the order code, matching the export queue's cue", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 1 }],
+          paid: true, amount_due: 0, has_digital_item: true,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const row = container.querySelector('[data-testid="order-row-1"]')
+    expect(row.textContent).toContain("+ Sản phẩm số")
+  })
+
+  it("does not show the '+' badge for a purely physical order", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 1 }],
+          paid: true, amount_due: 0, has_digital_item: false,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const row = container.querySelector('[data-testid="order-row-1"]')
+    expect(row.textContent).not.toContain("+ Sản phẩm số")
+  })
+
   it("shows a prepared pill defaulting to 'Cần đóng gói', toggling it via adminSetOrderPrepared", async () => {
     adminGetPickupRoster.mockResolvedValue({
       rows: [

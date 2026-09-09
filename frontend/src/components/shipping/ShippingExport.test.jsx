@@ -315,6 +315,30 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("2")
   })
 
+  it("badges a digital item in the expanded item list, matching the roster's per-item cue", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockResolvedValue({
+      id: 1,
+      items: [
+        { id: 11, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1, delivery_link_snapshot: null },
+        { id: 12, product_name_snapshot: "Digital Bonus", variant_label_snapshot: "", qty: 1, delivery_link_snapshot: "https://drive.google.com/x" },
+      ],
+    })
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
+    await click(toggleButton)
+    await flush()
+
+    expect(container.textContent).toContain("Digital Bonus")
+    const items = [...container.querySelectorAll("li")]
+    const digitalItem = items.find((li) => li.textContent.includes("Digital Bonus"))
+    const physicalItem = items.find((li) => li.textContent.includes("Card"))
+    expect(digitalItem.textContent).toContain("Số")
+    expect(physicalItem.textContent).not.toContain("Số")
+  })
+
   it("shows a variant photo per item when the order has one", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminGetOrder.mockResolvedValue({

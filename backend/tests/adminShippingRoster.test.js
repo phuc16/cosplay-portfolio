@@ -276,6 +276,7 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     const digitalItem = row.items.find((i) => i.product_name === "Digital Bonus")
     expect(physicalItem.delivery_link).toBeNull()
     expect(digitalItem.delivery_link).toBe("https://drive.google.com/x")
+    expect(row.has_digital_item).toBe(true)
   })
 
   it("includes pickup_code in the roster row", async () => {
