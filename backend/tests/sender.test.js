@@ -458,6 +458,31 @@ describe("sendQueued: receiver info and order code on every lifecycle email", ()
   })
 })
 
+describe("sendQueued: admin-audience emails skip buyer-only blocks", () => {
+  it("renders payment_proof_uploaded with no PIN reminder and no QR attachment", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "payment_proof_uploaded", "seller@example.com")
+
+    await sender.sendQueued()
+
+    const call = sendMailMock.mock.calls[0][0]
+    expect(call.html).not.toContain("Nếu trang yêu cầu mã PIN")
+    expect(call.html).not.toContain("Mã QR đơn hàng")
+    expect(call.attachments.some((a) => a.cid === "orderqr")).toBe(false)
+  })
+
+  it("still gives order_placed its PIN block and QR attachment (unaffected by the new gating)", async () => {
+    const o = await seedOrder("ship")
+    await queue.enqueue(o.id, "order_placed", "buyer@example.com", { access_pin: "123456" })
+
+    await sender.sendQueued()
+
+    const call = sendMailMock.mock.calls[0][0]
+    expect(call.html).toContain("123456")
+    expect(call.attachments.some((a) => a.cid === "orderqr")).toBe(true)
+  })
+})
+
 describe("sendQueued: PIN reminder on later lifecycle emails", () => {
   it("reminds the buyer the PIN was already emailed, on payment_confirmed", async () => {
     const o = await seedOrder("ship")

@@ -8,6 +8,11 @@ const qr = require("./../orders/qr")
 
 let transport = null
 
+// Templates in this set are sent to the admin, not a buyer - the PIN
+// reminder and QR/pickup-code block below are both meaningless to someone
+// who accesses orders via their own admin login, not a PIN or a printed QR.
+const ADMIN_EMAIL_TYPES = new Set(["payment_proof_uploaded"])
+
 function isConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
 }
@@ -74,21 +79,23 @@ async function sendQueued(limit = 10) {
       }
 
       // access_pin_hash is one-way, so the plaintext only exists here.
-      if (row.type === "order_placed") {
-        let payload
-        try { payload = JSON.parse(row.payload) } catch { payload = null }
-        if (payload?.access_pin) {
+      if (!ADMIN_EMAIL_TYPES.has(row.type)) {
+        if (row.type === "order_placed") {
+          let payload
+          try { payload = JSON.parse(row.payload) } catch { payload = null }
+          if (payload?.access_pin) {
+            html = spliceBeforeCardClose(html, `
+              <p style="margin:12px 0 0;font-size:13px">
+                Mã PIN xác thực đơn hàng: <strong style="color:${templates.BRAND}">${templates.escapeHtml(payload.access_pin)}</strong><br/>
+                <span style="font-size:12px;color:#888">Cần mã này để xem lại đơn hàng qua link nếu trang yêu cầu xác thực.</span>
+              </p>`)
+            }
+        } else {
           html = spliceBeforeCardClose(html, `
-            <p style="margin:12px 0 0;font-size:13px">
-              Mã PIN xác thực đơn hàng: <strong style="color:${templates.BRAND}">${templates.escapeHtml(payload.access_pin)}</strong><br/>
-              <span style="font-size:12px;color:#888">Cần mã này để xem lại đơn hàng qua link nếu trang yêu cầu xác thực.</span>
+            <p style="margin:12px 0 0;font-size:12px;color:#888">
+              Nếu trang yêu cầu mã PIN, mã đã được gửi trong email xác nhận lúc bạn đặt hàng.
             </p>`)
         }
-      } else {
-        html = spliceBeforeCardClose(html, `
-          <p style="margin:12px 0 0;font-size:12px;color:#888">
-            Nếu trang yêu cầu mã PIN, mã đã được gửi trong email xác nhận lúc bạn đặt hàng.
-          </p>`)
       }
 
       // Spliced right after the greeting paragraph (not appended at the end)
@@ -114,8 +121,10 @@ async function sendQueued(limit = 10) {
           : html.slice(0, greetingClose + "</p>".length) + block + html.slice(greetingClose + "</p>".length)
       }
 
-      // Included even for a cancelled order, so the buyer can still check its final state.
-      {
+      // Included even for a cancelled order, so the buyer can still check its
+      // final state - but never for an admin-audience email (no reason for
+      // the seller to scan their own shop's order QR).
+      if (!ADMIN_EMAIL_TYPES.has(row.type)) {
         // cid: attachment rather than a data URI (Gmail strips those) or a
         // remote URL (blocked by default in many clients).
         const png = await qr.qrPngBuffer(qr.orderUrl(order.order_token))
