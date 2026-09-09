@@ -327,6 +327,11 @@ function InfoSection({ data, onOpenPhoto, lang }) {
           <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: 14, marginTop: 14 }}>
             <h4 style={{ margin: "0 0 10px", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-link)" }}>{L.support}</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Link to="/merchandise"
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-brand)", color: "var(--brand)", background: "var(--brand-soft)", textDecoration: "none", fontWeight: 600 }}>
+                <span style={{ display: "flex", flexShrink: 0 }}>{icons.bag}</span>
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>{vi ? "Cửa hàng" : "Merchandise"}</span>
+              </Link>
               {data.supports.map((sp) => (
                 <a key={sp.platform} href={sp.url} target="_blank" rel="noreferrer"
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", color: sp.color, textDecoration: "none", transition: "background .15s,border-color .15s" }}
