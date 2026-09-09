@@ -193,9 +193,12 @@ module.exports = function orderRoutes() {
       // scheduled end_at just passed) - a race the client cannot retry
       // unchanged, same as OutOfStockError.
       if (err instanceof repo.CollectionNotActiveError) {
+        const reasonText = err.reason === "not_started"
+          ? "chưa mở bán"
+          : "thuộc một đợt mở bán đã kết thúc"
         return res.status(409).json({
           error: "collection_not_active",
-          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" thuộc một đợt mở bán đã kết thúc. Đã tự động xóa khỏi giỏ hàng, vui lòng kiểm tra lại và thử lại.`,
+          message: `Rất tiếc, "${err.productName} · ${err.variantLabel}" ${reasonText}. Đã tự động xóa khỏi giỏ hàng, vui lòng kiểm tra lại và thử lại.`,
           variant_id: err.variantId,
         })
       }

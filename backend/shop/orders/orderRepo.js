@@ -69,13 +69,18 @@ class FulfillmentNotOfferedError extends Error {
  * a 409 race the client cannot retry unchanged, not a 400 validation error.
  */
 class CollectionNotActiveError extends Error {
-  constructor(variantLabel, productName, variantId) {
+  constructor(variantLabel, productName, variantId, reason = "inactive") {
     super(`Bộ sưu tập đã đóng: ${productName} - ${variantLabel}`)
     this.name = "CollectionNotActiveError"
     this.variantLabel = variantLabel
     this.productName = productName
     // Lets the client auto-drop exactly this line, same as VariantNotFoundError.
     this.variantId = variantId
+    // "not_started" | "ended" | "inactive" (draft/archived/manually closed
+    // with no end_at) - lets the route give the buyer an accurate reason
+    // instead of always saying the drop has ended, which is wrong for a
+    // collection that has not opened yet.
+    this.reason = reason
   }
 }
 
@@ -236,7 +241,8 @@ async function createOrder(input) {
       const collectionNotStarted = row.collection_start_at && new Date(row.collection_start_at) > now
       const collectionExpired = row.collection_end_at && new Date(row.collection_end_at) <= now
       if (row.collection_status !== "active" || collectionNotStarted || collectionExpired) {
-        throw new CollectionNotActiveError(row.label, row.product_name, row.id)
+        const reason = collectionNotStarted ? "not_started" : collectionExpired ? "ended" : "inactive"
+        throw new CollectionNotActiveError(row.label, row.product_name, row.id, reason)
       }
       if (row.product_type !== "digital") {
         if (fulfillmentMethod === "ship" && !row.allow_ship) {

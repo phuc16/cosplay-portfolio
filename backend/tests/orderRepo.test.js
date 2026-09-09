@@ -337,6 +337,23 @@ describe("createOrder", () => {
     await expect(repo.createOrder(order(variantId, 1))).rejects.toThrow(repo.CollectionNotActiveError)
   })
 
+  it("tags CollectionNotActiveError with reason 'not_started' for a not-yet-started collection, distinct from 'ended'/'inactive'", async () => {
+    const future = new Date(Date.now() + 15 * 60 * 1000)
+    const { variantId } = await seedVariant(5, { start_at: future })
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toMatchObject({ reason: "not_started" })
+  })
+
+  it("tags CollectionNotActiveError with reason 'ended' once end_at has passed", async () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000)
+    const { variantId } = await seedVariant(5, { end_at: past })
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toMatchObject({ reason: "ended" })
+  })
+
+  it("tags CollectionNotActiveError with reason 'inactive' for a closed collection with no start_at/end_at involved", async () => {
+    const { variantId } = await seedVariant(5, { status: "closed" })
+    await expect(repo.createOrder(order(variantId, 1))).rejects.toMatchObject({ reason: "inactive" })
+  })
+
   it("still allows an order once start_at has passed", async () => {
     const past = new Date(Date.now() - 60 * 60 * 1000)
     const { variantId } = await seedVariant(5, { start_at: past })

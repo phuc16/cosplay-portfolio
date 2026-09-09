@@ -209,6 +209,22 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(409)
     expect(res.body.error).toBe("collection_not_active")
     expect(res.body.message).toContain("Card")
+    expect(res.body.message).toContain("kết thúc")
+    expect(res.body.variant_id).toBe(v)
+  })
+
+  // A not-yet-started collection is publicly browsable (buyers can preview
+  // it ahead of the drop) but still rejected here - the message must say so
+  // accurately, not reuse the "this drop has ended" wording meant for a
+  // collection that was live and then closed.
+  it("returns 409 collection_not_active with 'not started' wording, not 'ended', for a not-yet-started collection", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000)
+    const v = await seed(5, { start_at: future })
+    const res = await request(app).post("/api/orders").send(body(v))
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe("collection_not_active")
+    expect(res.body.message).toContain("chưa mở bán")
+    expect(res.body.message).not.toContain("kết thúc")
     expect(res.body.variant_id).toBe(v)
   })
 
