@@ -30,9 +30,11 @@ function validateCollection(body) {
   if (!body.title || !String(body.title).trim()) return "Cần tên bộ sưu tập"
   if (String(body.title).length > TITLE_MAX_LEN) return `Tên bộ sưu tập không được quá ${TITLE_MAX_LEN} ký tự`
   if (body.status && !STATUSES.includes(body.status)) return "Trạng thái không hợp lệ"
-  if (body.allow_ship === false && body.allow_pickup === false) {
-    return "Phải chọn ít nhất một hình thức nhận hàng"
-  }
+  // Ship/pickup can both be off - a collection made only for digital
+  // products has no physical fulfillment to offer at all. The reciprocal
+  // guard lives on product creation instead: a non-digital product cannot
+  // be added to a collection with neither enabled, since it would have no
+  // way to ever be fulfilled.
   if (body.payment_deadline_hours !== undefined && body.payment_deadline_hours !== null && body.payment_deadline_hours !== "") {
     const hours = Number(body.payment_deadline_hours)
     if (!Number.isInteger(hours) || hours <= 0) return "Hạn chuyển khoản phải là số giờ nguyên dương"
@@ -159,7 +161,18 @@ module.exports = function adminCatalogRoutes() {
       const invalid = validateProduct(req.body)
       if (invalid) return bad(res, invalid)
 
-      const id = await repo.createProduct({ ...req.body, collection_id: Number(req.params.id) })
+      const collectionId = Number(req.params.id)
+      // A non-digital product needs some way to actually reach the buyer -
+      // a collection with neither ship nor pickup enabled can only ever
+      // hold digital products.
+      if (req.body.type !== "digital") {
+        const collection = await repo.getCollectionDetailById(collectionId)
+        if (collection && !collection.allow_ship && !collection.allow_pickup) {
+          return bad(res, "Bộ sưu tập này không bật hình thức nhận hàng nào - chỉ thêm được sản phẩm số")
+        }
+      }
+
+      const id = await repo.createProduct({ ...req.body, collection_id: collectionId })
       res.status(201).json({ id })
     } catch (err) { oops(res, err, "Lỗi tạo sản phẩm") }
   })

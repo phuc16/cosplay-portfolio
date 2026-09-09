@@ -126,6 +126,16 @@ describe("POST /api/admin/collections", () => {
     expect(res.body.error).toBe("invalid_input")
   })
 
+  it("allows a collection with neither ship nor pickup enabled - meant for digital-only products", async () => {
+    const res = await authed(request(app).post("/api/admin/collections"))
+      .send({ title: "Digital Only", status: "active", allow_ship: false, allow_pickup: false })
+    expect(res.status).toBe(201)
+
+    const [c] = await repo.listAllCollections()
+    expect(c.allow_ship).toBe(false)
+    expect(c.allow_pickup).toBe(false)
+  })
+
   it("makes a newly created collection immediately visible on the public list", async () => {
     await request(app).get("/api/shop/collections")
     await authed(request(app).post("/api/admin/collections")).send({ title: "New", status: "active" })
@@ -259,6 +269,20 @@ describe("products and variants", () => {
     const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
       .send({ name: "Album", price: 99000, type: "cd" })
     expect(res.status).toBe(400)
+  })
+
+  it("rejects a physical product in a collection with neither ship nor pickup enabled", async () => {
+    const cid = await repo.createCollection({ title: "Digital Only", status: "active", allow_ship: false, allow_pickup: false })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Photocard", price: 35000 })
+    expect(res.status).toBe(400)
+  })
+
+  it("still allows a digital product in a collection with neither ship nor pickup enabled", async () => {
+    const cid = await repo.createCollection({ title: "Digital Only", status: "active", allow_ship: false, allow_pickup: false })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Digital Album", price: 99000, type: "digital", stock_qty: 20, delivery_link: "https://drive.google.com/x" })
+    expect(res.status).toBe(201)
   })
 
   it("creates a digital product with stock_qty and delivery_link", async () => {
