@@ -6,7 +6,10 @@ import {
 import AdminVariants from "./AdminVariants"
 import { formatVnd } from "../utils/money"
 
-const blank = { name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "" }
+const blank = {
+  name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "",
+  thumbnail_image: "",
+}
 
 const SORTS = [
   { value: "default", label: "Thứ tự kéo thả" },
@@ -72,6 +75,27 @@ export default function AdminProducts({ collection }) {
     }
   }
 
+  // Digital products have no admin-managed variant list, so unlike a
+  // physical product (whose card cover comes from a variant's own
+  // thumbnail_image) they'd otherwise have no way to set a cover distinct
+  // from the full picture gallery - this uploads straight into
+  // draft.thumbnail_image instead of the images array.
+  const pickThumbnail = async (file) => {
+    setError("")
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(",")[1])
+        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
+        reader.readAsDataURL(file)
+      })
+      const { url } = await adminUploadImage(base64, `products/${collection.id}`)
+      setDraft((d) => ({ ...d, thumbnail_image: url }))
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Tải ảnh đại diện thất bại")
+    }
+  }
+
   const save = async () => {
     setError("")
     try {
@@ -92,6 +116,7 @@ export default function AdminProducts({ collection }) {
     setDraft({
       name: p.name, description: p.description || "", price: p.price, images: p.images || [],
       type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
+      thumbnail_image: p.thumbnail_image || "",
     })
   }
 
@@ -212,6 +237,29 @@ export default function AdminProducts({ collection }) {
             placeholder="Link tải về"
             className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
           />
+
+          <p className="text-xs opacity-60 mb-1">Ảnh đại diện (hiển thị trên thẻ sản phẩm - để trống sẽ dùng ảnh đầu tiên bên dưới)</p>
+          <div className="flex items-center gap-2 mb-2">
+            {draft.thumbnail_image && (
+              <div className="relative">
+                <img src={draft.thumbnail_image} alt="" className="w-16 h-16 object-cover rounded-lg" />
+                <button
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, thumbnail_image: "" }))}
+                  aria-label="Xóa ảnh đại diện"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full bg-black/70 text-white text-xs leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => e.target.files?.[0] && pickThumbnail(e.target.files[0])}
+              className="text-sm"
+            />
+          </div>
         </>
       )}
 

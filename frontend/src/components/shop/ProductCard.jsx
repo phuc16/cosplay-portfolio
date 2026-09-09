@@ -65,9 +65,11 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   // having no variants at all, same as a physical product with zero
   // variants, rather than letting it submit variant_id: null to the cart.
   const variants = isDigital
-    ? (product.variant_id != null ? [{ id: product.variant_id, label: "", stock_qty: product.stock_qty, images: product.images }] : [])
+    ? (product.variant_id != null
+      ? [{ id: product.variant_id, label: "", stock_qty: product.stock_qty, images: product.images, thumbnail_image: product.thumbnail_image }]
+      : [])
     : (product.variants || [])
-  const cover = product.images?.[0] || variantCover(variants.find((v) => variantCover(v)) || {})
+  const cover = product.thumbnail_image || product.images?.[0] || variantCover(variants.find((v) => variantCover(v)) || {})
   const hasVariants = variants.length > 0
   // null = closed, "grid" = full variant gallery, an object = single-variant detail.
   const [view, setView] = useState(null)

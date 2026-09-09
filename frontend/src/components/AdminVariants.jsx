@@ -80,6 +80,27 @@ export default function AdminVariants({ product, onSaved }) {
 
   const stripExt = (filename) => filename.replace(/\.[^./\\]+$/, "").trim()
 
+  // "A1, A2, A10, B1" instead of plain string order putting "A10" before
+  // "A2" - splits each label into alternating text/number chunks and
+  // compares number chunks numerically, text chunks as strings.
+  const labelChunks = (label) => String(label).match(/\d+|\D+/g) || []
+  const compareLabelsNatural = (a, b) => {
+    const chunksA = labelChunks(a.label)
+    const chunksB = labelChunks(b.label)
+    const len = Math.max(chunksA.length, chunksB.length)
+    for (let i = 0; i < len; i++) {
+      const chunkA = chunksA[i] ?? ""
+      const chunkB = chunksB[i] ?? ""
+      const numA = Number(chunkA)
+      const numB = Number(chunkB)
+      const bothNumeric = chunkA !== "" && chunkB !== "" && !Number.isNaN(numA) && !Number.isNaN(numB)
+      const cmp = bothNumeric ? numA - numB : chunkA.localeCompare(chunkB)
+      if (cmp !== 0) return cmp
+    }
+    return 0
+  }
+  const sortRowsByLabel = () => setRows((prev) => [...prev].sort(compareLabelsNatural))
+
   // One image per variant code: filename (minus extension) becomes the
   // label, so a seller can select a whole folder of "A1.png, A2.png..."
   // photocards at once instead of adding rows one at a time. Uploaded rows
@@ -105,7 +126,9 @@ export default function AdminVariants({ product, onSaved }) {
           setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
         }
       }
-      if (uploaded.length) setRows([...rows.filter((r) => r.label.trim()), ...uploaded])
+      if (uploaded.length) {
+        setRows([...rows.filter((r) => r.label.trim()), ...uploaded].sort(compareLabelsNatural))
+      }
     } finally {
       setBatchUploading(false)
     }
@@ -169,7 +192,10 @@ export default function AdminVariants({ product, onSaved }) {
   const applyBulk = () => {
     const labels = bulk.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
     if (!labels.length) return
-    setRows([...rows.filter((r) => r.label.trim()), ...labels.map((label) => ({ label, stock_qty: "", images: [] }))])
+    setRows(
+      [...rows.filter((r) => r.label.trim()), ...labels.map((label) => ({ label, stock_qty: "", images: [] }))]
+        .sort(compareLabelsNatural)
+    )
     setBulk("")
   }
 
@@ -211,6 +237,15 @@ export default function AdminVariants({ product, onSaved }) {
         />
         <button type="button" onClick={applyBulk} className="px-3 py-1 rounded-lg border border-[var(--border-brand)]">
           Thêm hàng loạt
+        </button>
+        <button
+          type="button"
+          onClick={sortRowsByLabel}
+          disabled={rows.length < 2}
+          title="Sắp xếp danh sách theo mã (A1, A2, ... A10, B1)"
+          className="px-3 py-1 rounded-lg border border-[var(--border-brand)] disabled:opacity-50"
+        >
+          Sắp xếp theo mã
         </button>
       </div>
 

@@ -212,6 +212,67 @@ describe("digital products", () => {
     expect(after.stock_qty).toBe(7)
     expect(after.delivery_link).toBe("https://drive.google.com/keepme")
   })
+
+  it("creates a digital product with a dedicated thumbnail_image, separate from its images gallery", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000,
+      images: ["https://x/gallery1.jpg", "https://x/gallery2.jpg"], type: "digital",
+      stock_qty: 5, delivery_link: "https://drive.google.com/abc",
+      thumbnail_image: "https://x/cover.jpg",
+    })
+
+    const product = (await repo.getCollectionDetailById(cid)).products[0]
+    expect(product.thumbnail_image).toBe("https://x/cover.jpg")
+    expect(product.images).toEqual(["https://x/gallery1.jpg", "https://x/gallery2.jpg"])
+  })
+
+  it("thumbnail_image is null when not provided at creation", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital", stock_qty: 5,
+    })
+
+    const product = (await repo.getCollectionDetailById(cid)).products[0]
+    expect(product.thumbnail_image).toBeNull()
+  })
+
+  it("updateProduct overwrites thumbnail_image when provided, preserves it when omitted", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 5, thumbnail_image: "https://x/v1.jpg",
+    })
+
+    await repo.updateProduct(pid, { name: "Digital Album", price: 99000, thumbnail_image: "https://x/v2.jpg" })
+    expect((await repo.getCollectionDetailById(cid)).products[0].thumbnail_image).toBe("https://x/v2.jpg")
+
+    await repo.updateProduct(pid, { name: "Digital Album v3", price: 99000 })
+    expect((await repo.getCollectionDetailById(cid)).products[0].thumbnail_image).toBe("https://x/v2.jpg")
+  })
+
+  it("copyCollection carries a digital product's thumbnail_image through", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 3, thumbnail_image: "https://x/cover.jpg",
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].thumbnail_image).toBe("https://x/cover.jpg")
+  })
+
+  it("exposes thumbnail_image on the public path (unlike delivery_link)", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 3, thumbnail_image: "https://x/cover.jpg",
+    })
+
+    const publicDetail = await repo.getPublicCollectionBySlug("drop")
+    expect(publicDetail.products[0].thumbnail_image).toBe("https://x/cover.jpg")
+  })
 })
 
 describe("createCollection", () => {

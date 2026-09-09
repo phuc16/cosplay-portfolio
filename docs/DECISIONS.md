@@ -812,3 +812,21 @@ the cancellation - the existing confirm() guard still gates that). Stored
 in a new orders.cancel_reason column, appended to the cancelled email as
 "Lý do hủy: ..." only when present (omitted entirely otherwise, not an
 empty label), escaped like every other buyer-facing string in email HTML.
+
+## 2026-09-09 - Digital product thumbnail is optional, not required
+
+Digital products got a dedicated cover photo (`thumbnail_image`, stored on
+the hidden variant, reusing the column physical-product variants already
+have) distinct from the multi-image gallery. Decided it should be optional,
+falling back to the gallery's first image when unset - matching how a
+physical variant's own `thumbnail_image` already behaves, rather than
+adding a new required field alongside `delivery_link`.
+
+## 2026-09-09 - Variant list auto-sorts naturally instead of requiring manual drag/drop
+
+Admin explicitly didn't want to manually reorder a photocard sheet's 40-odd
+codes after bulk-adding/batch-uploading them. Bulk-add and batch-upload now
+auto-sort the merged row list by a natural label comparator (A1, A2, A10,
+B1 - not A1, A10, A2), plus an explicit "Sắp xếp theo mã" button for
+re-sorting on demand (e.g. after manual drag-reordering). Manual up/down/
+drag controls stay available for any exception the auto-sort doesn't fit.
