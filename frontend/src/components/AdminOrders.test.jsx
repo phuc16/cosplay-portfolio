@@ -427,7 +427,7 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     await act(async () => { detailBtn.click() })
     await flush()
 
-    expect(container.textContent).toContain("Số")
+    expect(container.textContent).toContain("Sản phẩm số")
     expect(container.querySelector('a[href="https://drive.google.com/x"]')).toBeTruthy()
   })
 
@@ -444,7 +444,7 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     await act(async () => { detailBtn.click() })
     await flush()
 
-    expect(container.textContent).not.toContain("Số")
+    expect(container.textContent).not.toContain("Sản phẩm số")
   })
 
   it("shows a '+ Sản phẩm số' badge on a mixed ship+digital order's collapsed row", async () => {

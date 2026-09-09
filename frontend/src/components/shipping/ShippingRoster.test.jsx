@@ -217,7 +217,7 @@ describe("ShippingRoster", () => {
     await flush()
 
     const detail = container.querySelector('[data-testid="order-detail-1"]')
-    expect(detail.textContent).toContain("Số")
+    expect(detail.textContent).toContain("Sản phẩm số")
   })
 
   it("shows a '+ Sản phẩm số' badge next to the order code, matching the export queue's cue", async () => {

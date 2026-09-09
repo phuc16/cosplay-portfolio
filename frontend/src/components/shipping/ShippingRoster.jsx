@@ -218,7 +218,7 @@ export default function ShippingRoster() {
                                     {i.product_name} · {i.variant_label} × {i.qty}
                                     {i.delivery_link && (
                                       <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
-                                        Số
+                                        Sản phẩm số
                                       </span>
                                     )}
                                   </li>

@@ -398,7 +398,7 @@ export default function AdminOrders() {
                     {i.delivery_link_snapshot && (
                       <>
                         {" "}
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">Số</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">Sản phẩm số</span>
                         {" - "}
                         <a href={i.delivery_link_snapshot} target="_blank" rel="noreferrer" className="text-[var(--text-link)]">
                           {i.delivery_link_snapshot}

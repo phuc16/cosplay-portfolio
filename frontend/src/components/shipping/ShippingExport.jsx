@@ -295,7 +295,7 @@ export default function ShippingExport() {
                                     {i.product_name_snapshot} · {i.variant_label_snapshot} × {i.qty}
                                     {i.delivery_link_snapshot && (
                                       <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
-                                        Số
+                                        Sản phẩm số
                                       </span>
                                     )}
                                   </li>

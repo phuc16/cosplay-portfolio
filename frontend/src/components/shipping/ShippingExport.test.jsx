@@ -335,8 +335,8 @@ describe("ShippingExport", () => {
     const items = [...container.querySelectorAll("li")]
     const digitalItem = items.find((li) => li.textContent.includes("Digital Bonus"))
     const physicalItem = items.find((li) => li.textContent.includes("Card"))
-    expect(digitalItem.textContent).toContain("Số")
-    expect(physicalItem.textContent).not.toContain("Số")
+    expect(digitalItem.textContent).toContain("Sản phẩm số")
+    expect(physicalItem.textContent).not.toContain("Sản phẩm số")
   })
 
   it("shows a variant photo per item when the order has one", async () => {
