@@ -711,6 +711,7 @@ app.delete(`${API_PREFIX}/albums/:id`, auth, async (req, res) => {
 // IMAGES CRUD - lưu vào MinIO, DB chỉ lưu url
 const sharp = require("sharp")
 const { validateImageBuffer, InvalidImageError } = require("./shop/images")
+const { uploadSingleImage } = require("./shop/upload")
 const MAX_FULL_WIDTH = 1920
 const JPEG_QUALITY = 85
 
@@ -757,13 +758,12 @@ async function extractAccentHex(buffer) {
 }
 
 // Upload ảnh hero/profile (không cần album)
-app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/upload/hero`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { base64 } = req.body
-    if (!base64) {
-      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    if (!req.file) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh" })
     }
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/HERO] size≈${sizeKb}KB`)
 
@@ -784,13 +784,12 @@ app.post(`${API_PREFIX}/upload/hero`, auth, async (req, res) => {
   }
 })
 
-app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/upload/thumbnail`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { base64 } = req.body
-    if (!base64) {
-      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    if (!req.file) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh" })
     }
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/THUMB] size≈${sizeKb}KB`)
 
@@ -811,13 +810,12 @@ app.post(`${API_PREFIX}/upload/thumbnail`, auth, async (req, res) => {
   }
 })
 
-app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/upload/event-image`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { base64 } = req.body
-    if (!base64) {
-      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh (base64)" })
+    if (!req.file) {
+      return res.status(400).json({ error: "invalid_input", message: "Cần ảnh" })
     }
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[UPLOAD/EVENT] size≈${sizeKb}KB`)
 
@@ -837,15 +835,15 @@ app.post(`${API_PREFIX}/upload/event-image`, auth, async (req, res) => {
   }
 })
 
-app.post(`${API_PREFIX}/image`, auth, async (req, res) => {
+app.post(`${API_PREFIX}/image`, auth, uploadSingleImage(), async (req, res) => {
   try {
-    const { album_id, base64 } = req.body
-    if (!album_id || !base64) {
-      console.warn("[IMAGE] Thiếu album_id hoặc base64")
-      return res.status(400).json({ error: "invalid_input", message: "Cần album_id và ảnh (base64)" })
+    const { album_id } = req.body
+    if (!album_id || !req.file) {
+      console.warn("[IMAGE] Thiếu album_id hoặc ảnh")
+      return res.status(400).json({ error: "invalid_input", message: "Cần album_id và ảnh" })
     }
 
-    const buffer = Buffer.from(base64, "base64")
+    const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[IMAGE] Upload: album=${album_id}, size≈${sizeKb}KB`)
 
