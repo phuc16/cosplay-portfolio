@@ -269,6 +269,20 @@ describe("listPublicCollections", () => {
     const [c] = await repo.listPublicCollections()
     expect(c.product_count).toBe(2)
   })
+
+  it("flags has_digital_item so the storefront can badge a collection without relying on title/description text", async () => {
+    const cidDigital = await repo.createCollection({ title: "Digital Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cidDigital, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 5, delivery_link: "https://drive.google.com/x",
+    })
+    const cidPhysical = await repo.createCollection({ title: "Physical Drop", status: "active" })
+    await repo.createProduct({ collection_id: cidPhysical, name: "Card", price: 35000 })
+
+    const collections = await repo.listPublicCollections()
+    expect(collections.find((c) => c.id === cidDigital).has_digital_item).toBe(true)
+    expect(collections.find((c) => c.id === cidPhysical).has_digital_item).toBe(false)
+  })
 })
 
 describe("getPublicCollectionBySlug", () => {

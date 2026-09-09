@@ -137,7 +137,14 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
         )}
 
         <div className="p-4 flex flex-col gap-2 flex-1">
-          <h3 className="font-semibold text-lg">{product.name}</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold text-lg">{product.name}</h3>
+            {isDigital && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
+                {t("shopDigitalBadge")}
+              </span>
+            )}
+          </div>
           <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
 
           {product.description && (
@@ -244,7 +251,14 @@ export default function ProductCard({ product, collectionSlug, orderable, onAdde
             )}
             <div className="p-4 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-lg">{product.name}{detail.label ? ` · ${detail.label}` : ""}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg">{product.name}{detail.label ? ` · ${detail.label}` : ""}</h3>
+                  {isDigital && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
+                      {t("shopDigitalBadge")}
+                    </span>
+                  )}
+                </div>
                 {variants.length > 1 && (
                   <button
                     type="button"

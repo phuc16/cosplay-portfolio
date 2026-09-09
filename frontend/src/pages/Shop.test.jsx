@@ -66,6 +66,25 @@ describe("Shop - collection ordering", () => {
   })
 })
 
+describe("Shop - digital badge", () => {
+  it("badges only the collection that has a digital product", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "mid-autumn", title: "Mid-Autumn Festival", status: "active", product_count: 1, has_digital_item: true },
+      { id: 2, slug: "spring-fest", title: "Spring Festival", status: "active", product_count: 1, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const cards = [...container.querySelectorAll("a")]
+    const withDigital = cards.find((a) => a.textContent.includes("Mid-Autumn Festival"))
+    const withoutDigital = cards.find((a) => a.textContent.includes("Spring Festival"))
+    expect(withDigital.textContent).toContain("Digital")
+    expect(withoutDigital.textContent).not.toContain("Digital")
+  })
+})
+
 describe("Shop - search, filter, sort", () => {
   it("filters collections by title, case-insensitively", async () => {
     fetchCollections.mockResolvedValue([

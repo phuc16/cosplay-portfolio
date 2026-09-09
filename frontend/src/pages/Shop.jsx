@@ -110,7 +110,14 @@ export default function Shop() {
               </div>
             )}
             <div className="p-4">
-              <h2 className="font-semibold">{c.title}</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-semibold">{c.title}</h2>
+                {c.has_digital_item && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
+                    {t("shopDigitalBadge")}
+                  </span>
+                )}
+              </div>
               <p className="text-sm opacity-70">{t("productsCount", { n: c.product_count })}</p>
               {c.status === "closed" && (
                 <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopClosed")}</p>

@@ -99,7 +99,8 @@ async function listAllCollections() {
 
 async function listPublicCollections() {
   const [rows] = await db.query(
-    `SELECT c.*, COUNT(p.id) AS product_count
+    `SELECT c.*, COUNT(p.id) AS product_count,
+            EXISTS (SELECT 1 FROM products dp WHERE dp.collection_id = c.id AND dp.type = 'digital') AS has_digital_item
        FROM collections c
        LEFT JOIN products p ON p.collection_id = c.id
       WHERE c.status IN (?, ?) AND (c.start_at IS NULL OR c.start_at <= UTC_TIMESTAMP())
@@ -108,7 +109,9 @@ async function listPublicCollections() {
     PUBLIC_STATUSES
   )
   const updated = await closeExpiredCollections(rows)
-  return updated.map((r) => ({ ...mapCollection(r), product_count: Number(r.product_count) }))
+  return updated.map((r) => ({
+    ...mapCollection(r), product_count: Number(r.product_count), has_digital_item: Boolean(r.has_digital_item),
+  }))
 }
 
 /** Nests a collection row with its products and each product's variants. */

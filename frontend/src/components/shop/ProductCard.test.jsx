@@ -348,6 +348,24 @@ describe("digital products", () => {
     const { container } = await renderCard({ product: digitalProduct({ stock_qty: 0 }) })
     expect(container.textContent).toContain("Sold out")
   })
+
+  it("badges the card and the detail view as digital, so a buyer can tell without reading the title/description", async () => {
+    const { container } = await renderCard({ product: digitalProduct() })
+    expect(container.textContent).toContain("Digital")
+
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+    expect(container.querySelectorAll('[role="dialog"] *').length).toBeGreaterThan(0)
+    const dialogText = container.querySelector('[role="dialog"]').textContent
+    expect(dialogText).toContain("Digital")
+  })
+
+  it("does not badge a physical product as digital", async () => {
+    const { container } = await renderCard({
+      product: { id: 2, name: "Card", price: 35000, images: ["https://x/card.jpg"], variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+    })
+    expect(container.textContent).not.toContain("Digital")
+  })
 })
 
 describe("ProductCard - full variant gallery", () => {
