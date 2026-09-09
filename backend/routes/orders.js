@@ -29,10 +29,11 @@ function toPublicOrder(order) {
     // here too.
     confirmed_at, shipped_at, completed_at, cancelled_at,
     // Spec (Fulfillment): pickup location/note must be shown on the order
-    // page, not just the pre-purchase collection browse page. Sourced from
-    // the order's own collection (joined in getOrderByToken), same content
-    // that is already public on the collection page - no new exposure.
-    pickup_location, pickup_note,
+    // page, not just the pre-purchase collection browse page. One entry per
+    // collection the order's items actually touch (a cart can span more than
+    // one) - same content already public on each collection's own page, no
+    // new exposure.
+    pickup_locations,
     // Spec (Buyer Onboarding, Phase 6): the payment deadline the reservation
     // and the expiry sweep already enforce, but never told to the buyer
     // before now. NULL for COD (domain.computeExpiry never sets a deadline
@@ -78,7 +79,7 @@ function toPublicOrder(order) {
   return {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items: publicItems,
     confirmed_at, shipped_at, completed_at, cancelled_at,
-    pickup_location, pickup_note, expires_at, pickup_code: paidPickupCode,
+    pickup_locations: pickup_locations || [], expires_at, pickup_code: paidPickupCode,
     has_payment_proof: Boolean(payment_proof_url),
     payment_proof_url: payment_proof_url || null,
     buyer_name, phone, address_raw: address_raw || null,

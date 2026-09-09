@@ -43,16 +43,17 @@ const PAYMENT_ICONS = {
 // Default to both open (rather than none) while the collection fetch is in
 // flight, so the picker doesn't flash empty before settling to what the
 // cart's collection(s) actually offer.
-const FLAGS_LOADING = { loaded: false, allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null }
+const FLAGS_LOADING = { loaded: false, allow_ship: true, allow_pickup: true, pickup_locations: [] }
 
 /**
  * Derives which fulfillment methods the cart's collection(s) actually offer,
  * reusing the existing public collection endpoint (no new one needed) - the
  * same data already shown on the pre-purchase collection page. A cart can in
  * principle span more than one collection, so a method only counts as
- * offered if every collection in the cart offers it; pickup location/note
- * are only surfaced when the cart is a single collection (otherwise which
- * one to show is ambiguous, so neither is shown).
+ * offered if every collection in the cart offers it. pickup_locations lists
+ * every collection in the cart that has a pickup_location/note set - the
+ * render side labels each with its collection title once there's more than
+ * one, same as the post-purchase order page.
  */
 async function loadFulfillmentFlags(cart) {
   const slugs = [...new Set(cart.map((c) => c.collection_slug).filter(Boolean))]
@@ -66,8 +67,12 @@ async function loadFulfillmentFlags(cart) {
     loaded: true,
     allow_ship: collections.every((c) => c.allow_ship),
     allow_pickup: collections.every((c) => c.allow_pickup),
-    pickup_location: collections.length === 1 ? collections[0].pickup_location || null : null,
-    pickup_note: collections.length === 1 ? collections[0].pickup_note || null : null,
+    pickup_locations: collections
+      .filter((c) => c.pickup_location || c.pickup_note)
+      .map((c) => ({
+        collection_id: c.id, collection_title: c.title,
+        pickup_location: c.pickup_location || null, pickup_note: c.pickup_note || null,
+      })),
   }
 }
 
@@ -255,12 +260,19 @@ export default function Checkout() {
             </div>
           )}
 
-          {fulfillment === "pickup" && (flags.pickup_location || flags.pickup_note) && (
-            <div className="mb-4 p-3 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm">
-              {flags.pickup_location && (
-                <p className="font-semibold">{t("shopPickupLocation")}: {flags.pickup_location}</p>
-              )}
-              {flags.pickup_note && <p>{t("shopPickupNote")}: {flags.pickup_note}</p>}
+          {fulfillment === "pickup" && flags.pickup_locations.length > 0 && (
+            <div className="mb-4 p-3 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm space-y-3">
+              {flags.pickup_locations.map((loc) => (
+                <div key={loc.collection_id}>
+                  {flags.pickup_locations.length > 1 && (
+                    <p className="text-xs uppercase tracking-wide opacity-60">{loc.collection_title}</p>
+                  )}
+                  {loc.pickup_location && (
+                    <p className="font-semibold">{t("shopPickupLocation")}: {loc.pickup_location}</p>
+                  )}
+                  {loc.pickup_note && <p>{t("shopPickupNote")}: {loc.pickup_note}</p>}
+                </div>
+              ))}
             </div>
           )}
         </>

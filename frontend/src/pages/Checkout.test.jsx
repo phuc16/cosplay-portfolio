@@ -143,6 +143,26 @@ describe("Checkout fulfillment filtering", () => {
     expect(container.textContent).toContain("9am-6pm")
   })
 
+  it("shows a labeled pickup location per collection when the cart spans more than one", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([
+      { variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop-a" },
+      { variant_id: 2, qty: 1, product_name: "Poster", variant_label: "Std", price: 40000, image_url: null, collection_slug: "drop-b" },
+    ]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchCollection.mockImplementation((slug) => Promise.resolve(
+      slug === "drop-a"
+        ? { id: 1, title: "Drop A", allow_ship: false, allow_pickup: true, pickup_location: "Booth 12", pickup_note: null }
+        : { id: 2, title: "Drop B", allow_ship: false, allow_pickup: true, pickup_location: "Booth 7", pickup_note: null }
+    ))
+
+    const container = await renderCheckout()
+
+    expect(container.textContent).toContain("Drop A")
+    expect(container.textContent).toContain("Booth 12")
+    expect(container.textContent).toContain("Drop B")
+    expect(container.textContent).toContain("Booth 7")
+  })
+
   it("offers only ship and auto-selects it when the collection is ship-only", async () => {
     seedCart()
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })

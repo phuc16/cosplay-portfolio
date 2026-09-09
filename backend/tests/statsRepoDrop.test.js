@@ -197,4 +197,26 @@ describe("getDropStats", () => {
     expect(v.time_to_sellout_days).not.toBeNull()
     expect(v.time_to_sellout_days).toBeGreaterThanOrEqual(0)
   })
+
+  it("attributes only this collection's own item revenue from a mixed-collection order, not the whole order total", async () => {
+    const a = await seed({ collectionTitle: "Drop A", price: 35000 })
+    const b = await seed({ collectionTitle: "Drop B", price: 20000 })
+    const o = await orders.createOrder({
+      items: [{ variant_id: a.variantId, qty: 1 }, { variant_id: b.variantId, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+    await orders.transitionOrder(o.id, "confirmed")
+    await orders.transitionOrder(o.id, "completed")
+
+    const statsA = await statsRepo.getDropStats(a.collectionId)
+    const statsB = await statsRepo.getDropStats(b.collectionId)
+    expect(statsA.received_total).toBe(35000)
+    expect(statsB.received_total).toBe(20000)
+    // The order itself is counted once in each collection's own tally, not
+    // split or dropped from either.
+    expect(statsA.order_counts.completed).toBe(1)
+    expect(statsB.order_counts.completed).toBe(1)
+    expect(statsA.units_sold).toBe(1)
+    expect(statsB.units_sold).toBe(1)
+  })
 })

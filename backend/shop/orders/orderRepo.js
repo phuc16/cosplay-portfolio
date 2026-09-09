@@ -329,11 +329,12 @@ async function createOrder(input) {
       await conn.query(
         `INSERT INTO order_items
            (order_id, product_variant_id, product_name_snapshot,
-            variant_label_snapshot, unit_price_snapshot, qty, delivery_link_snapshot, image_url_snapshot)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            variant_label_snapshot, unit_price_snapshot, qty, delivery_link_snapshot, image_url_snapshot,
+            collection_id_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [res.insertId, line.variant_id, line.product_name_snapshot,
          line.variant_label_snapshot, line.unit_price_snapshot, line.qty, line.delivery_link_snapshot,
-         line.image_url_snapshot]
+         line.image_url_snapshot, line.collection_id]
       )
     }
 
@@ -384,33 +385,41 @@ async function attachItems(order) {
   return { ...order, items }
 }
 
+/**
+ * A pickup order's items can span multiple collections (a cart isn't
+ * restricted to one), and each collection sets its own pickup_location/note -
+ * so "where do I go to collect this" can genuinely be more than one place.
+ * Distinct per collection_id (not per item), and only collections that still
+ * exist and have at least one of the two fields set; a deleted collection's
+ * entry silently drops rather than showing a blank location.
+ */
+async function attachPickupLocations(order) {
+  if (!order) return order
+  if (order.fulfillment_method !== "pickup") return { ...order, pickup_locations: [] }
+  const [rows] = await db.query(
+    `SELECT DISTINCT c.id AS collection_id, c.title AS collection_title, c.pickup_location, c.pickup_note
+       FROM order_items oi
+       JOIN collections c ON c.id = oi.collection_id_snapshot
+      WHERE oi.order_id = ? AND (c.pickup_location IS NOT NULL OR c.pickup_note IS NOT NULL)`,
+    [order.id]
+  )
+  return { ...order, pickup_locations: rows }
+}
+
 async function getOrderByToken(token) {
-  // Joined so the public order page can show pickup_location/pickup_note for
-  // pickup orders (spec: "shown at checkout and on the order page") without a
-  // second round trip. SET NULL on collection deletion means a very old order
-  // may have no collection left; the LEFT JOIN degrades to nulls rather than
-  // dropping the order.
   const [[row]] = await db.query(
-    `SELECT o.*, c.pickup_location, c.pickup_note
-       FROM orders o
-       LEFT JOIN collections c ON c.id = o.collection_id
-      WHERE o.order_token = ? LIMIT 1`,
+    "SELECT * FROM orders WHERE order_token = ? LIMIT 1",
     [token]
   )
-  return attachItems(row)
+  return attachPickupLocations(await attachItems(row))
 }
 
 async function getOrderById(id) {
-  // Same LEFT JOIN as getOrderByToken - the email sender needs
-  // pickup_location/pickup_note too, to tell a pickup buyer where to go.
   const [[row]] = await db.query(
-    `SELECT o.*, c.pickup_location, c.pickup_note
-       FROM orders o
-       LEFT JOIN collections c ON c.id = o.collection_id
-      WHERE o.id = ? LIMIT 1`,
+    "SELECT * FROM orders WHERE id = ? LIMIT 1",
     [id]
   )
-  return attachItems(row)
+  return attachPickupLocations(await attachItems(row))
 }
 
 /**
@@ -434,7 +443,15 @@ async function listOrders(filter = {}) {
   const where = []
   const params = []
   if (filter.status) { where.push("status = ?"); params.push(filter.status) }
-  if (filter.collection_id) { where.push("collection_id = ?"); params.push(filter.collection_id) }
+  // A cart (and so an order) can span multiple collections - matching on the
+  // order's own collection_id (set to only the first cart line's collection
+  // at createOrder time) would silently miss an order for every collection
+  // but the first one its items belong to. EXISTS against order_items'
+  // per-line snapshot catches every collection the order actually touches.
+  if (filter.collection_id) {
+    where.push("EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id AND oi.collection_id_snapshot = ?)")
+    params.push(filter.collection_id)
+  }
 
   // Filters on created_at (not confirmed_at/etc.) so idx_orders_status_created
   // stays usable when a status filter is also present.

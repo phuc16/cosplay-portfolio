@@ -427,6 +427,35 @@ describe("sendQueued: receiver info and order code on every lifecycle email", ()
     expect(html).toContain("Ghi chú nhận hàng")
     expect(html).toContain("9am-6pm, both days")
   })
+
+  it("labels each location with its collection title for an order spanning two pickup collections", async () => {
+    const cid1 = await catalog.createCollection({
+      title: "Comic Fest", status: "active", allow_pickup: true, pickup_location: "Booth 12", allow_ship: true,
+    })
+    const cid2 = await catalog.createCollection({
+      title: "Anime Day", status: "active", allow_pickup: true, pickup_location: "Booth 7", allow_ship: true,
+    })
+    const p1 = await catalog.createProduct({ collection_id: cid1, name: "Card A", price: 35000 })
+    const p2 = await catalog.createProduct({ collection_id: cid2, name: "Card B", price: 35000 })
+    await catalog.replaceVariants(p1, [{ label: "A1", stock_qty: 5 }])
+    await catalog.replaceVariants(p2, [{ label: "A1", stock_qty: 5 }])
+    const [[v1]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [p1])
+    const [[v2]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [p2])
+    const o = await orders.createOrder({
+      items: [{ variant_id: v1.id, qty: 1 }, { variant_id: v2.id, qty: 1 }],
+      buyer: { buyer_name: "A", phone: "09", email: "a@example.com" },
+      fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await queue.enqueue(o.id, "order_placed", "a@example.com")
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Comic Fest")
+    expect(html).toContain("Booth 12")
+    expect(html).toContain("Anime Day")
+    expect(html).toContain("Booth 7")
+  })
 })
 
 describe("sendQueued: PIN reminder on later lifecycle emails", () => {

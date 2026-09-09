@@ -54,8 +54,15 @@ function receiverInfoHtml(order) {
     rows.push(["Địa chỉ nhận hàng", order.address_raw])
   }
   if (order.fulfillment_method === "pickup") {
-    if (order.pickup_location) rows.push(["Địa điểm nhận", order.pickup_location])
-    if (order.pickup_note) rows.push(["Ghi chú nhận hàng", order.pickup_note])
+    // A cart can span multiple collections, each with its own pickup spot -
+    // only disambiguate with the collection title when there's more than one.
+    const locations = order.pickup_locations || []
+    const multi = locations.length > 1
+    for (const loc of locations) {
+      const suffix = multi ? ` (${loc.collection_title})` : ""
+      if (loc.pickup_location) rows.push([`Địa điểm nhận${suffix}`, loc.pickup_location])
+      if (loc.pickup_note) rows.push([`Ghi chú nhận hàng${suffix}`, loc.pickup_note])
+    }
   }
   const cells = rows.map(([label, value]) => `
     <tr>

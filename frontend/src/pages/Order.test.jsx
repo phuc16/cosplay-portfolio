@@ -41,7 +41,7 @@ function baseOrder(over = {}) {
     id: 1, order_token: "tok123", status: "confirmed", total: 35000,
     fulfillment_method: "ship", tracking_code: null, created_at: new Date().toISOString(),
     items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1 }],
-    pickup_location: null, pickup_note: null, has_payment_proof: false, payment_proof_url: null,
+    pickup_locations: [], has_payment_proof: false, payment_proof_url: null,
     buyer_name: "Nguyễn Văn A", phone: "0900000000", address_raw: "1 ABC, Q1, TP.HCM",
     order_code: "2608145VR0F1LR",
     ...over,
@@ -205,8 +205,7 @@ describe("Order pickup info", () => {
   it("shows pickup location and note for a pickup order", async () => {
     fetchOrder.mockResolvedValue(baseOrder({
       fulfillment_method: "pickup",
-      pickup_location: "Comic Fest, Booth 12",
-      pickup_note: "9am-6pm, both days",
+      pickup_locations: [{ collection_id: 1, collection_title: "Drop", pickup_location: "Comic Fest, Booth 12", pickup_note: "9am-6pm, both days" }],
     }))
 
     const container = await renderOrder()
@@ -215,10 +214,27 @@ describe("Order pickup info", () => {
     expect(container.textContent).toContain("9am-6pm, both days")
   })
 
+  it("labels each location with its collection title when the order spans more than one pickup collection", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      fulfillment_method: "pickup",
+      pickup_locations: [
+        { collection_id: 1, collection_title: "Comic Fest", pickup_location: "Booth 12", pickup_note: null },
+        { collection_id: 2, collection_title: "Anime Day", pickup_location: "Booth 7", pickup_note: null },
+      ],
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Comic Fest")
+    expect(container.textContent).toContain("Booth 12")
+    expect(container.textContent).toContain("Anime Day")
+    expect(container.textContent).toContain("Booth 7")
+  })
+
   it("does not render a pickup block for a ship order even if fields are somehow present", async () => {
     fetchOrder.mockResolvedValue(baseOrder({
       fulfillment_method: "ship",
-      pickup_location: "Comic Fest, Booth 12",
+      pickup_locations: [{ collection_id: 1, collection_title: "Drop", pickup_location: "Comic Fest, Booth 12", pickup_note: null }],
     }))
 
     const container = await renderOrder()
@@ -226,8 +242,8 @@ describe("Order pickup info", () => {
     expect(container.textContent).not.toContain("Comic Fest, Booth 12")
   })
 
-  it("renders no pickup block when the pickup order has neither location nor note", async () => {
-    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup" }))
+  it("renders no pickup block when the pickup order has no pickup_locations", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", pickup_locations: [] }))
 
     const container = await renderOrder()
 

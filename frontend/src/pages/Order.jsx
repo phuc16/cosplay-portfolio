@@ -421,12 +421,19 @@ export default function Order() {
         )}
       </div>
 
-      {order.fulfillment_method === "pickup" && (order.pickup_location || order.pickup_note) && (
-        <div className="mt-4 p-4 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm">
-          {order.pickup_location && (
-            <p className="font-semibold">{t("shopPickupLocation")}: {order.pickup_location}</p>
-          )}
-          {order.pickup_note && <p>{t("shopPickupNote")}: {order.pickup_note}</p>}
+      {order.fulfillment_method === "pickup" && order.pickup_locations?.length > 0 && (
+        <div className="mt-4 p-4 rounded-xl border border-[var(--border-brand)] opacity-80 text-sm space-y-3">
+          {order.pickup_locations.map((loc) => (
+            <div key={loc.collection_id}>
+              {order.pickup_locations.length > 1 && (
+                <p className="text-xs uppercase tracking-wide opacity-60">{loc.collection_title}</p>
+              )}
+              {loc.pickup_location && (
+                <p className="font-semibold">{t("shopPickupLocation")}: {loc.pickup_location}</p>
+              )}
+              {loc.pickup_note && <p>{t("shopPickupNote")}: {loc.pickup_note}</p>}
+            </div>
+          ))}
         </div>
       )}
 

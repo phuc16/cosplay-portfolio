@@ -479,17 +479,17 @@ describe("GET /api/orders/:token", () => {
 
     const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.status).toBe(200)
-    expect(res.body.pickup_location).toBe("Comic Fest, Booth 12")
-    expect(res.body.pickup_note).toBe("9am-6pm, both days")
+    expect(res.body.pickup_locations).toHaveLength(1)
+    expect(res.body.pickup_locations[0].pickup_location).toBe("Comic Fest, Booth 12")
+    expect(res.body.pickup_locations[0].pickup_note).toBe("9am-6pm, both days")
   })
 
-  it("omits pickup location/note (null) for a ship order", async () => {
+  it("omits pickup_locations (empty) for a ship order", async () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
 
     const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
-    expect(res.body.pickup_location).toBeNull()
-    expect(res.body.pickup_note).toBeNull()
+    expect(res.body.pickup_locations).toEqual([])
   })
 
   it("hides pickup_code while the order is still pending (unpaid)", async () => {

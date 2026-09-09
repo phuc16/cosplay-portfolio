@@ -783,6 +783,31 @@ describe("listOrders date filter", () => {
   })
 })
 
+describe("listOrders collection filter", () => {
+  it("matches an order whose items span multiple collections under EITHER collection's filter", async () => {
+    const { cid: cidA, variantId: variantA } = await seedVariant(5)
+    const { cid: cidB, variantId: variantB } = await seedVariant(5)
+    const mixed = await repo.createOrder({
+      items: [{ variant_id: variantA, qty: 1 }, { variant_id: variantB, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+
+    const rowsA = await repo.listOrders({ collection_id: cidA })
+    const rowsB = await repo.listOrders({ collection_id: cidB })
+    expect(rowsA.map((r) => r.id)).toContain(mixed.id)
+    expect(rowsB.map((r) => r.id)).toContain(mixed.id)
+  })
+
+  it("excludes an order that touches neither collection", async () => {
+    const { cid: cidA, variantId: variantA } = await seedVariant(5)
+    const { cid: cidOther } = await seedVariant(5)
+    const o = await repo.createOrder(order(variantA, 1))
+
+    const rows = await repo.listOrders({ collection_id: cidOther })
+    expect(rows.map((r) => r.id)).not.toContain(o.id)
+  })
+})
+
 describe("listOrders search", () => {
   it("matches an exact numeric id, not just as a substring of something else", async () => {
     const { variantId: v1 } = await seedVariant(5)

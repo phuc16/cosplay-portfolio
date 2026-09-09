@@ -231,6 +231,27 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(row.items[0].image_url).toBe("/api/storage/shop/variants/a1.webp")
   })
 
+  it("shows an order with items from two pickup collections on BOTH collections' rosters", async () => {
+    const cidA = await catalog.createCollection({ title: "Drop A", status: "active", allow_pickup: true })
+    const cidB = await catalog.createCollection({ title: "Drop B", status: "active", allow_pickup: true })
+    const pidA = await catalog.createProduct({ collection_id: cidA, name: "Card A", price: 40000 })
+    const pidB = await catalog.createProduct({ collection_id: cidB, name: "Card B", price: 40000 })
+    await catalog.replaceVariants(pidA, [{ label: "A1", stock_qty: 5 }])
+    await catalog.replaceVariants(pidB, [{ label: "A1", stock_qty: 5 }])
+    const [[vA]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pidA])
+    const [[vB]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pidB])
+    const o = await orders.createOrder({
+      items: [{ variant_id: vA.id, qty: 1 }, { variant_id: vB.id, qty: 1 }],
+      buyer, fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const resA = await authed(request(app).get(`/api/admin/shipping/roster/${cidA}`))
+    const resB = await authed(request(app).get(`/api/admin/shipping/roster/${cidB}`))
+    expect(resA.body.rows.map((r) => r.order_id)).toContain(o.id)
+    expect(resB.body.rows.map((r) => r.order_id)).toContain(o.id)
+  })
+
   it("includes pickup_code in the roster row", async () => {
     const { collectionId, orderId } = await seedPickupOrder()
     const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))

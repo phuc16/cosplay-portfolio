@@ -114,9 +114,19 @@ async function getDropStats(collectionId) {
   )
   if (!collection) return null
 
+  // A cart (and so an order) can span multiple collections - orders.collection_id
+  // is only the first cart line's collection, so filtering on it here would
+  // both miss orders whose first item belongs elsewhere and, worse, attribute
+  // a mixed order's *entire* total to whichever collection happened to be
+  // first. Money is computed from order_items' own per-line collection
+  // snapshot instead - one row per order it touches, scoped to just the
+  // revenue this collection's items represent within that order.
   const [orderRows] = await db.query(
-    `SELECT id, status, payment_method, total, fulfillment_method, expires_at, cancelled_at
-       FROM orders WHERE collection_id = ?`,
+    `SELECT o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at,
+            SUM(oi.unit_price_snapshot * oi.qty) AS collection_total
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id AND oi.collection_id_snapshot = ?
+      GROUP BY o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at`,
     [collectionId]
   )
 
@@ -134,12 +144,17 @@ async function getDropStats(collectionId) {
     orderCounts[o.status] += 1
     fulfillmentCounts[o.fulfillment_method] += 1
 
+    // SUM() over an integer expression comes back from mysql2 as a decimal
+    // string, not a number - unlike a bare column, which is why every other
+    // read in this file skips the cast. Number() here, or every += below
+    // silently string-concatenates instead of adding.
+    const amount = Number(o.collection_total)
     const bucket = classify(o)
-    if (bucket === "received") received[o.payment_method] += o.total
-    else if (bucket === "awaiting_payment") awaitingPayment += o.total
-    else if (bucket === "to_collect") toCollect += o.total
-    else if (bucket === "lost") lost += o.total
-    else if (bucket === "other") pendingCod += o.total
+    if (bucket === "received") received[o.payment_method] += amount
+    else if (bucket === "awaiting_payment") awaitingPayment += amount
+    else if (bucket === "to_collect") toCollect += amount
+    else if (bucket === "lost") lost += amount
+    else if (bucket === "other") pendingCod += amount
 
     if (isPrepaid(o.payment_method)) {
       prepaidCount += 1
@@ -151,7 +166,7 @@ async function getDropStats(collectionId) {
     `SELECT COALESCE(SUM(oi.qty), 0) AS units_sold
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
-      WHERE o.collection_id = ? AND o.status != 'cancelled'`,
+      WHERE oi.collection_id_snapshot = ? AND o.status != 'cancelled'`,
     [collectionId]
   )
 
@@ -165,7 +180,7 @@ async function getDropStats(collectionId) {
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN product_variants v ON v.id = oi.product_variant_id
-      WHERE o.collection_id = ? AND o.status != 'cancelled'
+      WHERE oi.collection_id_snapshot = ? AND o.status != 'cancelled'
       GROUP BY oi.product_variant_id, oi.product_name_snapshot, oi.variant_label_snapshot
       ORDER BY sold DESC`,
     [collectionId]
@@ -282,19 +297,40 @@ async function getRestockStats(collectionId) {
 
 /**
  * Bookkeeping totals across every collection for a date range, plus an
- * explicit "no collection" bucket (orders.collection_id is nullable) so
- * per-collection sums always reconcile with the top-level totals - both are
- * computed from the same fetched rows in the same pass, by construction.
+ * explicit "no collection" bucket (order_items.collection_id_snapshot can be
+ * null for a legacy row predating that column) so per-collection sums always
+ * reconcile with the top-level totals.
+ *
+ * Top-level totals come from the order rows directly (order.total,
+ * shipping_fee are whole-order values with no per-collection analog).
+ * byCollection comes from a separate order_items-scoped query, since a cart
+ * (and so an order) can span multiple collections - grouping by the order's
+ * own collection_id would attribute a mixed order's *entire* total to
+ * whichever collection happened to be the first cart line, both missing
+ * every other collection it touches and overcounting that one. Each order's
+ * total splits across every collection it touches by their item revenue
+ * within it, so summing byCollection still reconciles exactly against the
+ * top-level totals (a bucket is per-order, shared by all its item splits).
  */
 async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
   const { from, toExclusive } = parseLocalDateRange(dateFrom, dateTo)
 
   const [orderRows] = await db.query(
-    `SELECT o.id, o.status, o.payment_method, o.total, o.shipping_fee, o.collection_id,
-            c.title AS collection_title
+    `SELECT o.id, o.status, o.payment_method, o.total, o.shipping_fee
        FROM orders o
-       LEFT JOIN collections c ON c.id = o.collection_id
       WHERE o.created_at >= ? AND o.created_at < ?`,
+    [from, toExclusive]
+  )
+
+  const [collectionRows] = await db.query(
+    `SELECT o.id AS order_id, o.status, o.payment_method,
+            oi.collection_id_snapshot AS collection_id, c.title AS collection_title,
+            SUM(oi.unit_price_snapshot * oi.qty) AS amount
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN collections c ON c.id = oi.collection_id_snapshot
+      WHERE o.created_at >= ? AND o.created_at < ?
+      GROUP BY o.id, o.status, o.payment_method, oi.collection_id_snapshot, c.title`,
     [from, toExclusive]
   )
 
@@ -323,16 +359,19 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     else if (bucket === "other") pendingCod += o.total
 
     if (o.shipping_fee) shippingCost += o.shipping_fee
+  }
 
-    const key = o.collection_id === null ? "none" : o.collection_id
+  for (const row of collectionRows) {
+    const bucket = classify(row)
+    const key = row.collection_id === null ? "none" : row.collection_id
     if (!byCollection.has(key)) {
       byCollection.set(key, {
-        collection_id: o.collection_id,
-        collection_title: o.collection_id === null ? "Không thuộc bộ sưu tập" : o.collection_title,
+        collection_id: row.collection_id,
+        collection_title: row.collection_id === null ? "Không thuộc bộ sưu tập" : row.collection_title,
         received_total: 0, awaiting_payment: 0, to_collect: 0, lost: 0, pending_cod: 0,
       })
     }
-    addTo(byCollection.get(key), bucket, o.total)
+    addTo(byCollection.get(key), bucket, Number(row.amount))
   }
 
   return {

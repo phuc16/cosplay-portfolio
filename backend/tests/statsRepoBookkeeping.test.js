@@ -131,11 +131,11 @@ describe("getBookkeepingStats - money and buckets", () => {
     expect(stats.received_total).toBe(35000) // shipping never inflates income
   })
 
-  it("buckets orders with no collection into an explicit 'no collection' entry", async () => {
+  it("buckets an item with no collection snapshot (a legacy row predating that column) into an explicit 'no collection' entry", async () => {
     const { variantId } = await seedVariant()
     const today = new Date()
     const o = await placeOrderAt(variantId, today, { payment_method: "bank" })
-    await db.query("UPDATE orders SET collection_id = NULL WHERE id = ?", [o.id])
+    await db.query("UPDATE order_items SET collection_id_snapshot = NULL WHERE order_id = ?", [o.id])
 
     const dateStr = vnDateStr(today)
     const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
@@ -256,5 +256,27 @@ describe("reconciliation - the highest-value test in this phase", () => {
     expect(sumToCollect).toBe(stats.to_collect)
     expect(sumLost).toBe(stats.lost)
     expect(sumPendingCod).toBe(stats.pending_cod)
+  })
+
+  it("splits a mixed-collection order's total across every collection it touches, and still reconciles", async () => {
+    const today = new Date()
+    const dateStr = vnDateStr(today)
+
+    const a = await seedVariant()
+    const b = await seedVariant()
+    const o = await orders.createOrder({
+      items: [{ variant_id: a.variantId, qty: 1 }, { variant_id: b.variantId, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+    await db.query("UPDATE orders SET created_at = ? WHERE id = ?", [today, o.id])
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    const bucketA = stats.by_collection.find((c) => c.collection_id === a.collectionId)
+    const bucketB = stats.by_collection.find((c) => c.collection_id === b.collectionId)
+
+    expect(bucketA.received_total).toBe(35000)
+    expect(bucketB.received_total).toBe(35000)
+    expect(stats.received_total).toBe(70000)
   })
 })
