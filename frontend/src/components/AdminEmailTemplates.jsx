@@ -6,6 +6,7 @@ const LABELS = {
   payment_confirmed: "Đã xác nhận thanh toán",
   shipped: "Đã gửi hàng",
   cancelled: "Đã hủy đơn",
+  payment_proof_uploaded: "Admin: đã tải ảnh chuyển khoản",
 }
 
 // Mirrors backend/shop/email/templates.js PLACEHOLDERS - shown so the seller
@@ -14,6 +15,7 @@ const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
   "payment_note", "shop_name", "receiver_info", "shipping_fee_note", "prep_note",
+  "admin_url", "payment_proof_image",
 ]
 
 // Keyed by tpl.type in the parent, so this mounts fresh (picking up
