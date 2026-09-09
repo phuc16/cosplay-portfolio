@@ -9,10 +9,12 @@ function findProduct(collection, variantId) {
 }
 
 /**
- * Classifies every cart line into valid or one of three reasons a buyer
- * can't actually check out with it - a 404 collapses not-started, deleted,
- * and archived into one bucket since the public API deliberately can't
- * (and shouldn't) tell those apart from the outside.
+ * Classifies every cart line into valid or one of four reasons a buyer
+ * can't actually check out with it. A 404 collapses deleted and archived
+ * into one "unavailable" bucket, since the public API deliberately can't
+ * (and shouldn't) tell those apart from the outside - but a not-yet-started
+ * collection is now itself visible (see catalogRepo.js's not_started_yet),
+ * so it gets its own distinct reason instead of falling into that bucket.
  */
 export async function checkCartAvailability(cart) {
   const slugs = [...new Set(cart.map((c) => c.collection_slug).filter(Boolean))]
@@ -32,6 +34,10 @@ export async function checkCartAvailability(cart) {
     }
     if (collection.status === "closed") {
       problems.set(line.variant_id, "ended")
+      continue
+    }
+    if (collection.not_started_yet) {
+      problems.set(line.variant_id, "not_started")
       continue
     }
 

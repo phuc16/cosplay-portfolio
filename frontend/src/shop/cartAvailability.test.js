@@ -116,4 +116,20 @@ describe("checkCartAvailability", () => {
     const problems = await checkCartAvailability(cart)
     expect(problems.size).toBe(1)
   })
+
+  it("flags a line from a not-yet-started collection as not_started, not sold_out or unavailable", async () => {
+    fetchCollection.mockResolvedValue(physicalCollection({ not_started_yet: true }))
+    const cart = [{ variant_id: 1, collection_slug: "drop" }]
+
+    const problems = await checkCartAvailability(cart)
+    expect(problems.get(1)).toBe("not_started")
+  })
+
+  it("does not flag a started collection's line as not_started", async () => {
+    fetchCollection.mockResolvedValue(physicalCollection({ not_started_yet: false }))
+    const cart = [{ variant_id: 1, collection_slug: "drop" }]
+
+    const problems = await checkCartAvailability(cart)
+    expect(problems.has(1)).toBe(false)
+  })
 })

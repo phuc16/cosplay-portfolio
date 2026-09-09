@@ -40,6 +40,7 @@ export default function Cart() {
     sold_out: t("cartItemSoldOut"),
     ended: t("cartItemEnded"),
     unavailable: t("cartItemUnavailable"),
+    not_started: t("cartItemNotStarted"),
   }[reason])
 
   if (!cart.length) {

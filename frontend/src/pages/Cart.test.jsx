@@ -152,6 +152,16 @@ describe("Cart - early availability validation", () => {
     expect(container.textContent).toContain("This drop has ended")
   })
 
+  it("shows a not-started badge for a not-yet-started collection's line", async () => {
+    fetchCollection.mockResolvedValue({ status: "active", not_started_yet: true, products: [] })
+    addToCart({ variant_id: 23, qty: 1, product_name: "Upcoming Drop Item", variant_label: "Std", price: 10000, image_url: null, collection_slug: "upcoming" })
+
+    const container = await renderCart()
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Not started yet")
+  })
+
   it("shows an unavailable badge when the collection fetch fails", async () => {
     fetchCollection.mockRejectedValue(new Error("404"))
     addToCart({ variant_id: 22, qty: 1, product_name: "Hidden Item", variant_label: "Std", price: 10000, image_url: null, collection_slug: "hidden" })
