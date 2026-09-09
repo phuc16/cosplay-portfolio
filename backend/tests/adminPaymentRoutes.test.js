@@ -25,4 +25,11 @@ describe("PUT /api/admin/payment-settings", () => {
     })
     expect(res.status).toBe(200)
   })
+
+  it("accepts a momo_qr_image from this app's own storage proxy (what adminUploadImage always returns)", async () => {
+    const res = await authed(request(app).put("/api/admin/payment-settings")).send({
+      momo_enabled: true, momo_qr_image: "/api/storage/shop/payments/abc123.webp",
+    })
+    expect(res.status).toBe(200)
+  })
 })

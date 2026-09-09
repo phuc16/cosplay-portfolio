@@ -11,8 +11,14 @@ function validate(d) {
   if (d.momo_enabled && !d.momo_phone?.trim() && !d.momo_qr_image?.trim()) {
     return "Momo cần số điện thoại hoặc ảnh QR"
   }
-  if (d.momo_qr_image?.trim() && !/^https?:\/\//i.test(d.momo_qr_image.trim())) {
-    return "Ảnh QR Momo phải bắt đầu bằng http:// hoặc https://"
+  // adminUploadImage (the only way this field is ever populated through the
+  // UI) always returns storage.proxyUrl()'s relative "/api/storage/..."
+  // path, same as every other image field in the app - so this must accept
+  // that shape too, not just an absolute URL. Still blocks dangerous
+  // schemes (e.g. "javascript:") by only widening to this one known-safe,
+  // server-controlled prefix rather than any relative path.
+  if (d.momo_qr_image?.trim() && !/^(https?:\/\/|\/api\/storage\/)/i.test(d.momo_qr_image.trim())) {
+    return "Ảnh QR Momo phải là URL http:// hoặc https://, hoặc ảnh tải lên từ hệ thống"
   }
   if (d.paypal_enabled && !d.paypal_link?.trim()) return "Cần link PayPal"
   return null
