@@ -127,6 +127,36 @@ describe("GET /api/admin/shipping/export/orders", () => {
     expect(res.body.find((x) => x.id === o.id)).toBeUndefined()
   })
 
+  it("flags has_digital_item on a shipped order that also carries a digital item", async () => {
+    const cid = await catalog.createCollection({ title: "Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 50000 })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+    const digitalPid = await catalog.createProduct({
+      collection_id: cid, name: "Digital Bonus", price: 10000, type: "digital",
+      stock_qty: 5, delivery_link: "https://drive.google.com/x",
+    })
+    const detail = await catalog.getCollectionDetailById(cid)
+    const digitalVariantId = detail.products.find((p) => p.id === digitalPid).variant_id
+
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 1 }, { variant_id: digitalVariantId, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    const order = res.body.find((x) => x.id === o.id)
+    expect(order).toBeDefined()
+    expect(order.has_digital_item).toBe(true)
+  })
+
+  it("does not flag has_digital_item for a purely physical order", async () => {
+    const id = await seed()
+    const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    expect(res.body.find((o) => o.id === id).has_digital_item).toBe(false)
+  })
+
   it("filters to a single collection when collection_id is given, and lists across all when omitted", async () => {
     const cidA = await catalog.createCollection({ title: "Drop A", status: "active" })
     const cidB = await catalog.createCollection({ title: "Drop B", status: "active" })

@@ -85,6 +85,11 @@ module.exports = function adminShippingRoutes() {
         payment_method: o.payment_method,
         shipping_payer: o.shipping_payer,
         prepared: Boolean(o.prepared),
+        // A mixed cart (physical item shipped here + a digital one) still
+        // needs its digital delivery link sent - nothing else about this
+        // export queue would tell staff that, since it only ever handles
+        // the physical side of the order.
+        has_digital_item: o.has_digital_item,
       })))
     } catch (err) { oops(res, err, "Lỗi liệt kê đơn cần xuất") }
   })
@@ -393,6 +398,7 @@ module.exports = function adminShippingRoutes() {
         // - staff packing at the roster need to see the item, not just its name.
         [itemRows] = await db.query(
           `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty, oi.image_url_snapshot,
+                  oi.delivery_link_snapshot,
                   pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
              FROM order_items oi
              LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id

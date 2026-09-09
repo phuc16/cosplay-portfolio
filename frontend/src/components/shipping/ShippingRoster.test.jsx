@@ -197,6 +197,29 @@ describe("ShippingRoster", () => {
     expect(container.querySelector('img[src="/api/storage/shop/a.webp"]')).not.toBeNull()
   })
 
+  it("badges a digital item mixed into a pickup order's item list, so it isn't invisible to staff packing the physical one", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [
+            { product_name: "Photocard", variant_label: "A1", qty: 1, delivery_link: null },
+            { product_name: "Digital Bonus", variant_label: "", qty: 1, delivery_link: "https://drive.google.com/x" },
+          ],
+          paid: true, amount_due: 0,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const detail = container.querySelector('[data-testid="order-detail-1"]')
+    expect(detail.textContent).toContain("Số")
+  })
+
   it("shows a prepared pill defaulting to 'Cần đóng gói', toggling it via adminSetOrderPrepared", async () => {
     adminGetPickupRoster.mockResolvedValue({
       rows: [

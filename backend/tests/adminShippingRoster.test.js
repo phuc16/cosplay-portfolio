@@ -252,6 +252,32 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(resB.body.rows.map((r) => r.order_id)).toContain(o.id)
   })
 
+  it("exposes each item's delivery_link on the roster, so a digital item mixed into a pickup order isn't invisible to staff packing the physical one(s)", async () => {
+    const cid = await catalog.createCollection({ title: "Drop", status: "active", allow_pickup: true })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 40000 })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+    const digitalPid = await catalog.createProduct({
+      collection_id: cid, name: "Digital Bonus", price: 10000, type: "digital",
+      stock_qty: 5, delivery_link: "https://drive.google.com/x",
+    })
+    const detail = await catalog.getCollectionDetailById(cid)
+    const digitalVariantId = detail.products.find((p) => p.id === digitalPid).variant_id
+
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 1 }, { variant_id: digitalVariantId, qty: 1 }],
+      buyer, fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${cid}`))
+    const row = res.body.rows.find((r) => r.order_id === o.id)
+    const physicalItem = row.items.find((i) => i.product_name === "Card")
+    const digitalItem = row.items.find((i) => i.product_name === "Digital Bonus")
+    expect(physicalItem.delivery_link).toBeNull()
+    expect(digitalItem.delivery_link).toBe("https://drive.google.com/x")
+  })
+
   it("includes pickup_code in the roster row", async () => {
     const { collectionId, orderId } = await seedPickupOrder()
     const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))

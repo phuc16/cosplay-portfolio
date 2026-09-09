@@ -46,6 +46,11 @@ function buildRoster(orders) {
         variant_label: i.variant_label_snapshot,
         qty: i.qty,
         image_url: i.image_url || null,
+        // A pickup order can still carry a digital item alongside the
+        // physical one(s) actually handed over here - staff packing the
+        // physical side need a cue that a digital delivery link also needs
+        // sending, since nothing else about the pickup event covers it.
+        delivery_link: i.delivery_link_snapshot || null,
       })),
       paid,
       amount_due: amountDue,

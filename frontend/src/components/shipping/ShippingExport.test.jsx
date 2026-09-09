@@ -91,6 +91,22 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("Không có đơn nào cần xuất")
   })
 
+  it("shows a '+ Sản phẩm số' badge for an order that also has a digital item", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order({ has_digital_item: true })])
+    const container = await renderShippingExport()
+    await flush()
+
+    expect(container.textContent).toContain("+ Sản phẩm số")
+  })
+
+  it("does not show the badge for a purely physical order", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order({ has_digital_item: false })])
+    const container = await renderShippingExport()
+    await flush()
+
+    expect(container.textContent).not.toContain("+ Sản phẩm số")
+  })
+
   it("lists orders across all collections by default", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     await renderShippingExport()

@@ -68,7 +68,7 @@ describe("buildRoster - paid vs collect-at-handover", () => {
 })
 
 describe("buildRoster - items", () => {
-  it("maps each order's item snapshots to product_name/variant_label/qty/image_url", () => {
+  it("maps each order's item snapshots to product_name/variant_label/qty/image_url/delivery_link", () => {
     const { rows } = buildRoster([order({
       items: [
         { product_name_snapshot: "Photocard", variant_label_snapshot: "A1", qty: 2, image_url: "/api/storage/shop/a.webp" },
@@ -76,9 +76,18 @@ describe("buildRoster - items", () => {
       ],
     })])
     expect(rows[0].items).toEqual([
-      { product_name: "Photocard", variant_label: "A1", qty: 2, image_url: "/api/storage/shop/a.webp" },
-      { product_name: "Poster", variant_label: "Std", qty: 1, image_url: null },
+      { product_name: "Photocard", variant_label: "A1", qty: 2, image_url: "/api/storage/shop/a.webp", delivery_link: null },
+      { product_name: "Poster", variant_label: "Std", qty: 1, image_url: null, delivery_link: null },
     ])
+  })
+
+  it("surfaces a digital item's delivery_link, so it isn't invisible on a mostly-physical pickup order", () => {
+    const { rows } = buildRoster([order({
+      items: [
+        { product_name_snapshot: "Digital Bonus", variant_label_snapshot: "", qty: 1, delivery_link_snapshot: "https://drive.google.com/x" },
+      ],
+    })])
+    expect(rows[0].items[0].delivery_link).toBe("https://drive.google.com/x")
   })
 
   it("gives every row the same buyer-facing order_code shown elsewhere in admin", () => {
