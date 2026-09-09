@@ -4,6 +4,7 @@ import { act } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
+import { formatVnDateTime } from "../utils/orderDeadline"
 
 const fetchCollection = vi.fn()
 
@@ -217,6 +218,7 @@ describe("Collection - not-started preview", () => {
     // LanguageProvider defaults to English (localStorage.getItem("lang") || "en"),
     // so the rendered strings are translations.en's, not the Vietnamese ones.
     expect(container.textContent).toContain("Not started yet")
+    expect(container.textContent).toContain(formatVnDateTime("2026-12-25T13:00:00.000Z"))
     expect(container.textContent).toContain("Card")
   })
 
@@ -234,10 +236,16 @@ describe("Collection - not-started preview", () => {
     }))
 
     const container = await renderCollection()
-    const cover = container.querySelector("img")
-    await act(async () => { cover?.click() })
+    // baseCollection's product has no cover image (no product.images, no
+    // variant image_url), so there's no <img> to click - open its
+    // (single-variant) detail via the card's clickable wrapper instead,
+    // same trigger the img would otherwise sit inside (see the identical
+    // fix in ProductCard.test.jsx's "unavailableLabel" describe block).
+    const card = container.querySelector('[role="button"]')
+    await act(async () => { card?.click() })
 
     const addButton = [...container.querySelectorAll("button")].find((b) => b.textContent.includes("Thêm vào giỏ") || b.textContent.includes("Add to cart"))
-    if (addButton) expect(addButton.disabled).toBe(true)
+    expect(addButton).toBeTruthy()
+    expect(addButton.disabled).toBe(true)
   })
 })
