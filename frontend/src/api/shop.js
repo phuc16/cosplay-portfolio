@@ -1,4 +1,5 @@
 import { api } from "./api"
+import { uploadImage } from "./upload"
 
 // ── Public storefront ──
 export const fetchCollections = () =>
@@ -54,8 +55,8 @@ export const adminReorderProducts = (collectionId, productIds) =>
 export const adminSaveVariants = (productId, variants) =>
   api.put(`/api/admin/products/${productId}/variants`, { variants }).then((r) => r.data)
 
-export const adminUploadImage = (base64, folder) =>
-  api.post("/api/admin/shop/image", { base64, folder }).then((r) => r.data)
+export const adminUploadImage = (file, folder) =>
+  uploadImage("/api/admin/shop/image", file, { folder })
 
 // ── Orders ──
 export const createOrder = (payload) =>
@@ -96,8 +97,8 @@ export const fetchPaymentMethods = () =>
 export const fetchPaymentInstructions = (token, headers = {}) =>
   api.get(`/api/orders/${token}/payment`, { headers }).then((r) => r.data)
 
-export const uploadPaymentProof = (token, base64, headers = {}) =>
-  api.post(`/api/orders/${token}/proof`, { base64 }, { headers }).then((r) => r.data)
+export const uploadPaymentProof = (token, file, headers = {}) =>
+  uploadImage(`/api/orders/${token}/proof`, file, {}, { headers })
 
 export const fetchOrderQrBlob = (token, headers = {}) =>
   api.get(`/api/orders/${token}/qr.svg`, { headers, responseType: "blob" }).then((r) => r.data)
