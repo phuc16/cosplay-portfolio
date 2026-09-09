@@ -447,6 +447,31 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.textContent).not.toContain("Số")
   })
 
+  it("shows a '+ Sản phẩm số' badge on a mixed ship+digital order's collapsed row", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship", has_digital_item: true })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).toContain("+ Sản phẩm số")
+  })
+
+  it("does not show the '+' badge for a purely physical order", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship", has_digital_item: false })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).not.toContain("+ Sản phẩm số")
+  })
+
+  it("does not double-label an all-digital order with the '+' badge", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "digital", has_digital_item: true })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).not.toContain("+ Sản phẩm số")
+    expect(container.textContent).toContain("Sản phẩm số")
+  })
+
   it("fetches payment instructions by id under admin auth when opening the detail panel, not the buyer's public token route", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({ id: 1, email: "a@b.com", items: [] }))

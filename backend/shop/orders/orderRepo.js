@@ -449,7 +449,7 @@ async function listOrders(filter = {}) {
   // but the first one its items belong to. EXISTS against order_items'
   // per-line snapshot catches every collection the order actually touches.
   if (filter.collection_id) {
-    where.push("EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id AND oi.collection_id_snapshot = ?)")
+    where.push("EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.collection_id_snapshot = ?)")
     params.push(filter.collection_id)
   }
 
@@ -482,12 +482,22 @@ async function listOrders(filter = {}) {
     params.push(...clauseParams)
   }
 
+  // A mixed cart (e.g. a shipped physical item plus a digital one) resolves
+  // fulfillment_method to "ship"/"pickup" - only an all-digital order ever
+  // gets "digital" (see createOrder). Without this flag, the admin list has
+  // no way to show that a "ship" order still needs a delivery link sent;
+  // staff would only discover it by opening every order's detail.
   const [rows] = await db.query(
-    `SELECT * FROM orders ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-      ORDER BY created_at DESC, id DESC`,
+    `SELECT o.*,
+            EXISTS (
+              SELECT 1 FROM order_items oi
+               WHERE oi.order_id = o.id AND oi.delivery_link_snapshot IS NOT NULL
+            ) AS has_digital_item
+       FROM orders o ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY o.created_at DESC, o.id DESC`,
     params
   )
-  return rows
+  return rows.map((r) => ({ ...r, has_digital_item: Boolean(r.has_digital_item) }))
 }
 
 /** Return reserved stock. Caller must hold the order row lock. */

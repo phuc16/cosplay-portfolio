@@ -808,6 +808,29 @@ describe("listOrders collection filter", () => {
   })
 })
 
+describe("listOrders has_digital_item", () => {
+  it("flags a mixed ship+digital order, whose fulfillment_method is still 'ship'", async () => {
+    const { variantId: shipVariant } = await seedVariant(5)
+    const { variantId: digitalVariant } = await seedDigitalVariant(5)
+    const o = await repo.createOrder({
+      items: [{ variant_id: shipVariant, qty: 1 }, { variant_id: digitalVariant, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+
+    const found = (await repo.listOrders({})).find((r) => r.id === o.id)
+    expect(found.fulfillment_method).toBe("ship")
+    expect(found.has_digital_item).toBe(true)
+  })
+
+  it("is false for a purely physical order", async () => {
+    const { variantId } = await seedVariant(5)
+    const o = await repo.createOrder(order(variantId, 1))
+
+    const found = (await repo.listOrders({})).find((r) => r.id === o.id)
+    expect(found.has_digital_item).toBe(false)
+  })
+})
+
 describe("listOrders search", () => {
   it("matches an exact numeric id, not just as a substring of something else", async () => {
     const { variantId: v1 } = await seedVariant(5)
