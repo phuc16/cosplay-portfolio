@@ -101,8 +101,8 @@ export const FAQ_ITEMS = [
       en: "Why can't I see a drop, or why can't I order from it anymore?",
     },
     answer: {
-      vi: "Một số đợt mở bán được người bán đặt lịch mở/đóng vào thời điểm cụ thể. Trước giờ mở, đợt đó sẽ chưa xuất hiện trên trang chủ. Sau khi đã đến giờ đóng, bạn vẫn xem được sản phẩm nhưng không đặt hàng được nữa - trang sẽ hiển thị rõ trạng thái này.",
-      en: "Some drops are scheduled by the seller to open and close at specific times. Before the opening time, that drop simply won't appear on the homepage yet. After the scheduled close time, you can still browse it, but ordering is closed - the page will clearly show this.",
+      vi: "Một số đợt mở bán được người bán đặt lịch mở/đóng vào thời điểm cụ thể. Trước giờ mở, bạn vẫn xem được sản phẩm và giá nhưng chưa đặt hàng được - trang sẽ hiển thị rõ ngày giờ mở bán. Sau khi đã đến giờ đóng, bạn vẫn xem được sản phẩm nhưng không đặt hàng được nữa - trang sẽ hiển thị rõ trạng thái này.",
+      en: "Some drops are scheduled by the seller to open and close at specific times. Before the opening time, you can still browse the products and prices, but you can't order yet - the page clearly shows the exact opening date/time. After the scheduled close time, you can still browse it, but ordering is closed - the page will clearly show this.",
     },
   },
   {
