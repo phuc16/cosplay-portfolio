@@ -50,16 +50,22 @@ const FLAGS_LOADING = { loaded: false, allow_ship: true, allow_pickup: true, pic
  * reusing the existing public collection endpoint (no new one needed) - the
  * same data already shown on the pre-purchase collection page. A cart can in
  * principle span more than one collection, so a method only counts as
- * offered if every collection in the cart offers it. pickup_locations lists
- * every collection in the cart that has a pickup_location/note set - the
- * render side labels each with its collection title once there's more than
- * one, same as the post-purchase order page.
+ * offered if every collection with a *physical* item in the cart offers it -
+ * a collection contributing only digital items has no physical fulfillment
+ * stake, so its allow_ship/allow_pickup flags (allow_pickup defaults to
+ * false, and a digital-only collection has no reason to ever flip it) must
+ * not veto ship/pickup for the other, physical collection(s) in the cart.
+ * pickup_locations lists every physical collection with a pickup_location/
+ * note set - the render side labels each with its collection title once
+ * there's more than one, same as the post-purchase order page.
  */
 async function loadFulfillmentFlags(cart) {
-  const slugs = [...new Set(cart.map((c) => c.collection_slug).filter(Boolean))]
-  if (slugs.length === 0) return { ...FLAGS_LOADING, loaded: true }
+  const physicalSlugs = [...new Set(
+    cart.filter((c) => !c.is_digital).map((c) => c.collection_slug).filter(Boolean)
+  )]
+  if (physicalSlugs.length === 0) return { ...FLAGS_LOADING, loaded: true }
 
-  const collections = (await Promise.all(slugs.map((s) => fetchCollection(s).catch(() => null))))
+  const collections = (await Promise.all(physicalSlugs.map((s) => fetchCollection(s).catch(() => null))))
     .filter(Boolean)
   if (collections.length === 0) return { ...FLAGS_LOADING, loaded: true }
 

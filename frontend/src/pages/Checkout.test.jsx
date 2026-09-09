@@ -313,6 +313,27 @@ describe("Checkout - digital cart", () => {
     expect(options).toEqual(["Bank transfer"])
   })
 
+  it("still offers pickup for a mixed cart when only the digital item's collection has allow_pickup=false", async () => {
+    // allow_pickup defaults to false and a digital-only collection has no
+    // reason to ever flip it - this is the realistic shape, unlike the
+    // "hides cod for a mixed cart" test above which gives both collections
+    // the same allow_pickup:true and so never exercises this path.
+    const digitalItem = { ...digitalCartItem, collection_slug: "digital-drop" }
+    const physicalItem = { ...physicalCartItem, collection_slug: "physical-drop" }
+    localStorage.setItem("shop_cart", JSON.stringify([digitalItem, physicalItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchCollection.mockImplementation((slug) => Promise.resolve(
+      slug === "digital-drop"
+        ? { id: 1, title: "Digital Drop", allow_ship: false, allow_pickup: false, pickup_location: null, pickup_note: null }
+        : { id: 2, title: "Physical Drop", allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null }
+    ))
+
+    const container = await renderCheckout()
+
+    const radios = container.querySelectorAll('input[name="fulfillment"]')
+    expect(radios.length).toBe(2)
+  })
+
   it("omits fulfillment_method from the submitted order for an all-digital cart", async () => {
     localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
