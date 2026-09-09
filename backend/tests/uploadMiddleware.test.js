@@ -51,4 +51,26 @@ describe("uploadSingleImage", () => {
     expect(res.body.hasBuffer).toBe(false)
     expect(res.body.folder).toBe("misc")
   })
+
+  it("returns 400 invalid_input when a request carries far more text fields than any real caller sends", async () => {
+    const app = buildApp()
+    let req = request(app).post("/test-upload").attach("file", Buffer.from("hello"), "test.png")
+    for (let i = 0; i < 20; i++) req = req.field(`extra${i}`, "x")
+    const res = await req
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("returns 400 invalid_input for a non-size multer error (e.g. a second file part)", async () => {
+    const app = express()
+    app.post("/test-upload", uploadSingleImage(), (req, res) => res.json({ ok: true }))
+    const res = await request(app)
+      .post("/test-upload")
+      .attach("file", Buffer.from("a"), "a.png")
+      .attach("file", Buffer.from("b"), "b.png")
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
 })
