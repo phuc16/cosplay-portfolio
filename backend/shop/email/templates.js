@@ -5,6 +5,7 @@ const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
   "payment_note", "shop_name", "receiver_info", "shipping_fee_note", "prep_note",
+  "admin_url", "payment_proof_image",
 ]
 
 const SHOP_NAME = process.env.SHOP_NAME || "Shop"
@@ -126,6 +127,10 @@ function buildVars(order) {
     payment_note: escapeHtml(order.payment_note || ""),
     shop_name: escapeHtml(SHOP_NAME),
     receiver_info: receiverInfoHtml(order),
+    admin_url: `${SITE_URL}/admin`,
+    payment_proof_image: order.payment_proof_url
+      ? `<img src="${escapeHtml(SITE_URL + order.payment_proof_url)}" style="max-width:320px;width:100%;border-radius:8px;display:block;margin-top:8px" />`
+      : "",
     // Only a ship order has a shipper to pay at the door - a pickup order's
     // buyer never encounters this fee, so the note would just be confusing.
     shipping_fee_note: order.fulfillment_method === "ship"
@@ -164,7 +169,10 @@ function validatePlaceholders(text) {
 
 // Header bar + card, shared by every template so the order code/receiver
 // info/link show up the same way everywhere without each one repeating them.
-const wrap = (inner) => `
+// ctaUrlVar names the placeholder the "Xem đơn hàng" button links to -
+// "order_url" (the buyer's own order page) for every buyer-facing template,
+// "admin_url" for the admin-facing payment_proof_uploaded template below.
+const wrap = (inner, ctaUrlVar = "order_url") => `
 <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#fff">
   <div style="background:${BRAND};padding:18px 24px;border-radius:12px 12px 0 0">
     <span style="color:#fff;font-size:17px;font-weight:700">{{shop_name}}</span>
@@ -175,7 +183,7 @@ const wrap = (inner) => `
     {{receiver_info}}
     <p style="margin:20px 0 0;font-size:14px">Trân trọng,<br/>{{shop_name}}</p>
     <div style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;text-align:center">
-      <a href="{{order_url}}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 28px;border-radius:8px">Xem đơn hàng →</a>
+      <a href="{{${ctaUrlVar}}}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 28px;border-radius:8px">Xem đơn hàng →</a>
     </div>
   </div>
 </div>`
@@ -214,6 +222,14 @@ const DEFAULT_TEMPLATES = {
       <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, đơn hàng của bạn đã bị hủy. Nếu bạn đã thanh toán, vui lòng liên hệ để mình hoàn tiền.</p>
       {{items}}
       ${TOTAL_ROW}`),
+  },
+  payment_proof_uploaded: {
+    subject: "Đơn #{{order_id}} vừa gửi ảnh chuyển khoản",
+    body_html: wrap(`
+      <p style="margin:0 0 12px"><strong>{{buyer_name}}</strong> vừa tải ảnh chuyển khoản cho đơn hàng này - kiểm tra và xác nhận khi có thể.</p>
+      {{items}}
+      ${TOTAL_ROW}
+      {{payment_proof_image}}`, "admin_url"),
   },
 }
 

@@ -158,6 +158,47 @@ describe("digital delivery link", () => {
   })
 })
 
+describe("payment_proof_uploaded (admin template)", () => {
+  const orderWithProof = (overrides = {}) => ({
+    ...order,
+    payment_proof_url: "/api/storage/shop/proofs/12/abc.webp",
+    ...overrides,
+  })
+
+  it("buildVars computes admin_url from SITE_URL", () => {
+    const vars = t.buildVars(orderWithProof())
+    expect(vars.admin_url).toBe(`${process.env.SITE_URL || ""}/admin`)
+  })
+
+  it("buildVars embeds the proof screenshot as an <img> pointing at SITE_URL + payment_proof_url", () => {
+    const vars = t.buildVars(orderWithProof())
+    expect(vars.payment_proof_image).toContain("<img")
+    expect(vars.payment_proof_image).toContain(`${process.env.SITE_URL || ""}/api/storage/shop/proofs/12/abc.webp`)
+  })
+
+  it("buildVars renders no <img> when there is no proof yet", () => {
+    const vars = t.buildVars(orderWithProof({ payment_proof_url: null }))
+    expect(vars.payment_proof_image).not.toContain("<img")
+  })
+
+  it("renders the default template with the order code, buyer name, and embedded proof image", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_proof_uploaded, t.buildVars(orderWithProof()))
+    expect(out.html).toContain("Nguyễn Văn A")
+    expect(out.html).toContain("Mã đơn hàng")
+    expect(out.html).toContain("<img")
+  })
+
+  it("the CTA button links to admin_url, not the buyer's order_url", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_proof_uploaded, t.buildVars(orderWithProof()))
+    expect(out.html).toContain(`href="${process.env.SITE_URL || ""}/admin"`)
+  })
+
+  it("uses only valid placeholders", () => {
+    const tpl = t.DEFAULT_TEMPLATES.payment_proof_uploaded
+    expect(t.validatePlaceholders(tpl.subject + tpl.body_html)).toEqual([])
+  })
+})
+
 describe("validatePlaceholders", () => {
   it("accepts known placeholders", () => {
     expect(t.validatePlaceholders("{{order_id}} {{buyer_name}} {{total}}")).toEqual([])
@@ -175,7 +216,7 @@ describe("validatePlaceholders", () => {
 describe("DEFAULT_TEMPLATES", () => {
   it("covers every lifecycle email", () => {
     expect(Object.keys(t.DEFAULT_TEMPLATES).sort())
-      .toEqual(["cancelled", "order_placed", "payment_confirmed", "shipped"])
+      .toEqual(["cancelled", "order_placed", "payment_confirmed", "payment_proof_uploaded", "shipped"])
   })
 
   it("uses only valid placeholders", () => {
