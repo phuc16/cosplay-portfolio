@@ -249,3 +249,42 @@ describe("AdminVariants - reordering rows", () => {
     expect(downButtons[downButtons.length - 1].disabled).toBe(true)
   })
 })
+
+describe("AdminVariants - natural sort", () => {
+  it("bulk-adding codes out of order lands them sorted naturally (A2 before A10, not string order)", async () => {
+    const container = await renderVariants(baseProduct({ variants: [] }))
+
+    const bulkInput = container.querySelector('input[placeholder="Dán nhiều mã: A1, A2, B1..."]')
+    Object.defineProperty(bulkInput, "value", { value: "A10, A2, A1", writable: true })
+    await act(async () => bulkInput.dispatchEvent(new Event("change", { bubbles: true })))
+    const addBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm hàng loạt")
+    await act(async () => addBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    const labelInputs = [...container.querySelectorAll('input[placeholder="Mã (A1) hoặc size (M)"]')]
+    expect(labelInputs.map((i) => i.value)).toEqual(["A1", "A2", "A10"])
+  })
+
+  it("the 'Sắp xếp theo mã' button sorts existing rows naturally on demand", async () => {
+    const container = await renderVariants(
+      baseProduct({
+        variants: [
+          { id: 10, label: "A10", stock_qty: 1, image_url: null },
+          { id: 11, label: "A2", stock_qty: 1, image_url: null },
+          { id: 12, label: "A1", stock_qty: 1, image_url: null },
+        ],
+      })
+    )
+
+    const sortBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sắp xếp theo mã")
+    await act(async () => sortBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    const labelInputs = [...container.querySelectorAll('input[placeholder="Mã (A1) hoặc size (M)"]')]
+    expect(labelInputs.map((i) => i.value)).toEqual(["A1", "A2", "A10"])
+  })
+
+  it("disables the sort button with fewer than 2 rows", async () => {
+    const container = await renderVariants(baseProduct({ variants: [{ id: 10, label: "A1", stock_qty: 1, image_url: null }] }))
+    const sortBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sắp xếp theo mã")
+    expect(sortBtn.disabled).toBe(true)
+  })
+})
