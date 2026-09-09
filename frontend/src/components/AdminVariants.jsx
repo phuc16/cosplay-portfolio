@@ -114,13 +114,7 @@ export default function AdminVariants({ product, onSaved }) {
       const uploaded = []
       for (const file of files) {
         try {
-          const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(String(reader.result).split(",")[1])
-            reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-            reader.readAsDataURL(file)
-          })
-          const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
+          const { url } = await adminUploadImage(file, `products/${product.id}/variants`)
           uploaded.push({ label: stripExt(file.name), stock_qty: "", images: [url] })
         } catch (e) {
           setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
@@ -142,21 +136,20 @@ export default function AdminVariants({ product, onSaved }) {
   // append to that row's gallery instead of replacing it.
   const pickImages = async (i, files) => {
     setError("")
-    for (const file of files) {
-      try {
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(String(reader.result).split(",")[1])
-          reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-          reader.readAsDataURL(file)
-        })
-        const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
-        setRows((prev) => prev.map((r, idx) => (
-          idx === i ? { ...r, images: [...(r.images || []), url] } : r
-        )))
-      } catch (e) {
-        setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
+    setBatchUploading(true)
+    try {
+      for (const file of files) {
+        try {
+          const { url } = await adminUploadImage(file, `products/${product.id}/variants`)
+          setRows((prev) => prev.map((r, idx) => (
+            idx === i ? { ...r, images: [...(r.images || []), url] } : r
+          )))
+        } catch (e) {
+          setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
+        }
       }
+    } finally {
+      setBatchUploading(false)
     }
   }
 
@@ -170,17 +163,14 @@ export default function AdminVariants({ product, onSaved }) {
   // as one of the variant's pictures, only as the cover in the picker grid.
   const pickThumbnail = async (i, file) => {
     setError("")
+    setBatchUploading(true)
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result).split(",")[1])
-        reader.onerror = () => reject(new Error("Không đọc được file ảnh"))
-        reader.readAsDataURL(file)
-      })
-      const { url } = await adminUploadImage(base64, `products/${product.id}/variants`)
+      const { url } = await adminUploadImage(file, `products/${product.id}/variants`)
       setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, thumbnail_image: url } : r)))
     } catch (e) {
       setError(e.response?.data?.message || e.message || `Tải ảnh "${file.name}" thất bại`)
+    } finally {
+      setBatchUploading(false)
     }
   }
 
@@ -357,6 +347,7 @@ export default function AdminVariants({ product, onSaved }) {
                       e.target.value = ""
                       if (files.length) pickImages(i, files)
                     }}
+                    disabled={batchUploading}
                     className="hidden"
                   />
                 </label>
@@ -371,6 +362,7 @@ export default function AdminVariants({ product, onSaved }) {
                       e.target.value = ""
                       if (file) pickThumbnail(i, file)
                     }}
+                    disabled={batchUploading}
                     className="hidden"
                   />
                 </label>
