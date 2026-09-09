@@ -366,6 +366,19 @@ describe("digital products", () => {
     })
     expect(container.textContent).not.toContain("Digital")
   })
+
+  it("uses thumbnail_image as the cover when set, not the first gallery image", async () => {
+    const { container } = await renderCard({
+      product: digitalProduct({ thumbnail_image: "https://x/thumb.jpg" }),
+    })
+    expect(container.querySelector('img[src="https://x/thumb.jpg"]')).toBeTruthy()
+    expect(container.querySelector('img[src="https://x/cover.jpg"]')).toBeNull()
+  })
+
+  it("falls back to the first gallery image when thumbnail_image is not set", async () => {
+    const { container } = await renderCard({ product: digitalProduct() })
+    expect(container.querySelector('img[src="https://x/cover.jpg"]')).toBeTruthy()
+  })
 })
 
 describe("ProductCard - full variant gallery", () => {

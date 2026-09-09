@@ -164,6 +164,7 @@ async function nestCollectionDetail(collection) {
           variant_id: hidden?.id ?? null,
           stock_qty: hidden?.stock_qty ?? null,
           delivery_link: hidden?.delivery_link ?? null,
+          thumbnail_image: hidden?.thumbnail_image ?? null,
         }
       }
       return {
@@ -335,6 +336,7 @@ async function copyCollection(id) {
       type: p.type,
       stock_qty: p.stock_qty,
       delivery_link: p.delivery_link,
+      thumbnail_image: p.thumbnail_image,
     })
     if (p.type !== "digital" && p.variants.length) {
       await replaceVariants(
@@ -421,6 +423,7 @@ async function createProduct(data) {
       label: "",
       stock_qty: data.stock_qty,
       delivery_link: data.delivery_link,
+      thumbnail_image: data.thumbnail_image,
     }])
   }
   return productId
@@ -441,7 +444,7 @@ async function updateProduct(id, data) {
     // NULL on every edit, and a live order referencing it would make
     // replaceVariants throw VariantInUseError on an ordinary product edit.
     const [[currentVariant]] = await db.query(
-      "SELECT id, stock_qty, delivery_link FROM product_variants WHERE product_id = ? LIMIT 1",
+      "SELECT id, stock_qty, delivery_link, thumbnail_image FROM product_variants WHERE product_id = ? LIMIT 1",
       [id]
     )
     // A field omitted from the request body (undefined) falls back to the
@@ -454,6 +457,7 @@ async function updateProduct(id, data) {
       label: "",
       stock_qty: data.stock_qty !== undefined ? data.stock_qty : currentVariant?.stock_qty,
       delivery_link: data.delivery_link !== undefined ? data.delivery_link : currentVariant?.delivery_link,
+      thumbnail_image: data.thumbnail_image !== undefined ? data.thumbnail_image : currentVariant?.thumbnail_image,
     }])
   }
 
