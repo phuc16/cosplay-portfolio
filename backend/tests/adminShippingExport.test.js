@@ -49,14 +49,14 @@ function workbookText(wb) {
   return all
 }
 
-async function seed() {
+async function seed(over = {}) {
   const cid = await catalog.createCollection({ title: "Drop", status: "active" })
   const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 120000 })
   await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
   const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
   const o = await orders.createOrder({
     items: [{ variant_id: v.id, qty: 1 }],
-    buyer, fulfillment_method: "ship", payment_method: "bank",
+    buyer, fulfillment_method: "ship", payment_method: "bank", ...over,
   })
   await orders.transitionOrder(o.id, "confirmed")
   return o.id
@@ -93,6 +93,16 @@ describe("GET /api/admin/shipping/export/orders", () => {
     const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
     expect(res.status).toBe(200)
     expect(res.body.find((o) => o.id === id)).toBeDefined()
+  })
+
+  it("includes the buyer's checkout note, and null when none was left", async () => {
+    const withNote = await seed({ note: "Nhờ shop ký lên card giúp em" })
+    const withoutNote = await seed()
+
+    const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    expect(res.status).toBe(200)
+    expect(res.body.find((o) => o.id === withNote).note).toBe("Nhờ shop ký lên card giúp em")
+    expect(res.body.find((o) => o.id === withoutNote).note).toBeNull()
   })
 
   it("listing's order_code matches the same buyer-facing code shown everywhere else in admin (not the DH/VTP code)", async () => {

@@ -99,6 +99,20 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("+ Sản phẩm số")
   })
 
+  it("shows the buyer's note in its own column, and nothing when there isn't one", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, note: "Nhờ shop ký lên card giúp em" }),
+      order({ id: 2, order_code: "DH2", note: null }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+
+    expect(container.textContent).toContain("Nhờ shop ký lên card giúp em")
+    const rows = container.querySelectorAll("tbody tr")
+    // Row 2 (no note) should render an empty note cell, not the string "null".
+    expect(rows[1].textContent).not.toContain("null")
+  })
+
   it("does not show the badge for a purely physical order", async () => {
     adminListShippingExportOrders.mockResolvedValue([order({ has_digital_item: false })])
     const container = await renderShippingExport()

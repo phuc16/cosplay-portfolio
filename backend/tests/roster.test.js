@@ -146,3 +146,11 @@ describe("buildRoster - empty input", () => {
     expect(buildRoster([])).toEqual({ rows: [], excluded: [] })
   })
 })
+
+describe("buildRoster - note", () => {
+  it("carries the order's note through, and null when absent", () => {
+    const { rows } = buildRoster([order({ note: "Ký tên lên card" }), order({ id: 2, note: null })])
+    expect(rows.find((r) => r.order_id === 1).note).toBe("Ký tên lên card")
+    expect(rows.find((r) => r.order_id === 2).note).toBeNull()
+  })
+})

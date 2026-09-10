@@ -41,6 +41,10 @@ function buildRoster(orders) {
       buyer_name: order.buyer_name,
       phone: order.phone,
       pickup_code: order.pickup_code,
+      // The buyer's own checkout note - for staff handing the order over,
+      // never sent to a courier (this is a pickup order, there is no
+      // courier involved at all).
+      note: order.note || null,
       items: (order.items || []).map((i) => ({
         product_name: i.product_name_snapshot,
         variant_label: i.variant_label_snapshot,
