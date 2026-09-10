@@ -221,6 +221,7 @@ export default function ShippingExport() {
                     <th className="pr-2">Giá trị</th>
                     <th className="pr-2">Miễn phí ship</th>
                     <th className="pr-2">Sản phẩm</th>
+                    <th className="pr-2">Ghi chú</th>
                     <th>Chuẩn bị</th>
                   </tr>
                 </thead>
@@ -264,6 +265,9 @@ export default function ShippingExport() {
                             {expandedId === o.id ? "Ẩn" : "Sản phẩm"}
                           </button>
                         </td>
+                        <td className="pr-2 py-1 max-w-[160px] truncate" title={o.note || ""}>
+                          {o.note || ""}
+                        </td>
                         <td className="py-1">
                           <button
                             type="button"
@@ -282,7 +286,7 @@ export default function ShippingExport() {
                       {expandedId === o.id && (
                         <tr className="border-t border-[var(--border-brand)]">
                           <td></td>
-                          <td colSpan={7} className="py-2 text-sm">
+                          <td colSpan={8} className="py-2 text-sm">
                             {itemsByOrderId[o.id] === undefined && <p className="opacity-60">Đang tải...</p>}
                             {itemsByOrderId[o.id] === null && <p className="text-red-500">Không tải được sản phẩm.</p>}
                             {Array.isArray(itemsByOrderId[o.id]) && (

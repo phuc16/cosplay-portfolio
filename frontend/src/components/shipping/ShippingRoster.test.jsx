@@ -82,6 +82,29 @@ describe("ShippingRoster", () => {
     expect(rows[1].textContent).toContain("75.000₫")
   })
 
+  it("shows the buyer's note in the order's detail row, visible on print regardless of expand state", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+          note: "Nhờ shop ký lên card giúp em",
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await setSelectValue(container.querySelector("select"), "1")
+    await flush()
+
+    const detailRow = container.querySelector('[data-testid="order-detail-1"]')
+    expect(detailRow.textContent).toContain("Nhờ shop ký lên card giúp em")
+    // Must not be gated behind print:hidden - staff hand the printed page
+    // over at pickup and need this visible without any on-screen interaction.
+    expect(detailRow.className).not.toContain("print:hidden")
+  })
+
   it("shows a prepaid row and a collect-at-handover row unmistakably differently", async () => {
     adminGetPickupRoster.mockResolvedValue({
       rows: [
