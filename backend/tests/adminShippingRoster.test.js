@@ -158,6 +158,19 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(selectedColumns).toContain("status")
   })
 
+  it("includes the buyer's checkout note, and null when none was left", async () => {
+    const { collectionId: c1, orderId: withNote } = await seedPickupOrder({ note: "Giao buổi tối, tránh giờ hành chính" })
+    const { collectionId: c2, orderId: withoutNote } = await seedPickupOrder()
+
+    const res1 = await authed(request(app).get(`/api/admin/shipping/roster/${c1}`))
+    expect(res1.body.rows.find((r) => r.order_id === withNote).note).toBe("Giao buổi tối, tránh giờ hành chính")
+
+    // seedPickupOrder always creates its own fresh collection, so the
+    // no-note order needs its own roster fetch to check the null case.
+    const res2 = await authed(request(app).get(`/api/admin/shipping/roster/${c2}`))
+    expect(res2.body.rows.find((r) => r.order_id === withoutNote).note).toBeNull()
+  })
+
   it("multi-item order: every item is attached and rendered", async () => {
     const cid = await catalog.createCollection({ title: "MultiDrop", status: "active", allow_pickup: true })
     const p1 = await catalog.createProduct({ collection_id: cid, name: "Poster", price: 30000 })

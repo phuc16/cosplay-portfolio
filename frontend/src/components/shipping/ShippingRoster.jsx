@@ -224,6 +224,7 @@ export default function ShippingRoster() {
                                   </li>
                                 ))}
                               </ul>
+                              {r.note && <p className="text-sm italic opacity-80 mt-1">Ghi chú: {r.note}</p>}
                             </td>
                           </tr>
                         </Fragment>
