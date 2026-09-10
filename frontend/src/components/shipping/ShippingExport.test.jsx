@@ -99,18 +99,36 @@ describe("ShippingExport", () => {
     expect(container.textContent).toContain("+ Sản phẩm số")
   })
 
-  it("shows the buyer's note in its own column, and nothing when there isn't one", async () => {
-    adminListShippingExportOrders.mockResolvedValue([
-      order({ id: 1, note: "Nhờ shop ký lên card giúp em" }),
-      order({ id: 2, order_code: "DH2", note: null }),
-    ])
+  it("shows the buyer's note inside the expandable detail row (click to reveal), not a hover tooltip", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order({ id: 1, note: "Nhờ shop ký lên card giúp em" })])
+    adminGetOrder.mockResolvedValue({ id: 1, items: [] })
     const container = await renderShippingExport()
     await flush()
 
+    // Not visible before expanding - this is a click-to-reveal detail, not a
+    // truncated cell with a hover tooltip (a long note previously overflowed
+    // past the page edge as a title="" tooltip).
+    expect(container.textContent).not.toContain("Nhờ shop ký lên card giúp em")
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
+    await click(toggleButton)
+    await flush()
+
     expect(container.textContent).toContain("Nhờ shop ký lên card giúp em")
-    const rows = container.querySelectorAll("tbody tr")
-    // Row 2 (no note) should render an empty note cell, not the string "null".
-    expect(rows[1].textContent).not.toContain("null")
+  })
+
+  it("renders nothing extra in the detail row when there is no note", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order({ id: 1, note: null })])
+    adminGetOrder.mockResolvedValue({ id: 1, items: [] })
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
+    await click(toggleButton)
+    await flush()
+
+    expect(container.textContent).not.toContain("null")
+    expect(container.textContent).not.toContain("Ghi chú:")
   })
 
   it("does not show the badge for a purely physical order", async () => {
