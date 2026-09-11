@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { LanguageProvider } from "../contexts/LanguageContext"
+import { STATUS_LABELS, labelFor } from "../admin/orderLabels"
 
 const adminListOrders = vi.fn()
 const adminListCollections = vi.fn()
@@ -40,7 +42,11 @@ async function renderAdminOrders() {
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => {
-    root.render(<AdminOrders />)
+    root.render(
+      <LanguageProvider>
+        <AdminOrders />
+      </LanguageProvider>
+    )
   })
   return { container, root }
 }
@@ -82,17 +88,17 @@ describe("AdminOrders filters", () => {
     adminListOrders.mockClear()
     adminListOrders.mockResolvedValue([order()])
 
-    const [statusSelect, collectionSelect] = container.querySelectorAll("select")
     const [dateFromInput, dateToInput] = container.querySelectorAll('input[type="date"]')
 
-    await act(async () => {
-      statusSelect.value = "pending"
-      statusSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
-    await act(async () => {
-      collectionSelect.value = "7"
-      collectionSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
+    const pickOption = async (label, optionText) => {
+      const trigger = container.querySelector(`[aria-label="${label}"]`)
+      await act(async () => trigger.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+      const optionBtn = [...container.querySelectorAll("li button")].find((b) => b.textContent === optionText)
+      await act(async () => optionBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    }
+
+    await pickOption("Trạng thái", labelFor(STATUS_LABELS, "pending"))
+    await pickOption("Bộ sưu tập", "Fes Drop")
     await act(async () => setInputValue(dateFromInput, "2026-08-01"))
     await act(async () => setInputValue(dateToInput, "2026-08-08"))
 
@@ -552,13 +558,14 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     const { container } = await renderAdminOrders()
     await flush()
 
-    const statusSelect = container.querySelector("select")
-    const options = [...statusSelect.querySelectorAll("option")]
+    const trigger = container.querySelector('[aria-label="Trạng thái"]')
+    await act(async () => trigger.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    const options = [...container.querySelectorAll("li button")]
 
-    const values = options.map((o) => o.value)
-    expect(values).toEqual(["", "pending", "confirmed", "shipped", "completed", "cancelled"])
-
+    const STATUSES = ["", "pending", "confirmed", "shipped", "completed", "cancelled"]
     const texts = options.map((o) => o.textContent)
+    expect(texts).toEqual(STATUSES.map((s) => (s ? labelFor(STATUS_LABELS, s) : "Tất cả")))
+
     expect(texts).toContain("Tất cả")
     expect(texts).toContain("Đã xác nhận")
     expect(texts).not.toContain("pending")

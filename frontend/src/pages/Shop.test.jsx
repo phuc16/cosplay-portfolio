@@ -159,11 +159,16 @@ describe("Shop - search, filter, sort", () => {
     const container = await renderShop()
     await flush()
 
-    const statusSelect = [...container.querySelectorAll("select")][0]
+    // Find the status filter trigger by its aria-label (the placeholder text "All")
+    const statusTrigger = container.querySelector('button[aria-label="All"]')
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(statusSelect, "active")
-      statusSelect.dispatchEvent(new Event("change", { bubbles: true }))
+      statusTrigger.click()
+    })
+
+    const optionButtons = container.querySelectorAll("li button")
+    const activeOption = [...optionButtons].find((btn) => btn.textContent === "Open")
+    await act(async () => {
+      activeOption.click()
     })
 
     expect(container.textContent).toContain("Active One")
@@ -180,11 +185,16 @@ describe("Shop - search, filter, sort", () => {
     const container = await renderShop()
     await flush()
 
-    const sortSelect = [...container.querySelectorAll("select")][1]
+    // Find the sort filter trigger by its aria-label (the placeholder text "Default")
+    const sortTrigger = container.querySelector('button[aria-label="Default"]')
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(sortSelect, "name_asc")
-      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+      sortTrigger.click()
+    })
+
+    const optionButtons = container.querySelectorAll("li button")
+    const nameAscOption = [...optionButtons].find((btn) => btn.textContent === "Name A-Z")
+    await act(async () => {
+      nameAscOption.click()
     })
 
     const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
@@ -203,11 +213,16 @@ describe("Shop - search, filter, sort", () => {
     const container = await renderShop()
     await flush()
 
-    const sortSelect = [...container.querySelectorAll("select")][1]
+    // Find the sort filter trigger by its aria-label (the placeholder text "Default")
+    const sortTrigger = container.querySelector('button[aria-label="Default"]')
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(sortSelect, "name_asc")
-      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
+      sortTrigger.click()
+    })
+
+    const optionButtons = container.querySelectorAll("li button")
+    const nameAscOption = [...optionButtons].find((btn) => btn.textContent === "Name A-Z")
+    await act(async () => {
+      nameAscOption.click()
     })
 
     const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)

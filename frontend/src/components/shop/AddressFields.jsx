@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { fetchProvinces, fetchWards, searchAddress } from "../../api/shop"
-import SearchableSelect from "./SearchableSelect"
+import SearchableSelect from "../SearchableSelect"
 
 // Fires this long after the buyer stops typing, not on every keystroke - a
 // fast typist still costs one Goong call per pause, not one per character.

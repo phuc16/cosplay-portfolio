@@ -18,7 +18,18 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const { default: AddressFields } = await import("./AddressFields")
 
 const PROVINCES = [{ code: "30", name: "Hồ Chí Minh" }, { code: "01", name: "Hà Nội" }]
-const HCM_WARDS = [{ code: "00002", name: "Dĩ An" }, { code: "00003", name: "Hiệp Bình" }]
+const HCM_WARDS = [
+  { code: "00001", name: "Quận 1" },
+  { code: "00002", name: "Dĩ An" },
+  { code: "00003", name: "Hiệp Bình" },
+  { code: "00004", name: "Quận 2" },
+  { code: "00005", name: "Quận 3" },
+  { code: "00006", name: "Quận 4" },
+  { code: "00007", name: "Quận 5" },
+  { code: "00008", name: "Quận 6" },
+  { code: "00009", name: "Quận 7" },
+  { code: "00010", name: "Quận 8" },
+]
 
 async function renderField(value = {}, onChange = vi.fn()) {
   const container = document.createElement("div")

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { LanguageProvider } from "../../contexts/LanguageContext"
 
 const adminListShippingExportOrders = vi.fn()
 const adminSetShippingPayer = vi.fn()
@@ -45,7 +46,7 @@ async function renderShippingExport() {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => { root.render(<ShippingExport />) })
+  await act(async () => { root.render(<LanguageProvider><ShippingExport /></LanguageProvider>) })
   return container
 }
 
@@ -58,10 +59,11 @@ function setInputValue(el, value) {
   el.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
-function setSelectValue(el, value) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-  setter.call(el, value)
-  el.dispatchEvent(new Event("change", { bubbles: true }))
+async function pickOption(container, testId, optionText) {
+  const trigger = container.querySelector(`[data-testid="${testId}"]`)
+  await act(async () => trigger.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+  const optionBtn = [...container.querySelectorAll("li button")].find((b) => b.textContent === optionText)
+  await act(async () => optionBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 }
 
 async function selectOrderAndFillBatch(container) {
@@ -69,7 +71,7 @@ async function selectOrderAndFillBatch(container) {
   await click(checkbox)
   await act(async () => setInputValue(container.querySelector('[data-testid="ten-hang-hoa"]'), "Photocard"))
   await act(async () => setInputValue(container.querySelector('[data-testid="trong-luong"]'), "50"))
-  await act(async () => setSelectValue(container.querySelector('[data-testid="thoi-gian-hen-lay"]'), "Ngày mai - Cả ngày"))
+  await pickOption(container, "thoi-gian-hen-lay", "Ngày mai - Cả ngày")
 }
 
 beforeEach(() => {
@@ -155,8 +157,7 @@ describe("ShippingExport", () => {
     await click(orderCheckbox)
     expect(orderCheckbox.checked).toBe(true)
 
-    const collectionSelect = container.querySelector("select")
-    await act(async () => setSelectValue(collectionSelect, "2"))
+    await pickOption(container, "collection-filter", "Drop 2")
     await flush()
 
     expect(adminListShippingExportOrders).toHaveBeenLastCalledWith("2")

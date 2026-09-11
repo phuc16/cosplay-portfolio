@@ -4,6 +4,7 @@ import {
   adminDeleteCollection, adminCopyCollection, adminUploadImage,
 } from "../api/shop"
 import AdminProducts from "./AdminProducts"
+import SearchableSelect from "./SearchableSelect"
 
 const STATUSES = [
   { value: "draft", label: "Nháp (ẩn)" },
@@ -160,23 +161,20 @@ export default function AdminCollections() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Tìm theo tên hoặc đường dẫn..."
-            className="flex-1 min-w-[180px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            className="flex-1 min-w-[180px] h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
           />
-          <select
+          <SearchableSelect padding="px-2 py-1" height="h-[38px]"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            <option value="">Tất cả trạng thái</option>
-            {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-          <select
+            onChange={setStatusFilter}
+            options={[{ code: "", name: "Tất cả trạng thái" }, ...STATUSES.map((s) => ({ code: s.value, name: s.label }))]}
+            placeholder="Tất cả trạng thái"
+          />
+          <SearchableSelect padding="px-2 py-1" height="h-[38px]"
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+            onChange={setSortBy}
+            options={SORTS.map((s) => ({ code: s.value, name: s.label }))}
+            placeholder={SORTS[0]?.label}
+          />
         </div>
       )}
 
@@ -222,13 +220,12 @@ export default function AdminCollections() {
           className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
         />
 
-        <select
+        <SearchableSelect padding="px-2 py-1" height="h-[38px]"
           value={draft.status}
-          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
-          className="w-full mb-3 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-        >
-          {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
+          onChange={(status) => setDraft({ ...draft, status })}
+          options={STATUSES.map((s) => ({ code: s.value, name: s.label }))}
+          placeholder={STATUSES[0]?.label}
+        />
 
         <label className="block text-sm mb-3">
           Hạn chuyển khoản (giờ, để trống dùng mặc định hệ thống)

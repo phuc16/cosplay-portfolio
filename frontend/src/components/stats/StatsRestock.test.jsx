@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { LanguageProvider } from "../../contexts/LanguageContext"
 
 const adminListCollections = vi.fn()
 const adminGetRestockStats = vi.fn()
@@ -18,22 +19,30 @@ globalThis.URL.revokeObjectURL = vi.fn()
 
 const { default: StatsRestock } = await import("./StatsRestock")
 
-function setSelectValue(el, value) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-  setter.call(el, value)
-  el.dispatchEvent(new Event("change", { bubbles: true }))
-}
-
 async function renderStatsRestock() {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => { root.render(<StatsRestock />) })
+  await act(async () => {
+    root.render(
+      <LanguageProvider>
+        <StatsRestock />
+      </LanguageProvider>
+    )
+  })
   return container
 }
 
 async function flush() {
   await act(async () => {})
+}
+
+// Opens the SearchableSelect trigger and clicks the option with this exact text.
+async function pickOption(container, optionText) {
+  const trigger = container.querySelector('button[aria-label="- Tất cả bộ sưu tập -"]')
+  await act(async () => trigger.click())
+  const optionBtn = [...container.querySelectorAll("li button")].find((b) => b.textContent === optionText)
+  await act(async () => optionBtn.click())
 }
 
 beforeEach(() => {
@@ -151,7 +160,7 @@ describe("StatsRestock", () => {
     const container = await renderStatsRestock()
     await flush()
 
-    setSelectValue(container.querySelector("select"), "2")
+    await pickOption(container, "Second Drop")
     await flush()
 
     expect(adminGetRestockStats).toHaveBeenLastCalledWith("2")
@@ -163,7 +172,7 @@ describe("StatsRestock", () => {
     const container = await renderStatsRestock()
     await flush()
 
-    setSelectValue(container.querySelector("select"), "2")
+    await pickOption(container, "Second Drop")
     await flush()
 
     const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))

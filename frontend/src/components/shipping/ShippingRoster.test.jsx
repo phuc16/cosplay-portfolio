@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { LanguageProvider } from "../../contexts/LanguageContext"
 
 const adminListCollections = vi.fn()
 const adminGetPickupRoster = vi.fn()
@@ -16,14 +17,6 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: ShippingRoster } = await import("./ShippingRoster")
 
-async function setSelectValue(el, value) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-  await act(async () => {
-    setter.call(el, value)
-    el.dispatchEvent(new Event("change", { bubbles: true }))
-  })
-}
-
 async function setInputValue(el, value) {
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
   await act(async () => {
@@ -36,10 +29,17 @@ async function renderComponent() {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => { root.render(<ShippingRoster />) })
+  await act(async () => { root.render(<LanguageProvider><ShippingRoster /></LanguageProvider>) })
   return container
 }
 async function flush() { await act(async () => {}) }
+
+async function selectCollectionOption(container, label) {
+  const trigger = container.querySelector('[aria-label="- Chọn một bộ sưu tập -"]')
+  await act(async () => trigger.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+  const option = [...container.querySelectorAll("li button")].find((b) => b.textContent === label)
+  await act(async () => option.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+}
 
 beforeEach(() => {
   adminListCollections.mockReset()
@@ -72,7 +72,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const rows = container.querySelectorAll('[data-testid^="order-row-"]')
@@ -95,7 +95,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const detailRow = container.querySelector('[data-testid="order-detail-1"]')
@@ -121,7 +121,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const rows = container.querySelectorAll('[data-testid^="order-row-"]')
@@ -150,7 +150,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const detail = container.querySelector('[data-testid="order-detail-1"]')
@@ -178,7 +178,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const detail = container.querySelector('[data-testid="order-detail-1"]')
@@ -214,7 +214,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.querySelector('img[src="/api/storage/shop/a.webp"]')).not.toBeNull()
@@ -236,7 +236,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const detail = container.querySelector('[data-testid="order-detail-1"]')
@@ -256,7 +256,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const row = container.querySelector('[data-testid="order-row-1"]')
@@ -276,7 +276,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const row = container.querySelector('[data-testid="order-row-1"]')
@@ -297,7 +297,7 @@ describe("ShippingRoster", () => {
     adminSetOrderPrepared.mockResolvedValue({ ok: true })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const toggle = container.querySelector('[data-testid="prepared-1"]')
@@ -317,7 +317,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("đơn COD nhưng chưa có số tiền thu hộ")
@@ -336,7 +336,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("Mã nhận hàng")
@@ -348,7 +348,7 @@ describe("ShippingRoster", () => {
     adminGetPickupRoster.mockResolvedValue({ rows: [], excluded: [] })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const printButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "In")
@@ -359,7 +359,7 @@ describe("ShippingRoster", () => {
     adminGetPickupRoster.mockRejectedValue(new Error("network down"))
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("Không tải được danh sách nhận hàng")
@@ -382,9 +382,9 @@ describe("ShippingRoster", () => {
     const container = await renderComponent()
     await flush()
 
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
-    await setSelectValue(container.querySelector("select"), "2")
+    await selectCollectionOption(container, "Drop 2")
     await flush()
 
     await act(async () => {
@@ -417,7 +417,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
     adminGetPickupRoster.mockClear()
 
@@ -450,7 +450,7 @@ describe("ShippingRoster", () => {
     })
     const container = await renderComponent()
     await flush()
-    await setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT, mã nhận..."]')

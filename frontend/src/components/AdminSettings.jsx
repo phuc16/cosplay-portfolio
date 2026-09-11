@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { api } from "../api/api"
 import { uploadImage } from "../api/upload"
 import { useDropzone } from "react-dropzone"
+import SearchableSelect from "./SearchableSelect"
 import { toLocalizedObj } from "../utils/localize"
 import { COLOR_SCHEMES, applyColorScheme } from "../config"
 
@@ -930,12 +931,19 @@ export default function AdminSettings() {
           <p className="text-xs text-gray-500 dark:text-slate-500 mb-2">Nhập số điện thoại hoặc dán link. Số điện thoại KHÔNG hiển thị công khai - chỉ dùng để tạo nút bấm.</p>
           {(config.contact?.contactLinks || []).map((item, i) => (
             <div key={i} className="flex gap-2 items-center mb-2 flex-wrap">
-              <select value={item?.type ?? "zalo"} onChange={(e) => updateItem("contact.contactLinks", i, "type", e.target.value)} className={`${inputCls} w-32`}>
-                <option value="zalo">Zalo</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="messenger">Messenger</option>
-              </select>
-              <input type="text" value={item?.value ?? ""} onChange={(e) => updateItem("contact.contactLinks", i, "value", e.target.value)} className={`${inputCls} flex-1 min-w-[120px]`}
+              <div className="w-32">
+                <SearchableSelect padding="px-2 py-1" height="h-[38px]"
+                  value={item?.type ?? "zalo"}
+                  onChange={(type) => updateItem("contact.contactLinks", i, "type", type)}
+                  options={[
+                    { code: "zalo", name: "Zalo" },
+                    { code: "whatsapp", name: "WhatsApp" },
+                    { code: "messenger", name: "Messenger" },
+                  ]}
+                  placeholder="Zalo"
+                />
+              </div>
+              <input type="text" value={item?.value ?? ""} onChange={(e) => updateItem("contact.contactLinks", i, "value", e.target.value)} className={`${inputCls} h-[38px] flex-1 min-w-[120px]`}
                 placeholder={item?.type === "messenger" ? "username hoặc https://m.me/…" : "SĐT hoặc link (vd 0868835072)"} />
               <button type="button" onClick={() => removeItem("contact.contactLinks", i)} className="text-red-400 hover:text-red-300 shrink-0">×</button>
             </div>

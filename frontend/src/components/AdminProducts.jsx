@@ -4,6 +4,7 @@ import {
   adminReorderProducts,
 } from "../api/shop"
 import AdminVariants from "./AdminVariants"
+import SearchableSelect from "./SearchableSelect"
 import { formatVnd } from "../utils/money"
 
 const blank = {
@@ -186,15 +187,15 @@ export default function AdminProducts({ collection }) {
       <p className="font-medium mb-2">{editingId ? "Sửa sản phẩm" : "Thêm sản phẩm"}</p>
 
       {!editingId && (
-        <select
-          name="product-type"
+        <SearchableSelect padding="px-2 py-1" height="h-[38px]"
           value={draft.type}
-          onChange={(e) => setDraft({ ...draft, type: e.target.value })}
-          className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-        >
-          <option value="physical">Vật lý</option>
-          <option value="digital">Số (digital)</option>
-        </select>
+          onChange={(type) => setDraft({ ...draft, type })}
+          options={[
+            { code: "physical", name: "Vật lý" },
+            { code: "digital", name: "Số (digital)" },
+          ]}
+          placeholder="Vật lý"
+        />
       )}
 
       <input
@@ -325,24 +326,24 @@ export default function AdminProducts({ collection }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Tìm theo tên..."
-            className="flex-1 min-w-[160px] px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
+            className="flex-1 min-w-[160px] h-[38px] px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
           />
-          <select
+          <SearchableSelect padding="px-2 py-1 text-sm" height="h-[38px]"
             value={stockFilter}
-            onChange={(e) => setStockFilter(e.target.value)}
-            className="px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            <option value="">Tất cả</option>
-            <option value="in_stock">Còn hàng</option>
-            <option value="sold_out">Hết hàng</option>
-          </select>
-          <select
+            onChange={setStockFilter}
+            options={[
+              { code: "", name: "Tất cả" },
+              { code: "in_stock", name: "Còn hàng" },
+              { code: "sold_out", name: "Hết hàng" },
+            ]}
+            placeholder="Tất cả"
+          />
+          <SearchableSelect padding="px-2 py-1 text-sm" height="h-[38px]"
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-2 py-1 text-sm rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+            onChange={setSortBy}
+            options={SORTS.map((s) => ({ code: s.value, name: s.label }))}
+            placeholder={SORTS[0]?.label}
+          />
         </div>
       )}
 

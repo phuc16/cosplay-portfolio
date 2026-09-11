@@ -7,6 +7,7 @@ import ProductCard, { isProductSoldOut } from "../components/shop/ProductCard"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import FitTitle from "../components/shop/FitTitle"
+import SearchableSelect from "../components/SearchableSelect"
 import { formatVnDateTime } from "../utils/orderDeadline"
 
 // Sold-out products always sink to the end, under every sort mode - not
@@ -156,34 +157,36 @@ export default function Collection() {
       ) : (
         <>
           {collection.products.length > 1 && (
-            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-2 mb-5">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("shopSearchProducts")}
-                className="w-full sm:flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                className="w-full sm:flex-1 min-w-0 h-[38px] px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
               />
               <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-                <select
+                <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
                   value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value)}
-                  className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
-                >
-                  <option value="">{t("shopFilterAllStock")}</option>
-                  <option value="in_stock">{t("shopFilterInStock")}</option>
-                  <option value="sold_out">{t("shopFilterSoldOut")}</option>
-                </select>
-                <select
+                  onChange={setStockFilter}
+                  options={[
+                    { code: "", name: t("shopFilterAllStock") },
+                    { code: "in_stock", name: t("shopFilterInStock") },
+                    { code: "sold_out", name: t("shopFilterSoldOut") },
+                  ]}
+                  placeholder={t("shopFilterAllStock")}
+                />
+                <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
-                >
-                  <option value="default">{t("shopSortDefault")}</option>
-                  <option value="name_asc">{t("shopSortNameAsc")}</option>
-                  <option value="name_desc">{t("shopSortNameDesc")}</option>
-                  <option value="price_asc">{t("shopSortPriceAsc")}</option>
-                  <option value="price_desc">{t("shopSortPriceDesc")}</option>
-                </select>
+                  onChange={setSortBy}
+                  options={[
+                    { code: "default", name: t("shopSortDefault") },
+                    { code: "name_asc", name: t("shopSortNameAsc") },
+                    { code: "name_desc", name: t("shopSortNameDesc") },
+                    { code: "price_asc", name: t("shopSortPriceAsc") },
+                    { code: "price_desc", name: t("shopSortPriceDesc") },
+                  ]}
+                  placeholder={t("shopSortDefault")}
+                />
               </div>
             </div>
           )}
