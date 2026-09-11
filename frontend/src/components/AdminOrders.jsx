@@ -6,6 +6,7 @@ import {
 import { formatVnd } from "../utils/money"
 import OrderTimeline from "./OrderTimeline"
 import StatusBadge from "./StatusBadge"
+import SearchableSelect from "./SearchableSelect"
 import { variantForStatus, variantForAction } from "../constants/statusVariant"
 import {
   STATUS_LABELS, PAYMENT_METHOD_LABELS, FULFILLMENT_METHOD_LABELS, ACTION_LABELS, labelFor,
@@ -233,37 +234,42 @@ export default function AdminOrders() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Mã đơn, tên, SĐT, email..."
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent w-48"
+            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent w-48"
           />
         </label>
 
         <label className="flex flex-col text-xs gap-1">
           Trạng thái
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent">
-            {STATUSES.map((s) => <option key={s} value={s}>{s ? labelFor(STATUS_LABELS, s) : "Tất cả"}</option>)}
-          </select>
+          <SearchableSelect padding="px-2 py-1" height="h-[38px]"
+            value={filter}
+            onChange={setFilter}
+            options={STATUSES.map((s) => ({ code: s, name: s ? labelFor(STATUS_LABELS, s) : "Tất cả" }))}
+            placeholder="Tất cả"
+            label="Trạng thái"
+          />
         </label>
 
         <label className="flex flex-col text-xs gap-1">
           Bộ sưu tập
-          <select value={collectionId} onChange={(e) => setCollectionId(e.target.value)}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent">
-            <option value="">Tất cả</option>
-            {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-          </select>
+          <SearchableSelect padding="px-2 py-1" height="h-[38px]"
+            value={collectionId}
+            onChange={setCollectionId}
+            options={[{ code: "", name: "Tất cả" }, ...collections.map((c) => ({ code: String(c.id), name: c.title }))]}
+            placeholder="Tất cả"
+            label="Bộ sưu tập"
+          />
         </label>
 
         <label className="flex flex-col text-xs gap-1">
           Từ ngày
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
         </label>
 
         <label className="flex flex-col text-xs gap-1">
           Đến ngày
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
         </label>
 
         <button type="button" onClick={() => { setScanError(""); setScannerOpen(true) }}

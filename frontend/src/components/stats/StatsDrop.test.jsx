@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { LanguageProvider } from "../../contexts/LanguageContext"
 
 const adminListCollections = vi.fn()
 const adminGetDropStats = vi.fn()
@@ -33,22 +34,23 @@ function dropStats(over = {}) {
   }
 }
 
-function setSelectValue(el, value) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-  setter.call(el, value)
-  el.dispatchEvent(new Event("change", { bubbles: true }))
-}
-
 async function renderStatsDrop() {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => { root.render(<StatsDrop />) })
+  await act(async () => { root.render(<LanguageProvider><StatsDrop /></LanguageProvider>) })
   return container
 }
 
 async function flush() {
   await act(async () => {})
+}
+
+async function selectCollectionOption(container, label) {
+  const trigger = container.querySelector('[aria-label="- Chọn một bộ sưu tập -"]')
+  await act(async () => trigger.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+  const option = [...container.querySelectorAll("li button")].find((b) => b.textContent === label)
+  await act(async () => option.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 }
 
 beforeEach(() => {
@@ -71,7 +73,7 @@ describe("StatsDrop", () => {
     const container = await renderStatsDrop()
     await flush()
 
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(adminGetDropStats).toHaveBeenCalledWith("1")
@@ -82,7 +84,7 @@ describe("StatsDrop", () => {
     adminGetDropStats.mockResolvedValue(dropStats({ received_total: 35000, pending_cod: 12000 }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("Đơn COD chưa xác nhận")
@@ -96,7 +98,7 @@ describe("StatsDrop", () => {
     }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("không giới hạn")
@@ -108,7 +110,7 @@ describe("StatsDrop", () => {
     }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const row = Array.from(container.querySelectorAll("tbody tr")).find((tr) => tr.textContent.includes("Poster"))
@@ -125,7 +127,7 @@ describe("StatsDrop", () => {
     }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const row = Array.from(container.querySelectorAll("tbody tr")).find((tr) => tr.textContent.includes("Badge"))
@@ -139,7 +141,7 @@ describe("StatsDrop", () => {
     }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const row = Array.from(container.querySelectorAll("tbody tr")).find((tr) => tr.textContent.includes("Sticker"))
@@ -154,7 +156,7 @@ describe("StatsDrop", () => {
     }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const table = container.querySelector("table")
@@ -174,9 +176,9 @@ describe("StatsDrop", () => {
     const container = await renderStatsDrop()
     await flush()
 
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
-    setSelectValue(container.querySelector("select"), "2")
+    await selectCollectionOption(container, "Second Drop")
     await flush()
 
     await act(async () => { resolveSecond(dropStats({ collection_id: 2, collection_title: "Second Drop", received_total: 99000 })) })
@@ -190,7 +192,7 @@ describe("StatsDrop", () => {
     adminGetDropStats.mockRejectedValue(new Error("network down"))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("Không tải được thống kê cho bộ sưu tập này")
@@ -201,7 +203,7 @@ describe("StatsDrop", () => {
     adminGetDropStats.mockResolvedValue(dropStats())
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("nhập thêm hàng giữa đợt bán")
@@ -215,7 +217,7 @@ describe("StatsDrop - statistics emphasis (Admin UI plan)", () => {
     }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     expect(container.textContent).toContain("500.000₫")
@@ -229,7 +231,7 @@ describe("StatsDrop - statistics emphasis (Admin UI plan)", () => {
     adminGetDropStats.mockResolvedValue(dropStats({ received_total: 500000 }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const dominant = [...container.querySelectorAll("*")].find((el) => el.textContent.trim() === "500.000₫")
@@ -240,7 +242,7 @@ describe("StatsDrop - statistics emphasis (Admin UI plan)", () => {
     adminGetDropStats.mockResolvedValue(dropStats({ awaiting_payment: 70000 }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const secondary = [...container.querySelectorAll("*")].find((el) => el.textContent.trim() === "70.000₫")
@@ -261,7 +263,7 @@ describe("StatsDrop - CSV export", () => {
     adminDownloadDropStatsCsv.mockResolvedValue(new Blob(["csv"], { type: "text/csv" }))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))
@@ -276,7 +278,7 @@ describe("StatsDrop - CSV export", () => {
     adminDownloadDropStatsCsv.mockRejectedValue(new Error("network down"))
     const container = await renderStatsDrop()
     await flush()
-    setSelectValue(container.querySelector("select"), "1")
+    await selectCollectionOption(container, "Drop")
     await flush()
 
     const exportBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent.includes("Xuất CSV"))

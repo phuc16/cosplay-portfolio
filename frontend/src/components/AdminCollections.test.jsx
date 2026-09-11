@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { LanguageProvider } from "../contexts/LanguageContext"
 
 const adminListCollections = vi.fn()
 const adminCreateCollection = vi.fn()
@@ -38,7 +39,13 @@ async function renderCollections() {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => { root.render(<AdminCollections />) })
+  await act(async () => {
+    root.render(
+      <LanguageProvider>
+        <AdminCollections />
+      </LanguageProvider>
+    )
+  })
   return container
 }
 
@@ -218,12 +225,10 @@ describe("AdminCollections - search, filter, sort", () => {
     const container = await renderCollections()
     await flush()
 
-    const statusSelect = [...container.querySelectorAll("select")][0]
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(statusSelect, "closed")
-      statusSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
+    const statusTrigger = container.querySelector('[aria-label="Tất cả trạng thái"]')
+    await act(async () => statusTrigger.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    const closedOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Đã đóng (vẫn xem được)")
+    await act(async () => closedOption.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 
     expect(container.textContent).toContain("Closed One")
     expect(container.textContent).not.toContain("Active One")
@@ -237,12 +242,10 @@ describe("AdminCollections - search, filter, sort", () => {
     const container = await renderCollections()
     await flush()
 
-    const sortSelect = [...container.querySelectorAll("select")][1]
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(sortSelect, "title_asc")
-      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
+    const sortTrigger = container.querySelector('[aria-label="Mặc định"]')
+    await act(async () => sortTrigger.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    const titleAscOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Tên A-Z")
+    await act(async () => titleAscOption.dispatchEvent(new MouseEvent("click", { bubbles: true })))
 
     const titles = [...container.querySelectorAll("p.font-semibold")].map((p) => p.textContent)
     expect(titles).toEqual(["Apple Drop", "Zebra Drop"])

@@ -4,6 +4,7 @@ import {
   adminListCollections,
 } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
+import SearchableSelect from "../SearchableSelect"
 
 const LOAI_HANG_HOA_OPTIONS = ["Bưu kiện", "Tài liệu"]
 
@@ -181,14 +182,13 @@ export default function ShippingExport() {
     <div>
       <label className="flex flex-col text-xs gap-1 mb-3 max-w-xs">
         Bộ sưu tập
-        <select
+        <SearchableSelect padding="px-2 py-1" height="h-[38px]"
           value={collectionId}
-          onChange={(e) => selectCollection(e.target.value)}
-          className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-        >
-          <option value="">- Tất cả bộ sưu tập -</option>
-          {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-        </select>
+          onChange={selectCollection}
+          options={[{ code: "", name: "- Tất cả bộ sưu tập -" }, ...collections.map((c) => ({ code: String(c.id), name: c.title }))]}
+          placeholder="- Tất cả bộ sưu tập -"
+          dataTestId="collection-filter"
+        />
       </label>
 
       {orders.length === 0 && <p className="opacity-60">Không có đơn nào cần xuất.</p>}
@@ -317,26 +317,32 @@ export default function ShippingExport() {
             <label className="flex flex-col text-xs gap-1">
               Tên hàng hóa
               <input data-testid="ten-hang-hoa" value={tenHangHoa} onChange={(e) => setTenHangHoa(e.target.value)}
-                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+                className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
             </label>
             <label className="flex flex-col text-xs gap-1">
               Trọng lượng (gram)
               <input data-testid="trong-luong" type="number" value={trongLuong} onChange={(e) => setTrongLuong(e.target.value)}
-                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+                className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
             </label>
             <label className="flex flex-col text-xs gap-1">
               Loại hàng hóa
-              <select data-testid="loai-hang-hoa" value={loaiHangHoa} onChange={(e) => setLoaiHangHoa(e.target.value)}
-                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent">
-                {LOAI_HANG_HOA_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              <SearchableSelect padding="px-2 py-1" height="h-[38px]"
+                value={loaiHangHoa}
+                onChange={setLoaiHangHoa}
+                options={LOAI_HANG_HOA_OPTIONS.map((v) => ({ code: v, name: v }))}
+                placeholder={LOAI_HANG_HOA_OPTIONS[0]}
+                dataTestId="loai-hang-hoa"
+              />
             </label>
             <label className="flex flex-col text-xs gap-1">
               Thời gian hẹn lấy
-              <select data-testid="thoi-gian-hen-lay" value={thoiGianHenLay} onChange={(e) => setThoiGianHenLay(e.target.value)}
-                className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent">
-                {THOI_GIAN_HEN_LAY_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              <SearchableSelect padding="px-2 py-1" height="h-[38px]"
+                value={thoiGianHenLay}
+                onChange={setThoiGianHenLay}
+                options={THOI_GIAN_HEN_LAY_OPTIONS.map((v) => ({ code: v, name: v }))}
+                placeholder={THOI_GIAN_HEN_LAY_OPTIONS[0]}
+                dataTestId="thoi-gian-hen-lay"
+              />
             </label>
           </div>
 

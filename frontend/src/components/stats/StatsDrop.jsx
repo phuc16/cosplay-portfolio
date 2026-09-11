@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { adminListCollections, adminGetDropStats, adminDownloadDropStatsCsv } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 import { STATUS_LABELS } from "../../admin/orderLabels"
+import SearchableSelect from "../SearchableSelect"
 
 function formatPercent(ratio) {
   if (ratio === null || ratio === undefined) return "-"
@@ -58,16 +59,12 @@ export default function StatsDrop() {
       <div className="flex items-end gap-3 mb-4 flex-wrap">
         <label className="flex flex-col text-xs gap-1 max-w-xs">
           Bộ sưu tập
-          <select
+          <SearchableSelect padding="px-2 py-1" height="h-[38px]"
             value={collectionId}
-            onChange={(e) => { setStats(null); setCollectionId(e.target.value) }}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            <option value="">- Chọn một bộ sưu tập -</option>
-            {collections.map((c) => (
-              <option key={c.id} value={c.id}>{c.title}</option>
-            ))}
-          </select>
+            onChange={(id) => { setStats(null); setCollectionId(id) }}
+            options={[{ code: "", name: "- Chọn một bộ sưu tập -" }, ...collections.map((c) => ({ code: String(c.id), name: c.title }))]}
+            placeholder="- Chọn một bộ sưu tập -"
+          />
         </label>
         {stats && (
           <button

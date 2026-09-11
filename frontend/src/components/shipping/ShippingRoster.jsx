@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react"
 import { adminListCollections, adminGetPickupRoster, adminSetOrderPrepared } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
+import SearchableSelect from "../SearchableSelect"
 
 // Hides a non-matching row on screen (className "hidden") but forces it back
 // with "print:table-row" when actually printing - this is a physical
@@ -81,14 +82,12 @@ export default function ShippingRoster() {
       <div className="flex items-end gap-3 mb-4 flex-wrap print:hidden">
         <label className="flex flex-col text-xs gap-1 max-w-xs">
           Bộ sưu tập
-          <select
+          <SearchableSelect padding="px-2 py-1" height="h-[38px]"
             value={collectionId}
-            onChange={(e) => selectCollection(e.target.value)}
-            className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
-          >
-            <option value="">- Chọn một bộ sưu tập -</option>
-            {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-          </select>
+            onChange={selectCollection}
+            options={[{ code: "", name: "- Chọn một bộ sưu tập -" }, ...collections.map((c) => ({ code: String(c.id), name: c.title }))]}
+            placeholder="- Chọn một bộ sưu tập -"
+          />
         </label>
         {roster && (
           <label className="flex flex-col text-xs gap-1 max-w-xs">
@@ -98,7 +97,7 @@ export default function ShippingRoster() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Mã đơn, tên, SĐT, mã nhận..."
-              className="px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+              className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
             />
           </label>
         )}

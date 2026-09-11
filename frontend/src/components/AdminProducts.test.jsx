@@ -23,6 +23,7 @@ vi.mock("../api/shop", () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: AdminProducts } = await import("./AdminProducts")
+const { LanguageProvider } = await import("../contexts/LanguageContext")
 
 function product(over = {}) {
   return { id: 1, name: "Card", price: 35000, description: null, images: [], variants: [], ...over }
@@ -32,7 +33,9 @@ async function renderProducts(collection = { id: 1 }) {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => { root.render(<AdminProducts collection={collection} />) })
+  await act(async () => {
+    root.render(<LanguageProvider><AdminProducts collection={collection} /></LanguageProvider>)
+  })
   return container
 }
 
@@ -146,12 +149,10 @@ describe("AdminProducts - digital products", () => {
     const container = await renderProducts()
     await flush()
 
-    const typeSelect = container.querySelector('select[name="product-type"]')
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(typeSelect, "digital")
-      typeSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const digitalOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Số (digital)")
+    await act(async () => { digitalOption.click() })
 
     expect(container.querySelector('input[placeholder="Số lượng"]')).toBeTruthy()
     expect(container.querySelector('input[placeholder="Link tải về"]')).toBeTruthy()
@@ -204,12 +205,10 @@ describe("AdminProducts - digital products", () => {
     const container = await renderProducts()
     await flush()
 
-    const stockSelect = [...container.querySelectorAll("select")][0]
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(stockSelect, "sold_out")
-      stockSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
+    const stockTrigger = container.querySelector('[aria-label="Tất cả"]')
+    await act(async () => { stockTrigger.click() })
+    const soldOutOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Hết hàng")
+    await act(async () => { soldOutOption.click() })
 
     expect(container.textContent).toContain("Digital Sold Out")
     expect(container.textContent).not.toContain("Digital In Stock")
@@ -245,12 +244,10 @@ describe("AdminProducts - search, filter, sort", () => {
     const container = await renderProducts()
     await flush()
 
-    const stockSelect = [...container.querySelectorAll("select")][0]
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(stockSelect, "sold_out")
-      stockSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
+    const stockTrigger = container.querySelector('[aria-label="Tất cả"]')
+    await act(async () => { stockTrigger.click() })
+    const soldOutOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Hết hàng")
+    await act(async () => { soldOutOption.click() })
 
     expect(container.textContent).toContain("Sold Out")
     expect(container.textContent).not.toContain("In Stock")
@@ -263,12 +260,10 @@ describe("AdminProducts - search, filter, sort", () => {
     const container = await renderProducts()
     await flush()
 
-    const sortSelect = [...container.querySelectorAll("select")][1]
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set
-      setter.call(sortSelect, "price_asc")
-      sortSelect.dispatchEvent(new Event("change", { bubbles: true }))
-    })
+    const sortTrigger = container.querySelector('[aria-label="Thứ tự kéo thả"]')
+    await act(async () => { sortTrigger.click() })
+    const priceAscOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Giá thấp-cao")
+    await act(async () => { priceAscOption.click() })
 
     const names = [...container.querySelectorAll("[data-product-row] p.font-medium")].map((p) => p.textContent)
     expect(names).toEqual(["Cheap", "Expensive"])

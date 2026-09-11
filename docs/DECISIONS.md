@@ -830,3 +830,15 @@ auto-sort the merged row list by a natural label comparator (A1, A2, A10,
 B1 - not A1, A10, A2), plus an explicit "Sắp xếp theo mã" button for
 re-sorting on demand (e.g. after manual drag-reordering). Manual up/down/
 drag controls stay available for any exception the auto-sort doesn't fit.
+
+## 2026-09-11 - SearchableSelect ships without keyboard nav/ARIA, tracked as follow-up
+
+Migrating every native `<select>` to the custom `SearchableSelect` (dark-theme
+consistency, type-to-filter for long lists like province/ward) drops the
+keyboard navigation and ARIA combobox/listbox semantics a native `<select>`
+gets for free. Reviewed and explicitly deferred rather than blocking this
+migration on it - the custom component's accessibility deserves its own
+scoped spec/plan rather than being folded into a UI-parity migration. Needs
+a follow-up: Escape-to-close, arrow-key option navigation, and
+`aria-expanded`/`role="listbox"`/`role="option"` semantics on the trigger
+and list.
