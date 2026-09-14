@@ -82,6 +82,7 @@ export default function ShippingExport() {
   const requestIdRef = useRef(0)
   const [expandedId, setExpandedId] = useState(null)
   const [itemsByOrderId, setItemsByOrderId] = useState({})
+  const selectAllRef = useRef(null)
 
   useEffect(() => {
     adminListCollections().then(setCollections).catch(() => setCollections([]))
@@ -106,6 +107,8 @@ export default function ShippingExport() {
     setCollectionId(value)
   }
 
+  const visibleOrders = orders.filter((o) => matchesSearch(o, search))
+
   const toggleSelected = (id) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -113,6 +116,30 @@ export default function ShippingExport() {
       return next
     })
   }
+
+  // Acts on the currently *visible* (search-filtered) rows only - selecting
+  // "all" while a search narrows the list must not silently pull in orders
+  // the seller can't even see right now.
+  const allVisibleSelected = visibleOrders.length > 0 && visibleOrders.every((o) => selected.has(o.id))
+  const someVisibleSelected = visibleOrders.some((o) => selected.has(o.id))
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        visibleOrders.forEach((o) => next.delete(o.id))
+      } else {
+        visibleOrders.forEach((o) => next.add(o.id))
+      }
+      return next
+    })
+  }
+
+  // "indeterminate" (the dash state) isn't a settable prop - only a real
+  // DOM property - so it has to go through a ref rather than JSX.
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someVisibleSelected && !allVisibleSelected
+  }, [someVisibleSelected, allVisibleSelected])
 
   const toggleFreeship = async (order) => {
     const next = order.shipping_payer === "seller" ? "buyer" : "seller"
@@ -176,8 +203,6 @@ export default function ShippingExport() {
     }
   }
 
-  const visibleOrders = orders.filter((o) => matchesSearch(o, search))
-
   return (
     <div>
       <label className="flex flex-col text-xs gap-1 mb-3 max-w-xs">
@@ -213,7 +238,15 @@ export default function ShippingExport() {
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="text-left opacity-70">
-                    <th></th>
+                    <th>
+                      <input
+                        type="checkbox"
+                        ref={selectAllRef}
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAll}
+                        aria-label="Chọn tất cả"
+                      />
+                    </th>
                     <th className="pr-2">Mã đơn</th>
                     <th className="pr-2">Người nhận</th>
                     <th className="pr-2">SĐT</th>
@@ -233,6 +266,7 @@ export default function ShippingExport() {
                             type="checkbox"
                             checked={selected.has(o.id)}
                             onChange={() => toggleSelected(o.id)}
+                            aria-label={`Chọn đơn ${o.order_code}`}
                           />
                         </td>
                         <td className="pr-2 py-1">
