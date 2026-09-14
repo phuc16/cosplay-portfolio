@@ -28,7 +28,7 @@ services:
     logging: *logging
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     restart: unless-stopped
     command: server /data
     ports:
