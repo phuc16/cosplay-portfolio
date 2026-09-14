@@ -448,7 +448,11 @@ export default function Order() {
         )}
 
         {order.status === "pending" && !editingBuyerInfo && (
-          <button type="button" onClick={startEditBuyerInfo} className="text-sm underline opacity-70 mt-1">
+          <button
+            type="button"
+            onClick={startEditBuyerInfo}
+            className="mt-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--brand)] text-white"
+          >
             {t("orderEditInfo")}
           </button>
         )}
