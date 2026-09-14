@@ -1091,6 +1091,20 @@ describe("createOrder: free gift", () => {
     expect(res.total).toBe(105000) // gift never adds to the charged total
   })
 
+  it("normalizes is_gift to a real boolean on read (mysql2 returns TINYINT(1) as a JS number, not a boolean, with no typeCast configured)", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: true, name: "Postcard", minTotal: 100000, imageUrl: "https://x/gift.png" })
+    const res = await repo.createOrder(order(variantId, 3))
+
+    const fetched = await repo.getOrderById(res.id)
+    const [paidItem, giftItem] = fetched.items
+
+    expect(paidItem.is_gift).toBe(false)
+    expect(giftItem.is_gift).toBe(true)
+    expect(typeof paidItem.is_gift).toBe("boolean")
+    expect(typeof giftItem.is_gift).toBe("boolean")
+  })
+
   it("adds a digital gift line carrying its delivery_link snapshot", async () => {
     const { variantId } = await seedVariant(5)
     await seedGift({ enabled: true, name: "Wallpaper", minTotal: 35000, deliveryLink: "https://drive.google.com/gift" })

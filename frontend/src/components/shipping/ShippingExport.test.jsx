@@ -389,6 +389,24 @@ describe("ShippingExport", () => {
     expect(container.textContent).not.toContain("Postcard ·")
   })
 
+  it("does not render a stray '0' for a non-gift item (mysql2 returns is_gift as the number 0, not false)", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockResolvedValue({
+      id: 1,
+      items: [{ id: 11, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 3, unit_price_snapshot: 40000, is_gift: 0 }],
+    })
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
+    await click(toggleButton)
+    await flush()
+
+    expect(container.textContent).not.toContain("🎁 Quà tặng")
+    const li = [...container.querySelectorAll("li")].find((el) => el.textContent.includes("Card"))
+    expect(li.textContent.trim()).toBe("Card · A1 × 3")
+  })
+
   it("shows a variant photo per item when the order has one", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminGetOrder.mockResolvedValue({

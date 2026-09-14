@@ -182,6 +182,18 @@ describe("Order - free gift line", () => {
     expect(container.textContent).toContain("🎁")
     expect(container.textContent).not.toContain("Postcard ·")
   })
+
+  it("does not render a stray '0' after the price for a non-gift item (mysql2 returns is_gift as the number 0, not false)", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 40000, qty: 1, is_gift: 0 }],
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("🎁")
+    expect(container.textContent).toContain("40.000₫")
+    expect(container.textContent).not.toMatch(/₫0(?!\d)/)
+  })
 })
 
 describe("Order - tracking code", () => {

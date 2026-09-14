@@ -447,6 +447,11 @@ async function attachItems(order) {
   )
   const items = rows.map(({ variant_thumbnail, variant_image_url, product_images, ...item }) => ({
     ...item,
+    // mysql2 returns a TINYINT(1) as a JS number (0/1), not a boolean (no
+    // typeCast configured in db.js) - left as-is, `{item.is_gift && <X/>}`
+    // renders a literal "0" text node for every non-gift item, since 0 is
+    // falsy but still a renderable React child.
+    is_gift: Boolean(item.is_gift),
     image_url: item.image_url_snapshot || variant_thumbnail || variant_image_url || firstImage(product_images),
   }))
   return { ...order, items }

@@ -472,6 +472,24 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.textContent).not.toContain("Postcard ·")
   })
 
+  it("does not render a stray '0' after the price for a non-gift item (mysql2 returns is_gift as the number 0, not false)", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, email: "a@b.com",
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 40000, qty: 1, is_gift: 0 }],
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).not.toContain("🎁 Quà tặng")
+    expect(container.textContent).toContain("40.000₫")
+    expect(container.textContent).not.toMatch(/₫0(?!\d)/)
+  })
+
   it("shows no digital badge or link for a physical line item", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({

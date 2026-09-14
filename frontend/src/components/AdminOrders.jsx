@@ -493,7 +493,7 @@ export default function AdminOrders() {
                   <li key={i.id}>
                     {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty} -{" "}
                     {formatVnd(i.unit_price_snapshot * i.qty)}
-                    {i.is_gift && (
+                    {Boolean(i.is_gift) && (
                       <>
                         {" "}
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">🎁 Quà tặng</span>
