@@ -227,6 +227,22 @@ describe("Order - receiver info", () => {
     expect(container.textContent).toContain("0909999999")
     expect(container.textContent).not.toContain("Address:")
   })
+
+  it("shows the buyer's note when the order has one", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ note: "Gọi trước khi giao" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Gọi trước khi giao")
+  })
+
+  it("shows no note line when the order has none", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ note: null }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Note:")
+  })
 })
 
 describe("Order pickup info", () => {

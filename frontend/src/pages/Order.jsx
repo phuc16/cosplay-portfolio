@@ -446,6 +446,9 @@ export default function Order() {
         {order.fulfillment_method === "ship" && order.address_raw && (
           <p>{t("orderReceiverAddress")}: {order.address_raw}</p>
         )}
+        {order.note && (
+          <p>{t("orderReceiverNote")}: {order.note}</p>
+        )}
 
         {order.status === "pending" && !editingBuyerInfo && (
           <button
