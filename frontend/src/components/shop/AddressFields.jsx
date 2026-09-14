@@ -27,6 +27,12 @@ export default function AddressFields({ value, onChange }) {
   const [street, setStreet] = useState(value.address_street || "")
   const [streetSuggestions, setStreetSuggestions] = useState([])
   const [searching, setSearching] = useState(false)
+  // Editing an existing order seeds `street` already filled in (see the
+  // resolution effects below) - without this guard, the debounced search
+  // effect below would fire immediately on opening the edit form, before
+  // the buyer ever touched the field. Sticky once true: sets on the
+  // field's first focus, never reset back to false.
+  const [streetFocused, setStreetFocused] = useState(false)
   const streetEnabled = Boolean(provinceCode && wardCode)
 
   useEffect(() => {
@@ -110,7 +116,7 @@ export default function AddressFields({ value, onChange }) {
   // burst of typing actually fires a request. Never runs before both
   // province and ward are picked (streetEnabled), keeping each query scoped.
   useEffect(() => {
-    if (!streetEnabled || street.trim().length < 3) {
+    if (!streetFocused || !streetEnabled || street.trim().length < 3) {
       setStreetSuggestions([])
       return
     }
@@ -123,7 +129,7 @@ export default function AddressFields({ value, onChange }) {
     }, STREET_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [street, streetEnabled, wardCode, provinceCode])
+  }, [street, streetFocused, streetEnabled, wardCode, provinceCode])
 
   const pickStreetSuggestion = (s) => {
     // s.structured_formatting.main_text is too short for anything Goong
@@ -177,6 +183,7 @@ export default function AddressFields({ value, onChange }) {
             type="text"
             value={street}
             onChange={(e) => onStreetChange(e.target.value)}
+            onFocus={() => setStreetFocused(true)}
             onKeyDown={(e) => {
               // This field lives inside the checkout form - without
               // preventDefault, Enter would submit the whole order instead
