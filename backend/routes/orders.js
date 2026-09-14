@@ -56,7 +56,12 @@ function toPublicOrder(order) {
     // an oversight. The order page's only protection is still the
     // unguessable token in the URL, so this does trade some safety for a
     // buyer being able to catch a typo'd address/phone before it ships.
-    buyer_name, phone, address_raw,
+    // The structured sub-fields (street/ward/district/province) were never
+    // exposed before this - added so a buyer editing their own pending
+    // order's address can have the province/ward picker pre-filled with
+    // their existing selection (see AddressFields.jsx's name-to-code
+    // resolution), not just shown as an opaque combined string.
+    buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province,
     // Shown in place of the generic "save this link" note once an order is
     // cancelled - the buyer lands here wanting to know why, not to be told
     // to bookmark an order that's already dead. Same field the admin's own
@@ -83,7 +88,9 @@ function toPublicOrder(order) {
     pickup_locations: pickup_locations || [], expires_at, pickup_code: paidPickupCode,
     has_payment_proof: Boolean(payment_proof_url),
     payment_proof_url: payment_proof_url || null,
-    buyer_name, phone, address_raw: address_raw || null,
+    buyer_name, phone, note: note || null, address_raw: address_raw || null,
+    address_street: address_street || null, address_ward: address_ward || null,
+    address_district: address_district || null, address_province: address_province || null,
     // The human-readable code shown everywhere else (admin, emails) - the
     // order page never surfaced it before, leaving a buyer with no code to
     // reference when contacting support, only the opaque URL token.
@@ -378,6 +385,31 @@ module.exports = function orderRoutes() {
       res.status(201).json({ url })
     } catch (err) {
       console.error("[ORDERS] Lỗi tải ảnh chuyển khoản:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.put("/:token/buyer-info", orderAccess, async (req, res) => {
+    try {
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      // Email is deliberately not accepted here - it's never editable, see
+      // orderRepo.updateBuyerInfo's own comment for why.
+      const { buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province } = req.body
+      const result = await repo.updateBuyerInfo(
+        order.id,
+        { buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province },
+        { requirePending: true, actor: req.isAdmin ? "admin" : "buyer" }
+      )
+      if (result === null) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      res.json(result.changed ? { changed: true, order: toPublicOrder(result.order) } : { changed: false })
+    } catch (err) {
+      if (err instanceof repo.InvalidBuyerInfoError) return bad(res, err.message)
+      if (err instanceof repo.OrderNotEditableError) {
+        return res.status(409).json({ error: "not_editable", message: err.message })
+      }
+      console.error("[ORDERS] Lỗi sửa thông tin đơn hàng:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

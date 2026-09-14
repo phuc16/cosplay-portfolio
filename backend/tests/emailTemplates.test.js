@@ -74,6 +74,18 @@ describe("renderTemplate", () => {
     const out = t.renderTemplate({ subject: "{{buyer_name}}", body_html: "x" }, t.buildVars(evil))
     expect(out.subject).not.toContain("<b>")
   })
+
+  it("renders the order_updated template's static greeting", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_updated, t.buildVars(order))
+    expect(out.subject).toContain("đã được cập nhật")
+    expect(out.html).toContain("thông tin đơn hàng của bạn vừa được cập nhật")
+  })
+
+  it("leaves actor/changes/guidance out of the static template - sender.js splices those in per-send", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_updated, t.buildVars(order))
+    expect(out.html).not.toContain("Nếu không phải bạn thực hiện thay đổi này")
+    expect(out.html).not.toContain("Người bán")
+  })
 })
 
 describe("shipping_fee_note", () => {
@@ -227,7 +239,7 @@ describe("validatePlaceholders", () => {
 describe("DEFAULT_TEMPLATES", () => {
   it("covers every lifecycle email", () => {
     expect(Object.keys(t.DEFAULT_TEMPLATES).sort())
-      .toEqual(["cancelled", "order_placed", "payment_confirmed", "payment_proof_uploaded", "shipped"])
+      .toEqual(["cancelled", "order_placed", "order_updated", "payment_confirmed", "payment_proof_uploaded", "shipped"])
   })
 
   it("uses only valid placeholders", () => {

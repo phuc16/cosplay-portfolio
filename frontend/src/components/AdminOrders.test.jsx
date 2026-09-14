@@ -12,6 +12,13 @@ const adminGetOrder = vi.fn()
 const adminTransitionOrder = vi.fn()
 const adminGetOrderPayment = vi.fn()
 const adminFindOrderByToken = vi.fn()
+const adminUpdateOrderBuyerInfo = vi.fn()
+// AddressFields.jsx (rendered inside the buyer-info edit form for a ship
+// order) calls these on its own - must resolve, not just exist, or its
+// mount-time effect throws synchronously.
+const fetchProvinces = vi.fn().mockResolvedValue([])
+const fetchWards = vi.fn().mockResolvedValue([])
+const searchAddress = vi.fn().mockResolvedValue({ predictions: [] })
 
 vi.mock("../api/shop", () => ({
   adminListOrders: (...args) => adminListOrders(...args),
@@ -22,6 +29,10 @@ vi.mock("../api/shop", () => ({
   adminTransitionOrder: (...args) => adminTransitionOrder(...args),
   adminGetOrderPayment: (...args) => adminGetOrderPayment(...args),
   adminFindOrderByToken: (...args) => adminFindOrderByToken(...args),
+  adminUpdateOrderBuyerInfo: (...args) => adminUpdateOrderBuyerInfo(...args),
+  fetchProvinces: (...args) => fetchProvinces(...args),
+  fetchWards: (...args) => fetchWards(...args),
+  searchAddress: (...args) => searchAddress(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -75,8 +86,15 @@ beforeEach(() => {
   adminTransitionOrder.mockReset()
   adminGetOrderPayment.mockReset()
   adminFindOrderByToken.mockReset()
+  adminUpdateOrderBuyerInfo.mockReset()
   adminListCollections.mockResolvedValue([{ id: 7, title: "Fes Drop" }])
   adminGetOrderPayment.mockResolvedValue(null)
+  // Re-applied every test (not just at declaration) - some tests in this
+  // file call vi.restoreAllMocks(), which would otherwise wipe these back
+  // to a bare vi.fn() with no resolved value for every test that runs after.
+  fetchProvinces.mockReset().mockResolvedValue([])
+  fetchWards.mockReset().mockResolvedValue([])
+  searchAddress.mockReset().mockResolvedValue({ predictions: [] })
 })
 
 describe("AdminOrders filters", () => {
@@ -454,6 +472,24 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.textContent).not.toContain("Postcard ·")
   })
 
+  it("does not render a stray '0' after the price for a non-gift item (mysql2 returns is_gift as the number 0, not false)", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, email: "a@b.com",
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 40000, qty: 1, is_gift: 0 }],
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).not.toContain("🎁 Quà tặng")
+    expect(container.textContent).toContain("40.000₫")
+    expect(container.textContent).not.toMatch(/₫0(?!\d)/)
+  })
+
   it("shows no digital badge or link for a physical line item", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({
@@ -590,5 +626,108 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(texts).not.toContain("shipped")
     expect(texts).not.toContain("completed")
     expect(texts).not.toContain("cancelled")
+  })
+
+  it("edits and saves buyer info from the order detail panel", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, buyer_name: "Nguyễn Văn A", phone: "0900000000", email: "a@b.com", note: null, items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+    await flush()
+
+    const nameInput = container.querySelector('input[data-testid="edit-buyer-name"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Nguyễn Văn B")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    adminUpdateOrderBuyerInfo.mockResolvedValue({ changed: true, order: order({ id: 1, buyer_name: "Nguyễn Văn B", phone: "0900000000", email: "a@b.com", items: [] }) })
+    const saveBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Lưu")
+    await act(async () => { saveBtn.click() })
+    await flush()
+
+    expect(adminUpdateOrderBuyerInfo).toHaveBeenCalledWith(1, expect.objectContaining({ buyer_name: "Nguyễn Văn B" }))
+    expect(container.textContent).toContain("Nguyễn Văn B")
+  })
+
+  it("has no email input in the edit form - email is not editable", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, buyer_name: "A", phone: "090", email: "a@b.com", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết").click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+
+    expect(container.querySelector('input[placeholder="Email"]')).toBeNull()
+  })
+
+  it("does not show the address picker in the edit form for a pickup order", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "pickup" })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, fulfillment_method: "pickup", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết").click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+
+    expect(container.querySelector('button[aria-label="Province/City"]')).toBeNull()
+  })
+
+  it("shows the address picker in the edit form for a ship order", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship" })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, fulfillment_method: "ship", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết").click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+
+    expect(container.querySelector('button[aria-label="Province/City"]')).toBeTruthy()
+  })
+
+  it("does not leak an in-progress edit draft into a different order opened afterward", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 }), order({ id: 2 })])
+    adminGetOrder.mockImplementation((id) =>
+      Promise.resolve(order({
+        id, buyer_name: id === 1 ? "Order One Buyer" : "Order Two Buyer",
+        note: id === 1 ? "Note from order one" : null, items: [],
+      }))
+    )
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtns = () => [...container.querySelectorAll("button")].filter((b) => b.textContent === "Chi tiết")
+
+    await act(async () => { detailBtns()[0].click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+    expect(container.querySelector('textarea[placeholder="Ghi chú"]').value).toBe("Note from order one")
+
+    // Order 1's own detail toggle now reads "Ẩn" ("Hide"), so the only
+    // remaining "Chi tiết" button belongs to order 2.
+    await act(async () => { detailBtns()[0].click() })
+    await flush()
+
+    // The edit form must not still be open with order 1's stale draft
+    // showing through order 2's detail panel.
+    expect(container.querySelector('textarea[placeholder="Ghi chú"]')).toBeNull()
+    expect(container.textContent).toContain("Order Two Buyer")
+    expect(container.textContent).not.toContain("Note from order one")
   })
 })

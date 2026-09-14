@@ -67,7 +67,7 @@ async function pickOption(container, testId, optionText) {
 }
 
 async function selectOrderAndFillBatch(container) {
-  const checkbox = container.querySelector('input[type="checkbox"]')
+  const checkbox = container.querySelector('input[aria-label="Chọn đơn DH1"]')
   await click(checkbox)
   await act(async () => setInputValue(container.querySelector('[data-testid="ten-hang-hoa"]'), "Photocard"))
   await act(async () => setInputValue(container.querySelector('[data-testid="trong-luong"]'), "50"))
@@ -153,7 +153,7 @@ describe("ShippingExport", () => {
     const container = await renderShippingExport()
     await flush()
 
-    const orderCheckbox = container.querySelector('input[type="checkbox"]')
+    const orderCheckbox = container.querySelector('input[aria-label="Chọn đơn DH1"]')
     await click(orderCheckbox)
     expect(orderCheckbox.checked).toBe(true)
 
@@ -161,16 +161,82 @@ describe("ShippingExport", () => {
     await flush()
 
     expect(adminListShippingExportOrders).toHaveBeenLastCalledWith("2")
-    expect(container.querySelector('input[type="checkbox"]').checked).toBe(false)
+    expect(container.querySelector('input[aria-label="Chọn đơn DH1"]').checked).toBe(false)
   })
 
   it("lists eligible orders with a checkbox each", async () => {
     adminListShippingExportOrders.mockResolvedValue([order(), order({ id: 2, order_code: "DH2" })])
     const container = await renderShippingExport()
     await flush()
-    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(4)
+    // 1 select-all header checkbox + (1 select + 1 freeship) per order.
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(5)
     expect(container.textContent).toContain("DH1")
     expect(container.textContent).toContain("DH2")
+  })
+
+  it("select-all checks every order row and the header checkbox reflects it", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, order_code: "DH1" }), order({ id: 2, order_code: "DH2" }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+
+    const selectAll = container.querySelector('input[aria-label="Chọn tất cả"]')
+    expect(selectAll.checked).toBe(false)
+
+    await click(selectAll)
+
+    expect(container.querySelector('input[aria-label="Chọn đơn DH1"]').checked).toBe(true)
+    expect(container.querySelector('input[aria-label="Chọn đơn DH2"]').checked).toBe(true)
+    expect(selectAll.checked).toBe(true)
+  })
+
+  it("select-all again clears every order row", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, order_code: "DH1" }), order({ id: 2, order_code: "DH2" }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+
+    const selectAll = container.querySelector('input[aria-label="Chọn tất cả"]')
+    await click(selectAll)
+    await click(selectAll)
+
+    expect(container.querySelector('input[aria-label="Chọn đơn DH1"]').checked).toBe(false)
+    expect(container.querySelector('input[aria-label="Chọn đơn DH2"]').checked).toBe(false)
+    expect(selectAll.checked).toBe(false)
+  })
+
+  it("select-all only affects orders matching the current search, not the whole list", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, order_code: "DH1", buyer_name: "Nguyễn Văn A" }),
+      order({ id: 2, order_code: "DH2", buyer_name: "Trần Thị B" }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Mã đơn, tên, SĐT..."]')
+    await act(async () => setInputValue(searchInput, "trần"))
+
+    const selectAll = container.querySelector('input[aria-label="Chọn tất cả"]')
+    await click(selectAll)
+
+    await act(async () => setInputValue(searchInput, ""))
+
+    expect(container.querySelector('input[aria-label="Chọn đơn DH1"]').checked).toBe(false)
+    expect(container.querySelector('input[aria-label="Chọn đơn DH2"]').checked).toBe(true)
+  })
+
+  it("checking one order row individually does not check the select-all header (only a partial selection)", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, order_code: "DH1" }), order({ id: 2, order_code: "DH2" }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+
+    await click(container.querySelector('input[aria-label="Chọn đơn DH1"]'))
+
+    expect(container.querySelector('input[aria-label="Chọn tất cả"]').checked).toBe(false)
   })
 
   it("shows the buyer's phone so an admin can match an order without decoding order_code", async () => {
@@ -387,6 +453,24 @@ describe("ShippingExport", () => {
 
     expect(container.textContent).toContain("🎁 Quà tặng")
     expect(container.textContent).not.toContain("Postcard ·")
+  })
+
+  it("does not render a stray '0' for a non-gift item (mysql2 returns is_gift as the number 0, not false)", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockResolvedValue({
+      id: 1,
+      items: [{ id: 11, product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 3, unit_price_snapshot: 40000, is_gift: 0 }],
+    })
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
+    await click(toggleButton)
+    await flush()
+
+    expect(container.textContent).not.toContain("🎁 Quà tặng")
+    const li = [...container.querySelectorAll("li")].find((el) => el.textContent.includes("Card"))
+    expect(li.textContent.trim()).toBe("Card · A1 × 3")
   })
 
   it("shows a variant photo per item when the order has one", async () => {

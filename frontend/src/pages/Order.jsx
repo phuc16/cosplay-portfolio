@@ -3,13 +3,14 @@
    directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob } from "../api/shop"
+import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo } from "../api/shop"
 import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../utils/orderAuth"
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import { formatDeadline, formatVnDateTime } from "../utils/orderDeadline"
 import PaymentInstructions from "../components/shop/PaymentInstructions"
+import AddressFields from "../components/shop/AddressFields"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import StatusBadge from "../components/StatusBadge"
@@ -231,6 +232,39 @@ export default function Order() {
   const [unlockCount, setUnlockCount] = useState(0)
   // Lets the buyer re-open the bank/QR panel on demand once proof is submitted (hidden by default at that point).
   const [showPaymentAgain, setShowPaymentAgain] = useState(false)
+  const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
+  const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
+  const [buyerInfoError, setBuyerInfoError] = useState("")
+
+  const startEditBuyerInfo = () => {
+    // Email is deliberately excluded - it's not editable (backend ignores
+    // it even if sent), so there's no field for it here. It's also never
+    // part of this page's own order data in the first place (toPublicOrder
+    // never exposes it).
+    setBuyerInfoDraft({
+      buyer_name: order.buyer_name, phone: order.phone,
+      note: order.note || "",
+      address_raw: order.address_raw || "",
+      address_street: order.address_street || "",
+      address_ward: order.address_ward || "",
+      address_district: order.address_district || "",
+      address_province: order.address_province || "",
+    })
+    setBuyerInfoError("")
+    setEditingBuyerInfo(true)
+  }
+
+  const saveBuyerInfo = async () => {
+    setBuyerInfoError("")
+    try {
+      await updateOrderBuyerInfo(token, buyerInfoDraft, orderAuthHeaders(token))
+      const fresh = await fetchOrder(token, orderAuthHeaders(token))
+      setOrder(fresh)
+      setEditingBuyerInfo(false)
+    } catch (e) {
+      setBuyerInfoError(e.response?.data?.message || t("orderEditSaveFailed"))
+    }
+  }
 
   useEffect(() => {
     // Belt and braces with the server's X-Robots-Tag - must never be indexed.
@@ -381,7 +415,7 @@ export default function Order() {
             <div className="min-w-0">
               <span className="truncate block">
                 {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty}
-                {i.is_gift && (
+                {Boolean(i.is_gift) && (
                   <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">🎁 {t("orderGiftBadge")}</span>
                 )}
               </span>
@@ -411,6 +445,61 @@ export default function Order() {
         <p>{t("orderReceiverPhone")}: {order.phone}</p>
         {order.fulfillment_method === "ship" && order.address_raw && (
           <p>{t("orderReceiverAddress")}: {order.address_raw}</p>
+        )}
+        {order.note && (
+          <p>{t("orderReceiverNote")}: {order.note}</p>
+        )}
+
+        {order.status === "pending" && !editingBuyerInfo && (
+          <button
+            type="button"
+            onClick={startEditBuyerInfo}
+            className="mt-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--brand)] text-white"
+          >
+            {t("orderEditInfo")}
+          </button>
+        )}
+
+        {editingBuyerInfo && (
+          <div className="mt-2 p-3 rounded-lg border border-[var(--border-brand)]">
+            {buyerInfoError && <p className="text-red-500 text-sm mb-2">{buyerInfoError}</p>}
+            <input
+              data-testid="edit-buyer-name"
+              value={buyerInfoDraft.buyer_name}
+              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, buyer_name: e.target.value })}
+              placeholder={t("orderEditName")}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <input
+              value={buyerInfoDraft.phone}
+              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, phone: e.target.value })}
+              placeholder={t("orderEditPhone")}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            {order.fulfillment_method === "ship" && (
+              <div className="mb-2">
+                <AddressFields
+                  value={buyerInfoDraft}
+                  onChange={(addr) => setBuyerInfoDraft({ ...buyerInfoDraft, ...addr })}
+                />
+              </div>
+            )}
+            <textarea
+              value={buyerInfoDraft.note}
+              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, note: e.target.value })}
+              placeholder={t("orderEditNote")}
+              rows={2}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={saveBuyerInfo} className="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm">
+                {t("orderEditSave")}
+              </button>
+              <button type="button" onClick={() => setEditingBuyerInfo(false)} className="px-4 py-2 rounded-lg border border-[var(--border-brand)] text-sm">
+                {t("orderEditCancel")}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

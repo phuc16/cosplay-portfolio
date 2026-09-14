@@ -127,6 +127,24 @@ module.exports = function adminOrderRoutes() {
     } catch (err) { oops(res, err, "Lỗi đổi trạng thái đơn") }
   })
 
+  router.put("/orders/:id/buyer-info", async (req, res) => {
+    try {
+      // Email is deliberately not accepted here - it's never editable, see
+      // orderRepo.updateBuyerInfo's own comment for why.
+      const { buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province } = req.body
+      const result = await repo.updateBuyerInfo(Number(req.params.id), {
+        buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province,
+      }, { actor: "admin" })
+      if (result === null) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      res.json(result.changed ? { changed: true, order: withAllowedTransitions(result.order) } : { changed: false })
+    } catch (err) {
+      if (err instanceof repo.InvalidBuyerInfoError) {
+        return res.status(400).json({ error: "invalid_input", message: err.message })
+      }
+      oops(res, err, "Lỗi sửa thông tin đơn hàng")
+    }
+  })
+
   // Bulk cancel - the abuse-resistance mitigation for a griefed drop: lets the
   // admin clear a batch of orders in one request. Cancels each order through
   // the same transitionOrder() used everywhere else (stock release, the

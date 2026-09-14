@@ -27,6 +27,12 @@ export default function AddressFields({ value, onChange }) {
   const [street, setStreet] = useState(value.address_street || "")
   const [streetSuggestions, setStreetSuggestions] = useState([])
   const [searching, setSearching] = useState(false)
+  // Editing an existing order seeds `street` already filled in (see the
+  // resolution effects below) - without this guard, the debounced search
+  // effect below would fire immediately on opening the edit form, before
+  // the buyer ever touched the field. Sticky once true: sets on the
+  // field's first focus, never reset back to false.
+  const [streetFocused, setStreetFocused] = useState(false)
   const streetEnabled = Boolean(provinceCode && wardCode)
 
   useEffect(() => {
@@ -44,6 +50,31 @@ export default function AddressFields({ value, onChange }) {
       .then(setWards)
       .catch(() => setWards([]))
   }, [provinceCode])
+
+  // Editing an EXISTING order's address (AdminOrders.jsx/Order.jsx) passes
+  // an already-filled `value` in - unlike checkout, where it always starts
+  // blank. The stored columns only ever hold the province/ward's *name*
+  // (there's no code column), so on the first province list that arrives,
+  // resolve the matching code by name and seed the picker's selection from
+  // it. The `provinceCode`/`wardCode` guards make this run at most once per
+  // field: once the user (or this same resolution) has set a real code,
+  // later re-renders of this effect (e.g. a provinces re-fetch) must not
+  // silently override their choice. A pre-restructuring order whose stored
+  // name no longer matches any current province/ward just fails to
+  // resolve - same as today, the user reselects manually.
+  useEffect(() => {
+    if (!value.address_province || provinceCode || provinces.length === 0) return
+    const match = provinces.find((p) => p.name === value.address_province)
+    if (match) setProvinceCode(match.code)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provinces])
+
+  useEffect(() => {
+    if (!value.address_ward || wardCode || wards.length === 0) return
+    const match = wards.find((w) => w.name === value.address_ward)
+    if (match) setWardCode(match.code)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wards])
 
   const wardNameFor = (code) => wards.find((w) => w.code === code)?.name || ""
   const provinceNameFor = (code) => provinces.find((p) => p.code === code)?.name || ""
@@ -85,7 +116,7 @@ export default function AddressFields({ value, onChange }) {
   // burst of typing actually fires a request. Never runs before both
   // province and ward are picked (streetEnabled), keeping each query scoped.
   useEffect(() => {
-    if (!streetEnabled || street.trim().length < 3) {
+    if (!streetFocused || !streetEnabled || street.trim().length < 3) {
       setStreetSuggestions([])
       return
     }
@@ -98,7 +129,7 @@ export default function AddressFields({ value, onChange }) {
     }, STREET_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [street, streetEnabled, wardCode, provinceCode])
+  }, [street, streetFocused, streetEnabled, wardCode, provinceCode])
 
   const pickStreetSuggestion = (s) => {
     // s.structured_formatting.main_text is too short for anything Goong
@@ -152,6 +183,7 @@ export default function AddressFields({ value, onChange }) {
             type="text"
             value={street}
             onChange={(e) => onStreetChange(e.target.value)}
+            onFocus={() => setStreetFocused(true)}
             onKeyDown={(e) => {
               // This field lives inside the checkout form - without
               // preventDefault, Enter would submit the whole order instead

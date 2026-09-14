@@ -416,9 +416,9 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.expires_at).toBeNull()
   })
 
-  it("allowlist regression: expires_at, buyer_name, phone, address_raw are present; order_token stays as before; request_key/stock_released_at/note/email still never appear", async () => {
+  it("allowlist regression: expires_at, buyer_name, phone, address_raw, note are present; order_token stays as before; request_key/stock_released_at/email still never appear", async () => {
     const v = await seed()
-    const created = await request(app).post("/api/orders").send(body(v))
+    const created = await request(app).post("/api/orders").send(body(v, { note: "Gọi trước khi giao" }))
 
     const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).toHaveProperty("expires_at")
@@ -432,12 +432,16 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.buyer_name).toBe("Nguyễn Văn A")
     expect(res.body.phone).toBe("0900000000")
     expect(res.body.address_raw).toBe("1 ABC, Q1, TP.HCM")
+    // note is now exposed too - the buyer's own edit form needs it to
+    // pre-fill the "Ghi chú" field when editing a pending order (previously
+    // always blank since this response never included it, mirroring the
+    // same latent gap email/address had before their own exposure).
+    expect(res.body.note).toBe("Gọi trước khi giao")
     // email is still never exposed here - the buyer already has it (they
     // typed it at checkout), so there's nothing for this page to confirm,
     // only more PII to leak if the link is ever forwarded.
     expect(res.body).not.toHaveProperty("request_key")
     expect(res.body).not.toHaveProperty("stock_released_at")
-    expect(res.body).not.toHaveProperty("note")
     expect(res.body).not.toHaveProperty("email")
   })
 
@@ -558,5 +562,59 @@ describe("GET /api/orders/:token", () => {
 
     const res = await authed(request(app).get(`/api/orders/${pickup.body.order_token}`))
     expect(res.body.pickup_code).toMatch(/^\d{6}$/)
+  })
+})
+
+describe("PUT /api/orders/:token/buyer-info", () => {
+  it("requires PIN/session auth", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`).send({
+      buyer_name: "A", phone: "09",
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it("allows a pending order's own buyer to update their info, using the access_token issued at checkout", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+      .send({ buyer_name: "Sửa bởi khách", phone: "09", address_raw: "x" })
+    expect(res.status).toBe(200)
+    expect(res.body.changed).toBe(true)
+  })
+
+  it("ignores an email field even if the buyer sends one - email is not editable through this route", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+      .send({ buyer_name: "Sửa bởi khách", phone: "09", email: "attacker@example.com" })
+    expect(res.status).toBe(200)
+    // toPublicOrder deliberately never exposes email - assert against the
+    // DB directly to confirm the attacker-supplied value was never written.
+    const stored = await orders.getOrderByToken(created.body.order_token)
+    expect(stored.email).toBe("a@example.com")
+  })
+
+  it("rejects the edit once the order is no longer pending, with 409", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const stored = await orders.getOrderByToken(created.body.order_token)
+    await orders.transitionOrder(stored.id, "confirmed")
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+      .send({ buyer_name: "A", phone: "09" })
+    expect(res.status).toBe(409)
+  })
+
+  it("also allows an admin JWT to use this route", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ buyer_name: "Sửa bởi admin qua route khách", phone: "09" })
+    expect(res.status).toBe(200)
   })
 })

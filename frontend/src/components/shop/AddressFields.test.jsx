@@ -46,6 +46,11 @@ async function renderField(value = {}, onChange = vi.fn()) {
 }
 
 function setInputValue(el, value) {
+  // Real typing is always preceded by a focus (you can't type into a field
+  // without clicking/tabbing into it first) - React's onFocus listens for
+  // the native "focusin" bubble (not "focus", which doesn't bubble), so
+  // el.focus() is used rather than dispatching a plain Event("focus").
+  el.focus()
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
   setter.call(el, value)
   el.dispatchEvent(new Event("change", { bubbles: true }))
@@ -144,6 +149,56 @@ describe("AddressFields - province/ward picker (no live per-keystroke autocomple
     await act(async () => provinceTrigger(container).click())
     expect(container.querySelectorAll("li button")).toHaveLength(0)
     expect(container.querySelector("li").textContent).toBe("No results")
+  })
+})
+
+describe("AddressFields - resolving an existing order's stored address back to picker selections", () => {
+  it("seeds the province and ward pickers by matching the stored names against the fetched lists", async () => {
+    const { container } = await renderField({
+      address_raw: "1 Đường ABC, Hiệp Bình, Hồ Chí Minh",
+      address_street: "1 Đường ABC",
+      address_ward: "Hiệp Bình",
+      address_district: null,
+      address_province: "Hồ Chí Minh",
+    })
+    await act(async () => {})
+    await act(async () => {})
+
+    expect(provinceTrigger(container).textContent).toContain("Hồ Chí Minh")
+    expect(wardTrigger(container).textContent).toContain("Hiệp Bình")
+    expect(container.querySelector("input[type='text']").value).toBe("1 Đường ABC")
+  })
+
+  it("leaves the pickers unresolved when the stored name no longer matches any current province/ward (e.g. a pre-restructuring order)", async () => {
+    const { container } = await renderField({
+      address_raw: "1 X, Phường Cũ, Tỉnh Không Còn Tồn Tại",
+      address_street: "1 X",
+      address_ward: "Phường Cũ",
+      address_district: null,
+      address_province: "Tỉnh Không Còn Tồn Tại",
+    })
+    await act(async () => {})
+    await act(async () => {})
+
+    expect(provinceTrigger(container).textContent).toContain("Select province/city")
+  })
+
+  it("does not override a province the user has since picked manually", async () => {
+    const { container } = await renderField({ address_province: "Hồ Chí Minh" })
+    await pickOption(container, provinceTrigger(container), "Hà Nội")
+    // A late-arriving re-fetch of the same provinces list must not silently
+    // flip the user's own selection back to the stored value.
+    await act(async () => { fetchProvinces.mock.results[0].value.then(() => {}) })
+
+    expect(provinceTrigger(container).textContent).toContain("Hà Nội")
+  })
+
+  it("does not resolve anything for a fresh checkout with no stored address (regression guard)", async () => {
+    const { container, onChange } = await renderField()
+    await act(async () => {})
+
+    expect(provinceTrigger(container).textContent).toContain("Select province/city")
+    expect(onChange).not.toHaveBeenCalled()
   })
 })
 
@@ -268,5 +323,40 @@ describe("AddressFields - debounced auto-search (not per-keystroke, not button-g
       address_district: null,
       address_province: "Hồ Chí Minh",
     })
+  })
+})
+
+describe("AddressFields - street search waits for the field to be focused (edit forms open with the street already filled)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("does not auto-search on opening an edit form whose street is already filled in", async () => {
+    await renderField({
+      address_street: "66B Nguyen Si Sach", address_ward: "Hiệp Bình", address_province: "Hồ Chí Minh",
+    })
+    await act(async () => {})
+    await act(async () => {})
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+
+    expect(searchAddress).not.toHaveBeenCalled()
+  })
+
+  it("searches once the buyer actually focuses the pre-filled street field", async () => {
+    const { container } = await renderField({
+      address_street: "66B Nguyen Si Sach", address_ward: "Hiệp Bình", address_province: "Hồ Chí Minh",
+    })
+    await act(async () => {})
+    await act(async () => {})
+
+    const input = container.querySelector("input[type='text']")
+    await act(async () => { input.focus() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+
+    expect(searchAddress).toHaveBeenCalledWith("66B Nguyen Si Sach", "Hiệp Bình", "Hồ Chí Minh")
   })
 })

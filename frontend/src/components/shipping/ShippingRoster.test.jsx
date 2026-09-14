@@ -181,6 +181,26 @@ describe("ShippingRoster", () => {
     expect(detail.textContent).not.toContain("Postcard ·")
   })
 
+  it("does not render a stray '0' for a non-gift item (mysql2 returns is_gift as the number 0, not false)", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [{
+        order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+        items: [{ product_name: "Card", variant_label: "A1", qty: 3, is_gift: 0 }],
+        paid: true, amount_due: 0,
+      }],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    const detail = container.querySelector('[data-testid="order-detail-1"]')
+    expect(detail.textContent).not.toContain("🎁 Quà tặng")
+    const li = detail.querySelector("li")
+    expect(li.textContent.trim()).toBe("Card · A1 × 3")
+  })
+
   it("collapses the item list on screen behind a toggle, but always renders it in full for print", async () => {
     adminGetPickupRoster.mockResolvedValue({
       rows: [

@@ -583,6 +583,110 @@ describe("sendQueued: footer (automated-email notice)", () => {
   })
 })
 
+describe("sendQueued: order_updated changed-fields list", () => {
+  it("splices in every changed field from the payload, right after the greeting", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("Tên người nhận")
+    expect(sentArg.html).toContain("Nguyễn Văn B")
+  })
+
+  it("does not mention a field that did not change", async () => {
+    // "Số điện thoại" alone also appears unconditionally in the receiver-info
+    // block (wrap()'s {{receiver_info}}, always rendered), so the changes
+    // list's own row format (`<strong>{label}:</strong> ...`, with a colon)
+    // is the only marker distinguishing "this field is in the changed list"
+    // from "this field is just part of the standard receiver-info block".
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("Số điện thoại:")
+  })
+
+  it("escapes HTML in a changed value", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "<script>alert(1)</script>", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("<script>")
+    expect(sentArg.html).toContain("&lt;script&gt;")
+  })
+
+  it("places the changes list ahead of the link, same as cancel_reason", async () => {
+    // Anchor on "Tên người nhận:" (with colon - the changes-list row format),
+    // not the bare new value: send-time rendering means {{buyer_name}} in the
+    // static greeting itself already resolves to the *new* name ("Chào
+    // Nguyễn Văn B, ..."), so a plain indexOf("Nguyễn Văn B") would find that
+    // first occurrence instead of the spliced block.
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    const greetingIndex = html.indexOf("vừa được cập nhật")
+    const changeIndex = html.indexOf("Tên người nhận:")
+    const linkIndex = html.indexOf("Xem đơn hàng")
+    expect(changeIndex).toBeGreaterThan(greetingIndex)
+    expect(changeIndex).toBeLessThan(linkIndex)
+  })
+
+  it("names the seller as the actor and points the buyer to contact support, for an admin-made edit", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", address_raw: "x" }, { actor: "admin" })
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Người bán")
+    expect(html).toContain("vui lòng liên hệ chúng tôi để được hỗ trợ")
+    expect(html).not.toContain("tự chỉnh sửa lại")
+  })
+
+  it("tells the buyer they made the edit themselves and can self-correct it, for a buyer-made edit", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(
+      o.id,
+      { buyer_name: "Nguyễn Văn B", phone: "09", address_raw: "x" },
+      { requirePending: true, actor: "buyer" }
+    )
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("<strong>Bạn</strong> vừa tự thực hiện thay đổi này")
+    expect(html).toContain("bạn có thể tự chỉnh sửa lại ngay trên trang đơn hàng")
+    expect(html).toContain("Nếu đây không phải do bạn thực hiện")
+    expect(html).not.toContain("Người bán")
+  })
+
+  it("falls back to the original neutral wording when a legacy queued row carries no actor", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", address_raw: "x" }, { actor: "admin" })
+    // Simulate a row enqueued before the actor field existed.
+    await db.query(
+      "UPDATE email_queue SET payload = JSON_REMOVE(payload, '$.actor') WHERE order_id = ? AND type = 'order_updated'",
+      [o.id]
+    )
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Nếu không phải bạn thực hiện thay đổi này")
+    expect(html).not.toContain("Người bán")
+    expect(html).not.toContain("<strong>Bạn</strong> vừa tự")
+  })
+})
+
 describe("sendQueued: no real network connection", () => {
   it("actually goes through the mocked transport (mock invoked, not bypassed)", async () => {
     const o = await seedOrder()

@@ -1,9 +1,10 @@
 import { useEffect, lazy, Suspense, useState } from "react"
 import {
   adminListOrders, adminTransitionOrder, adminGetOrder, adminGetOrderPayment, adminFindOrderByToken,
-  adminBulkCancelOrders, adminBulkCompleteOrders, adminListCollections,
+  adminBulkCancelOrders, adminBulkCompleteOrders, adminListCollections, adminUpdateOrderBuyerInfo,
 } from "../api/shop"
 import { formatVnd } from "../utils/money"
+import AddressFields from "./shop/AddressFields"
 import OrderTimeline from "./OrderTimeline"
 import StatusBadge from "./StatusBadge"
 import SearchableSelect from "./SearchableSelect"
@@ -77,6 +78,9 @@ export default function AdminOrders() {
   // transferNote), not stored on the order row - reused via the same public
   // endpoint the buyer's order page calls rather than re-deriving it here.
   const [paymentInfo, setPaymentInfo] = useState(null)
+  const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
+  const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
+  const [buyerInfoError, setBuyerInfoError] = useState("")
   const [error, setError] = useState("")
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scanError, setScanError] = useState("")
@@ -113,10 +117,51 @@ export default function AdminOrders() {
   }, [filter, collectionId, dateFrom, dateTo, search])
 
   const openDetail = async (id) => {
+    // Switching to a different order must drop any in-progress edit form -
+    // otherwise the buyer-info draft (and even the "editing" flag itself)
+    // from whichever order was open before stays visible, silently
+    // overlaid on the newly opened order's detail.
+    setEditingBuyerInfo(false)
+    setBuyerInfoDraft(null)
+    setBuyerInfoError("")
     const o = await adminGetOrder(id)
     setDetail(o)
     setPaymentInfo(null)
     adminGetOrderPayment(id).then(setPaymentInfo).catch(() => setPaymentInfo(null))
+  }
+
+  const closeDetail = () => {
+    setDetail(null)
+    setEditingBuyerInfo(false)
+    setBuyerInfoDraft(null)
+    setBuyerInfoError("")
+  }
+
+  const startEditBuyerInfo = () => {
+    // Email is deliberately excluded - it's not editable (backend ignores
+    // it even if sent), so there's no field for it here.
+    setBuyerInfoDraft({
+      buyer_name: detail.buyer_name, phone: detail.phone,
+      note: detail.note || "",
+      address_raw: detail.address_raw || "",
+      address_street: detail.address_street || "",
+      address_ward: detail.address_ward || "",
+      address_district: detail.address_district || "",
+      address_province: detail.address_province || "",
+    })
+    setBuyerInfoError("")
+    setEditingBuyerInfo(true)
+  }
+
+  const saveBuyerInfo = async () => {
+    setBuyerInfoError("")
+    try {
+      const result = await adminUpdateOrderBuyerInfo(detail.id, buyerInfoDraft)
+      if (result.changed) setDetail(result.order)
+      setEditingBuyerInfo(false)
+    } catch (e) {
+      setBuyerInfoError(e.response?.data?.message || "Lưu thất bại")
+    }
   }
 
   const move = async (order, to) => {
@@ -355,7 +400,7 @@ export default function AdminOrders() {
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={() => (detail?.id === o.id ? setDetail(null) : openDetail(o.id))}
+              <button type="button" onClick={() => (detail?.id === o.id ? closeDetail() : openDetail(o.id))}
                 className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.neutral}`}>
                 {detail?.id === o.id ? "Ẩn" : "Chi tiết"}
               </button>
@@ -374,9 +419,56 @@ export default function AdminOrders() {
                 <OrderTimeline order={detail} />
               </div>
 
-              <p className="opacity-70">{detail.email}</p>
-              {detail.fulfillment_method === "ship" && <p className="opacity-70">{detail.address_raw}</p>}
-              {detail.note && <p className="mt-1 italic opacity-70">“{detail.note}”</p>}
+              {!editingBuyerInfo ? (
+                <>
+                  <p className="opacity-70">{detail.buyer_name} · {detail.phone} · {detail.email}</p>
+                  {detail.fulfillment_method === "ship" && <p className="opacity-70">{detail.address_raw}</p>}
+                  {detail.note && <p className="mt-1 italic opacity-70">"{detail.note}"</p>}
+                  <button type="button" onClick={startEditBuyerInfo} className="mt-1 text-xs underline opacity-70">
+                    Sửa thông tin
+                  </button>
+                </>
+              ) : (
+                <div className="mt-2 p-3 rounded-lg border border-[var(--border-brand)]">
+                  {buyerInfoError && <p className="text-red-500 text-xs mb-2">{buyerInfoError}</p>}
+                  <input
+                    data-testid="edit-buyer-name"
+                    value={buyerInfoDraft.buyer_name}
+                    onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, buyer_name: e.target.value })}
+                    placeholder="Tên người nhận"
+                    className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  <input
+                    value={buyerInfoDraft.phone}
+                    onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, phone: e.target.value })}
+                    placeholder="Số điện thoại"
+                    className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  {detail.fulfillment_method === "ship" && (
+                    <div className="mb-2">
+                      <AddressFields
+                        value={buyerInfoDraft}
+                        onChange={(addr) => setBuyerInfoDraft({ ...buyerInfoDraft, ...addr })}
+                      />
+                    </div>
+                  )}
+                  <textarea
+                    value={buyerInfoDraft.note}
+                    onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, note: e.target.value })}
+                    placeholder="Ghi chú"
+                    rows={2}
+                    className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={saveBuyerInfo} className="px-3 py-1 rounded-lg bg-[var(--brand)] text-white text-sm">
+                      Lưu
+                    </button>
+                    <button type="button" onClick={() => setEditingBuyerInfo(false)} className="px-3 py-1 rounded-lg border border-[var(--border-brand)] text-sm">
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              )}
               {detail.status === "cancelled" && detail.cancel_reason && (
                 <p className="mt-1 text-red-500">Lý do hủy: {detail.cancel_reason}</p>
               )}
@@ -401,7 +493,7 @@ export default function AdminOrders() {
                   <li key={i.id}>
                     {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty} -{" "}
                     {formatVnd(i.unit_price_snapshot * i.qty)}
-                    {i.is_gift && (
+                    {Boolean(i.is_gift) && (
                       <>
                         {" "}
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">🎁 Quà tặng</span>

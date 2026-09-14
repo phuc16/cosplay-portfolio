@@ -232,6 +232,18 @@ const DEFAULT_TEMPLATES = {
       ${TOTAL_ROW}
       {{payment_proof_image}}`, "admin_url"),
   },
+  // One base template shared by both admin- and buyer-initiated edits; the
+  // actor line, changed-fields list, and closing guidance are spliced in by
+  // sender.js (see its order_updated handling) since they depend on who
+  // made the edit - not expressible as a static {{placeholder}}. Safe to
+  // name the actor now that email is locked to the order's own address
+  // (orderRepo.updateBuyerInfo), so the real buyer always receives this
+  // regardless of who made the change.
+  order_updated: {
+    subject: "Thông tin đơn #{{order_id}} đã được cập nhật",
+    body_html: wrap(`
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, thông tin đơn hàng của bạn vừa được cập nhật.</p>`),
+  },
 }
 
 async function getTemplate(type) {

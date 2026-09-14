@@ -11,6 +11,13 @@ const fetchPaymentInstructions = vi.fn()
 const uploadPaymentProof = vi.fn()
 const verifyOrderPin = vi.fn()
 const fetchOrderQrBlob = vi.fn()
+const updateOrderBuyerInfo = vi.fn()
+// AddressFields.jsx (rendered inside the buyer-info edit form for a ship
+// order) calls these on its own - must resolve, not just exist, or its
+// mount-time effect throws synchronously.
+const fetchProvinces = vi.fn()
+const fetchWards = vi.fn()
+const searchAddress = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchOrder: (...args) => fetchOrder(...args),
@@ -18,6 +25,10 @@ vi.mock("../api/shop", () => ({
   uploadPaymentProof: (...args) => uploadPaymentProof(...args),
   verifyOrderPin: (...args) => verifyOrderPin(...args),
   fetchOrderQrBlob: (...args) => fetchOrderQrBlob(...args),
+  updateOrderBuyerInfo: (...args) => updateOrderBuyerInfo(...args),
+  fetchProvinces: (...args) => fetchProvinces(...args),
+  fetchWards: (...args) => fetchWards(...args),
+  searchAddress: (...args) => searchAddress(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings via `get`
@@ -75,6 +86,10 @@ beforeEach(() => {
   verifyOrderPin.mockReset()
   fetchOrderQrBlob.mockReset()
   fetchOrderQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
+  updateOrderBuyerInfo.mockReset()
+  fetchProvinces.mockReset().mockResolvedValue([])
+  fetchWards.mockReset().mockResolvedValue([])
+  searchAddress.mockReset().mockResolvedValue({ predictions: [] })
   axios.post.mockReset()
   sessionStorage.clear()
   localStorage.clear()
@@ -167,6 +182,18 @@ describe("Order - free gift line", () => {
     expect(container.textContent).toContain("🎁")
     expect(container.textContent).not.toContain("Postcard ·")
   })
+
+  it("does not render a stray '0' after the price for a non-gift item (mysql2 returns is_gift as the number 0, not false)", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 40000, qty: 1, is_gift: 0 }],
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("🎁")
+    expect(container.textContent).toContain("40.000₫")
+    expect(container.textContent).not.toMatch(/₫0(?!\d)/)
+  })
 })
 
 describe("Order - tracking code", () => {
@@ -211,6 +238,22 @@ describe("Order - receiver info", () => {
     expect(container.textContent).toContain("Trần Thị B")
     expect(container.textContent).toContain("0909999999")
     expect(container.textContent).not.toContain("Address:")
+  })
+
+  it("shows the buyer's note when the order has one", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ note: "Gọi trước khi giao" }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("Gọi trước khi giao")
+  })
+
+  it("shows no note line when the order has none", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ note: null }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Note:")
   })
 })
 
@@ -923,5 +966,98 @@ describe("Order - status timestamp", () => {
     // Just confirms no stray "Invalid Date" text renders - the absence of a
     // specific timestamp string isn't otherwise assertable here.
     expect(container.textContent).not.toContain("Invalid Date")
+  })
+})
+
+describe("Order - buyer edits their own info", () => {
+  it("shows the edit button only while the order is pending", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const pendingContainer = await renderOrder()
+    expect([...pendingContainer.querySelectorAll("button")].some((b) => b.textContent === "Sửa thông tin")).toBe(true)
+
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    const confirmedContainer = await renderOrder()
+    expect([...confirmedContainer.querySelectorAll("button")].some((b) => b.textContent === "Sửa thông tin")).toBe(false)
+  })
+
+  it("saves an edit and re-fetches the order", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", buyer_name: "Nguyễn Văn A" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    const nameInput = container.querySelector('input[data-testid="edit-buyer-name"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Nguyễn Văn B")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    updateOrderBuyerInfo.mockResolvedValue({ changed: true, order: baseOrder({ status: "pending", buyer_name: "Nguyễn Văn B" }) })
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", buyer_name: "Nguyễn Văn B" }))
+    const saveBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Lưu")
+    await act(async () => { saveBtn.click() })
+    await act(async () => {})
+
+    expect(updateOrderBuyerInfo).toHaveBeenCalledWith("tok123", expect.objectContaining({ buyer_name: "Nguyễn Văn B" }), expect.anything())
+    expect(container.textContent).toContain("Nguyễn Văn B")
+  })
+
+  it("shows a 409 error message and stays in edit mode when the order stopped being pending mid-edit", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    updateOrderBuyerInfo.mockRejectedValue({ response: { status: 409, data: { message: "Đơn hàng không còn ở trạng thái chờ thanh toán nên không thể chỉnh sửa." } } })
+    const saveBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Lưu")
+    await act(async () => { saveBtn.click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("không còn ở trạng thái chờ thanh toán")
+  })
+
+  it("has no email input in the edit form - email is not editable", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    expect(container.querySelector('input[placeholder="Email"]')).toBeNull()
+  })
+
+  it("does not show the address picker in the edit form for a pickup order", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", fulfillment_method: "pickup" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    expect(container.querySelector('button[aria-label="Tỉnh/Thành phố"]')).toBeNull()
+  })
+
+  it("shows the address picker in the edit form for a ship order", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", fulfillment_method: "ship" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    expect(container.querySelector('button[aria-label="Tỉnh/Thành phố"]')).toBeTruthy()
   })
 })
