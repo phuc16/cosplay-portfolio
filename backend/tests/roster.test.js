@@ -76,8 +76,8 @@ describe("buildRoster - items", () => {
       ],
     })])
     expect(rows[0].items).toEqual([
-      { product_name: "Photocard", variant_label: "A1", qty: 2, image_url: "/api/storage/shop/a.webp", delivery_link: null },
-      { product_name: "Poster", variant_label: "Std", qty: 1, image_url: null, delivery_link: null },
+      { product_name: "Photocard", variant_label: "A1", qty: 2, image_url: "/api/storage/shop/a.webp", delivery_link: null, is_gift: false },
+      { product_name: "Poster", variant_label: "Std", qty: 1, image_url: null, delivery_link: null, is_gift: false },
     ])
   })
 

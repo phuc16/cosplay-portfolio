@@ -4,6 +4,7 @@ import { readCart, updateQty, removeFromCart, cartTotal } from "../shop/cart"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import { checkCartAvailability } from "../shop/cartAvailability"
+import { fetchGiftSettings } from "../api/shop"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 
@@ -14,6 +15,11 @@ export default function Cart() {
   const [pendingRemove, setPendingRemove] = useState(null)
   const [problems, setProblems] = useState(new Map())
   const [checking, setChecking] = useState(true)
+  const [giftSettings, setGiftSettings] = useState(null)
+
+  useEffect(() => {
+    fetchGiftSettings().then(setGiftSettings).catch(() => setGiftSettings(null))
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -144,6 +150,21 @@ export default function Cart() {
           )}
         </div>
       </div>
+
+      {giftSettings?.enabled && (
+        cartTotal(cart) >= giftSettings.min_total ? (
+          <div className="mt-3">
+            <p className="text-sm text-[var(--brand)]">
+              {t("cartGiftQualified", { name: giftSettings.name })}
+            </p>
+            {giftSettings.note && <p className="text-sm opacity-70">{giftSettings.note}</p>}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm opacity-70">
+            {t("cartGiftProgress", { amount: formatVnd(giftSettings.min_total - cartTotal(cart)), name: giftSettings.name })}
+          </p>
+        )
+      )}
       </main>
       <ShopFooter />
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, afterAll } from "vitest"
 import db from "../db.js"
 import repo from "../shop/orders/orderRepo.js"
 import catalog from "../shop/catalogRepo.js"
@@ -29,6 +29,13 @@ async function seedDigitalVariant(stock, deliveryLink = "https://drive.google.co
   return { cid, pid, variantId: detail.products[0].variant_id }
 }
 
+async function seedGift({ enabled = true, name = "Postcard", minTotal = 100000, deliveryLink = null, imageUrl = null } = {}) {
+  await db.query(
+    "INSERT INTO gift_settings (enabled, name, min_total, delivery_link, image_url) VALUES (?, ?, ?, ?, ?)",
+    [enabled, name, minTotal, deliveryLink, imageUrl]
+  )
+}
+
 const order = (variantId, qty = 1, over = {}) => ({
   items: [{ variant_id: variantId, qty }],
   buyer,
@@ -38,7 +45,15 @@ const order = (variantId, qty = 1, over = {}) => ({
 })
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables("order_items", "orders", "product_variants", "products", "collections", "gift_settings")
+})
+
+// gift_settings is a table many other test files don't yet know to reset in
+// their own beforeEach - without this, a row left behind by this file's last
+// test would silently leak into whichever test file runs next and calls
+// createOrder, making every order in that file unexpectedly gift-eligible.
+afterAll(async () => {
+  await db.query("DELETE FROM gift_settings")
 })
 
 describe("createOrder", () => {
@@ -1024,5 +1039,157 @@ describe("createOrder - digital items", () => {
 
     const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
     expect(v.stock_qty).toBe(1)
+  })
+})
+
+describe("createOrder: free gift", () => {
+  it("adds no gift line when nothing is configured", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ?", [res.id])
+    expect(items).toHaveLength(1)
+    expect(Boolean(items[0].is_gift)).toBe(false)
+  })
+
+  it("adds no gift line when disabled, even if the total qualifies", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: false, minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 1))
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ?", [res.id])
+    expect(items).toHaveLength(1)
+  })
+
+  it("adds no gift line when the total is below the threshold", async () => {
+    const { variantId } = await seedVariant(5) // price 35000
+    await seedGift({ enabled: true, minTotal: 100000 })
+    const res = await repo.createOrder(order(variantId, 1))
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ?", [res.id])
+    expect(items).toHaveLength(1)
+  })
+
+  it("adds a physical gift line at 0đ when the total meets the threshold", async () => {
+    const { variantId } = await seedVariant(5) // price 35000 * 3 = 105000
+    await seedGift({ enabled: true, name: "Postcard", minTotal: 100000, imageUrl: "https://x/gift.png" })
+    const res = await repo.createOrder(order(variantId, 3))
+
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ? ORDER BY id", [res.id])
+    expect(items).toHaveLength(2)
+    const gift = items[1]
+    expect(Boolean(gift.is_gift)).toBe(true)
+    expect(gift.product_variant_id).toBeNull()
+    expect(gift.product_name_snapshot).toBe("Postcard")
+    expect(gift.variant_label_snapshot).toBe("")
+    expect(gift.unit_price_snapshot).toBe(0)
+    expect(gift.qty).toBe(1)
+    expect(gift.image_url_snapshot).toBe("https://x/gift.png")
+    expect(gift.delivery_link_snapshot).toBeNull()
+    expect(res.total).toBe(105000) // gift never adds to the charged total
+  })
+
+  it("adds a digital gift line carrying its delivery_link snapshot", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: true, name: "Wallpaper", minTotal: 35000, deliveryLink: "https://drive.google.com/gift" })
+    const res = await repo.createOrder(order(variantId, 1))
+
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ? ORDER BY id", [res.id])
+    const gift = items[1]
+    expect(Boolean(gift.is_gift)).toBe(true)
+    expect(gift.delivery_link_snapshot).toBe("https://drive.google.com/gift")
+  })
+
+  it("adds exactly one gift unit regardless of how far over the threshold the order is", async () => {
+    const { variantId } = await seedVariant(20)
+    await seedGift({ enabled: true, minTotal: 10000 })
+    const res = await repo.createOrder(order(variantId, 20)) // 700000, way over
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ? AND is_gift = 1", [res.id])
+    expect(items).toHaveLength(1)
+    expect(items[0].qty).toBe(1)
+  })
+
+  it("does not touch stock for the gift - it has none to reserve", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: true, minTotal: 1 })
+    await repo.createOrder(order(variantId, 1))
+    // No error, and the paid variant's own stock is the only thing decremented.
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(4)
+  })
+
+  it("forces fulfillment_method to be required for an all-digital cart that qualifies for a physical gift", async () => {
+    const { variantId } = await seedDigitalVariant(5)
+    await seedGift({ enabled: true, minTotal: 1 }) // physical (no delivery_link)
+    await expect(
+      repo.createOrder({
+        items: [{ variant_id: variantId, qty: 1 }],
+        buyer,
+        payment_method: "bank",
+        // fulfillment_method omitted, as an all-digital cart would normally send
+      })
+    ).rejects.toThrow(repo.FulfillmentRequiredError)
+  })
+
+  it("does not require fulfillment_method for an all-digital cart when the qualifying gift is itself digital", async () => {
+    const { variantId } = await seedDigitalVariant(5)
+    await seedGift({ enabled: true, minTotal: 1, deliveryLink: "https://drive.google.com/gift" })
+    const res = await repo.createOrder({
+      items: [{ variant_id: variantId, qty: 1 }],
+      buyer,
+      payment_method: "bank",
+    })
+    expect(res.reused).toBe(false)
+  })
+
+  it("succeeds with a valid fulfillment_method for an all-digital cart forced physical by the gift", async () => {
+    const { variantId } = await seedDigitalVariant(5)
+    await seedGift({ enabled: true, minTotal: 1 })
+    const res = await repo.createOrder({
+      items: [{ variant_id: variantId, qty: 1 }],
+      buyer,
+      payment_method: "bank",
+      fulfillment_method: "ship",
+    })
+    const [[savedOrder]] = await db.query("SELECT fulfillment_method, address_raw FROM orders WHERE id = ?", [res.id])
+    expect(savedOrder.fulfillment_method).toBe("ship")
+    expect(savedOrder.address_raw).toBe("1 Đường ABC, Q1, TP.HCM")
+  })
+
+  it("does not block COD for a paid all-physical cart just because the qualifying gift is digital", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: true, minTotal: 1, deliveryLink: "https://drive.google.com/gift" })
+    const res = await repo.createOrder(order(variantId, 1, { payment_method: "cod" }))
+    expect(res.reused).toBe(false)
+  })
+
+  it("still rejects COD for a cart with a paid digital item, gift notwithstanding", async () => {
+    const { variantId } = await seedDigitalVariant(5)
+    await seedGift({ enabled: true, minTotal: 1 })
+    await expect(
+      repo.createOrder({
+        items: [{ variant_id: variantId, qty: 1 }],
+        buyer, payment_method: "cod", fulfillment_method: "ship",
+      })
+    ).rejects.toThrow(repo.NoCodForDigitalError)
+  })
+
+  it("does not subject the gift to the paid items' collection's allow_ship/allow_pickup restriction", async () => {
+    const { variantId } = await seedVariant(5, { allow_ship: false, allow_pickup: true })
+    await seedGift({ enabled: true, minTotal: 1 })
+    // Collection only allows pickup - ship must still be rejected for the
+    // real paid item, proving the gift did not silently relax that check.
+    await expect(
+      repo.createOrder(order(variantId, 1, { fulfillment_method: "ship" }))
+    ).rejects.toThrow(repo.FulfillmentNotOfferedError)
+  })
+
+  it("cancelling a gift-bearing order restocks only the paid variant, not the gift (which has none)", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: true, minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 2))
+
+    const ok = await repo.transitionOrder(res.id, "cancelled")
+    expect(ok).toBe(true)
+
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(5) // fully restored - the gift row had no stock to touch
   })
 })

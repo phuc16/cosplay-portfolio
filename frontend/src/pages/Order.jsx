@@ -381,6 +381,9 @@ export default function Order() {
             <div className="min-w-0">
               <span className="truncate block">
                 {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty}
+                {i.is_gift && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">🎁 {t("orderGiftBadge")}</span>
+                )}
               </span>
               {i.delivery_link_snapshot && (
                 <a href={i.delivery_link_snapshot} target="_blank" rel="noreferrer" className="text-sm text-[var(--text-link)] underline">

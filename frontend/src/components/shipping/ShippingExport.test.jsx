@@ -372,6 +372,23 @@ describe("ShippingExport", () => {
     expect(physicalItem.textContent).not.toContain("Sản phẩm số")
   })
 
+  it("marks a free gift line and doesn't render a dangling separator for its blank variant label", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    adminGetOrder.mockResolvedValue({
+      id: 1,
+      items: [{ id: 11, product_name_snapshot: "Postcard", variant_label_snapshot: "", qty: 1, unit_price_snapshot: 0, is_gift: true }],
+    })
+    const container = await renderShippingExport()
+    await flush()
+
+    const toggleButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sản phẩm")
+    await click(toggleButton)
+    await flush()
+
+    expect(container.textContent).toContain("🎁 Quà tặng")
+    expect(container.textContent).not.toContain("Postcard ·")
+  })
+
   it("shows a variant photo per item when the order has one", async () => {
     adminListShippingExportOrders.mockResolvedValue([order()])
     adminGetOrder.mockResolvedValue({

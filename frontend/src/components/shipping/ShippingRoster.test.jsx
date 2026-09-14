@@ -162,6 +162,25 @@ describe("ShippingRoster", () => {
     expect(detail.textContent).toContain("× 3")
   })
 
+  it("marks a free gift line and doesn't render a dangling separator for its blank variant label", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [{
+        order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+        items: [{ product_name: "Postcard", variant_label: "", qty: 1, is_gift: true }],
+        paid: true, amount_due: 0,
+      }],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    const detail = container.querySelector('[data-testid="order-detail-1"]')
+    expect(detail.textContent).toContain("🎁 Quà tặng")
+    expect(detail.textContent).not.toContain("Postcard ·")
+  })
+
   it("collapses the item list on screen behind a toggle, but always renders it in full for print", async () => {
     adminGetPickupRoster.mockResolvedValue({
       rows: [

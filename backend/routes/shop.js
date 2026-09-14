@@ -1,6 +1,7 @@
 const express = require("express")
 const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
+const giftSettings = require("../shop/giftSettings")
 const vnAddress = require("../shop/vnAddress")
 
 /**
@@ -40,6 +41,19 @@ module.exports = function shopRoutes() {
       res.json({ methods: paymentSettings.enabledMethods(s), payment_note: s.payment_note || null })
     } catch (err) {
       console.error("[SHOP] Lỗi lấy phương thức thanh toán:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Buyer-facing gift config - no delivery_link (see giftSettings.js's
+  // publicSettings for why), just enough for the Cart/Checkout pages to show
+  // a progress hint and decide whether a physical gift forces the shipping
+  // section open for an otherwise-all-digital cart.
+  router.get("/gift-settings", async (req, res) => {
+    try {
+      res.json(giftSettings.publicSettings(await giftSettings.getSettings()))
+    } catch (err) {
+      console.error("[SHOP] Lỗi lấy cấu hình quà tặng:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

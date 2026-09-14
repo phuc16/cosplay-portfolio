@@ -34,6 +34,17 @@ describe("renderTemplate", () => {
     expect(out.html).toContain("Poster")
   })
 
+  it("marks a free gift line as 'Miễn phí' instead of 0 đ, with no dangling separator for its blank label", () => {
+    const withGift = {
+      ...order,
+      items: [{ product_name_snapshot: "Postcard", variant_label_snapshot: "", unit_price_snapshot: 0, qty: 1, is_gift: true }],
+    }
+    const out = t.renderTemplate({ subject: "x", body_html: "{{items}}" }, t.buildVars(withGift))
+    expect(out.html).toContain("Miễn phí")
+    expect(out.html).toContain("🎁")
+    expect(out.html).not.toContain("Postcard ·")
+  })
+
   it("renders a variant photo for an item that has one", () => {
     const withImage = { ...order, items: [{ ...order.items[0], image_url: "/api/storage/shop/products/1/a.webp" }] }
     const out = t.renderTemplate({ subject: "x", body_html: "{{items}}" }, t.buildVars(withImage))

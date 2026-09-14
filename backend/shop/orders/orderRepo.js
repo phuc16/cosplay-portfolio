@@ -211,21 +211,11 @@ async function createOrder(input) {
     if (anyDigital && input.payment_method === "cod") {
       throw new NoCodForDigitalError()
     }
-    if (!allDigital && !["ship", "pickup"].includes(input.fulfillment_method)) {
-      throw new FulfillmentRequiredError()
-    }
-    const fulfillmentMethod = allDigital ? "digital" : input.fulfillment_method
 
-    // Every line's collection must still be open for ordering, and - for a
-    // physical line - must actually offer the requested fulfillment method.
-    // A digital line is never checked against allow_ship/allow_pickup: those
-    // flags describe how a collection ships/hands over physical goods, and
-    // have nothing to say about a line that was never going to be shipped.
-    // A cart could in principle span collections; check each row's own
-    // collection rather than assuming a single one for the whole order.
-    // Checked with the same row lock as the stock check below, so a cart
-    // item added while a collection was "active" cannot slip through a race
-    // against the admin closing it - see CollectionNotActiveError.
+    // Collection open/scheduled check only here - the ship/pickup-offered
+    // check that used to run in this same loop is deferred below, until
+    // fulfillmentMethod is resolved, which now depends on whether a gift
+    // applies (see below), which in turn depends on the real paid total.
     const now = new Date()
     for (const row of rows) {
       // A collection whose end_at has already passed is rejected here even
@@ -243,14 +233,6 @@ async function createOrder(input) {
       if (row.collection_status !== "active" || collectionNotStarted || collectionExpired) {
         const reason = collectionNotStarted ? "not_started" : collectionExpired ? "ended" : "inactive"
         throw new CollectionNotActiveError(row.label, row.product_name, row.id, reason)
-      }
-      if (row.product_type !== "digital") {
-        if (fulfillmentMethod === "ship" && !row.allow_ship) {
-          throw new FulfillmentNotOfferedError("ship")
-        }
-        if (fulfillmentMethod === "pickup" && !row.allow_pickup) {
-          throw new FulfillmentNotOfferedError("pickup")
-        }
       }
     }
 
@@ -272,12 +254,51 @@ async function createOrder(input) {
         collection_id: variant.collection_id,
         delivery_link_snapshot: variant.product_type === "digital" ? variant.delivery_link : null,
         image_url_snapshot: variant.thumbnail_image || variant.image_url || firstImage(variant.product_images),
+        is_gift: false,
       })
     }
 
     const total = domain.computeTotal(lines)
 
+    // A free gift is not a catalog item: no stock, no collection, no
+    // relationship to product_variants at all (see the 2026-09-14 free-gift
+    // design doc). Looked up directly, inside this same transaction, so its
+    // config can't change mid-request.
+    const [[giftSettingsRow]] = await conn.query("SELECT * FROM gift_settings ORDER BY id LIMIT 1")
+    const giftApplies = Boolean(giftSettingsRow?.enabled) && total >= (giftSettingsRow?.min_total || 0)
+    // Digital-vs-physical is inferred from delivery_link presence, not a
+    // separate type column - one field that can't contradict itself.
+    const giftIsPhysical = giftApplies && !giftSettingsRow.delivery_link
+
+    // Fulfillment resolution now happens after the gift decision: an
+    // all-digital cart that qualifies for a *physical* gift still needs a
+    // real shipping/pickup answer, even though none of its actual paid items
+    // would have required one on their own. When no gift applies (or it's
+    // itself digital), this is identical to the original `!allDigital` check.
+    const fulfillmentRequired = !allDigital || giftIsPhysical
+    if (fulfillmentRequired && !["ship", "pickup"].includes(input.fulfillment_method)) {
+      throw new FulfillmentRequiredError()
+    }
+    const fulfillmentMethod = fulfillmentRequired ? input.fulfillment_method : "digital"
+
+    // Ship/pickup-offered check, deferred from the loop above because it
+    // needs fulfillmentMethod. Only ever checked against the buyer's real
+    // paid rows - the gift has no collection to check this against, and is
+    // never subject to it (mirrors how a digital row is already exempt).
+    for (const row of rows) {
+      if (row.product_type !== "digital") {
+        if (fulfillmentMethod === "ship" && !row.allow_ship) {
+          throw new FulfillmentNotOfferedError("ship")
+        }
+        if (fulfillmentMethod === "pickup" && !row.allow_pickup) {
+          throw new FulfillmentNotOfferedError("pickup")
+        }
+      }
+    }
+
     // Decrement only finite stock; NULL means unlimited and stays NULL.
+    // Runs over the paid lines only - the gift (appended below, if any) has
+    // no stock to reserve.
     for (const line of lines) {
       const variant = byId.get(line.variant_id)
       if (variant.stock_qty !== null) {
@@ -288,9 +309,25 @@ async function createOrder(input) {
       }
     }
 
+    if (giftApplies) {
+      lines.push({
+        variant_id: null,
+        qty: 1,
+        product_name_snapshot: giftSettingsRow.name,
+        variant_label_snapshot: "",
+        unit_price_snapshot: 0,
+        collection_id: null,
+        delivery_link_snapshot: giftSettingsRow.delivery_link || null,
+        image_url_snapshot: giftSettingsRow.image_url || null,
+        is_gift: true,
+      })
+    }
+
     const token = domain.generateOrderToken()
     // Falls back to domain.RESERVATION_HOURS (via computeExpiry's default
-    // parameter) when the collection has no override configured.
+    // parameter) when the collection has no override configured. Reads
+    // lines[0], which is always the first *paid* line - the gift, if any,
+    // is always appended last and is never lines[0].
     const deadlineHours = byId.get(lines[0].variant_id).payment_deadline_hours || undefined
     const expiresAt = domain.computeExpiry(input.payment_method, new Date(), deadlineHours)
     const isPickup = fulfillmentMethod === "pickup"
@@ -338,11 +375,11 @@ async function createOrder(input) {
         `INSERT INTO order_items
            (order_id, product_variant_id, product_name_snapshot,
             variant_label_snapshot, unit_price_snapshot, qty, delivery_link_snapshot, image_url_snapshot,
-            collection_id_snapshot)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            collection_id_snapshot, is_gift)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [res.insertId, line.variant_id, line.product_name_snapshot,
          line.variant_label_snapshot, line.unit_price_snapshot, line.qty, line.delivery_link_snapshot,
-         line.image_url_snapshot, line.collection_id]
+         line.image_url_snapshot, line.collection_id, line.is_gift]
       )
     }
 

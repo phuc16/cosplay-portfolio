@@ -94,6 +94,9 @@ export const adminBulkCompleteOrders = (ids) =>
 export const fetchPaymentMethods = () =>
   api.get("/api/shop/payment-methods").then((r) => r.data)
 
+export const fetchGiftSettings = () =>
+  api.get("/api/shop/gift-settings").then((r) => r.data)
+
 export const fetchPaymentInstructions = (token, headers = {}) =>
   api.get(`/api/orders/${token}/payment`, { headers }).then((r) => r.data)
 
@@ -111,6 +114,12 @@ export const adminGetPaymentSettings = () =>
 
 export const adminSavePaymentSettings = (data) =>
   api.put("/api/admin/payment-settings", data).then((r) => r.data)
+
+export const adminGetGiftSettings = () =>
+  api.get("/api/admin/gift-settings").then((r) => r.data)
+
+export const adminSaveGiftSettings = (data) =>
+  api.put("/api/admin/gift-settings", data).then((r) => r.data)
 
 // ── Email templates ──
 export const adminListEmailTemplates = () =>
