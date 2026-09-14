@@ -566,7 +566,7 @@ describe("PUT /api/orders/:token/buyer-info", () => {
     const v = await seed()
     const created = await request(app).post("/api/orders").send(body(v))
     const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`).send({
-      buyer_name: "A", phone: "09", email: "a@example.com",
+      buyer_name: "A", phone: "09",
     })
     expect(res.status).toBe(401)
   })
@@ -576,9 +576,22 @@ describe("PUT /api/orders/:token/buyer-info", () => {
     const created = await request(app).post("/api/orders").send(body(v))
     const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
       .set("Authorization", `Bearer ${created.body.access_token}`)
-      .send({ buyer_name: "Sửa bởi khách", phone: "09", email: "a@example.com", address_raw: "x" })
+      .send({ buyer_name: "Sửa bởi khách", phone: "09", address_raw: "x" })
     expect(res.status).toBe(200)
     expect(res.body.changed).toBe(true)
+  })
+
+  it("ignores an email field even if the buyer sends one - email is not editable through this route", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+      .send({ buyer_name: "Sửa bởi khách", phone: "09", email: "attacker@example.com" })
+    expect(res.status).toBe(200)
+    // toPublicOrder deliberately never exposes email - assert against the
+    // DB directly to confirm the attacker-supplied value was never written.
+    const stored = await orders.getOrderByToken(created.body.order_token)
+    expect(stored.email).toBe("a@example.com")
   })
 
   it("rejects the edit once the order is no longer pending, with 409", async () => {
@@ -588,7 +601,7 @@ describe("PUT /api/orders/:token/buyer-info", () => {
     await orders.transitionOrder(stored.id, "confirmed")
     const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
       .set("Authorization", `Bearer ${created.body.access_token}`)
-      .send({ buyer_name: "A", phone: "09", email: "a@example.com" })
+      .send({ buyer_name: "A", phone: "09" })
     expect(res.status).toBe(409)
   })
 
@@ -597,7 +610,7 @@ describe("PUT /api/orders/:token/buyer-info", () => {
     const created = await request(app).post("/api/orders").send(body(v))
     const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ buyer_name: "Sửa bởi admin qua route khách", phone: "09", email: "a@example.com" })
+      .send({ buyer_name: "Sửa bởi admin qua route khách", phone: "09" })
     expect(res.status).toBe(200)
   })
 })

@@ -80,6 +80,11 @@ describe("renderTemplate", () => {
     expect(out.subject).toContain("đã được cập nhật")
     expect(out.html).toContain("thông tin đơn hàng của bạn vừa được cập nhật")
   })
+
+  it("includes an actor-agnostic 'if this wasn't you' alert line, regardless of who made the edit", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_updated, t.buildVars(order))
+    expect(out.html).toContain("Nếu không phải bạn thực hiện thay đổi này")
+  })
 })
 
 describe("shipping_fee_note", () => {

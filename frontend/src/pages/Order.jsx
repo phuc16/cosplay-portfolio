@@ -10,6 +10,7 @@ import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
 import { formatDeadline, formatVnDateTime } from "../utils/orderDeadline"
 import PaymentInstructions from "../components/shop/PaymentInstructions"
+import AddressFields from "../components/shop/AddressFields"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import StatusBadge from "../components/StatusBadge"
@@ -236,9 +237,18 @@ export default function Order() {
   const [buyerInfoError, setBuyerInfoError] = useState("")
 
   const startEditBuyerInfo = () => {
+    // Email is deliberately excluded - it's not editable (backend ignores
+    // it even if sent), so there's no field for it here. It's also never
+    // part of this page's own order data in the first place (toPublicOrder
+    // never exposes it).
     setBuyerInfoDraft({
-      buyer_name: order.buyer_name, phone: order.phone, email: order.email,
-      note: order.note || "", address_raw: order.address_raw || "",
+      buyer_name: order.buyer_name, phone: order.phone,
+      note: order.note || "",
+      address_raw: order.address_raw || "",
+      address_street: order.address_street || "",
+      address_ward: order.address_ward || "",
+      address_district: order.address_district || "",
+      address_province: order.address_province || "",
     })
     setBuyerInfoError("")
     setEditingBuyerInfo(true)
@@ -459,20 +469,13 @@ export default function Order() {
               placeholder={t("orderEditPhone")}
               className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
             />
-            <input
-              value={buyerInfoDraft.email}
-              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, email: e.target.value })}
-              placeholder={t("orderEditEmail")}
-              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
-            />
             {order.fulfillment_method === "ship" && (
-              <textarea
-                value={buyerInfoDraft.address_raw}
-                onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, address_raw: e.target.value })}
-                placeholder={t("orderEditAddress")}
-                rows={2}
-                className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
-              />
+              <div className="mb-2">
+                <AddressFields
+                  value={buyerInfoDraft}
+                  onChange={(addr) => setBuyerInfoDraft({ ...buyerInfoDraft, ...addr })}
+                />
+              </div>
             )}
             <textarea
               value={buyerInfoDraft.note}

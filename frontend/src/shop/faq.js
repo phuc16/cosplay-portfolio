@@ -117,6 +117,16 @@ export const FAQ_ITEMS = [
   },
   {
     question: {
+      vi: "Tôi nhập sai tên, số điện thoại hoặc địa chỉ, sửa lại thế nào?",
+      en: "I entered the wrong name, phone number, or address - how do I fix it?",
+    },
+    answer: {
+      vi: "Khi đơn còn ở trạng thái chờ thanh toán, bạn có thể tự sửa tên người nhận, số điện thoại, ghi chú và địa chỉ giao hàng (nếu đơn có giao hàng) ngay trên trang đơn hàng của mình - không sửa được email. Sau khi đơn đã được xác nhận, vui lòng liên hệ người bán để được hỗ trợ chỉnh sửa.",
+      en: "While your order is still pending payment, you can edit the recipient name, phone number, note, and shipping address (for orders that ship) right on your order page - email can't be changed. Once the order is confirmed, please contact the seller for help making the change.",
+    },
+  },
+  {
+    question: {
       vi: "Sản phẩm hiện \"Hết hàng\" nghĩa là gì?",
       en: "What does \"Sold out\" mean?",
     },

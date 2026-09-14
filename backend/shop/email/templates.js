@@ -232,10 +232,17 @@ const DEFAULT_TEMPLATES = {
       ${TOTAL_ROW}
       {{payment_proof_image}}`, "admin_url"),
   },
+  // Deliberately ONE neutral template regardless of who made the edit
+  // (admin or the buyer themselves) - a variant that says "you just
+  // updated..." would read as falsely reassuring in the one case this
+  // email exists to catch: someone else using a leaked order link to
+  // redirect the buyer's info. A single, actor-agnostic notice with an
+  // explicit "if this wasn't you" line stays equally alerting either way.
   order_updated: {
     subject: "Thông tin đơn #{{order_id}} đã được cập nhật",
     body_html: wrap(`
-      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, thông tin đơn hàng của bạn vừa được cập nhật.</p>`),
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, thông tin đơn hàng của bạn vừa được cập nhật.</p>
+      <p style="margin:12px 0 0;font-size:13px;color:#888">Nếu không phải bạn thực hiện thay đổi này, vui lòng liên hệ ngay để được hỗ trợ.</p>`),
   },
 }
 

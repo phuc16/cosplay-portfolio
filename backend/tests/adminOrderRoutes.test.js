@@ -491,40 +491,49 @@ describe("POST /api/admin/orders/bulk-complete", () => {
 describe("PUT /api/admin/orders/:id/buyer-info", () => {
   it("requires auth", async () => {
     const o = await seedOrder()
-    const res = await request(app).put(`/api/admin/orders/${o.id}/buyer-info`).send({ buyer_name: "A", phone: "09", email: "a@example.com" })
+    const res = await request(app).put(`/api/admin/orders/${o.id}/buyer-info`).send({ buyer_name: "A", phone: "09" })
     expect(res.status).toBe(401)
   })
 
   it("updates the order and returns the new values", async () => {
     const o = await seedOrder()
     const res = await authed(request(app).put(`/api/admin/orders/${o.id}/buyer-info`)).send({
-      buyer_name: "Sửa bởi admin", phone: "0911111111", email: "new@example.com", note: null, address_raw: "x",
+      buyer_name: "Sửa bởi admin", phone: "0911111111", note: null, address_raw: "x",
     })
     expect(res.status).toBe(200)
     expect(res.body.changed).toBe(true)
     expect(res.body.order.buyer_name).toBe("Sửa bởi admin")
   })
 
+  it("ignores an email field even if the client sends one - email is not editable", async () => {
+    const o = await seedOrder()
+    const res = await authed(request(app).put(`/api/admin/orders/${o.id}/buyer-info`)).send({
+      buyer_name: "Sửa bởi admin", phone: "0911111111", email: "attacker@example.com",
+    })
+    expect(res.status).toBe(200)
+    expect(res.body.order.email).toBe(buyer.email)
+  })
+
   it("succeeds even on a cancelled order - admin has no status restriction", async () => {
     const o = await seedOrder()
     await orders.transitionOrder(o.id, "cancelled")
     const res = await authed(request(app).put(`/api/admin/orders/${o.id}/buyer-info`)).send({
-      buyer_name: "Sửa sau khi hủy", phone: "09", email: "a@example.com",
+      buyer_name: "Sửa sau khi hủy", phone: "09",
     })
     expect(res.status).toBe(200)
   })
 
-  it("rejects an invalid email with 400", async () => {
+  it("rejects a blank name with 400", async () => {
     const o = await seedOrder()
     const res = await authed(request(app).put(`/api/admin/orders/${o.id}/buyer-info`)).send({
-      buyer_name: "A", phone: "09", email: "not-an-email",
+      buyer_name: "  ", phone: "09",
     })
     expect(res.status).toBe(400)
   })
 
   it("404s for a non-existent order", async () => {
     const res = await authed(request(app).put("/api/admin/orders/999999/buyer-info")).send({
-      buyer_name: "A", phone: "09", email: "a@example.com",
+      buyer_name: "A", phone: "09",
     })
     expect(res.status).toBe(404)
   })

@@ -12,6 +12,12 @@ const uploadPaymentProof = vi.fn()
 const verifyOrderPin = vi.fn()
 const fetchOrderQrBlob = vi.fn()
 const updateOrderBuyerInfo = vi.fn()
+// AddressFields.jsx (rendered inside the buyer-info edit form for a ship
+// order) calls these on its own - must resolve, not just exist, or its
+// mount-time effect throws synchronously.
+const fetchProvinces = vi.fn()
+const fetchWards = vi.fn()
+const searchAddress = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchOrder: (...args) => fetchOrder(...args),
@@ -20,6 +26,9 @@ vi.mock("../api/shop", () => ({
   verifyOrderPin: (...args) => verifyOrderPin(...args),
   fetchOrderQrBlob: (...args) => fetchOrderQrBlob(...args),
   updateOrderBuyerInfo: (...args) => updateOrderBuyerInfo(...args),
+  fetchProvinces: (...args) => fetchProvinces(...args),
+  fetchWards: (...args) => fetchWards(...args),
+  searchAddress: (...args) => searchAddress(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings via `get`
@@ -78,6 +87,9 @@ beforeEach(() => {
   fetchOrderQrBlob.mockReset()
   fetchOrderQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
   updateOrderBuyerInfo.mockReset()
+  fetchProvinces.mockReset().mockResolvedValue([])
+  fetchWards.mockReset().mockResolvedValue([])
+  searchAddress.mockReset().mockResolvedValue({ predictions: [] })
   axios.post.mockReset()
   sessionStorage.clear()
   localStorage.clear()
@@ -983,5 +995,41 @@ describe("Order - buyer edits their own info", () => {
     await act(async () => {})
 
     expect(container.textContent).toContain("không còn ở trạng thái chờ thanh toán")
+  })
+
+  it("has no email input in the edit form - email is not editable", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    expect(container.querySelector('input[placeholder="Email"]')).toBeNull()
+  })
+
+  it("does not show the address picker in the edit form for a pickup order", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", fulfillment_method: "pickup" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    expect(container.querySelector('button[aria-label="Tỉnh/Thành phố"]')).toBeNull()
+  })
+
+  it("shows the address picker in the edit form for a ship order", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", fulfillment_method: "ship" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    expect(container.querySelector('button[aria-label="Tỉnh/Thành phố"]')).toBeTruthy()
   })
 })

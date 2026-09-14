@@ -129,8 +129,12 @@ module.exports = function adminOrderRoutes() {
 
   router.put("/orders/:id/buyer-info", async (req, res) => {
     try {
-      const { buyer_name, phone, email, note, address_raw } = req.body
-      const result = await repo.updateBuyerInfo(Number(req.params.id), { buyer_name, phone, email, note, address_raw })
+      // Email is deliberately not accepted here - it's never editable, see
+      // orderRepo.updateBuyerInfo's own comment for why.
+      const { buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province } = req.body
+      const result = await repo.updateBuyerInfo(Number(req.params.id), {
+        buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province,
+      })
       if (result === null) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
       res.json(result.changed ? { changed: true, order: withAllowedTransitions(result.order) } : { changed: false })
     } catch (err) {

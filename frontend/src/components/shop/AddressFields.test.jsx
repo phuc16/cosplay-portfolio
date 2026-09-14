@@ -147,6 +147,56 @@ describe("AddressFields - province/ward picker (no live per-keystroke autocomple
   })
 })
 
+describe("AddressFields - resolving an existing order's stored address back to picker selections", () => {
+  it("seeds the province and ward pickers by matching the stored names against the fetched lists", async () => {
+    const { container } = await renderField({
+      address_raw: "1 Đường ABC, Hiệp Bình, Hồ Chí Minh",
+      address_street: "1 Đường ABC",
+      address_ward: "Hiệp Bình",
+      address_district: null,
+      address_province: "Hồ Chí Minh",
+    })
+    await act(async () => {})
+    await act(async () => {})
+
+    expect(provinceTrigger(container).textContent).toContain("Hồ Chí Minh")
+    expect(wardTrigger(container).textContent).toContain("Hiệp Bình")
+    expect(container.querySelector("input[type='text']").value).toBe("1 Đường ABC")
+  })
+
+  it("leaves the pickers unresolved when the stored name no longer matches any current province/ward (e.g. a pre-restructuring order)", async () => {
+    const { container } = await renderField({
+      address_raw: "1 X, Phường Cũ, Tỉnh Không Còn Tồn Tại",
+      address_street: "1 X",
+      address_ward: "Phường Cũ",
+      address_district: null,
+      address_province: "Tỉnh Không Còn Tồn Tại",
+    })
+    await act(async () => {})
+    await act(async () => {})
+
+    expect(provinceTrigger(container).textContent).toContain("Select province/city")
+  })
+
+  it("does not override a province the user has since picked manually", async () => {
+    const { container } = await renderField({ address_province: "Hồ Chí Minh" })
+    await pickOption(container, provinceTrigger(container), "Hà Nội")
+    // A late-arriving re-fetch of the same provinces list must not silently
+    // flip the user's own selection back to the stored value.
+    await act(async () => { fetchProvinces.mock.results[0].value.then(() => {}) })
+
+    expect(provinceTrigger(container).textContent).toContain("Hà Nội")
+  })
+
+  it("does not resolve anything for a fresh checkout with no stored address (regression guard)", async () => {
+    const { container, onChange } = await renderField()
+    await act(async () => {})
+
+    expect(provinceTrigger(container).textContent).toContain("Select province/city")
+    expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
 describe("AddressFields - street field requires province + ward first", () => {
   it("starts disabled, with a hint placeholder, before province/ward are picked", async () => {
     const { container } = await renderField()

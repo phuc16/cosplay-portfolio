@@ -9,13 +9,9 @@ const TRANSITION_EMAILS = {
   // `completed` intentionally sends nothing: the buyer already has the item.
 }
 
-// Same regex as routes/orders.js's own buyer-field validation at create time.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 const BUYER_INFO_LABELS = {
   buyer_name: "Tên người nhận",
   phone: "Số điện thoại",
-  email: "Email",
   note: "Ghi chú",
   address_raw: "Địa chỉ nhận hàng",
 }
@@ -700,11 +696,18 @@ async function transitionOrder(id, toStatus, extra = {}) {
  * Corrects an order's contact/address/note fields after it was placed -
  * admin (no requirePending) or the buyer themselves (requirePending: true,
  * only while the order is still 'pending'). Diffs against the row's current
- * values; a no-op diff makes no DB write and enqueues no email. Address is
- * edited/diffed as the single address_raw field - address_street/ward/
- * district/province are never touched here (see plan's Global Constraints
- * for why: AddressFields.jsx has no way to turn a stored name back into a
- * picker code).
+ * values; a no-op diff makes no DB write and enqueues no email.
+ *
+ * Email is deliberately NOT editable here - `fields.email` is never read,
+ * and the notification always goes to the order's own, unchanged address.
+ * Allowing an edit to redirect where its own notification goes would defeat
+ * the notification's point.
+ *
+ * Address is written as the full structured set (street/ward/district/
+ * province/raw - see AddressFields.jsx for how a stored province/ward name
+ * resolves back to that picker's selection on edit), but diffed/shown to
+ * the buyer as a single composite entry (old/new address_raw) rather than
+ * five separate lines.
  *
  * Mirrors transitionOrder's connection discipline: commit and release the
  * connection before enqueueing the notification email - a mail-layer issue
@@ -727,19 +730,20 @@ async function updateBuyerInfo(id, fields, { requirePending = false } = {}) {
     }
 
     if (requirePending && order.status !== "pending") {
-      await conn.rollback()
       throw new OrderNotEditableError()
     }
 
     const buyerName = fields.buyer_name === undefined ? order.buyer_name : String(fields.buyer_name ?? "").trim()
     const phone = fields.phone === undefined ? order.phone : String(fields.phone ?? "").trim()
-    const email = fields.email === undefined ? order.email : String(fields.email ?? "").trim()
-    const note = fields.note === undefined ? order.note : (fields.note === null || fields.note === "" ? null : String(fields.note))
-    const addressRaw = fields.address_raw === undefined ? order.address_raw : (fields.address_raw === null || fields.address_raw === "" ? null : String(fields.address_raw))
+    const note = fields.note === undefined ? order.note : (String(fields.note ?? "").trim() || null)
+    const addressRaw = fields.address_raw === undefined ? order.address_raw : (String(fields.address_raw ?? "").trim() || null)
+    const addressStreet = fields.address_street === undefined ? order.address_street : (String(fields.address_street ?? "").trim() || null)
+    const addressWard = fields.address_ward === undefined ? order.address_ward : (String(fields.address_ward ?? "").trim() || null)
+    const addressDistrict = fields.address_district === undefined ? order.address_district : (String(fields.address_district ?? "").trim() || null)
+    const addressProvince = fields.address_province === undefined ? order.address_province : (String(fields.address_province ?? "").trim() || null)
 
     if (!buyerName) throw new InvalidBuyerInfoError("Cần họ tên")
     if (!phone) throw new InvalidBuyerInfoError("Cần số điện thoại")
-    if (!email || !EMAIL_RE.test(email)) throw new InvalidBuyerInfoError("Email không hợp lệ")
     if (order.fulfillment_method === "ship" && !addressRaw) {
       throw new InvalidBuyerInfoError("Cần địa chỉ nhận hàng")
     }
@@ -750,10 +754,19 @@ async function updateBuyerInfo(id, fields, { requirePending = false } = {}) {
     }
     pushIfChanged("buyer_name", order.buyer_name, buyerName)
     pushIfChanged("phone", order.phone, phone)
-    pushIfChanged("email", order.email, email)
     pushIfChanged("note", order.note, note)
-    if (order.fulfillment_method === "ship") {
-      pushIfChanged("address_raw", order.address_raw, addressRaw)
+
+    const isShip = order.fulfillment_method === "ship"
+    if (isShip) {
+      const addressChanged =
+        (order.address_raw || "") !== (addressRaw || "") ||
+        (order.address_street || "") !== (addressStreet || "") ||
+        (order.address_ward || "") !== (addressWard || "") ||
+        (order.address_district || "") !== (addressDistrict || "") ||
+        (order.address_province || "") !== (addressProvince || "")
+      if (addressChanged) {
+        diff.push({ field: "address_raw", label: BUYER_INFO_LABELS.address_raw, old: order.address_raw, new: addressRaw })
+      }
     }
 
     if (diff.length === 0) {
@@ -761,11 +774,21 @@ async function updateBuyerInfo(id, fields, { requirePending = false } = {}) {
       result = { changed: false }
     } else {
       await conn.query(
-        "UPDATE orders SET buyer_name = ?, phone = ?, email = ?, note = ?, address_raw = ? WHERE id = ?",
-        [buyerName, phone, email, note, order.fulfillment_method === "ship" ? addressRaw : order.address_raw, id]
+        `UPDATE orders SET buyer_name = ?, phone = ?, note = ?,
+           address_raw = ?, address_street = ?, address_ward = ?, address_district = ?, address_province = ?
+         WHERE id = ?`,
+        [
+          buyerName, phone, note,
+          isShip ? addressRaw : order.address_raw,
+          isShip ? addressStreet : order.address_street,
+          isShip ? addressWard : order.address_ward,
+          isShip ? addressDistrict : order.address_district,
+          isShip ? addressProvince : order.address_province,
+          id,
+        ]
       )
       await conn.commit()
-      notifyEmail = email
+      notifyEmail = order.email
       notifyChanges = diff
     }
   } catch (err) {

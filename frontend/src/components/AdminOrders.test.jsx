@@ -13,6 +13,12 @@ const adminTransitionOrder = vi.fn()
 const adminGetOrderPayment = vi.fn()
 const adminFindOrderByToken = vi.fn()
 const adminUpdateOrderBuyerInfo = vi.fn()
+// AddressFields.jsx (rendered inside the buyer-info edit form for a ship
+// order) calls these on its own - must resolve, not just exist, or its
+// mount-time effect throws synchronously.
+const fetchProvinces = vi.fn().mockResolvedValue([])
+const fetchWards = vi.fn().mockResolvedValue([])
+const searchAddress = vi.fn().mockResolvedValue({ predictions: [] })
 
 vi.mock("../api/shop", () => ({
   adminListOrders: (...args) => adminListOrders(...args),
@@ -24,6 +30,9 @@ vi.mock("../api/shop", () => ({
   adminGetOrderPayment: (...args) => adminGetOrderPayment(...args),
   adminFindOrderByToken: (...args) => adminFindOrderByToken(...args),
   adminUpdateOrderBuyerInfo: (...args) => adminUpdateOrderBuyerInfo(...args),
+  fetchProvinces: (...args) => fetchProvinces(...args),
+  fetchWards: (...args) => fetchWards(...args),
+  searchAddress: (...args) => searchAddress(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -80,6 +89,12 @@ beforeEach(() => {
   adminUpdateOrderBuyerInfo.mockReset()
   adminListCollections.mockResolvedValue([{ id: 7, title: "Fes Drop" }])
   adminGetOrderPayment.mockResolvedValue(null)
+  // Re-applied every test (not just at declaration) - some tests in this
+  // file call vi.restoreAllMocks(), which would otherwise wipe these back
+  // to a bare vi.fn() with no resolved value for every test that runs after.
+  fetchProvinces.mockReset().mockResolvedValue([])
+  fetchWards.mockReset().mockResolvedValue([])
+  searchAddress.mockReset().mockResolvedValue({ predictions: [] })
 })
 
 describe("AdminOrders filters", () => {
@@ -623,5 +638,47 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
 
     expect(adminUpdateOrderBuyerInfo).toHaveBeenCalledWith(1, expect.objectContaining({ buyer_name: "Nguyễn Văn B" }))
     expect(container.textContent).toContain("Nguyễn Văn B")
+  })
+
+  it("has no email input in the edit form - email is not editable", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, buyer_name: "A", phone: "090", email: "a@b.com", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết").click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+
+    expect(container.querySelector('input[placeholder="Email"]')).toBeNull()
+  })
+
+  it("does not show the address picker in the edit form for a pickup order", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "pickup" })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, fulfillment_method: "pickup", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết").click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+
+    expect(container.querySelector('button[aria-label="Province/City"]')).toBeNull()
+  })
+
+  it("shows the address picker in the edit form for a ship order", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship" })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, fulfillment_method: "ship", items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết").click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+
+    expect(container.querySelector('button[aria-label="Province/City"]')).toBeTruthy()
   })
 })

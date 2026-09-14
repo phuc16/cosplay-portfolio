@@ -45,6 +45,31 @@ export default function AddressFields({ value, onChange }) {
       .catch(() => setWards([]))
   }, [provinceCode])
 
+  // Editing an EXISTING order's address (AdminOrders.jsx/Order.jsx) passes
+  // an already-filled `value` in - unlike checkout, where it always starts
+  // blank. The stored columns only ever hold the province/ward's *name*
+  // (there's no code column), so on the first province list that arrives,
+  // resolve the matching code by name and seed the picker's selection from
+  // it. The `provinceCode`/`wardCode` guards make this run at most once per
+  // field: once the user (or this same resolution) has set a real code,
+  // later re-renders of this effect (e.g. a provinces re-fetch) must not
+  // silently override their choice. A pre-restructuring order whose stored
+  // name no longer matches any current province/ward just fails to
+  // resolve - same as today, the user reselects manually.
+  useEffect(() => {
+    if (!value.address_province || provinceCode || provinces.length === 0) return
+    const match = provinces.find((p) => p.name === value.address_province)
+    if (match) setProvinceCode(match.code)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provinces])
+
+  useEffect(() => {
+    if (!value.address_ward || wardCode || wards.length === 0) return
+    const match = wards.find((w) => w.name === value.address_ward)
+    if (match) setWardCode(match.code)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wards])
+
   const wardNameFor = (code) => wards.find((w) => w.code === code)?.name || ""
   const provinceNameFor = (code) => provinces.find((p) => p.code === code)?.name || ""
 
