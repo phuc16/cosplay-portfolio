@@ -117,10 +117,24 @@ export default function AdminOrders() {
   }, [filter, collectionId, dateFrom, dateTo, search])
 
   const openDetail = async (id) => {
+    // Switching to a different order must drop any in-progress edit form -
+    // otherwise the buyer-info draft (and even the "editing" flag itself)
+    // from whichever order was open before stays visible, silently
+    // overlaid on the newly opened order's detail.
+    setEditingBuyerInfo(false)
+    setBuyerInfoDraft(null)
+    setBuyerInfoError("")
     const o = await adminGetOrder(id)
     setDetail(o)
     setPaymentInfo(null)
     adminGetOrderPayment(id).then(setPaymentInfo).catch(() => setPaymentInfo(null))
+  }
+
+  const closeDetail = () => {
+    setDetail(null)
+    setEditingBuyerInfo(false)
+    setBuyerInfoDraft(null)
+    setBuyerInfoError("")
   }
 
   const startEditBuyerInfo = () => {
@@ -386,7 +400,7 @@ export default function AdminOrders() {
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={() => (detail?.id === o.id ? setDetail(null) : openDetail(o.id))}
+              <button type="button" onClick={() => (detail?.id === o.id ? closeDetail() : openDetail(o.id))}
                 className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.neutral}`}>
                 {detail?.id === o.id ? "Ẩn" : "Chi tiết"}
               </button>

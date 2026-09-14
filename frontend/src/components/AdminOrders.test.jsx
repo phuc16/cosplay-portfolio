@@ -681,4 +681,35 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
 
     expect(container.querySelector('button[aria-label="Province/City"]')).toBeTruthy()
   })
+
+  it("does not leak an in-progress edit draft into a different order opened afterward", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 }), order({ id: 2 })])
+    adminGetOrder.mockImplementation((id) =>
+      Promise.resolve(order({
+        id, buyer_name: id === 1 ? "Order One Buyer" : "Order Two Buyer",
+        note: id === 1 ? "Note from order one" : null, items: [],
+      }))
+    )
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtns = () => [...container.querySelectorAll("button")].filter((b) => b.textContent === "Chi tiết")
+
+    await act(async () => { detailBtns()[0].click() })
+    await flush()
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin").click() })
+    await flush()
+    expect(container.querySelector('textarea[placeholder="Ghi chú"]').value).toBe("Note from order one")
+
+    // Order 1's own detail toggle now reads "Ẩn" ("Hide"), so the only
+    // remaining "Chi tiết" button belongs to order 2.
+    await act(async () => { detailBtns()[0].click() })
+    await flush()
+
+    // The edit form must not still be open with order 1's stale draft
+    // showing through order 2's detail panel.
+    expect(container.querySelector('textarea[placeholder="Ghi chú"]')).toBeNull()
+    expect(container.textContent).toContain("Order Two Buyer")
+    expect(container.textContent).not.toContain("Note from order one")
+  })
 })
