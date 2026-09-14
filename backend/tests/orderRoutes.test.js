@@ -416,9 +416,9 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.expires_at).toBeNull()
   })
 
-  it("allowlist regression: expires_at, buyer_name, phone, address_raw are present; order_token stays as before; request_key/stock_released_at/note/email still never appear", async () => {
+  it("allowlist regression: expires_at, buyer_name, phone, address_raw, note are present; order_token stays as before; request_key/stock_released_at/email still never appear", async () => {
     const v = await seed()
-    const created = await request(app).post("/api/orders").send(body(v))
+    const created = await request(app).post("/api/orders").send(body(v, { note: "Gọi trước khi giao" }))
 
     const res = await authed(request(app).get(`/api/orders/${created.body.order_token}`))
     expect(res.body).toHaveProperty("expires_at")
@@ -432,12 +432,16 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.buyer_name).toBe("Nguyễn Văn A")
     expect(res.body.phone).toBe("0900000000")
     expect(res.body.address_raw).toBe("1 ABC, Q1, TP.HCM")
+    // note is now exposed too - the buyer's own edit form needs it to
+    // pre-fill the "Ghi chú" field when editing a pending order (previously
+    // always blank since this response never included it, mirroring the
+    // same latent gap email/address had before their own exposure).
+    expect(res.body.note).toBe("Gọi trước khi giao")
     // email is still never exposed here - the buyer already has it (they
     // typed it at checkout), so there's nothing for this page to confirm,
     // only more PII to leak if the link is ever forwarded.
     expect(res.body).not.toHaveProperty("request_key")
     expect(res.body).not.toHaveProperty("stock_released_at")
-    expect(res.body).not.toHaveProperty("note")
     expect(res.body).not.toHaveProperty("email")
   })
 
