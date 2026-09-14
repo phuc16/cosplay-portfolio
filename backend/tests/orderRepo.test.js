@@ -1306,6 +1306,26 @@ describe("updateBuyerInfo", () => {
     expect(payload.changes.some((c) => c.field === "email")).toBe(false) // email is never editable/diffed
   })
 
+  it("defaults the notification's actor to 'admin' when the caller passes none", async () => {
+    const res = await orderWithBuyer()
+    await repo.updateBuyerInfo(res.id, { buyer_name: "Nguyễn Văn B", phone: buyer.phone })
+
+    const [[row]] = await db.query("SELECT * FROM email_queue WHERE order_id = ? AND type = 'order_updated'", [res.id])
+    expect(JSON.parse(row.payload).actor).toBe("admin")
+  })
+
+  it("carries the caller's actor ('buyer') through to the notification payload", async () => {
+    const res = await orderWithBuyer()
+    await repo.updateBuyerInfo(
+      res.id,
+      { buyer_name: "Nguyễn Văn B", phone: buyer.phone },
+      { requirePending: true, actor: "buyer" }
+    )
+
+    const [[row]] = await db.query("SELECT * FROM email_queue WHERE order_id = ? AND type = 'order_updated'", [res.id])
+    expect(JSON.parse(row.payload).actor).toBe("buyer")
+  })
+
   it("rejects a blank buyer_name", async () => {
     const res = await orderWithBuyer()
     await expect(

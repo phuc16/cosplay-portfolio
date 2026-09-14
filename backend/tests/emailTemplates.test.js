@@ -81,9 +81,10 @@ describe("renderTemplate", () => {
     expect(out.html).toContain("thông tin đơn hàng của bạn vừa được cập nhật")
   })
 
-  it("includes an actor-agnostic 'if this wasn't you' alert line, regardless of who made the edit", () => {
+  it("leaves actor/changes/guidance out of the static template - sender.js splices those in per-send", () => {
     const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_updated, t.buildVars(order))
-    expect(out.html).toContain("Nếu không phải bạn thực hiện thay đổi này")
+    expect(out.html).not.toContain("Nếu không phải bạn thực hiện thay đổi này")
+    expect(out.html).not.toContain("Người bán")
   })
 })
 

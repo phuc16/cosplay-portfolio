@@ -134,7 +134,7 @@ module.exports = function adminOrderRoutes() {
       const { buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province } = req.body
       const result = await repo.updateBuyerInfo(Number(req.params.id), {
         buyer_name, phone, note, address_raw, address_street, address_ward, address_district, address_province,
-      })
+      }, { actor: "admin" })
       if (result === null) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
       res.json(result.changed ? { changed: true, order: withAllowedTransitions(result.order) } : { changed: false })
     } catch (err) {

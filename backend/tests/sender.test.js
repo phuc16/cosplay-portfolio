@@ -639,6 +639,52 @@ describe("sendQueued: order_updated changed-fields list", () => {
     expect(changeIndex).toBeGreaterThan(greetingIndex)
     expect(changeIndex).toBeLessThan(linkIndex)
   })
+
+  it("names the seller as the actor and points the buyer to contact support, for an admin-made edit", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", address_raw: "x" }, { actor: "admin" })
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Người bán")
+    expect(html).toContain("vui lòng liên hệ chúng tôi để được hỗ trợ")
+    expect(html).not.toContain("tự chỉnh sửa lại")
+  })
+
+  it("tells the buyer they made the edit themselves and can self-correct it, for a buyer-made edit", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(
+      o.id,
+      { buyer_name: "Nguyễn Văn B", phone: "09", address_raw: "x" },
+      { requirePending: true, actor: "buyer" }
+    )
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("<strong>Bạn</strong> vừa tự thực hiện thay đổi này")
+    expect(html).toContain("bạn có thể tự chỉnh sửa lại ngay trên trang đơn hàng")
+    expect(html).toContain("Nếu đây không phải do bạn thực hiện")
+    expect(html).not.toContain("Người bán")
+  })
+
+  it("falls back to the original neutral wording when a legacy queued row carries no actor", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", address_raw: "x" }, { actor: "admin" })
+    // Simulate a row enqueued before the actor field existed.
+    await db.query(
+      "UPDATE email_queue SET payload = JSON_REMOVE(payload, '$.actor') WHERE order_id = ? AND type = 'order_updated'",
+      [o.id]
+    )
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).toContain("Nếu không phải bạn thực hiện thay đổi này")
+    expect(html).not.toContain("Người bán")
+    expect(html).not.toContain("<strong>Bạn</strong> vừa tự")
+  })
 })
 
 describe("sendQueued: no real network connection", () => {

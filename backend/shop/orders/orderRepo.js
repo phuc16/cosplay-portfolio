@@ -713,8 +713,13 @@ async function transitionOrder(id, toStatus, extra = {}) {
  * connection before enqueueing the notification email - a mail-layer issue
  * must never hold a pool connection open, and must never roll back a change
  * the caller already made.
+ *
+ * `actor` ('admin' or 'buyer') is carried into the notification email so it
+ * can say who made the change - safe to do now that email is locked to the
+ * order's own address (see above), so the real buyer always gets it
+ * regardless of who edited.
  */
-async function updateBuyerInfo(id, fields, { requirePending = false } = {}) {
+async function updateBuyerInfo(id, fields, { requirePending = false, actor = "admin" } = {}) {
   let result = null
   let notifyEmail = null
   let notifyChanges = null
@@ -800,7 +805,7 @@ async function updateBuyerInfo(id, fields, { requirePending = false } = {}) {
 
   if (notifyChanges) {
     try {
-      await emailQueue.enqueue(id, "order_updated", notifyEmail, { changes: notifyChanges })
+      await emailQueue.enqueue(id, "order_updated", notifyEmail, { changes: notifyChanges, actor })
     } catch (err) {
       console.error("[ORDERS] Không xếp được email order_updated:", err.message)
     }

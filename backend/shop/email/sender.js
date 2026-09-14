@@ -122,20 +122,46 @@ async function sendQueued(limit = 10) {
           : html.slice(0, greetingClose + "</p>".length) + block + html.slice(greetingClose + "</p>".length)
       }
 
-      // Same reasoning as cancel_reason above: a fixed set of changed fields
-      // (zero to five optional lines) can't be expressed as a template
-      // placeholder, so it's spliced in directly - right after the
-      // greeting, ahead of the link, same insertion point.
-      if (row.type === "order_updated" && payload?.changes?.length) {
-        const rows = payload.changes.map((c) => `
+      // Same reasoning as cancel_reason above: which fields changed, who
+      // made the change, and the closing guidance all depend on this
+      // specific edit and can't be expressed as a static template
+      // placeholder - spliced in directly, right after the greeting, ahead
+      // of the link, same insertion point as cancel_reason.
+      //
+      // The actor line and guidance differ by who made the edit (safe to
+      // name now that email is locked to the order's own address - see
+      // orderRepo.updateBuyerInfo - so the real buyer always receives this
+      // regardless of who edited):
+      // - buyer: "Bạn vừa tự..." so a buyer who made the edit recognizes it
+      //   immediately ("oh right, I did that"), with a pointer to just fix
+      //   it themselves if something's wrong, or contact support if this
+      //   wasn't them at all ("wait, I didn't do that").
+      // - admin: "Người bán vừa..." so the buyer knows to contact the seller
+      //   (not self-edit - the order may no longer be pending) about it.
+      // - missing/unknown actor (legacy queued rows predating this field):
+      //   falls back to the original neutral "if this wasn't you" wording.
+      if (row.type === "order_updated") {
+        const rows = (payload?.changes || []).map((c) => `
           <p style="font-size:14px;margin:4px 0 0">
             <strong>${templates.escapeHtml(c.label)}:</strong> ${templates.escapeHtml(c.old || "-")} → ${templates.escapeHtml(c.new || "-")}
           </p>`).join("")
+        const actor = payload?.actor
+        const actorLine = actor === "buyer"
+          ? `<p style="margin:8px 0 0;font-size:14px"><strong>Bạn</strong> vừa tự thực hiện thay đổi này.</p>`
+          : actor === "admin"
+            ? `<p style="margin:8px 0 0;font-size:14px"><strong>Người bán</strong> vừa thực hiện thay đổi này.</p>`
+            : ""
+        const note = actor === "buyer"
+          ? `<p style="margin:12px 0 0;font-size:13px;color:#888">Nếu thông tin trên chưa đúng, bạn có thể tự chỉnh sửa lại ngay trên trang đơn hàng của mình. Nếu đây không phải do bạn thực hiện, vui lòng liên hệ ngay để được hỗ trợ.</p>`
+          : actor === "admin"
+            ? `<p style="margin:12px 0 0;font-size:13px;color:#888">Nếu bạn có thắc mắc hoặc cần điều chỉnh thêm về thay đổi này, vui lòng liên hệ chúng tôi để được hỗ trợ.</p>`
+            : `<p style="margin:12px 0 0;font-size:13px;color:#888">Nếu không phải bạn thực hiện thay đổi này, vui lòng liên hệ ngay để được hỗ trợ.</p>`
+        const block = actorLine + rows + note
         const firstP = html.indexOf("</p>")
         const greetingClose = firstP === -1 ? -1 : html.indexOf("</p>", firstP + 1)
         html = greetingClose === -1
-          ? html + rows
-          : html.slice(0, greetingClose + "</p>".length) + rows + html.slice(greetingClose + "</p>".length)
+          ? html + block
+          : html.slice(0, greetingClose + "</p>".length) + block + html.slice(greetingClose + "</p>".length)
       }
 
       // Included even for a cancelled order, so the buyer can still check its
