@@ -150,11 +150,20 @@ export default function Checkout() {
   // Auto-select the sole offered method once the real flags are in, and
   // never leave the picker pointed at a method the collection doesn't offer.
   const offered = useMemo(() => {
+    // A cart that's all-digital has no physical item of its own to ground a
+    // pickup location in - the fulfillment section is only showing at all
+    // because a physical gift qualifies (directly, or via the forceShipping
+    // recovery path - reached only when the server itself required
+    // fulfillment for an all-digital cart, which likewise can only mean a
+    // physical gift applied). Offering "pickup" here would show a picker
+    // with nothing to fill its pickup-location block (no collection to
+    // pull one from), so shipping is the only real choice.
+    if (allDigital && (giftForcesPhysical || forceShipping)) return ["ship"]
     const list = []
     if (flags.allow_ship) list.push("ship")
     if (flags.allow_pickup) list.push("pickup")
     return list
-  }, [flags])
+  }, [flags, allDigital, giftForcesPhysical, forceShipping])
 
   useEffect(() => {
     if (!flags.loaded) return

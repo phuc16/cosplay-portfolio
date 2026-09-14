@@ -456,6 +456,22 @@ describe("Checkout - free gift forces shipping info for a digital-only cart", ()
     expect(container.querySelectorAll('input[name="fulfillment"]').length).toBeGreaterThan(0)
   })
 
+  it("offers only shipping, not pickup, since a gift-only physical order has no collection to ground a pickup location in", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+
+    const container = await renderCheckout()
+    await act(async () => {})
+
+    const radios = container.querySelectorAll('input[name="fulfillment"]')
+    expect(radios).toHaveLength(1)
+    expect(container.textContent).toContain("Ship")
+    expect(container.textContent).not.toContain("Pickup")
+  })
+
   it("does not force the shipping section when the qualifying gift is itself digital", async () => {
     localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
     fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
