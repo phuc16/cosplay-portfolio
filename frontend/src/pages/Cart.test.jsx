@@ -217,14 +217,28 @@ describe("Cart - gift hint", () => {
     expect(container.textContent).toContain("Postcard")
   })
 
-  it("shows a qualified message when the cart total already meets the threshold", async () => {
+  it("shows the gift as its own item row, badged and priced free, once the cart total meets the threshold", async () => {
     addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
     fetchGiftSettings.mockResolvedValue({
-      enabled: true, min_total: 1, name: "Postcard", image_url: null, note: null, is_digital: false,
+      enabled: true, min_total: 1, name: "Postcard", image_url: "https://x/gift.png", note: null, is_digital: false,
     })
     const container = await renderCart()
     await act(async () => {})
+
+    expect(container.textContent).toContain("Postcard × 1")
     expect(container.textContent).toContain("🎁")
+    expect(container.querySelector('img[src="https://x/gift.png"]')).toBeTruthy()
+    expect(container.textContent).toContain("0")
+  })
+
+  it("does not show the gift row before the cart total meets the threshold", async () => {
+    addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 200000, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+    const container = await renderCart()
+    await act(async () => {})
+    expect(container.textContent).not.toContain("Postcard × 1")
   })
 
   it("shows nothing when the gift is disabled", async () => {

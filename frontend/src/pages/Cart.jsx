@@ -131,6 +131,22 @@ export default function Cart() {
         )
       })}
 
+      {giftSettings?.enabled && cartTotal(cart) >= giftSettings.min_total && (
+        <div className="flex gap-3 items-center py-3 border-b border-[var(--border-brand)]">
+          {giftSettings.image_url
+            ? <img src={giftSettings.image_url} alt="" className="w-16 h-16 object-cover rounded-lg" />
+            : <div className="w-16 h-16 rounded-lg bg-[var(--surface-neutral)]" />}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">
+              {giftSettings.name} × 1{" "}
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">🎁 {t("orderGiftBadge")}</span>
+            </p>
+            {giftSettings.note && <p className="text-sm opacity-70">{giftSettings.note}</p>}
+          </div>
+          <p className="shrink-0">{formatVnd(0)}</p>
+        </div>
+      )}
+
       <div className="mt-6 flex justify-between items-center">
         <div>
           <p className="text-sm opacity-70">{t("cartTotal")}</p>
@@ -151,19 +167,10 @@ export default function Cart() {
         </div>
       </div>
 
-      {giftSettings?.enabled && (
-        cartTotal(cart) >= giftSettings.min_total ? (
-          <div className="mt-3">
-            <p className="text-sm text-[var(--brand)]">
-              {t("cartGiftQualified", { name: giftSettings.name })}
-            </p>
-            {giftSettings.note && <p className="text-sm opacity-70">{giftSettings.note}</p>}
-          </div>
-        ) : (
-          <p className="mt-3 text-sm opacity-70">
-            {t("cartGiftProgress", { amount: formatVnd(giftSettings.min_total - cartTotal(cart)), name: giftSettings.name })}
-          </p>
-        )
+      {giftSettings?.enabled && cartTotal(cart) < giftSettings.min_total && (
+        <p className="mt-3 text-sm opacity-70">
+          {t("cartGiftProgress", { amount: formatVnd(giftSettings.min_total - cartTotal(cart)), name: giftSettings.name })}
+        </p>
       )}
       </main>
       <ShopFooter />
