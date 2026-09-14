@@ -382,5 +382,28 @@ module.exports = function orderRoutes() {
     }
   })
 
+  router.put("/:token/buyer-info", orderAccess, async (req, res) => {
+    try {
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      const { buyer_name, phone, email, note, address_raw } = req.body
+      const result = await repo.updateBuyerInfo(
+        order.id,
+        { buyer_name, phone, email, note, address_raw },
+        { requirePending: true }
+      )
+      if (result === null) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+      res.json(result.changed ? { changed: true, order: toPublicOrder(result.order) } : { changed: false })
+    } catch (err) {
+      if (err instanceof repo.InvalidBuyerInfoError) return bad(res, err.message)
+      if (err instanceof repo.OrderNotEditableError) {
+        return res.status(409).json({ error: "not_editable", message: err.message })
+      }
+      console.error("[ORDERS] Lỗi sửa thông tin đơn hàng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
   return router
 }

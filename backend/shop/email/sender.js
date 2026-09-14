@@ -78,11 +78,12 @@ async function sendQueued(limit = 10) {
           : htmlIn.slice(0, cardCloseIndex) + block + htmlIn.slice(cardCloseIndex)
       }
 
+      let payload
+      try { payload = JSON.parse(row.payload) } catch { payload = null }
+
       // access_pin_hash is one-way, so the plaintext only exists here.
       if (!ADMIN_EMAIL_TYPES.has(row.type)) {
         if (row.type === "order_placed") {
-          let payload
-          try { payload = JSON.parse(row.payload) } catch { payload = null }
           if (payload?.access_pin) {
             html = spliceBeforeCardClose(html, `
               <p style="margin:12px 0 0;font-size:13px">
@@ -119,6 +120,22 @@ async function sendQueued(limit = 10) {
         html = greetingClose === -1
           ? html + block
           : html.slice(0, greetingClose + "</p>".length) + block + html.slice(greetingClose + "</p>".length)
+      }
+
+      // Same reasoning as cancel_reason above: a fixed set of changed fields
+      // (zero to five optional lines) can't be expressed as a template
+      // placeholder, so it's spliced in directly - right after the
+      // greeting, ahead of the link, same insertion point.
+      if (row.type === "order_updated" && payload?.changes?.length) {
+        const rows = payload.changes.map((c) => `
+          <p style="font-size:14px;margin:4px 0 0">
+            <strong>${templates.escapeHtml(c.label)}:</strong> ${templates.escapeHtml(c.old || "-")} → ${templates.escapeHtml(c.new || "-")}
+          </p>`).join("")
+        const firstP = html.indexOf("</p>")
+        const greetingClose = firstP === -1 ? -1 : html.indexOf("</p>", firstP + 1)
+        html = greetingClose === -1
+          ? html + rows
+          : html.slice(0, greetingClose + "</p>".length) + rows + html.slice(greetingClose + "</p>".length)
       }
 
       // Included even for a cancelled order, so the buyer can still check its

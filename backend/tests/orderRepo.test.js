@@ -44,8 +44,13 @@ const order = (variantId, qty = 1, over = {}) => ({
   ...over,
 })
 
+async function orderWithBuyer(over = {}) {
+  const { variantId } = await seedVariant(5)
+  return repo.createOrder(order(variantId, 1, over))
+}
+
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections", "gift_settings")
+  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections", "gift_settings")
 })
 
 // gift_settings is a table many other test files don't yet know to reset in
@@ -1191,5 +1196,102 @@ describe("createOrder: free gift", () => {
 
     const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
     expect(v.stock_qty).toBe(5) // fully restored - the gift row had no stock to touch
+  })
+})
+
+describe("updateBuyerInfo", () => {
+  it("updates changed fields and returns the diff-driven changed:true result", async () => {
+    const res = await orderWithBuyer()
+    const result = await repo.updateBuyerInfo(res.id, {
+      buyer_name: "Nguyễn Văn B", phone: "0911111111", email: "b@example.com",
+      note: "Giao giờ hành chính", address_raw: "2 Đường XYZ, Q2, TP.HCM",
+    })
+    expect(result.changed).toBe(true)
+    expect(result.order.buyer_name).toBe("Nguyễn Văn B")
+    expect(result.order.phone).toBe("0911111111")
+    expect(result.order.email).toBe("b@example.com")
+    expect(result.order.note).toBe("Giao giờ hành chính")
+    expect(result.order.address_raw).toBe("2 Đường XYZ, Q2, TP.HCM")
+  })
+
+  it("leaves address_street/ward/district/province untouched even when address_raw changes", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1, {
+      buyer: { ...buyer, address_street: "1 Đường ABC", address_ward: "Phường 1", address_district: "Q1", address_province: "TP.HCM" },
+    }))
+    await repo.updateBuyerInfo(res.id, { buyer_name: "A", phone: "09", email: "a@example.com", address_raw: "Địa chỉ mới" })
+
+    const [[row]] = await db.query("SELECT * FROM orders WHERE id = ?", [res.id])
+    expect(row.address_raw).toBe("Địa chỉ mới")
+    expect(row.address_street).toBe("1 Đường ABC")
+    expect(row.address_ward).toBe("Phường 1")
+  })
+
+  it("does nothing and reports changed:false when the submitted values are identical to what's stored", async () => {
+    const res = await orderWithBuyer()
+    const result = await repo.updateBuyerInfo(res.id, {
+      buyer_name: buyer.buyer_name, phone: buyer.phone, email: buyer.email,
+      note: null, address_raw: buyer.address_raw,
+    })
+    expect(result).toEqual({ changed: false })
+
+    const [rows] = await db.query("SELECT id FROM email_queue")
+    expect(rows).toHaveLength(0)
+  })
+
+  it("enqueues an order_updated email to the (post-update) email address, carrying the diff as payload", async () => {
+    const res = await orderWithBuyer()
+    await repo.updateBuyerInfo(res.id, {
+      buyer_name: "Nguyễn Văn B", phone: buyer.phone, email: "new@example.com",
+      note: null, address_raw: buyer.address_raw,
+    })
+
+    const [[row]] = await db.query("SELECT * FROM email_queue WHERE order_id = ? AND type = 'order_updated'", [res.id])
+    expect(row).toBeTruthy()
+    expect(row.to_email).toBe("new@example.com")
+    const payload = JSON.parse(row.payload)
+    expect(payload.changes.some((c) => c.field === "buyer_name" && c.old === buyer.buyer_name && c.new === "Nguyễn Văn B")).toBe(true)
+    expect(payload.changes.some((c) => c.field === "email" && c.old === buyer.email && c.new === "new@example.com")).toBe(true)
+    expect(payload.changes.some((c) => c.field === "phone")).toBe(false) // unchanged
+  })
+
+  it("rejects a blank buyer_name", async () => {
+    const res = await orderWithBuyer()
+    await expect(
+      repo.updateBuyerInfo(res.id, { buyer_name: "  ", phone: "09", email: "a@example.com" })
+    ).rejects.toThrow(repo.InvalidBuyerInfoError)
+  })
+
+  it("rejects an invalid email", async () => {
+    const res = await orderWithBuyer()
+    await expect(
+      repo.updateBuyerInfo(res.id, { buyer_name: "A", phone: "09", email: "not-an-email" })
+    ).rejects.toThrow(repo.InvalidBuyerInfoError)
+  })
+
+  it("returns null for a non-existent order id", async () => {
+    const result = await repo.updateBuyerInfo(999999, { buyer_name: "A", phone: "09", email: "a@example.com" })
+    expect(result).toBeNull()
+  })
+
+  it("allows the admin call (no requirePending) to edit a cancelled order", async () => {
+    const res = await orderWithBuyer()
+    await repo.transitionOrder(res.id, "cancelled")
+    const result = await repo.updateBuyerInfo(res.id, { buyer_name: "Sửa sau khi hủy", phone: "09", email: "a@example.com" })
+    expect(result.changed).toBe(true)
+  })
+
+  it("rejects the buyer path (requirePending: true) once the order is no longer pending", async () => {
+    const res = await orderWithBuyer()
+    await repo.transitionOrder(res.id, "confirmed")
+    await expect(
+      repo.updateBuyerInfo(res.id, { buyer_name: "A", phone: "09", email: "a@example.com" }, { requirePending: true })
+    ).rejects.toThrow(repo.OrderNotEditableError)
+  })
+
+  it("allows the buyer path while the order is still pending", async () => {
+    const res = await orderWithBuyer()
+    const result = await repo.updateBuyerInfo(res.id, { buyer_name: "Sửa bởi khách", phone: "09", email: "a@example.com" }, { requirePending: true })
+    expect(result.changed).toBe(true)
   })
 })

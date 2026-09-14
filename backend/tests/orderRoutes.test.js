@@ -560,3 +560,44 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.pickup_code).toMatch(/^\d{6}$/)
   })
 })
+
+describe("PUT /api/orders/:token/buyer-info", () => {
+  it("requires PIN/session auth", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`).send({
+      buyer_name: "A", phone: "09", email: "a@example.com",
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it("allows a pending order's own buyer to update their info, using the access_token issued at checkout", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+      .send({ buyer_name: "Sửa bởi khách", phone: "09", email: "a@example.com", address_raw: "x" })
+    expect(res.status).toBe(200)
+    expect(res.body.changed).toBe(true)
+  })
+
+  it("rejects the edit once the order is no longer pending, with 409", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const stored = await orders.getOrderByToken(created.body.order_token)
+    await orders.transitionOrder(stored.id, "confirmed")
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+      .send({ buyer_name: "A", phone: "09", email: "a@example.com" })
+    expect(res.status).toBe(409)
+  })
+
+  it("also allows an admin JWT to use this route", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+    const res = await request(app).put(`/api/orders/${created.body.order_token}/buyer-info`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ buyer_name: "Sửa bởi admin qua route khách", phone: "09", email: "a@example.com" })
+    expect(res.status).toBe(200)
+  })
+})

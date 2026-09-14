@@ -3,7 +3,7 @@
    directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob } from "../api/shop"
+import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo } from "../api/shop"
 import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../utils/orderAuth"
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
@@ -231,6 +231,30 @@ export default function Order() {
   const [unlockCount, setUnlockCount] = useState(0)
   // Lets the buyer re-open the bank/QR panel on demand once proof is submitted (hidden by default at that point).
   const [showPaymentAgain, setShowPaymentAgain] = useState(false)
+  const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
+  const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
+  const [buyerInfoError, setBuyerInfoError] = useState("")
+
+  const startEditBuyerInfo = () => {
+    setBuyerInfoDraft({
+      buyer_name: order.buyer_name, phone: order.phone, email: order.email,
+      note: order.note || "", address_raw: order.address_raw || "",
+    })
+    setBuyerInfoError("")
+    setEditingBuyerInfo(true)
+  }
+
+  const saveBuyerInfo = async () => {
+    setBuyerInfoError("")
+    try {
+      await updateOrderBuyerInfo(token, buyerInfoDraft, orderAuthHeaders(token))
+      const fresh = await fetchOrder(token, orderAuthHeaders(token))
+      setOrder(fresh)
+      setEditingBuyerInfo(false)
+    } catch (e) {
+      setBuyerInfoError(e.response?.data?.message || t("orderEditSaveFailed"))
+    }
+  }
 
   useEffect(() => {
     // Belt and braces with the server's X-Robots-Tag - must never be indexed.
@@ -411,6 +435,61 @@ export default function Order() {
         <p>{t("orderReceiverPhone")}: {order.phone}</p>
         {order.fulfillment_method === "ship" && order.address_raw && (
           <p>{t("orderReceiverAddress")}: {order.address_raw}</p>
+        )}
+
+        {order.status === "pending" && !editingBuyerInfo && (
+          <button type="button" onClick={startEditBuyerInfo} className="text-sm underline opacity-70 mt-1">
+            {t("orderEditInfo")}
+          </button>
+        )}
+
+        {editingBuyerInfo && (
+          <div className="mt-2 p-3 rounded-lg border border-[var(--border-brand)]">
+            {buyerInfoError && <p className="text-red-500 text-sm mb-2">{buyerInfoError}</p>}
+            <input
+              data-testid="edit-buyer-name"
+              value={buyerInfoDraft.buyer_name}
+              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, buyer_name: e.target.value })}
+              placeholder={t("orderEditName")}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <input
+              value={buyerInfoDraft.phone}
+              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, phone: e.target.value })}
+              placeholder={t("orderEditPhone")}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <input
+              value={buyerInfoDraft.email}
+              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, email: e.target.value })}
+              placeholder={t("orderEditEmail")}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            {order.fulfillment_method === "ship" && (
+              <textarea
+                value={buyerInfoDraft.address_raw}
+                onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, address_raw: e.target.value })}
+                placeholder={t("orderEditAddress")}
+                rows={2}
+                className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+              />
+            )}
+            <textarea
+              value={buyerInfoDraft.note}
+              onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, note: e.target.value })}
+              placeholder={t("orderEditNote")}
+              rows={2}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={saveBuyerInfo} className="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm">
+                {t("orderEditSave")}
+              </button>
+              <button type="button" onClick={() => setEditingBuyerInfo(false)} className="px-4 py-2 rounded-lg border border-[var(--border-brand)] text-sm">
+                {t("orderEditCancel")}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

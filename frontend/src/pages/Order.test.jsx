@@ -11,6 +11,7 @@ const fetchPaymentInstructions = vi.fn()
 const uploadPaymentProof = vi.fn()
 const verifyOrderPin = vi.fn()
 const fetchOrderQrBlob = vi.fn()
+const updateOrderBuyerInfo = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchOrder: (...args) => fetchOrder(...args),
@@ -18,6 +19,7 @@ vi.mock("../api/shop", () => ({
   uploadPaymentProof: (...args) => uploadPaymentProof(...args),
   verifyOrderPin: (...args) => verifyOrderPin(...args),
   fetchOrderQrBlob: (...args) => fetchOrderQrBlob(...args),
+  updateOrderBuyerInfo: (...args) => updateOrderBuyerInfo(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings via `get`
@@ -75,6 +77,7 @@ beforeEach(() => {
   verifyOrderPin.mockReset()
   fetchOrderQrBlob.mockReset()
   fetchOrderQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
+  updateOrderBuyerInfo.mockReset()
   axios.post.mockReset()
   sessionStorage.clear()
   localStorage.clear()
@@ -923,5 +926,62 @@ describe("Order - status timestamp", () => {
     // Just confirms no stray "Invalid Date" text renders - the absence of a
     // specific timestamp string isn't otherwise assertable here.
     expect(container.textContent).not.toContain("Invalid Date")
+  })
+})
+
+describe("Order - buyer edits their own info", () => {
+  it("shows the edit button only while the order is pending", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const pendingContainer = await renderOrder()
+    expect([...pendingContainer.querySelectorAll("button")].some((b) => b.textContent === "Sửa thông tin")).toBe(true)
+
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    const confirmedContainer = await renderOrder()
+    expect([...confirmedContainer.querySelectorAll("button")].some((b) => b.textContent === "Sửa thông tin")).toBe(false)
+  })
+
+  it("saves an edit and re-fetches the order", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", buyer_name: "Nguyễn Văn A" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    const nameInput = container.querySelector('input[data-testid="edit-buyer-name"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Nguyễn Văn B")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    updateOrderBuyerInfo.mockResolvedValue({ changed: true, order: baseOrder({ status: "pending", buyer_name: "Nguyễn Văn B" }) })
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending", buyer_name: "Nguyễn Văn B" }))
+    const saveBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Lưu")
+    await act(async () => { saveBtn.click() })
+    await act(async () => {})
+
+    expect(updateOrderBuyerInfo).toHaveBeenCalledWith("tok123", expect.objectContaining({ buyer_name: "Nguyễn Văn B" }), expect.anything())
+    expect(container.textContent).toContain("Nguyễn Văn B")
+  })
+
+  it("shows a 409 error message and stays in edit mode when the order stopped being pending mid-edit", async () => {
+    localStorage.setItem("lang", "vi")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+
+    updateOrderBuyerInfo.mockRejectedValue({ response: { status: 409, data: { message: "Đơn hàng không còn ở trạng thái chờ thanh toán nên không thể chỉnh sửa." } } })
+    const saveBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Lưu")
+    await act(async () => { saveBtn.click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("không còn ở trạng thái chờ thanh toán")
   })
 })

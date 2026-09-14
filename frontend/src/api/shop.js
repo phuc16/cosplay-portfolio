@@ -84,6 +84,9 @@ export const adminGetOrderPayment = (id) =>
 export const adminTransitionOrder = (id, payload) =>
   api.post(`/api/admin/orders/${id}/transition`, payload).then((r) => r.data)
 
+export const adminUpdateOrderBuyerInfo = (id, fields) =>
+  api.put(`/api/admin/orders/${id}/buyer-info`, fields).then((r) => r.data)
+
 export const adminBulkCancelOrders = (ids) =>
   api.post("/api/admin/orders/bulk-cancel", { ids }).then((r) => r.data)
 
@@ -102,6 +105,9 @@ export const fetchPaymentInstructions = (token, headers = {}) =>
 
 export const uploadPaymentProof = (token, file, headers = {}) =>
   uploadImage(`/api/orders/${token}/proof`, file, {}, { headers })
+
+export const updateOrderBuyerInfo = (token, fields, headers = {}) =>
+  api.put(`/api/orders/${token}/buyer-info`, fields, { headers }).then((r) => r.data)
 
 export const fetchOrderQrBlob = (token, headers = {}) =>
   api.get(`/api/orders/${token}/qr.svg`, { headers, responseType: "blob" }).then((r) => r.data)

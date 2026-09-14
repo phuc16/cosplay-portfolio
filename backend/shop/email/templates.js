@@ -232,6 +232,11 @@ const DEFAULT_TEMPLATES = {
       ${TOTAL_ROW}
       {{payment_proof_image}}`, "admin_url"),
   },
+  order_updated: {
+    subject: "Thông tin đơn #{{order_id}} đã được cập nhật",
+    body_html: wrap(`
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, thông tin đơn hàng của bạn vừa được cập nhật.</p>`),
+  },
 }
 
 async function getTemplate(type) {

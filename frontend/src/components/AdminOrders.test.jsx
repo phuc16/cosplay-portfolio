@@ -12,6 +12,7 @@ const adminGetOrder = vi.fn()
 const adminTransitionOrder = vi.fn()
 const adminGetOrderPayment = vi.fn()
 const adminFindOrderByToken = vi.fn()
+const adminUpdateOrderBuyerInfo = vi.fn()
 
 vi.mock("../api/shop", () => ({
   adminListOrders: (...args) => adminListOrders(...args),
@@ -22,6 +23,7 @@ vi.mock("../api/shop", () => ({
   adminTransitionOrder: (...args) => adminTransitionOrder(...args),
   adminGetOrderPayment: (...args) => adminGetOrderPayment(...args),
   adminFindOrderByToken: (...args) => adminFindOrderByToken(...args),
+  adminUpdateOrderBuyerInfo: (...args) => adminUpdateOrderBuyerInfo(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -75,6 +77,7 @@ beforeEach(() => {
   adminTransitionOrder.mockReset()
   adminGetOrderPayment.mockReset()
   adminFindOrderByToken.mockReset()
+  adminUpdateOrderBuyerInfo.mockReset()
   adminListCollections.mockResolvedValue([{ id: 7, title: "Fes Drop" }])
   adminGetOrderPayment.mockResolvedValue(null)
 })
@@ -590,5 +593,35 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(texts).not.toContain("shipped")
     expect(texts).not.toContain("completed")
     expect(texts).not.toContain("cancelled")
+  })
+
+  it("edits and saves buyer info from the order detail panel", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({ id: 1, buyer_name: "Nguyễn Văn A", phone: "0900000000", email: "a@b.com", note: null, items: [] }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    const editBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa thông tin")
+    await act(async () => { editBtn.click() })
+    await flush()
+
+    const nameInput = container.querySelector('input[data-testid="edit-buyer-name"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Nguyễn Văn B")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    adminUpdateOrderBuyerInfo.mockResolvedValue({ changed: true, order: order({ id: 1, buyer_name: "Nguyễn Văn B", phone: "0900000000", email: "a@b.com", items: [] }) })
+    const saveBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Lưu")
+    await act(async () => { saveBtn.click() })
+    await flush()
+
+    expect(adminUpdateOrderBuyerInfo).toHaveBeenCalledWith(1, expect.objectContaining({ buyer_name: "Nguyễn Văn B" }))
+    expect(container.textContent).toContain("Nguyễn Văn B")
   })
 })

@@ -583,6 +583,64 @@ describe("sendQueued: footer (automated-email notice)", () => {
   })
 })
 
+describe("sendQueued: order_updated changed-fields list", () => {
+  it("splices in every changed field from the payload, right after the greeting", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).toContain("Tên người nhận")
+    expect(sentArg.html).toContain("Nguyễn Văn B")
+  })
+
+  it("does not mention a field that did not change", async () => {
+    // "Số điện thoại" alone also appears unconditionally in the receiver-info
+    // block (wrap()'s {{receiver_info}}, always rendered), so the changes
+    // list's own row format (`<strong>{label}:</strong> ...`, with a colon)
+    // is the only marker distinguishing "this field is in the changed list"
+    // from "this field is just part of the standard receiver-info block".
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("Số điện thoại:")
+  })
+
+  it("escapes HTML in a changed value", async () => {
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "<script>alert(1)</script>", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const sentArg = sendMailMock.mock.calls[0][0]
+    expect(sentArg.html).not.toContain("<script>")
+    expect(sentArg.html).toContain("&lt;script&gt;")
+  })
+
+  it("places the changes list ahead of the link, same as cancel_reason", async () => {
+    // Anchor on "Tên người nhận:" (with colon - the changes-list row format),
+    // not the bare new value: send-time rendering means {{buyer_name}} in the
+    // static greeting itself already resolves to the *new* name ("Chào
+    // Nguyễn Văn B, ..."), so a plain indexOf("Nguyễn Văn B") would find that
+    // first occurrence instead of the spliced block.
+    const o = await seedOrder("ship")
+    await orders.updateBuyerInfo(o.id, { buyer_name: "Nguyễn Văn B", phone: "09", email: "a@example.com", address_raw: "x" })
+
+    await sender.sendQueued()
+
+    const html = sendMailMock.mock.calls[0][0].html
+    const greetingIndex = html.indexOf("vừa được cập nhật")
+    const changeIndex = html.indexOf("Tên người nhận:")
+    const linkIndex = html.indexOf("Xem đơn hàng")
+    expect(changeIndex).toBeGreaterThan(greetingIndex)
+    expect(changeIndex).toBeLessThan(linkIndex)
+  })
+})
+
 describe("sendQueued: no real network connection", () => {
   it("actually goes through the mocked transport (mock invoked, not bypassed)", async () => {
     const o = await seedOrder()

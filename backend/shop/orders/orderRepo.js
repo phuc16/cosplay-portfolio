@@ -9,6 +9,17 @@ const TRANSITION_EMAILS = {
   // `completed` intentionally sends nothing: the buyer already has the item.
 }
 
+// Same regex as routes/orders.js's own buyer-field validation at create time.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const BUYER_INFO_LABELS = {
+  buyer_name: "Tên người nhận",
+  phone: "Số điện thoại",
+  email: "Email",
+  note: "Ghi chú",
+  address_raw: "Địa chỉ nhận hàng",
+}
+
 class OutOfStockError extends Error {
   constructor(variantLabel, productName, variantId) {
     super(`Hết hàng: ${productName} - ${variantLabel}`)
@@ -97,6 +108,21 @@ class FulfillmentRequiredError extends Error {
   constructor() {
     super("Hình thức nhận hàng không hợp lệ")
     this.name = "FulfillmentRequiredError"
+  }
+}
+
+class InvalidBuyerInfoError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = "InvalidBuyerInfoError"
+  }
+}
+
+/** Only ever thrown by the buyer-facing edit path (requirePending: true) - the admin path has no status restriction. */
+class OrderNotEditableError extends Error {
+  constructor() {
+    super("Đơn hàng không còn ở trạng thái chờ thanh toán nên không thể chỉnh sửa.")
+    this.name = "OrderNotEditableError"
   }
 }
 
@@ -671,6 +697,97 @@ async function transitionOrder(id, toStatus, extra = {}) {
 }
 
 /**
+ * Corrects an order's contact/address/note fields after it was placed -
+ * admin (no requirePending) or the buyer themselves (requirePending: true,
+ * only while the order is still 'pending'). Diffs against the row's current
+ * values; a no-op diff makes no DB write and enqueues no email. Address is
+ * edited/diffed as the single address_raw field - address_street/ward/
+ * district/province are never touched here (see plan's Global Constraints
+ * for why: AddressFields.jsx has no way to turn a stored name back into a
+ * picker code).
+ *
+ * Mirrors transitionOrder's connection discipline: commit and release the
+ * connection before enqueueing the notification email - a mail-layer issue
+ * must never hold a pool connection open, and must never roll back a change
+ * the caller already made.
+ */
+async function updateBuyerInfo(id, fields, { requirePending = false } = {}) {
+  let result = null
+  let notifyEmail = null
+  let notifyChanges = null
+
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    const [[order]] = await conn.query("SELECT * FROM orders WHERE id = ? FOR UPDATE", [id])
+    if (!order) {
+      await conn.rollback()
+      return null
+    }
+
+    if (requirePending && order.status !== "pending") {
+      await conn.rollback()
+      throw new OrderNotEditableError()
+    }
+
+    const buyerName = fields.buyer_name === undefined ? order.buyer_name : String(fields.buyer_name ?? "").trim()
+    const phone = fields.phone === undefined ? order.phone : String(fields.phone ?? "").trim()
+    const email = fields.email === undefined ? order.email : String(fields.email ?? "").trim()
+    const note = fields.note === undefined ? order.note : (fields.note === null || fields.note === "" ? null : String(fields.note))
+    const addressRaw = fields.address_raw === undefined ? order.address_raw : (fields.address_raw === null || fields.address_raw === "" ? null : String(fields.address_raw))
+
+    if (!buyerName) throw new InvalidBuyerInfoError("Cần họ tên")
+    if (!phone) throw new InvalidBuyerInfoError("Cần số điện thoại")
+    if (!email || !EMAIL_RE.test(email)) throw new InvalidBuyerInfoError("Email không hợp lệ")
+    if (order.fulfillment_method === "ship" && !addressRaw) {
+      throw new InvalidBuyerInfoError("Cần địa chỉ nhận hàng")
+    }
+
+    const diff = []
+    const pushIfChanged = (field, oldVal, newVal) => {
+      if ((oldVal || "") !== (newVal || "")) diff.push({ field, label: BUYER_INFO_LABELS[field], old: oldVal, new: newVal })
+    }
+    pushIfChanged("buyer_name", order.buyer_name, buyerName)
+    pushIfChanged("phone", order.phone, phone)
+    pushIfChanged("email", order.email, email)
+    pushIfChanged("note", order.note, note)
+    if (order.fulfillment_method === "ship") {
+      pushIfChanged("address_raw", order.address_raw, addressRaw)
+    }
+
+    if (diff.length === 0) {
+      await conn.commit()
+      result = { changed: false }
+    } else {
+      await conn.query(
+        "UPDATE orders SET buyer_name = ?, phone = ?, email = ?, note = ?, address_raw = ? WHERE id = ?",
+        [buyerName, phone, email, note, order.fulfillment_method === "ship" ? addressRaw : order.address_raw, id]
+      )
+      await conn.commit()
+      notifyEmail = email
+      notifyChanges = diff
+    }
+  } catch (err) {
+    await conn.rollback()
+    throw err
+  } finally {
+    conn.release()
+  }
+
+  if (notifyChanges) {
+    try {
+      await emailQueue.enqueue(id, "order_updated", notifyEmail, { changes: notifyChanges })
+    } catch (err) {
+      console.error("[ORDERS] Không xếp được email order_updated:", err.message)
+    }
+    result = { changed: true, order: await getOrderById(id) }
+  }
+
+  return result
+}
+
+/**
  * Cancel pending prepaid orders past their deadline. COD orders have a NULL
  * expires_at and are excluded by the query itself, not by a code path that
  * could be forgotten. An order that already has a payment_proof_url is also
@@ -710,6 +827,7 @@ module.exports = {
   getOrderById,
   listOrders,
   transitionOrder,
+  updateBuyerInfo,
   releaseExpiredOrders,
   OutOfStockError,
   VariantNotFoundError,
@@ -719,4 +837,6 @@ module.exports = {
   CollectionNotActiveError,
   NoCodForDigitalError,
   FulfillmentRequiredError,
+  InvalidBuyerInfoError,
+  OrderNotEditableError,
 }

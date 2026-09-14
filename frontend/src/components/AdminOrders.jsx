@@ -1,7 +1,7 @@
 import { useEffect, lazy, Suspense, useState } from "react"
 import {
   adminListOrders, adminTransitionOrder, adminGetOrder, adminGetOrderPayment, adminFindOrderByToken,
-  adminBulkCancelOrders, adminBulkCompleteOrders, adminListCollections,
+  adminBulkCancelOrders, adminBulkCompleteOrders, adminListCollections, adminUpdateOrderBuyerInfo,
 } from "../api/shop"
 import { formatVnd } from "../utils/money"
 import OrderTimeline from "./OrderTimeline"
@@ -77,6 +77,9 @@ export default function AdminOrders() {
   // transferNote), not stored on the order row - reused via the same public
   // endpoint the buyer's order page calls rather than re-deriving it here.
   const [paymentInfo, setPaymentInfo] = useState(null)
+  const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
+  const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
+  const [buyerInfoError, setBuyerInfoError] = useState("")
   const [error, setError] = useState("")
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scanError, setScanError] = useState("")
@@ -117,6 +120,26 @@ export default function AdminOrders() {
     setDetail(o)
     setPaymentInfo(null)
     adminGetOrderPayment(id).then(setPaymentInfo).catch(() => setPaymentInfo(null))
+  }
+
+  const startEditBuyerInfo = () => {
+    setBuyerInfoDraft({
+      buyer_name: detail.buyer_name, phone: detail.phone, email: detail.email,
+      note: detail.note || "", address_raw: detail.address_raw || "",
+    })
+    setBuyerInfoError("")
+    setEditingBuyerInfo(true)
+  }
+
+  const saveBuyerInfo = async () => {
+    setBuyerInfoError("")
+    try {
+      const result = await adminUpdateOrderBuyerInfo(detail.id, buyerInfoDraft)
+      if (result.changed) setDetail(result.order)
+      setEditingBuyerInfo(false)
+    } catch (e) {
+      setBuyerInfoError(e.response?.data?.message || "Lưu thất bại")
+    }
   }
 
   const move = async (order, to) => {
@@ -374,9 +397,63 @@ export default function AdminOrders() {
                 <OrderTimeline order={detail} />
               </div>
 
-              <p className="opacity-70">{detail.email}</p>
-              {detail.fulfillment_method === "ship" && <p className="opacity-70">{detail.address_raw}</p>}
-              {detail.note && <p className="mt-1 italic opacity-70">“{detail.note}”</p>}
+              {!editingBuyerInfo ? (
+                <>
+                  <p className="opacity-70">{detail.buyer_name} · {detail.phone} · {detail.email}</p>
+                  {detail.fulfillment_method === "ship" && <p className="opacity-70">{detail.address_raw}</p>}
+                  {detail.note && <p className="mt-1 italic opacity-70">"{detail.note}"</p>}
+                  <button type="button" onClick={startEditBuyerInfo} className="mt-1 text-xs underline opacity-70">
+                    Sửa thông tin
+                  </button>
+                </>
+              ) : (
+                <div className="mt-2 p-3 rounded-lg border border-[var(--border-brand)]">
+                  {buyerInfoError && <p className="text-red-500 text-xs mb-2">{buyerInfoError}</p>}
+                  <input
+                    data-testid="edit-buyer-name"
+                    value={buyerInfoDraft.buyer_name}
+                    onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, buyer_name: e.target.value })}
+                    placeholder="Tên người nhận"
+                    className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  <input
+                    value={buyerInfoDraft.phone}
+                    onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, phone: e.target.value })}
+                    placeholder="Số điện thoại"
+                    className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  <input
+                    value={buyerInfoDraft.email}
+                    onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, email: e.target.value })}
+                    placeholder="Email"
+                    className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  {detail.fulfillment_method === "ship" && (
+                    <textarea
+                      value={buyerInfoDraft.address_raw}
+                      onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, address_raw: e.target.value })}
+                      placeholder="Địa chỉ nhận hàng"
+                      rows={2}
+                      className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                    />
+                  )}
+                  <textarea
+                    value={buyerInfoDraft.note}
+                    onChange={(e) => setBuyerInfoDraft({ ...buyerInfoDraft, note: e.target.value })}
+                    placeholder="Ghi chú"
+                    rows={2}
+                    className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={saveBuyerInfo} className="px-3 py-1 rounded-lg bg-[var(--brand)] text-white text-sm">
+                      Lưu
+                    </button>
+                    <button type="button" onClick={() => setEditingBuyerInfo(false)} className="px-3 py-1 rounded-lg border border-[var(--border-brand)] text-sm">
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              )}
               {detail.status === "cancelled" && detail.cancel_reason && (
                 <p className="mt-1 text-red-500">Lý do hủy: {detail.cancel_reason}</p>
               )}
