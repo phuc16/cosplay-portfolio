@@ -402,7 +402,7 @@ module.exports = function adminShippingRoutes() {
         // - staff packing at the roster need to see the item, not just its name.
         [itemRows] = await db.query(
           `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty, oi.image_url_snapshot,
-                  oi.delivery_link_snapshot,
+                  oi.delivery_link_snapshot, oi.is_gift,
                   pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
              FROM order_items oi
              LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id

@@ -14,8 +14,10 @@ vi.mock("axios", async (importOriginal) => {
 })
 
 const fetchCollection = vi.fn()
+const fetchGiftSettings = vi.fn()
 vi.mock("../api/shop", () => ({
   fetchCollection: (...args) => fetchCollection(...args),
+  fetchGiftSettings: (...args) => fetchGiftSettings(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -45,6 +47,8 @@ async function renderCart() {
 beforeEach(() => {
   localStorage.clear()
   fetchCollection.mockReset()
+  fetchGiftSettings.mockReset()
+  fetchGiftSettings.mockResolvedValue({ enabled: false, min_total: 0, name: "", image_url: null, note: null, is_digital: false })
 })
 
 describe("Cart - clicking an item goes to its product", () => {
@@ -188,5 +192,80 @@ describe("Cart - early availability validation", () => {
     await act(async () => { confirmBtn.click() })
 
     expect(readCart()).toHaveLength(0)
+  })
+})
+
+describe("Cart - gift hint", () => {
+  // fetchCollection is exercised by checkCartAvailability (unrelated to this
+  // describe block's own concern) purely because addToCart's fixture below
+  // carries a collection_slug - give it a resolvable value so that unrelated
+  // effect doesn't reject unhandled.
+  beforeEach(() => {
+    fetchCollection.mockResolvedValue({
+      status: "active",
+      products: [{ type: "physical", variants: [{ id: 1, stock_qty: null }] }],
+    })
+  })
+
+  it("shows a progress hint when under the gift threshold", async () => {
+    addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 200000, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+    const container = await renderCart()
+    await act(async () => {})
+    expect(container.textContent).toContain("Postcard")
+  })
+
+  it("shows the gift as its own item row, badged and priced free, once the cart total meets the threshold", async () => {
+    addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Postcard", image_url: "https://x/gift.png", note: null, is_digital: false,
+    })
+    const container = await renderCart()
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Postcard × 1")
+    expect(container.textContent).toContain("🎁")
+    expect(container.querySelector('img[src="https://x/gift.png"]')).toBeTruthy()
+    expect(container.textContent).toContain("0")
+  })
+
+  it("does not show the gift row before the cart total meets the threshold", async () => {
+    addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 200000, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+    const container = await renderCart()
+    await act(async () => {})
+    expect(container.textContent).not.toContain("Postcard × 1")
+  })
+
+  it("shows nothing when the gift is disabled", async () => {
+    addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
+    fetchGiftSettings.mockResolvedValue({ enabled: false, min_total: 0, name: "", image_url: null, note: null, is_digital: false })
+    const container = await renderCart()
+    await act(async () => {})
+    expect(container.textContent).not.toContain("Postcard")
+  })
+
+  it("shows the gift note once the gift has qualified", async () => {
+    addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Postcard", image_url: null, note: "Limited to one per order", is_digital: false,
+    })
+    const container = await renderCart()
+    await act(async () => {})
+    expect(container.textContent).toContain("Limited to one per order")
+  })
+
+  it("does not show the gift note before the gift has qualified", async () => {
+    addToCart({ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 50000, image_url: null, collection_slug: "drop" })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 200000, name: "Postcard", image_url: null, note: "Limited to one per order", is_digital: false,
+    })
+    const container = await renderCart()
+    await act(async () => {})
+    expect(container.textContent).not.toContain("Limited to one per order")
   })
 })

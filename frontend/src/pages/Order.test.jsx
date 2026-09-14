@@ -156,6 +156,19 @@ describe("Order - digital items download link", () => {
   })
 })
 
+describe("Order - free gift line", () => {
+  it("shows a gift badge on a free gift line and no dangling separator for its blank label", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [{ id: 1, product_name_snapshot: "Postcard", variant_label_snapshot: "", unit_price_snapshot: 0, qty: 1, is_gift: true }],
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("🎁")
+    expect(container.textContent).not.toContain("Postcard ·")
+  })
+})
+
 describe("Order - tracking code", () => {
   it("labels the tracking code as a ViettelPost code, not just a bare number", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "shipped", tracking_code: "151045353461" }))

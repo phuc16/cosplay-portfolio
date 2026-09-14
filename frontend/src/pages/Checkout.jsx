@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { readCart, cartTotal, clearCart, removeFromCart } from "../shop/cart"
 import { generateRequestKey } from "../shop/requestKey"
-import { createOrder, fetchCollection, fetchPaymentMethods } from "../api/shop"
+import { createOrder, fetchCollection, fetchPaymentMethods, fetchGiftSettings } from "../api/shop"
 import { setOrderSessionToken } from "../utils/orderAuth"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
@@ -97,6 +97,31 @@ export default function Checkout() {
   const allDigital = cart.length > 0 && cart.every((c) => c.is_digital)
   const anyDigital = cart.some((c) => c.is_digital)
 
+  const [giftSettings, setGiftSettings] = useState(null)
+
+  useEffect(() => {
+    fetchGiftSettings().then(setGiftSettings).catch(() => setGiftSettings(null))
+  }, [])
+
+  // A client-side estimate only, exactly like cartTotal()'s own display -
+  // the server is still the sole authority on whether the gift actually
+  // gets added (see orderRepo.createOrder). Used only to decide whether to
+  // render/require the shipping section before the buyer ever gets there.
+  const giftMayApply = Boolean(giftSettings?.enabled) && cartTotal(cart) >= (giftSettings?.min_total ?? Infinity)
+  const giftForcesPhysical = giftMayApply && giftSettings && !giftSettings.is_digital
+  // Set when the server has already told us (via FulfillmentRequiredError)
+  // that this all-digital cart actually needs a shipping/pickup choice -
+  // the most common cause is exactly the giftSettings fetch above having
+  // failed/returned stale data, so the client-side estimate above missed a
+  // physical gift the server knows applies. Once set, the shipping section
+  // must render regardless of what the client-side estimate says, or the
+  // buyer is stuck resubmitting into the same error forever.
+  const [forceShipping, setForceShipping] = useState(false)
+  // An all-digital cart that would otherwise skip the shipping section must
+  // still show it when a physical gift might apply - the gift needs
+  // somewhere to ship to even though none of the buyer's actual items do.
+  const effectiveAllDigital = allDigital && !giftForcesPhysical && !forceShipping
+
   const [buyer, setBuyer] = useState({ buyer_name: "", phone: "", email: "" })
   const [address, setAddress] = useState({ address_raw: "" })
   const [fulfillment, setFulfillment] = useState("ship")
@@ -116,20 +141,29 @@ export default function Checkout() {
   }, [])
 
   useEffect(() => {
-    if (allDigital) return
+    if (effectiveAllDigital) return
     let ignore = false
     loadFulfillmentFlags(cart).then((f) => { if (!ignore) setFlags(f) })
     return () => { ignore = true }
-  }, [cart, allDigital])
+  }, [cart, effectiveAllDigital])
 
   // Auto-select the sole offered method once the real flags are in, and
   // never leave the picker pointed at a method the collection doesn't offer.
   const offered = useMemo(() => {
+    // A cart that's all-digital has no physical item of its own to ground a
+    // pickup location in - the fulfillment section is only showing at all
+    // because a physical gift qualifies (directly, or via the forceShipping
+    // recovery path - reached only when the server itself required
+    // fulfillment for an all-digital cart, which likewise can only mean a
+    // physical gift applied). Offering "pickup" here would show a picker
+    // with nothing to fill its pickup-location block (no collection to
+    // pull one from), so shipping is the only real choice.
+    if (allDigital && (giftForcesPhysical || forceShipping)) return ["ship"]
     const list = []
     if (flags.allow_ship) list.push("ship")
     if (flags.allow_pickup) list.push("pickup")
     return list
-  }, [flags])
+  }, [flags, allDigital, giftForcesPhysical, forceShipping])
 
   useEffect(() => {
     if (!flags.loaded) return
@@ -162,8 +196,8 @@ export default function Checkout() {
     try {
       const res = await createOrder({
         items: cart.map((c) => ({ variant_id: c.variant_id, qty: c.qty })),
-        buyer: { ...buyer, ...(fulfillment === "ship" && !allDigital ? address : {}) },
-        fulfillment_method: allDigital ? undefined : fulfillment,
+        buyer: { ...buyer, ...(fulfillment === "ship" && !effectiveAllDigital ? address : {}) },
+        fulfillment_method: effectiveAllDigital ? undefined : fulfillment,
         payment_method: payment,
         note,
         request_key: requestKey,
@@ -197,6 +231,20 @@ export default function Checkout() {
       if (staleIds.length) {
         for (const id of staleIds) removeFromCart(id)
         setCart(readCart())
+      }
+      // The server disagrees with our client-side gift estimate: this cart
+      // actually needs a real ship/pickup answer (almost always because the
+      // giftSettings fetch above failed or went stale, missing a physical
+      // gift the server knows applies). Recover into a state where the
+      // shipping section renders so the buyer can pick a method and
+      // resubmit successfully, instead of dead-ending on the same error
+      // forever - and retry the gift-settings fetch so future renders
+      // (and the qualified/progress hint) reflect reality too.
+      if (e.response?.data?.error === "invalid_input" && e.response.data.message === "Hình thức nhận hàng không hợp lệ") {
+        setForceShipping(true)
+        fetchGiftSettings().then(setGiftSettings).catch(() => {})
+        setError(t("checkoutFulfillmentNowRequired"))
+        return
       }
       setError(
         e.response?.status === 409
@@ -248,7 +296,7 @@ export default function Checkout() {
       {field("phone", t("checkoutPhone"), "tel")}
       {field("email", t("checkoutEmail"), "email")}
 
-      {!allDigital && (
+      {!effectiveAllDigital && (
         <>
           <fieldset className="mb-4">
             <legend className="text-sm mb-1">{t("checkoutFulfillment")}</legend>
@@ -339,6 +387,21 @@ export default function Checkout() {
         <span className="opacity-70">{t("cartTotal")}</span>
         <span className="text-xl font-bold text-[var(--brand)]">{formatVnd(cartTotal(cart))}</span>
       </div>
+
+      {giftSettings?.enabled && (
+        cartTotal(cart) >= giftSettings.min_total ? (
+          <div className="mb-3">
+            <p className="text-sm text-[var(--brand)]">
+              {t("cartGiftQualified", { name: giftSettings.name })}
+            </p>
+            {giftSettings.note && <p className="text-sm opacity-70">{giftSettings.note}</p>}
+          </div>
+        ) : (
+          <p className="mb-3 text-sm opacity-70">
+            {t("cartGiftProgress", { amount: formatVnd(giftSettings.min_total - cartTotal(cart)), name: giftSettings.name })}
+          </p>
+        )
+      )}
 
       {error && <p className="text-red-500 mb-3">{error}</p>}
 

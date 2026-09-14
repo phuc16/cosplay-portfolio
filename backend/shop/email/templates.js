@@ -85,11 +85,12 @@ function itemsHtml(items = [], { showDeliveryLink = false } = {}) {
       </td>
       <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px">
         ${escapeHtml(i.product_name_snapshot)}${i.variant_label_snapshot ? ` · ${escapeHtml(i.variant_label_snapshot)}` : ""} × ${Number(i.qty)}
+        ${i.is_gift ? ` <span style="font-size:11px;font-weight:600;background:#f0f0f0;padding:1px 6px;border-radius:4px">🎁 Quà tặng</span>` : ""}
         ${showDeliveryLink && i.delivery_link_snapshot
           ? `<br/><a href="${escapeHtml(i.delivery_link_snapshot)}" style="color:${BRAND}">Tải về</a>`
           : ""}
       </td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-size:14px;white-space:nowrap">${formatVnd(i.unit_price_snapshot * i.qty)}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-size:14px;white-space:nowrap">${i.is_gift ? "Miễn phí" : formatVnd(i.unit_price_snapshot * i.qty)}</td>
     </tr>`).join("")
   return `<table style="width:100%;border-collapse:collapse;margin-top:12px">${rows}</table>`
 }

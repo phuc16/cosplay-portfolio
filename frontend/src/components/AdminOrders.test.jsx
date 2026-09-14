@@ -437,6 +437,23 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.querySelector('a[href="https://drive.google.com/x"]')).toBeTruthy()
   })
 
+  it("marks a free gift line distinctly from a priced item", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, email: "a@b.com",
+      items: [{ id: 1, product_name_snapshot: "Postcard", variant_label_snapshot: "", unit_price_snapshot: 0, qty: 1, is_gift: true }],
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("🎁 Quà tặng")
+    expect(container.textContent).not.toContain("Postcard ·")
+  })
+
   it("shows no digital badge or link for a physical line item", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({

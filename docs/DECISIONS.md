@@ -842,3 +842,19 @@ scoped spec/plan rather than being folded into a UI-parity migration. Needs
 a follow-up: Escape-to-close, arrow-key option navigation, and
 `aria-expanded`/`role="listbox"`/`role="option"` semantics on the trigger
 and list.
+
+## 2026-09-14 - Free gift: global, no stock, no opt-out, exempt from collection rules
+
+The free gift is shop-wide, not per-collection - one `gift_settings` row
+config applies to every order, not tied to any collection's own status/
+schedule/allow_ship/allow_pickup, since it isn't one of that collection's
+items. It carries no stock limit (available until the seller disables it,
+not until a count runs out) and no buyer opt-out - it's either added or it
+isn't, based purely on the order total meeting `min_total`, exactly one
+unit regardless of how large the qualifying order is. Digital-vs-physical
+is inferred from whether `delivery_link` is set rather than a separate
+type field, so the two can't drift out of sync. A physical gift can force
+an otherwise all-digital order into needing real shipping/pickup info even
+though none of the buyer's paid items require it. COD eligibility is
+deliberately left unaffected by the gift in either direction - COD is a
+property of the paid cart, not of a free add-on.

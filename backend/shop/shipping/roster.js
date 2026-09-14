@@ -55,6 +55,7 @@ function buildRoster(orders) {
         // physical side need a cue that a digital delivery link also needs
         // sending, since nothing else about the pickup event covers it.
         delivery_link: i.delivery_link_snapshot || null,
+        is_gift: Boolean(i.is_gift),
       })),
       // Same "+ Sản phẩm số" cue the shipping export queue and admin orders
       // list already show next to the order code, for the same reason: the

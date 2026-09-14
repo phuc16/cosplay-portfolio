@@ -14,6 +14,7 @@ const fetchCollection = vi.fn()
 const fetchProvinces = vi.fn().mockResolvedValue([])
 const fetchWards = vi.fn().mockResolvedValue([])
 const searchAddress = vi.fn().mockResolvedValue({ predictions: [] })
+const fetchGiftSettings = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchPaymentMethods: (...args) => fetchPaymentMethods(...args),
@@ -22,6 +23,7 @@ vi.mock("../api/shop", () => ({
   fetchProvinces: (...args) => fetchProvinces(...args),
   fetchWards: (...args) => fetchWards(...args),
   searchAddress: (...args) => searchAddress(...args),
+  fetchGiftSettings: (...args) => fetchGiftSettings(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings - mocked
@@ -68,6 +70,8 @@ beforeEach(() => {
   // Default: both methods offered, matching this file's existing tests which
   // predate fulfillment filtering and expect the ship/pickup radio pair.
   fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+  fetchGiftSettings.mockReset()
+  fetchGiftSettings.mockResolvedValue({ enabled: false, min_total: 0, name: "", image_url: null, note: null, is_digital: false })
 })
 
 describe("Checkout payment methods", () => {
@@ -434,5 +438,146 @@ describe("Checkout - out_of_stock / collection_not_active recovery", () => {
 
     expect(readCart()).toEqual([])
     expect(container.textContent).toContain("Đợt mở bán đã kết thúc")
+  })
+})
+
+describe("Checkout - free gift forces shipping info for a digital-only cart", () => {
+  const digitalCartItem = { variant_id: 1, qty: 1, price: 99000, product_name: "Digital Album", variant_label: "", is_digital: true }
+
+  it("forces the shipping section open for an all-digital cart that qualifies for a physical gift", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]').length).toBeGreaterThan(0)
+  })
+
+  it("offers only shipping, not pickup, since a gift-only physical order has no collection to ground a pickup location in", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+
+    const container = await renderCheckout()
+    await act(async () => {})
+
+    const radios = container.querySelectorAll('input[name="fulfillment"]')
+    expect(radios).toHaveLength(1)
+    expect(container.textContent).toContain("Ship")
+    expect(container.textContent).not.toContain("Pickup")
+  })
+
+  it("does not force the shipping section when the qualifying gift is itself digital", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Wallpaper", image_url: null, note: null, is_digital: true,
+    })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]')).toHaveLength(0)
+  })
+
+  it("does not force the shipping section when the gift threshold isn't met", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 999999999, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]')).toHaveLength(0)
+  })
+
+  it("sends a real fulfillment_method for an all-digital cart forced physical by the gift", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Postcard", image_url: null, note: null, is_digital: false,
+    })
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 99000 })
+
+    const container = await renderCheckout()
+    // loadFulfillmentFlags resolves asynchronously (it's only triggered once
+    // effectiveAllDigital flips to false) - flush once more before reading
+    // the now-rendered radio.
+    await act(async () => {})
+
+    const shipRadio = container.querySelector('input[name="fulfillment"]')
+    await act(async () => { shipRadio.click() })
+
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ fulfillment_method: expect.stringMatching(/ship|pickup/) })
+    )
+  })
+
+  it("recovers from a fulfillment_required rejection (e.g. a failed gift-settings fetch) by revealing the shipping section", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([digitalCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    // The gift-settings fetch failed (or returned stale data), so the
+    // client-side estimate never suspected a physical gift applied - the
+    // shipping section starts out hidden even though the cart is over the
+    // real (server-side) gift threshold.
+    fetchGiftSettings.mockRejectedValueOnce(new Error("network"))
+    fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
+    createOrder.mockRejectedValueOnce({
+      response: { status: 400, data: { error: "invalid_input", message: "Hình thức nhận hàng không hợp lệ" } },
+    })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]')).toHaveLength(0)
+
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(container.textContent).toContain("free gift that needs shipping")
+    const radios = container.querySelectorAll('input[name="fulfillment"]')
+    expect(radios.length).toBeGreaterThan(0)
+
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 99000 })
+    await act(async () => { radios[0].click() })
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(createOrder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ fulfillment_method: expect.stringMatching(/ship|pickup/) })
+    )
+  })
+
+  it("shows the gift note once the gift has qualified", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 1, name: "Postcard", image_url: null, note: "Limited to one per order", is_digital: false,
+    })
+
+    const container = await renderCheckout()
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Limited to one per order")
+  })
+
+  it("does not show the gift note before the gift has qualified", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    fetchGiftSettings.mockResolvedValue({
+      enabled: true, min_total: 999999999, name: "Postcard", image_url: null, note: "Limited to one per order", is_digital: false,
+    })
+
+    const container = await renderCheckout()
+    await act(async () => {})
+
+    expect(container.textContent).not.toContain("Limited to one per order")
   })
 })

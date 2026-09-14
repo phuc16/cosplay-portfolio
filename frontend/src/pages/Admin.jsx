@@ -6,6 +6,7 @@ import AdminSettings from "../components/AdminSettings"
 import AdminCollections from "../components/AdminCollections"
 import AdminOrders from "../components/AdminOrders"
 import AdminPaymentSettings from "../components/AdminPaymentSettings"
+import AdminGiftSettings from "../components/AdminGiftSettings"
 import AdminEmailTemplates from "../components/AdminEmailTemplates"
 import AdminStats from "../components/AdminStats"
 import AdminShipping from "../components/AdminShipping"
@@ -190,7 +191,12 @@ export default function Admin() {
         {tab === "settings" && <AdminSettings />}
         {tab === "shop" && <AdminCollections />}
         {tab === "orders" && <AdminOrders />}
-        {tab === "payments" && <AdminPaymentSettings />}
+        {tab === "payments" && (
+          <>
+            <AdminPaymentSettings />
+            <AdminGiftSettings />
+          </>
+        )}
         {tab === "email" && <AdminEmailTemplates />}
         {tab === "stats" && <AdminStats />}
         {tab === "shipping" && <AdminShipping />}
