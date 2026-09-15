@@ -14,7 +14,7 @@ import { resetTables } from "./helpers/db.js"
 // actually observes the route's real calls.
 const cjsDb = createRequire(import.meta.url)("../db.js")
 
-const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
+const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 const buyer = { buyer_name: "Phạm Thu Trang", phone: "0912345678", email: "trang@example.com", address_raw: "x" }
 

@@ -18,7 +18,7 @@ async function buildXlsxBase64(headerRow, dataRows) {
   return Buffer.from(buffer).toString("base64")
 }
 
-const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
+const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }
 

@@ -7,7 +7,7 @@ import settings from "../shop/payments/settingsRepo.js"
 import catalog from "../shop/catalogRepo.js"
 import { resetTables } from "./helpers/db.js"
 
-const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
+const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 
 beforeEach(async () => {

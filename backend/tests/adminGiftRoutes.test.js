@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken"
 import app from "../server.js"
 import db from "../db.js"
 
-const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
+const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 
 beforeEach(async () => {

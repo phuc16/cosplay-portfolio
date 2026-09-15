@@ -9,7 +9,7 @@ import redis from "../redis.js"
 import { MAX_UPLOAD_BYTES } from "../shop/images.js"
 import { resetTables, closeDb } from "./helpers/db.js"
 
-const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET || "change-me-in-production")
+const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET || "change-me-in-production")
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 
 /** Inserts an order + single order_item referencing variantId, at the given status. */

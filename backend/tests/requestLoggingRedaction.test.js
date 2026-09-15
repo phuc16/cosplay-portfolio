@@ -7,7 +7,7 @@ import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import { resetTables } from "./helpers/db.js"
 
-const adminToken = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
+const adminToken = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${adminToken}`)
 
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }

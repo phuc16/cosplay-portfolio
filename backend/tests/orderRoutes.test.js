@@ -107,6 +107,15 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(401)
   })
 
+  it("the access_token every buyer receives does NOT grant admin access (same JWT_SECRET as admin login, but no role claim)", async () => {
+    const v = await seed()
+    const created = await request(app).post("/api/orders").send(body(v))
+
+    const res = await request(app).get("/api/admin/orders")
+      .set("Authorization", `Bearer ${created.body.access_token}`)
+    expect(res.status).toBe(403)
+  })
+
   it("ignores a client-supplied total", async () => {
     const v = await seed()
     const res = await request(app).post("/api/orders").send(body(v, { total: 1 }))

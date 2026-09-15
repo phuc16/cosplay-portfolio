@@ -10,7 +10,7 @@ import { orderCode } from "../shop/shipping/vtpMapping.js"
 import { formatOrderCode } from "../shop/orders/domain.js"
 import { resetTables } from "./helpers/db.js"
 
-const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET)
+const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
 const authed = (req) => req.set("Authorization", `Bearer ${token}`)
 
 const buyer = {
