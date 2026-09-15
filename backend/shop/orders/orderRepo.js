@@ -277,6 +277,9 @@ async function createOrder(input) {
         delivery_link_snapshot: variant.product_type === "digital" ? variant.delivery_link : null,
         image_url_snapshot: variant.thumbnail_image || variant.image_url || firstImage(variant.product_images),
         is_gift: false,
+        // Recorded now, not re-derived later - see releaseStock and this
+        // migration's own comment for why.
+        stock_reserved: variant.stock_qty !== null,
       })
     }
 
@@ -342,6 +345,7 @@ async function createOrder(input) {
         delivery_link_snapshot: giftSettingsRow.delivery_link || null,
         image_url_snapshot: giftSettingsRow.image_url || null,
         is_gift: true,
+        stock_reserved: false,
       })
     }
 
@@ -397,11 +401,11 @@ async function createOrder(input) {
         `INSERT INTO order_items
            (order_id, product_variant_id, product_name_snapshot,
             variant_label_snapshot, unit_price_snapshot, qty, delivery_link_snapshot, image_url_snapshot,
-            collection_id_snapshot, is_gift)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            collection_id_snapshot, is_gift, stock_reserved)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [res.insertId, line.variant_id, line.product_name_snapshot,
          line.variant_label_snapshot, line.unit_price_snapshot, line.qty, line.delivery_link_snapshot,
-         line.image_url_snapshot, line.collection_id, line.is_gift]
+         line.image_url_snapshot, line.collection_id, line.is_gift, line.stock_reserved]
       )
     }
 
@@ -575,16 +579,24 @@ async function listOrders(filter = {}) {
 /** Return reserved stock. Caller must hold the order row lock. */
 async function releaseStock(conn, orderId) {
   const [items] = await conn.query(
-    "SELECT product_variant_id, qty FROM order_items WHERE order_id = ?",
+    "SELECT product_variant_id, qty, stock_reserved FROM order_items WHERE order_id = ?",
     [orderId]
   )
   // Ascending id order, same as reservation, to keep lock ordering consistent.
+  // Gated on stock_reserved (recorded at order-creation time - see
+  // createOrder and migration 039), not on the variant's *current*
+  // stock_qty - a variant can be converted from unlimited (NULL) to tracked
+  // (a real number) after this order was placed but before it cancels/
+  // expires, and re-deriving "was this reserved" from the variant's current
+  // state would then credit stock that this order never actually reserved.
   const sorted = items
-    .filter((i) => i.product_variant_id !== null)
+    .filter((i) => i.product_variant_id !== null && i.stock_reserved)
     .sort((a, b) => a.product_variant_id - b.product_variant_id)
 
   for (const item of sorted) {
-    // The NULL guard keeps unlimited variants unlimited.
+    // The NULL guard is now just a belt-and-suspenders no-op (adding to a
+    // NULL column stays NULL either way) - stock_reserved above is what
+    // actually decides whether this row credits anything back.
     await conn.query(
       "UPDATE product_variants SET stock_qty = stock_qty + ? WHERE id = ? AND stock_qty IS NOT NULL",
       [item.qty, item.product_variant_id]

@@ -557,6 +557,26 @@ describe("transitionOrder", () => {
     expect(v.stock_qty).toBeNull()
   })
 
+  it("does not credit stock to a variant converted from unlimited to tracked after the order was placed (would otherwise oversell)", async () => {
+    // Order placed while the variant is unlimited (stock_qty NULL) - no
+    // decrement happens for it (see createOrder's own guard), so
+    // order_items.stock_reserved is recorded false for this line.
+    const { variantId } = await seedVariant(null)
+    const res = await repo.createOrder(order(variantId, 3))
+
+    // Seller later converts the variant to tracked stock, seeding real
+    // inventory - unrelated to this old order, which never actually
+    // reserved any of it.
+    await db.query("UPDATE product_variants SET stock_qty = 10 WHERE id = ?", [variantId])
+
+    await repo.transitionOrder(res.id, "cancelled")
+
+    // If this credited the old order's qty (3) on top, stock_qty would read
+    // 13 - overselling by 3 against real, tracked inventory.
+    const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
+    expect(v.stock_qty).toBe(10)
+  })
+
   it("stores an admin-supplied cancel_reason", async () => {
     const { variantId } = await seedVariant(5)
     const res = await repo.createOrder(order(variantId))
