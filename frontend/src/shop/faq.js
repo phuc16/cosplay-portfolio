@@ -87,6 +87,16 @@ export const FAQ_ITEMS = [
   },
   {
     question: {
+      vi: "Quà tặng miễn phí khi mua đủ số tiền là gì?",
+      en: "What's the free gift for orders over a certain amount?",
+    },
+    answer: {
+      vi: "Khi tổng giá trị đơn hàng đạt mức tối thiểu người bán đang áp dụng (hiển thị ngay trong giỏ hàng khi có chương trình quà tặng), bạn tự động nhận thêm một quà tặng miễn phí - không cần nhập mã hay chọn gì thêm. Quà tặng hiện trong giỏ hàng và trang đơn hàng như một sản phẩm 0đ, không tính vào phí vận chuyển hay số tiền cần thanh toán.",
+      en: "Once your cart's total reaches the minimum the seller is currently offering (shown right in your cart whenever a gift promotion is active), you automatically get one free gift added - no code or extra step needed. It appears in your cart and order page as a 0đ line item, and never adds to the shipping fee or the amount you pay.",
+    },
+  },
+  {
+    question: {
       vi: "Sản phẩm số hoạt động như thế nào?",
       en: "How do digital products work?",
     },
