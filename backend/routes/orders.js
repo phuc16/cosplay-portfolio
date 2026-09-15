@@ -6,7 +6,6 @@ const { processShopImage, storeShopImage, InvalidImageError } = require("../shop
 const { uploadSingleImage } = require("../shop/upload")
 const emailQueue = require("../shop/email/queue")
 const qr = require("../shop/orders/qr")
-const db = require("../db")
 const { orderAccess, verifyPin, issueOrderSessionToken } = require("../shop/orders/orderAccess")
 const { formatOrderCode } = require("../shop/orders/domain")
 
@@ -366,10 +365,16 @@ module.exports = function orderRoutes() {
 
       const url = await storeShopImage(`proofs/${order.id}`, processed)
 
-      await db.query(
-        "UPDATE orders SET payment_proof_url = ?, payment_proof_uploaded_at = NOW() WHERE id = ?",
-        [url, order.id]
-      )
+      // Re-checks status under a row lock at write time (see
+      // orderRepo.savePaymentProof) - the order may have been cancelled by
+      // the expiry sweep while the image was being processed/stored above.
+      const saved = await repo.savePaymentProof(order.id, url)
+      if (!saved) {
+        return res.status(409).json({
+          error: "invalid_state",
+          message: "Đơn hàng đã được xử lý, không cần tải ảnh nữa",
+        })
+      }
       console.log(`[ORDERS] Đã nhận ảnh chuyển khoản cho đơn ${order.id}`)
 
       // Best-effort, after the proof is already stored: a mail failure must

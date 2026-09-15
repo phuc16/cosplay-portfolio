@@ -698,6 +698,41 @@ async function transitionOrder(id, toStatus, extra = {}) {
 }
 
 /**
+ * Attaches a buyer's uploaded payment-proof URL, but only if the order is
+ * still 'pending' at write time. The route's own image processing/MinIO
+ * storage I/O happens before this is called (outside any lock, since that
+ * work has no reason to hold a row lock) - without re-checking status right
+ * before the write, the worker's expiry sweep could cancel (and release the
+ * stock of) this exact order in that window, and this write would silently
+ * attach a "successful" proof to an order that's already dead. Taking the
+ * same `SELECT ... FOR UPDATE` row lock the sweep's transitionOrder takes
+ * serializes the two: whichever acquires the lock first determines the
+ * outcome, instead of a plain unconditional UPDATE racing it blind.
+ */
+async function savePaymentProof(orderId, url) {
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [[order]] = await conn.query("SELECT status FROM orders WHERE id = ? FOR UPDATE", [orderId])
+    if (!order || order.status !== "pending") {
+      await conn.rollback()
+      return false
+    }
+    await conn.query(
+      "UPDATE orders SET payment_proof_url = ?, payment_proof_uploaded_at = NOW() WHERE id = ?",
+      [url, orderId]
+    )
+    await conn.commit()
+    return true
+  } catch (err) {
+    await conn.rollback()
+    throw err
+  } finally {
+    conn.release()
+  }
+}
+
+/**
  * Corrects an order's contact/address/note fields after it was placed -
  * admin (no requirePending) or the buyer themselves (requirePending: true,
  * only while the order is still 'pending'). Diffs against the row's current
@@ -861,6 +896,7 @@ module.exports = {
   listOrders,
   transitionOrder,
   updateBuyerInfo,
+  savePaymentProof,
   releaseExpiredOrders,
   OutOfStockError,
   VariantNotFoundError,

@@ -104,6 +104,42 @@ describe("POST /api/orders/:token/proof", () => {
     expect(res.status).toBe(409)
   })
 
+  it("does not attach a proof to an order the expiry sweep cancelled while the upload was still in flight", async () => {
+    // Same deterministic technique as orderRepo.test.js's "does not cancel an
+    // order that is confirmed while the sweep waits for its lock": hold the
+    // order row's lock on a separate connection so the real HTTP request
+    // blocks inside savePaymentProof's own `SELECT ... FOR UPDATE`, then
+    // decide the race's outcome by committing a cancellation before
+    // releasing it - exercises the actual lock contention, not a timing
+    // guess or a mocked module boundary.
+    const o = await seedOrder()
+
+    const holder = await db.getConnection()
+    await holder.beginTransaction()
+    await holder.query("SELECT id FROM orders WHERE id = ? FOR UPDATE", [o.id])
+
+    const reqPromise = authed(request(app).post(`/api/orders/${o.order_token}/proof`))
+      .attach("file", await png(), "proof.png")
+
+    // Give the request time to finish image processing and reach (and block
+    // on) savePaymentProof's own row lock.
+    await new Promise((r) => setTimeout(r, 400))
+
+    await holder.query(
+      "UPDATE orders SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?",
+      [o.id]
+    )
+    await holder.commit()
+    holder.release()
+
+    const res = await reqPromise
+
+    expect(res.status).toBe(409)
+    const [[row]] = await db.query("SELECT status, payment_proof_url FROM orders WHERE id = ?", [o.id])
+    expect(row.status).toBe("cancelled")
+    expect(row.payment_proof_url).toBeNull()
+  }, 20000)
+
   it("allows replacing proof while still pending", async () => {
     const o = await seedOrder()
 
