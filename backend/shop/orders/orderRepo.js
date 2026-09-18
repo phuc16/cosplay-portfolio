@@ -901,6 +901,49 @@ async function releaseExpiredOrders(now = new Date()) {
   return released
 }
 
+// How long before expires_at a still-unpaid pending order gets one reminder
+// email. Same "hours before a moment" shape as RESERVATION_HOURS/
+// payment_deadline_hours, independently configurable since a shop may want
+// buyers nudged well before the same window that decides auto-cancellation.
+const PAYMENT_REMINDER_LEAD_HOURS = Number(process.env.PAYMENT_REMINDER_LEAD_HOURS) || 12
+
+/**
+ * Queue a one-time reminder for a pending, unpaid, non-COD order whose
+ * expires_at falls within the lead window. Mirrors releaseExpiredOrders's
+ * shape: an unlocked read, then a per-row atomic conditional UPDATE that
+ * only enqueues the email if this call is the one that actually flips the
+ * guard column - safe against an overlapping tick, or a concurrent proof
+ * upload, racing the same row. Unlike releaseExpiredOrders this never
+ * changes order.status, so there's no transitionOrder call - the UPDATE's
+ * own WHERE clause is the entire race guard.
+ */
+async function sendDuePaymentReminders(now = new Date(), leadHours = PAYMENT_REMINDER_LEAD_HOURS) {
+  const windowEnd = new Date(now.getTime() + leadHours * 60 * 60 * 1000)
+  const [due] = await db.query(
+    `SELECT id, email FROM orders
+      WHERE status = 'pending' AND expires_at IS NOT NULL
+        AND expires_at > ? AND expires_at <= ?
+        AND payment_proof_url IS NULL
+        AND payment_reminder_sent_at IS NULL`,
+    [now, windowEnd]
+  )
+
+  let sent = 0
+  for (const row of due) {
+    const [result] = await db.query(
+      `UPDATE orders SET payment_reminder_sent_at = UTC_TIMESTAMP()
+        WHERE id = ? AND status = 'pending'
+          AND payment_proof_url IS NULL AND payment_reminder_sent_at IS NULL`,
+      [row.id]
+    )
+    if (result.affectedRows === 1) {
+      await emailQueue.enqueue(row.id, "payment_reminder", row.email)
+      sent += 1
+    }
+  }
+  return sent
+}
+
 module.exports = {
   createOrder,
   getOrderByToken,
@@ -910,6 +953,7 @@ module.exports = {
   updateBuyerInfo,
   savePaymentProof,
   releaseExpiredOrders,
+  sendDuePaymentReminders,
   OutOfStockError,
   VariantNotFoundError,
   EmptyCartError,

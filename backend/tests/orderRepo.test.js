@@ -806,6 +806,86 @@ describe("releaseExpiredOrders", () => {
   })
 })
 
+describe("sendDuePaymentReminders", () => {
+  const inLeadWindow = () => new Date(Date.now() + 6 * 60 * 60 * 1000) // 6h out, inside a 12h lead
+  const farOut = () => new Date(Date.now() + 40 * 60 * 60 * 1000) // 40h out, outside a 12h lead
+  const alreadyExpired = () => new Date(Date.now() - 1000)
+
+  it("queues a reminder for a pending, unpaid order inside the lead window", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    await db.query("UPDATE orders SET expires_at = ? WHERE id = ?", [inLeadWindow(), res.id])
+
+    const sent = await repo.sendDuePaymentReminders(new Date(), 12)
+    expect(sent).toBe(1)
+
+    const [[o]] = await db.query("SELECT payment_reminder_sent_at FROM orders WHERE id = ?", [res.id])
+    expect(o.payment_reminder_sent_at).not.toBeNull()
+
+    const [[q]] = await db.query(
+      "SELECT type, order_id FROM email_queue WHERE order_id = ? AND type = 'payment_reminder'", [res.id]
+    )
+    expect(q).toBeTruthy()
+  })
+
+  it("does not queue for an order outside the lead window", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    await db.query("UPDATE orders SET expires_at = ? WHERE id = ?", [farOut(), res.id])
+
+    expect(await repo.sendDuePaymentReminders(new Date(), 12)).toBe(0)
+  })
+
+  it("does not queue for an order that has already expired", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    await db.query("UPDATE orders SET expires_at = ? WHERE id = ?", [alreadyExpired(), res.id])
+
+    expect(await repo.sendDuePaymentReminders(new Date(), 12)).toBe(0)
+  })
+
+  it("never touches COD orders (no expires_at to be approaching)", async () => {
+    const { variantId } = await seedVariant(5)
+    await repo.createOrder(order(variantId, 1, { payment_method: "cod" }))
+
+    expect(await repo.sendDuePaymentReminders(new Date(), 12)).toBe(0)
+  })
+
+  it("does not queue when payment proof is already uploaded", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    await db.query(
+      "UPDATE orders SET expires_at = ?, payment_proof_url = ? WHERE id = ?",
+      [inLeadWindow(), "https://x/proof.jpg", res.id]
+    )
+
+    expect(await repo.sendDuePaymentReminders(new Date(), 12)).toBe(0)
+  })
+
+  it("never sends a second reminder for the same order", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    await db.query("UPDATE orders SET expires_at = ? WHERE id = ?", [inLeadWindow(), res.id])
+
+    expect(await repo.sendDuePaymentReminders(new Date(), 12)).toBe(1)
+    expect(await repo.sendDuePaymentReminders(new Date(), 12)).toBe(0)
+
+    const [rows] = await db.query(
+      "SELECT id FROM email_queue WHERE order_id = ? AND type = 'payment_reminder'", [res.id]
+    )
+    expect(rows).toHaveLength(1)
+  })
+
+  it("does not queue for a non-pending order", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    await repo.transitionOrder(res.id, "confirmed")
+    await db.query("UPDATE orders SET expires_at = ? WHERE id = ?", [inLeadWindow(), res.id])
+
+    expect(await repo.sendDuePaymentReminders(new Date(), 12)).toBe(0)
+  })
+})
+
 describe("listOrders date filter", () => {
   it("includes an order created within the range and excludes one outside it", async () => {
     const { variantId } = await seedVariant(5)

@@ -4,6 +4,7 @@ import { adminListEmailTemplates, adminSaveEmailTemplate, adminListFailedEmails 
 const LABELS = {
   order_placed: "Đã nhận đơn hàng",
   payment_confirmed: "Đã xác nhận thanh toán",
+  payment_reminder: "Nhắc hạn thanh toán",
   shipped: "Đã gửi hàng",
   cancelled: "Đã hủy đơn",
   payment_proof_uploaded: "Admin: đã tải ảnh chuyển khoản",

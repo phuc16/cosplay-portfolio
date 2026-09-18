@@ -5,7 +5,7 @@ import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import queue from "../shop/email/queue.js"
 import settings from "../shop/payments/settingsRepo.js"
-import { run, dispatchEmails } from "../worker.js"
+import { run, dispatchEmails, sendPaymentReminders } from "../worker.js"
 import { resetTables } from "./helpers/db.js"
 
 // Same nodemailer-mocking gotcha documented in sender.test.js: mutate the
@@ -63,10 +63,11 @@ describe("worker run(): overlapping ticks", () => {
     )
 
     const first = run()
-    // Let the first tick get past its own DB work and into the mocked SMTP
-    // call, so it is genuinely still in-flight (running === true) when the
-    // second call is made.
-    await new Promise((r) => setTimeout(r, 150))
+    // Let the first tick get past its own DB work (now including the
+    // payment-reminder sweep ahead of dispatchEmails) and into the mocked
+    // SMTP call, so it is genuinely still in-flight (running === true) when
+    // the second call is made.
+    await new Promise((r) => setTimeout(r, 400))
 
     // Fires while `first` is still pending. If the overlap guard is missing
     // (or guards only dispatchEmails and not the whole tick), this starts a
@@ -84,6 +85,34 @@ describe("worker run(): overlapping ticks", () => {
     expect(row.status).toBe("sent")
     expect(row.attempts).toBe(0)
   }, 20000)
+})
+
+describe("worker run(): payment reminders", () => {
+  it("queues and sends a reminder for a pending order inside the lead window", async () => {
+    const o = await seedOrder()
+    await db.query(
+      "UPDATE orders SET expires_at = ? WHERE id = ?",
+      [new Date(Date.now() + 6 * 60 * 60 * 1000), o.id] // 6h out, inside the default 12h lead
+    )
+
+    await run()
+
+    const [[order]] = await db.query("SELECT payment_reminder_sent_at FROM orders WHERE id = ?", [o.id])
+    expect(order.payment_reminder_sent_at).not.toBeNull()
+    expect(sendMailMock).toHaveBeenCalledTimes(1)
+    const [subject] = sendMailMock.mock.calls[0]
+    expect(subject.subject).toContain("sắp hết hạn thanh toán")
+  })
+
+  it("does nothing for an order far from its deadline", async () => {
+    const o = await seedOrder()
+    // Default RESERVATION_HOURS (48h) already leaves this order well outside
+    // the default 12h lead window with no further changes needed.
+    const sent = await sendPaymentReminders()
+    expect(sent).toBe(0)
+    const [[order]] = await db.query("SELECT payment_reminder_sent_at FROM orders WHERE id = ?", [o.id])
+    expect(order.payment_reminder_sent_at).toBeNull()
+  })
 })
 
 describe("worker dispatchEmails(): SMTP unconfigured", () => {

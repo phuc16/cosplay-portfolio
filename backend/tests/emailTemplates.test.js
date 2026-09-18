@@ -222,6 +222,28 @@ describe("payment_proof_uploaded (admin template)", () => {
   })
 })
 
+describe("payment_reminder", () => {
+  it("renders the buyer name, item list, and a mention of the deadline", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_reminder, t.buildVars(order))
+    expect(out.html).toContain("Nguyễn Văn A")
+    expect(out.html).toContain("Photocard")
+    expect(out.subject).toContain("sắp hết hạn thanh toán")
+  })
+
+  it("uses only valid placeholders", () => {
+    const tpl = t.DEFAULT_TEMPLATES.payment_reminder
+    expect(t.validatePlaceholders(tpl.subject + tpl.body_html)).toEqual([])
+  })
+
+  it("shows the shipper-fee note for a ship order, omits it for pickup", () => {
+    const shipOut = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_reminder, t.buildVars(order))
+    expect(shipOut.html).toContain("Phí ship trả cho shipper khi nhận hàng")
+
+    const pickupOut = t.renderTemplate(t.DEFAULT_TEMPLATES.payment_reminder, t.buildVars({ ...order, fulfillment_method: "pickup" }))
+    expect(pickupOut.html).not.toContain("Phí ship trả cho shipper khi nhận hàng")
+  })
+})
+
 describe("validatePlaceholders", () => {
   it("accepts known placeholders", () => {
     expect(t.validatePlaceholders("{{order_id}} {{buyer_name}} {{total}}")).toEqual([])
@@ -239,7 +261,7 @@ describe("validatePlaceholders", () => {
 describe("DEFAULT_TEMPLATES", () => {
   it("covers every lifecycle email", () => {
     expect(Object.keys(t.DEFAULT_TEMPLATES).sort())
-      .toEqual(["cancelled", "order_placed", "order_updated", "payment_confirmed", "payment_proof_uploaded", "shipped"])
+      .toEqual(["cancelled", "order_placed", "order_updated", "payment_confirmed", "payment_proof_uploaded", "payment_reminder", "shipped"])
   })
 
   it("uses only valid placeholders", () => {

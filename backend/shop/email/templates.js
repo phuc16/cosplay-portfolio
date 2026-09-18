@@ -206,6 +206,20 @@ const DEFAULT_TEMPLATES = {
       {{items}}
       ${TOTAL_ROW}`),
   },
+  // Sent once, by worker.js's sendPaymentReminders (see orderRepo.js's
+  // sendDuePaymentReminders), to a still-pending/unpaid order approaching
+  // its payment deadline - a buyer-facing type like every one above, so it
+  // needs no special-casing in sender.js: same QR block, same PIN-reminder
+  // hint, same footer.
+  payment_reminder: {
+    subject: "Đơn #{{order_id}} sắp hết hạn thanh toán",
+    body_html: wrap(`
+      <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, đơn hàng của bạn vẫn đang <strong>chờ thanh toán</strong> và sắp đến hạn.</p>
+      <p style="margin:0 0 12px">Vui lòng chuyển khoản rồi tải ảnh chuyển khoản lên trang đơn hàng trước khi hết hạn - quá hạn đơn sẽ tự động bị hủy và kho hàng được hoàn lại.</p>
+      {{items}}
+      ${TOTAL_ROW}
+      {{shipping_fee_note}}`),
+  },
   shipped: {
     subject: "Đơn #{{order_id}} đã được gửi đi",
     body_html: wrap(`

@@ -24,7 +24,7 @@ describe("GET /api/admin/email-templates", () => {
     const res = await authed(request(app).get("/api/admin/email-templates"))
     expect(res.status).toBe(200)
     const types = res.body.map((t) => t.type).sort()
-    expect(types).toEqual(["cancelled", "order_placed", "order_updated", "payment_confirmed", "payment_proof_uploaded", "shipped"])
+    expect(types).toEqual(["cancelled", "order_placed", "order_updated", "payment_confirmed", "payment_proof_uploaded", "payment_reminder", "shipped"])
     expect(res.body.find((t) => t.type === "order_placed").subject)
       .toBe(templates.DEFAULT_TEMPLATES.order_placed.subject)
   })

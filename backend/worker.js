@@ -55,6 +55,26 @@ async function sweepExpiredOrders() {
 }
 
 /**
+ * Queue a one-time reminder email for pending, unpaid orders approaching
+ * their payment deadline. Runs after sweepExpiredOrders so an order that
+ * crossed into "expired" in this same tick is cancelled, not reminded -
+ * releaseExpiredOrders's own status/payment_proof_url guard means a row it
+ * just cancelled is no longer 'pending' by the time this query runs.
+ */
+async function sendPaymentReminders() {
+  try {
+    const sent = await orderRepo.sendDuePaymentReminders(new Date())
+    if (sent > 0) {
+      console.log(`[WORKER] Đã nhắc thanh toán ${sent} đơn sắp hết hạn`)
+    }
+    return sent
+  } catch (err) {
+    console.error("[WORKER] Lỗi nhắc thanh toán:", err.message)
+    return 0
+  }
+}
+
+/**
  * When SMTP isn't configured, sendQueued() no-ops without touching the queue
  * at all - so with no signal here, email_queue grows forever and nobody
  * finds out until a buyer complains. This is the one cheap check
@@ -121,6 +141,7 @@ async function run() {
     }
 
     await sweepExpiredOrders()
+    await sendPaymentReminders()
     await dispatchEmails()
   } finally {
     running = false
@@ -195,4 +216,4 @@ if (require.main === module) {
   setInterval(tick, TICK_INTERVAL_MS)
 }
 
-module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured, tick, lease }
+module.exports = { run, sweepExpiredOrders, sendPaymentReminders, dispatchEmails, warnIfMailStuckUnconfigured, tick, lease }
