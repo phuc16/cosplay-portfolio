@@ -33,7 +33,7 @@ submitting.
 ## 2026-09-18 - product-reviews
 
 Branch: `feature/auto-product-reviews`
-PR: (filled in after opening)
+PR: https://github.com/phuc16/cosplay-portfolio/pull/9
 
 Buyers can leave a 1-5 star rating + optional comment for a product once
 their order reaches `completed`, gated by the existing `orderAccess`
