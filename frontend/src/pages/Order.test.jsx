@@ -12,6 +12,7 @@ const uploadPaymentProof = vi.fn()
 const verifyOrderPin = vi.fn()
 const fetchOrderQrBlob = vi.fn()
 const updateOrderBuyerInfo = vi.fn()
+const submitReview = vi.fn()
 // AddressFields.jsx (rendered inside the buyer-info edit form for a ship
 // order) calls these on its own - must resolve, not just exist, or its
 // mount-time effect throws synchronously.
@@ -26,6 +27,7 @@ vi.mock("../api/shop", () => ({
   verifyOrderPin: (...args) => verifyOrderPin(...args),
   fetchOrderQrBlob: (...args) => fetchOrderQrBlob(...args),
   updateOrderBuyerInfo: (...args) => updateOrderBuyerInfo(...args),
+  submitReview: (...args) => submitReview(...args),
   fetchProvinces: (...args) => fetchProvinces(...args),
   fetchWards: (...args) => fetchWards(...args),
   searchAddress: (...args) => searchAddress(...args),
@@ -87,6 +89,7 @@ beforeEach(() => {
   fetchOrderQrBlob.mockReset()
   fetchOrderQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
   updateOrderBuyerInfo.mockReset()
+  submitReview.mockReset()
   fetchProvinces.mockReset().mockResolvedValue([])
   fetchWards.mockReset().mockResolvedValue([])
   searchAddress.mockReset().mockResolvedValue({ predictions: [] })
@@ -1059,5 +1062,72 @@ describe("Order - buyer edits their own info", () => {
     await act(async () => { editBtn.click() })
 
     expect(container.querySelector('button[aria-label="Tỉnh/Thành phố"]')).toBeTruthy()
+  })
+})
+
+describe("Order - product reviews", () => {
+  const completedOrder = (itemOver = {}) => baseOrder({
+    status: "completed",
+    items: [{
+      id: 1, product_variant_id: 7, product_name_snapshot: "Card", variant_label_snapshot: "A1",
+      unit_price_snapshot: 35000, qty: 1, is_gift: false, ...itemOver,
+    }],
+  })
+
+  it("shows a review form for a non-gift item once the order is completed", async () => {
+    fetchOrder.mockResolvedValue(completedOrder())
+    const container = await renderOrder()
+
+    expect(container.querySelector('[role="radiogroup"]')).toBeTruthy()
+  })
+
+  it("does not show a review form before the order is completed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+    const container = await renderOrder()
+
+    expect(container.querySelector('[role="radiogroup"]')).toBeNull()
+  })
+
+  it("does not show a review form for the free-gift line", async () => {
+    fetchOrder.mockResolvedValue(completedOrder({ is_gift: true, product_variant_id: null }))
+    const container = await renderOrder()
+
+    expect(container.querySelector('[role="radiogroup"]')).toBeNull()
+  })
+
+  it("submits a rating and shows a thank-you message", async () => {
+    fetchOrder.mockResolvedValue(completedOrder())
+    submitReview.mockResolvedValue({ id: 1 })
+    const container = await renderOrder()
+
+    const stars = [...container.querySelectorAll('[role="radio"]')]
+    await act(async () => { stars[3].click() }) // 4 stars
+
+    const submitBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Submit review")
+    await act(async () => { submitBtn.click() })
+    await act(async () => {})
+
+    expect(submitReview).toHaveBeenCalledWith(
+      "tok123",
+      expect.objectContaining({ variant_id: 7, rating: 4 }),
+      expect.anything()
+    )
+    expect(container.textContent).toContain("Thanks for your review!")
+  })
+
+  it("shows an already-reviewed message on a duplicate submit", async () => {
+    fetchOrder.mockResolvedValue(completedOrder())
+    submitReview.mockRejectedValue({ response: { data: { error: "already_reviewed" } } })
+    const container = await renderOrder()
+
+    const stars = [...container.querySelectorAll('[role="radio"]')]
+    await act(async () => { stars[0].click() })
+
+    const submitBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Submit review")
+    await act(async () => { submitBtn.click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("You've already reviewed this item.")
   })
 })

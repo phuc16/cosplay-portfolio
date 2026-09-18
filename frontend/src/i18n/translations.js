@@ -120,6 +120,13 @@ export const translations = {
     orderPickupCodeHint: "Show or read this to event staff if the QR code can't be scanned.",
     orderTrackingCodeLabel: "ViettelPost tracking code",
     orderCancelReasonLabel: "Cancellation reason",
+    orderReviewTitle: "Rate this item", orderReviewSubmit: "Submit review",
+    orderReviewCommentPlaceholder: "What did you think? (optional)",
+    orderReviewThanks: "Thanks for your review!",
+    orderReviewAlready: "You've already reviewed this item.",
+    orderReviewFailed: "Couldn't submit your review, please try again.",
+    productReviewsTitle: "Reviews", productReviewsEmpty: "No reviews yet.",
+    productReviewsCount: "{count} reviews",
 
     // Payment instructions
     paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
@@ -313,6 +320,13 @@ export const translations = {
     orderPickupCodeHint: "Đọc hoặc cho nhân viên xem mã này nếu không quét được mã QR.",
     orderTrackingCodeLabel: "Mã vận đơn Viettel Post",
     orderCancelReasonLabel: "Lý do hủy",
+    orderReviewTitle: "Đánh giá sản phẩm này", orderReviewSubmit: "Gửi đánh giá",
+    orderReviewCommentPlaceholder: "Bạn thấy sản phẩm thế nào? (không bắt buộc)",
+    orderReviewThanks: "Cảm ơn bạn đã đánh giá!",
+    orderReviewAlready: "Bạn đã đánh giá sản phẩm này rồi.",
+    orderReviewFailed: "Gửi đánh giá thất bại, vui lòng thử lại.",
+    productReviewsTitle: "Đánh giá", productReviewsEmpty: "Chưa có đánh giá nào.",
+    productReviewsCount: "{count} đánh giá",
 
     // Payment instructions
     paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",

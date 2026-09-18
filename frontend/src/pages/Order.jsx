@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo } from "../api/shop"
+import ProductReviewForm from "../components/shop/ProductReviewForm"
 import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../utils/orderAuth"
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
@@ -423,6 +424,13 @@ export default function Order() {
                 <a href={i.delivery_link_snapshot} target="_blank" rel="noreferrer" className="text-sm text-[var(--text-link)] underline">
                   {t("orderDownloadLink")}
                 </a>
+              )}
+              {/* A review is about a received item - only offered once the
+                  order is completed, and never for the free gift (which has
+                  no catalog relationship at all, so there's nothing to
+                  attach a review to). */}
+              {order.status === "completed" && !i.is_gift && i.product_variant_id && (
+                <ProductReviewForm token={token} variantId={i.product_variant_id} authHeaders={orderAuthHeaders(token)} />
               )}
             </div>
           </div>

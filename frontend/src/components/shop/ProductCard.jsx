@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
 import { addToCart } from "../../shop/cart"
+import { fetchProductReviews } from "../../api/shop"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
 function stockLabel(variant, t) {
@@ -77,6 +78,20 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const [activeImage, setActiveImage] = useState(0)
   const detail = view && typeof view === "object" ? view : null
   const detailImages = detail ? variantImages(detail) : []
+
+  // Fetched on demand only once the detail view actually opens - not on
+  // every card in a grid, matching the "fetch what this specific view
+  // needs" precedent the free-gift/payment-methods fetches already follow.
+  const [reviewSummary, setReviewSummary] = useState(null)
+  useEffect(() => {
+    if (!detail) { setReviewSummary(null); return }
+    let cancelled = false
+    fetchProductReviews(product.id)
+      .then((d) => { if (!cancelled) setReviewSummary(d.summary) })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the detail view opens/closes, not on every product prop churn
+  }, [Boolean(detail), product.id])
 
   // Every path to a variant's detail goes through this, so qty/photo never carry over stale from a prior variant.
   const openDetail = (v) => {
@@ -272,6 +287,11 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 )}
               </div>
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
+              {reviewSummary && reviewSummary.count > 0 && (
+                <p className="text-sm opacity-80">
+                  ★ {reviewSummary.average} · {t("productReviewsCount", { count: reviewSummary.count })}
+                </p>
+              )}
               <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : (unavailableLabel || t("shopClosed"))}</p>
 
               {detail.description && (

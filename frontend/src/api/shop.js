@@ -109,6 +109,12 @@ export const uploadPaymentProof = (token, file, headers = {}) =>
 export const updateOrderBuyerInfo = (token, fields, headers = {}) =>
   api.put(`/api/orders/${token}/buyer-info`, fields, { headers }).then((r) => r.data)
 
+export const submitReview = (token, fields, headers = {}) =>
+  api.post(`/api/orders/${token}/reviews`, fields, { headers }).then((r) => r.data)
+
+export const fetchProductReviews = (productId) =>
+  api.get(`/api/shop/products/${productId}/reviews`).then((r) => r.data)
+
 export const fetchOrderQrBlob = (token, headers = {}) =>
   api.get(`/api/orders/${token}/qr.svg`, { headers, responseType: "blob" }).then((r) => r.data)
 

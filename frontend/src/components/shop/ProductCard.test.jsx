@@ -4,6 +4,11 @@ import { act } from "react"
 import { LanguageProvider } from "../../contexts/LanguageContext"
 import { readCart } from "../../shop/cart"
 
+const fetchProductReviews = vi.fn()
+vi.mock("../../api/shop", () => ({
+  fetchProductReviews: (...args) => fetchProductReviews(...args),
+}))
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: ProductCard, isProductSoldOut, isSoldOut } = await import("./ProductCard")
@@ -37,6 +42,8 @@ async function renderCard(props = {}) {
 
 beforeEach(() => {
   localStorage.clear()
+  fetchProductReviews.mockReset()
+  fetchProductReviews.mockResolvedValue({ summary: { count: 0, average: 0 }, reviews: [] })
 })
 
 // The per-card pill list was removed - opening any variant's detail now goes
@@ -533,5 +540,40 @@ describe("unavailableLabel", () => {
     await act(async () => { card?.click() })
 
     expect(container.textContent).toContain("Chưa mở bán")
+  })
+})
+
+describe("review rating badge", () => {
+  const singleVariantProduct = {
+    id: 5, name: "Card", price: 35000, images: [], variants: [{ id: 1, label: "A1", stock_qty: 5 }],
+  }
+
+  it("fetches and shows the rating summary once the detail view opens", async () => {
+    fetchProductReviews.mockResolvedValue({ summary: { count: 12, average: 4.3 }, reviews: [] })
+    const { container } = await renderCard({ product: singleVariantProduct })
+
+    const card = container.querySelector('[role="button"]')
+    await act(async () => { card?.click() })
+    await act(async () => {})
+
+    expect(fetchProductReviews).toHaveBeenCalledWith(5)
+    expect(container.textContent).toContain("4.3")
+    expect(container.textContent).toContain("12")
+  })
+
+  it("shows no badge for a product with zero reviews", async () => {
+    fetchProductReviews.mockResolvedValue({ summary: { count: 0, average: 0 }, reviews: [] })
+    const { container } = await renderCard({ product: singleVariantProduct })
+
+    const card = container.querySelector('[role="button"]')
+    await act(async () => { card?.click() })
+    await act(async () => {})
+
+    expect(container.textContent).not.toContain("★")
+  })
+
+  it("does not fetch reviews before the detail view opens", async () => {
+    await renderCard()
+    expect(fetchProductReviews).not.toHaveBeenCalled()
   })
 })

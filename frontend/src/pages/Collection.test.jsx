@@ -7,9 +7,13 @@ import { ThemeProvider } from "../contexts/ThemeContext"
 import { formatVnDateTime } from "../utils/orderDeadline"
 
 const fetchCollection = vi.fn()
+// ProductCard's detail view fetches this on open - mocked so it resolves
+// instead of attempting a real network call.
+const fetchProductReviews = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchCollection: (...args) => fetchCollection(...args),
+  fetchProductReviews: (...args) => fetchProductReviews(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings - mocked
@@ -61,6 +65,8 @@ async function renderCollection() {
 beforeEach(() => {
   localStorage.clear()
   fetchCollection.mockReset()
+  fetchProductReviews.mockReset()
+  fetchProductReviews.mockResolvedValue({ summary: { count: 0, average: 0 }, reviews: [] })
 })
 
 describe("Collection - product ordering", () => {

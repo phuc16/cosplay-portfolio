@@ -8,6 +8,8 @@ const emailQueue = require("../shop/email/queue")
 const qr = require("../shop/orders/qr")
 const { orderAccess, verifyPin, issueOrderSessionToken } = require("../shop/orders/orderAccess")
 const { formatOrderCode } = require("../shop/orders/domain")
+const db = require("../db")
+const reviewRepo = require("../shop/reviews/reviewRepo")
 
 const PAYMENT_METHODS = ["bank", "momo", "paypal", "cod"]
 const FULFILLMENT = ["ship", "pickup"]
@@ -415,6 +417,57 @@ module.exports = function orderRoutes() {
         return res.status(409).json({ error: "not_editable", message: err.message })
       }
       console.error("[ORDERS] Lỗi sửa thông tin đơn hàng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // A review is about a received item, so it's only allowed once the order
+  // reaches 'completed' - the one status both ship and pickup orders share
+  // at the end of their lifecycle (domain.canTransition: pickup skips
+  // 'shipped' entirely). variant_id must match a non-gift item on this
+  // order - a buyer can only review something they actually bought here,
+  // and the gift line (product_variant_id: NULL, no catalog relationship)
+  // never matches. product_id is resolved server-side from a live join,
+  // never trusted from the client.
+  router.post("/:token/reviews", orderAccess, async (req, res) => {
+    try {
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      if (order.status !== "completed") {
+        return bad(res, "Chỉ có thể đánh giá sau khi đơn hàng đã hoàn tất")
+      }
+
+      const variantId = Number(req.body.variant_id)
+      const boughtHere = (order.items || []).some(
+        (i) => !i.is_gift && Number(i.product_variant_id) === variantId
+      )
+      if (!variantId || !boughtHere) {
+        return bad(res, "Sản phẩm này không thuộc đơn hàng của bạn")
+      }
+
+      const [[variant]] = await db.query("SELECT product_id FROM product_variants WHERE id = ?", [variantId])
+      if (!variant) {
+        return res.status(400).json({
+          error: "product_unavailable",
+          message: "Sản phẩm này không còn tồn tại để đánh giá",
+        })
+      }
+
+      const id = await reviewRepo.createReview({
+        orderId: order.id,
+        productId: variant.product_id,
+        buyerName: order.buyer_name,
+        rating: req.body.rating,
+        comment: req.body.comment,
+      })
+      res.status(201).json({ id })
+    } catch (err) {
+      if (err instanceof reviewRepo.InvalidReviewInputError) return bad(res, err.message)
+      if (err instanceof reviewRepo.DuplicateReviewError) {
+        return res.status(409).json({ error: "already_reviewed", message: err.message })
+      }
+      console.error("[ORDERS] Lỗi tạo đánh giá:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

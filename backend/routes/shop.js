@@ -3,6 +3,7 @@ const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const giftSettings = require("../shop/giftSettings")
 const vnAddress = require("../shop/vnAddress")
+const reviewRepo = require("../shop/reviews/reviewRepo")
 
 /**
  * Public storefront routes. `publicLimiter` is applied by the caller so the
@@ -54,6 +55,29 @@ module.exports = function shopRoutes() {
       res.json(giftSettings.publicSettings(await giftSettings.getSettings()))
     } catch (err) {
       console.error("[SHOP] Lỗi lấy cấu hình quà tặng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Fetched on demand by the frontend when a product's detail view opens -
+  // deliberately not folded into listPublicCollections/
+  // getPublicCollectionBySlug, which are already the most performance-
+  // sensitive, heavily-tested queries in the catalog. buyer_name is masked
+  // before it ever leaves the server (reviewRepo.listProductReviews) - no
+  // "show full name" mode exists on this public, unauthenticated route.
+  router.get("/products/:id/reviews", async (req, res) => {
+    try {
+      const productId = Number(req.params.id)
+      if (!Number.isInteger(productId)) {
+        return res.status(400).json({ error: "invalid_input", message: "Sản phẩm không hợp lệ" })
+      }
+      const [summary, reviews] = await Promise.all([
+        reviewRepo.getProductRatingSummary(productId),
+        reviewRepo.listProductReviews(productId),
+      ])
+      res.json({ summary, reviews })
+    } catch (err) {
+      console.error("[SHOP] Lỗi lấy đánh giá sản phẩm:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
