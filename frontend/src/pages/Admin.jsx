@@ -7,6 +7,7 @@ import AdminCollections from "../components/AdminCollections"
 import AdminOrders from "../components/AdminOrders"
 import AdminPaymentSettings from "../components/AdminPaymentSettings"
 import AdminGiftSettings from "../components/AdminGiftSettings"
+import AdminCoupons from "../components/AdminCoupons"
 import AdminEmailTemplates from "../components/AdminEmailTemplates"
 import AdminStats from "../components/AdminStats"
 import AdminShipping from "../components/AdminShipping"
@@ -195,6 +196,7 @@ export default function Admin() {
           <>
             <AdminPaymentSettings />
             <AdminGiftSettings />
+            <AdminCoupons />
           </>
         )}
         {tab === "email" && <AdminEmailTemplates />}

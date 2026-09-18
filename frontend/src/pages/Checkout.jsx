@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { readCart, cartTotal, clearCart, removeFromCart } from "../shop/cart"
 import { generateRequestKey } from "../shop/requestKey"
-import { createOrder, fetchCollection, fetchPaymentMethods, fetchGiftSettings } from "../api/shop"
+import { createOrder, fetchCollection, fetchPaymentMethods, fetchGiftSettings, validateCoupon } from "../api/shop"
 import { setOrderSessionToken } from "../utils/orderAuth"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
@@ -103,11 +103,54 @@ export default function Checkout() {
     fetchGiftSettings().then(setGiftSettings).catch(() => setGiftSettings(null))
   }, [])
 
+  // Button-gated, like AddressFields' street search - never validated on
+  // every keystroke. The server (validateCoupon, then createOrder itself)
+  // is the sole authority on whether a code is actually usable; this is
+  // only a checkout-time preview so the buyer sees the discount before
+  // submitting, same "client estimate, server authoritative" pattern the
+  // free-gift hint already established.
+  const [couponInput, setCouponInput] = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState(null) // { code, discount_amount }
+  const [couponError, setCouponError] = useState("")
+  const [couponChecking, setCouponChecking] = useState(false)
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim()
+    if (!code) return
+    setCouponError("")
+    setCouponChecking(true)
+    try {
+      const res = await validateCoupon(code, cartTotal(cart))
+      if (res.valid) {
+        setAppliedCoupon({ code: code.toUpperCase(), discount_amount: res.discount_amount })
+      } else {
+        setAppliedCoupon(null)
+        setCouponError(t("errInvalidCoupon"))
+      }
+    } catch {
+      setAppliedCoupon(null)
+      setCouponError(t("errInvalidCoupon"))
+    } finally {
+      setCouponChecking(false)
+    }
+  }
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponInput("")
+    setCouponError("")
+  }
+
+  // What the buyer actually pays for their items - cartTotal(cart) minus
+  // whatever coupon is currently applied, clamped like the server clamps it.
+  const discountedTotal = Math.max(0, cartTotal(cart) - (appliedCoupon?.discount_amount || 0))
+
   // A client-side estimate only, exactly like cartTotal()'s own display -
   // the server is still the sole authority on whether the gift actually
   // gets added (see orderRepo.createOrder). Used only to decide whether to
   // render/require the shipping section before the buyer ever gets there.
-  const giftMayApply = Boolean(giftSettings?.enabled) && cartTotal(cart) >= (giftSettings?.min_total ?? Infinity)
+  // Evaluated against the post-discount total, matching the backend.
+  const giftMayApply = Boolean(giftSettings?.enabled) && discountedTotal >= (giftSettings?.min_total ?? Infinity)
   const giftForcesPhysical = giftMayApply && giftSettings && !giftSettings.is_digital
   // Set when the server has already told us (via FulfillmentRequiredError)
   // that this all-digital cart actually needs a shipping/pickup choice -
@@ -201,6 +244,7 @@ export default function Checkout() {
         payment_method: payment,
         note,
         request_key: requestKey,
+        coupon_code: appliedCoupon?.code || undefined,
       })
       clearCart()
       // Skips the PIN gate for this one browser session - this is the exact
@@ -244,6 +288,16 @@ export default function Checkout() {
         setForceShipping(true)
         fetchGiftSettings().then(setGiftSettings).catch(() => {})
         setError(t("checkoutFulfillmentNowRequired"))
+        return
+      }
+      // The coupon preview said valid, but the code went stale before submit
+      // (exhausted by a concurrent order, deactivated, or expired in the
+      // gap) - the server is authoritative, so drop the applied state and
+      // let the buyer retry without it rather than dead-ending on the same
+      // error forever.
+      if (e.response?.data?.error === "invalid_coupon") {
+        setAppliedCoupon(null)
+        setError(e.response.data.message)
         return
       }
       setError(
@@ -383,13 +437,56 @@ export default function Checkout() {
           className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent" />
       </label>
 
+      <div className="mb-4">
+        <span className="block text-sm mb-1">{t("checkoutCouponLabel")}</span>
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-[var(--border-brand)]">
+            <span className="text-sm text-[var(--brand)]">
+              {t("checkoutCouponApplied", { code: appliedCoupon.code })}
+            </span>
+            <button type="button" onClick={removeCoupon} className="text-sm opacity-70 underline">
+              {t("checkoutCouponRemove")}
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="coupon_code"
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <button
+              type="button"
+              onClick={applyCoupon}
+              disabled={couponChecking || !couponInput.trim()}
+              className="px-4 py-2 rounded-lg border border-[var(--border-brand)] disabled:opacity-50"
+            >
+              {t("checkoutCouponApply")}
+            </button>
+          </div>
+        )}
+        {couponError && <p className="text-sm text-red-500 mt-1">{couponError}</p>}
+      </div>
+
+      {appliedCoupon && (
+        <div className="flex justify-between items-center mb-1 text-sm">
+          <span className="opacity-70">{t("checkoutDiscount")}</span>
+          <span className="text-[var(--brand)]">-{formatVnd(appliedCoupon.discount_amount)}</span>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <span className="opacity-70">{t("cartTotal")}</span>
-        <span className="text-xl font-bold text-[var(--brand)]">{formatVnd(cartTotal(cart))}</span>
+        <span className="text-xl font-bold text-[var(--brand)]">{formatVnd(discountedTotal)}</span>
       </div>
 
       {giftSettings?.enabled && (
-        cartTotal(cart) >= giftSettings.min_total ? (
+        // Matches the backend: gift eligibility is evaluated against the
+        // post-discount total (what the buyer actually pays), not the raw
+        // cart subtotal - see orderRepo.createOrder's coupon handling.
+        discountedTotal >= giftSettings.min_total ? (
           <div className="mb-3">
             <p className="text-sm text-[var(--brand)]">
               {t("cartGiftQualified", { name: giftSettings.name })}
@@ -398,7 +495,7 @@ export default function Checkout() {
           </div>
         ) : (
           <p className="mb-3 text-sm opacity-70">
-            {t("cartGiftProgress", { amount: formatVnd(giftSettings.min_total - cartTotal(cart)), name: giftSettings.name })}
+            {t("cartGiftProgress", { amount: formatVnd(giftSettings.min_total - discountedTotal), name: giftSettings.name })}
           </p>
         )
       )}

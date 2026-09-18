@@ -15,6 +15,7 @@ const fetchProvinces = vi.fn().mockResolvedValue([])
 const fetchWards = vi.fn().mockResolvedValue([])
 const searchAddress = vi.fn().mockResolvedValue({ predictions: [] })
 const fetchGiftSettings = vi.fn()
+const validateCoupon = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchPaymentMethods: (...args) => fetchPaymentMethods(...args),
@@ -24,6 +25,7 @@ vi.mock("../api/shop", () => ({
   fetchWards: (...args) => fetchWards(...args),
   searchAddress: (...args) => searchAddress(...args),
   fetchGiftSettings: (...args) => fetchGiftSettings(...args),
+  validateCoupon: (...args) => validateCoupon(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings - mocked
@@ -72,6 +74,7 @@ beforeEach(() => {
   fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
   fetchGiftSettings.mockReset()
   fetchGiftSettings.mockResolvedValue({ enabled: false, min_total: 0, name: "", image_url: null, note: null, is_digital: false })
+  validateCoupon.mockReset()
 })
 
 describe("Checkout payment methods", () => {
@@ -579,5 +582,90 @@ describe("Checkout - free gift forces shipping info for a digital-only cart", ()
     await act(async () => {})
 
     expect(container.textContent).not.toContain("Limited to one per order")
+  })
+})
+
+describe("Checkout - coupon codes", () => {
+  const setCouponInput = (container, value) => {
+    const input = container.querySelector('input[name="coupon_code"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    setter.call(input, value)
+    input.dispatchEvent(new Event("change", { bubbles: true }))
+  }
+
+  const clickApply = async (container) => {
+    const applyBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Apply")
+    await act(async () => { applyBtn.click() })
+    // Flush the validateCoupon promise's state update(s) - two ticks since
+    // applyCoupon has an await before its setState calls land.
+    await act(async () => {})
+    await act(async () => {})
+  }
+
+  it("shows the discount and reduced total once a valid code is applied", async () => {
+    seedCart() // total 35000
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    validateCoupon.mockResolvedValue({ valid: true, discount_amount: 3500, type: "percent", value: 10 })
+
+    const container = await renderCheckout()
+    setCouponInput(container, "save10")
+    await clickApply(container)
+
+    expect(validateCoupon).toHaveBeenCalledWith("save10", 35000)
+    expect(container.textContent).toContain("SAVE10")
+    expect(container.textContent).toMatch(/31.500/)
+  })
+
+  it("shows an error and applies no discount for an invalid code", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    validateCoupon.mockResolvedValue({ valid: false, reason: "not_found" })
+
+    const container = await renderCheckout()
+    setCouponInput(container, "NOPE")
+    await clickApply(container)
+
+    expect(container.textContent).toContain("This code isn't valid for your order")
+    // No applied-coupon chip rendered - the plain input + Apply button stays.
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Apply")).toBe(true)
+  })
+
+  it("includes coupon_code in the submitted order once applied", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    validateCoupon.mockResolvedValue({ valid: true, discount_amount: 3500, type: "percent", value: 10 })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 31500 })
+
+    const container = await renderCheckout()
+    setCouponInput(container, "save10")
+    await clickApply(container)
+
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ coupon_code: "SAVE10" })
+    )
+  })
+
+  it("clears the applied coupon and surfaces the server message when the code goes stale before submit", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    validateCoupon.mockResolvedValue({ valid: true, discount_amount: 3500, type: "percent", value: 10 })
+    createOrder.mockRejectedValue({
+      response: { data: { error: "invalid_coupon", message: "Mã giảm giá đã hết lượt sử dụng" } },
+    })
+
+    const container = await renderCheckout()
+    setCouponInput(container, "save10")
+    await clickApply(container)
+
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(container.textContent).toContain("Mã giảm giá đã hết lượt sử dụng")
+    // The applied-coupon chip (with its "Remove" button) should be gone,
+    // replaced back by the plain input + Apply button.
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Apply")).toBe(true)
   })
 })

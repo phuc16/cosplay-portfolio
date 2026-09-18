@@ -1,6 +1,7 @@
 const db = require("./../../db")
 const domain = require("./domain")
 const emailQueue = require("./../email/queue")
+const couponRepo = require("./../coupons/couponRepo")
 
 const TRANSITION_EMAILS = {
   confirmed: "payment_confirmed",
@@ -119,6 +120,20 @@ class OrderNotEditableError extends Error {
   constructor() {
     super("Đơn hàng không còn ở trạng thái chờ thanh toán nên không thể chỉnh sửa.")
     this.name = "OrderNotEditableError"
+  }
+}
+
+/**
+ * A submitted coupon_code failed one of couponRepo.checkEligibility's checks
+ * - reason is the same vocabulary that function returns ("not_found",
+ * "inactive", "expired", "limit_reached", "min_total_not_met"), so the route
+ * layer can give an accurate message instead of one generic "invalid coupon".
+ */
+class InvalidCouponError extends Error {
+  constructor(reason) {
+    super(`Mã giảm giá không hợp lệ: ${reason}`)
+    this.name = "InvalidCouponError"
+    this.reason = reason
   }
 }
 
@@ -283,7 +298,35 @@ async function createOrder(input) {
       })
     }
 
-    const total = domain.computeTotal(lines)
+    const subtotal = domain.computeTotal(lines)
+
+    // Coupon, if one was submitted. Locked on its own row (not the variant
+    // rows - a different table with no id relationship to product_variants,
+    // so as long as this lock always runs after the variant lock above, as
+    // it does here, the shop-wide lock order stays consistent and this can't
+    // introduce a new deadlock class) so two concurrent checkouts racing the
+    // last use of a max_uses-limited code serialize instead of both winning.
+    let discountAmount = 0
+    let couponCodeSnapshot = null
+    if (input.coupon_code) {
+      const code = couponRepo.normalizeCode(input.coupon_code)
+      const [[couponRow]] = await conn.query("SELECT * FROM coupons WHERE code = ? FOR UPDATE", [code])
+      const eligibility = couponRepo.checkEligibility(couponRow, subtotal)
+      if (!eligibility.ok) throw new InvalidCouponError(eligibility.reason)
+
+      discountAmount = couponRepo.computeDiscount(couponRow, subtotal)
+      couponCodeSnapshot = couponRow.code
+      // Incremented here, inside this same transaction - rolled back along
+      // with everything else if a later step throws, so a rejected order
+      // (stock race, closed collection, ...) never consumes a coupon use.
+      await conn.query("UPDATE coupons SET times_used = times_used + 1 WHERE id = ?", [couponRow.id])
+    }
+    // Every downstream step (gift threshold, orders.total, cod_amount for a
+    // COD order) reads this post-discount total - nothing past this point
+    // needs to know a coupon was involved. Gift eligibility is deliberately
+    // evaluated against what the buyer actually ends up paying, not the
+    // pre-discount subtotal.
+    const total = subtotal - discountAmount
 
     // A free gift is not a catalog item: no stock, no collection, no
     // relationship to product_variants at all (see the 2026-09-14 free-gift
@@ -371,8 +414,8 @@ async function createOrder(input) {
          (order_token, request_key, buyer_name, phone, email, fulfillment_method,
           address_street, address_ward, address_district, address_province, address_raw,
           note, status, payment_method, total, cod_amount, collection_id, expires_at, pickup_code,
-          access_pin_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+          access_pin_hash, coupon_code_snapshot, discount_amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         token,
         input.request_key || null,
@@ -393,6 +436,8 @@ async function createOrder(input) {
         expiresAt,
         pickupCode,
         accessPinHash,
+        couponCodeSnapshot,
+        discountAmount,
       ]
     )
 
@@ -920,4 +965,5 @@ module.exports = {
   FulfillmentRequiredError,
   InvalidBuyerInfoError,
   OrderNotEditableError,
+  InvalidCouponError,
 }

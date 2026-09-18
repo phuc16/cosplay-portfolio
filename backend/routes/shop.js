@@ -2,6 +2,7 @@ const express = require("express")
 const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const giftSettings = require("../shop/giftSettings")
+const couponRepo = require("../shop/coupons/couponRepo")
 const vnAddress = require("../shop/vnAddress")
 
 /**
@@ -54,6 +55,34 @@ module.exports = function shopRoutes() {
       res.json(giftSettings.publicSettings(await giftSettings.getSettings()))
     } catch (err) {
       console.error("[SHOP] Lỗi lấy cấu hình quà tặng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Read-only preview: lets Checkout show a discount estimate before
+  // submitting, without reserving/consuming a use - the real, authoritative
+  // check (locked, mutating) only ever runs inside orderRepo.createOrder.
+  // subtotal is the buyer's client-computed cart total, same "client
+  // estimate, server authoritative" trust boundary the free-gift hint
+  // already established.
+  router.post("/coupons/validate", async (req, res) => {
+    try {
+      const subtotal = Number(req.body.subtotal)
+      if (!Number.isInteger(subtotal) || subtotal < 0) {
+        return res.status(400).json({ error: "invalid_input", message: "Tổng đơn hàng không hợp lệ" })
+      }
+      const coupon = await couponRepo.getCouponByCode(req.body.code)
+      const eligibility = couponRepo.checkEligibility(coupon, subtotal)
+      if (!eligibility.ok) return res.json({ valid: false, reason: eligibility.reason })
+
+      res.json({
+        valid: true,
+        discount_amount: couponRepo.computeDiscount(coupon, subtotal),
+        type: coupon.type,
+        value: coupon.value,
+      })
+    } catch (err) {
+      console.error("[SHOP] Lỗi kiểm tra mã giảm giá:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

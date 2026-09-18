@@ -66,6 +66,10 @@ function toPublicOrder(order) {
     // to bookmark an order that's already dead. Same field the admin's own
     // view and the cancellation email already show.
     cancel_reason,
+    // The coupon (if any) redeemed at checkout, and the VND amount actually
+    // deducted - so the buyer's own order page can show "you saved X",
+    // matching what the confirmation email already shows.
+    coupon_code_snapshot, discount_amount,
   } = order
   // The code is only meaningful once the order is actually paid for - an
   // unpaid pending order (or one that got cancelled after confirming) has
@@ -95,6 +99,8 @@ function toPublicOrder(order) {
     // reference when contacting support, only the opaque URL token.
     order_code: formatOrderCode(id, created_at),
     cancel_reason: cancel_reason || null,
+    coupon_code_snapshot: coupon_code_snapshot || null,
+    discount_amount: discount_amount || 0,
   }
 }
 
@@ -215,6 +221,20 @@ module.exports = function orderRoutes() {
       // like an ordinary validation error or retry with the same key.
       if (err instanceof repo.RequestKeyConflictError) {
         return res.status(409).json({ error: "request_key_conflict", message: err.message })
+      }
+      // A submitted coupon_code failed validation (unknown, inactive,
+      // expired, exhausted, or the cart doesn't meet its min_total) - the
+      // client should clear the applied coupon and surface this, not retry
+      // the same submission unchanged.
+      if (err instanceof repo.InvalidCouponError) {
+        const reasonText = {
+          not_found: "Mã giảm giá không tồn tại",
+          inactive: "Mã giảm giá đã ngừng áp dụng",
+          expired: "Mã giảm giá đã hết hạn",
+          limit_reached: "Mã giảm giá đã hết lượt sử dụng",
+          min_total_not_met: "Đơn hàng chưa đạt mức tối thiểu để áp dụng mã giảm giá",
+        }[err.reason] || "Mã giảm giá không hợp lệ"
+        return res.status(400).json({ error: "invalid_coupon", message: reasonText, reason: err.reason })
       }
       // Never log the raw err object here: mysql2 embeds the fully
       // interpolated failing SQL (every bound parameter, including the

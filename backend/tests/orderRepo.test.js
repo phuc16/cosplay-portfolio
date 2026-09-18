@@ -36,6 +36,18 @@ async function seedGift({ enabled = true, name = "Postcard", minTotal = 100000, 
   )
 }
 
+async function seedCoupon({
+  code = "SAVE10", type = "percent", value = 10, active = true,
+  minTotal = 0, maxUses = null, timesUsed = 0, expiresAt = null,
+} = {}) {
+  const [res] = await db.query(
+    `INSERT INTO coupons (code, type, value, active, min_total, max_uses, times_used, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [code, type, value, active, minTotal, maxUses, timesUsed, expiresAt]
+  )
+  return res.insertId
+}
+
 const order = (variantId, qty = 1, over = {}) => ({
   items: [{ variant_id: variantId, qty }],
   buyer,
@@ -50,7 +62,7 @@ async function orderWithBuyer(over = {}) {
 }
 
 beforeEach(async () => {
-  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections", "gift_settings")
+  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections", "gift_settings", "coupons")
 })
 
 // gift_settings is a table many other test files don't yet know to reset in
@@ -1397,5 +1409,144 @@ describe("updateBuyerInfo", () => {
     const res = await orderWithBuyer()
     const result = await repo.updateBuyerInfo(res.id, { buyer_name: "Sửa bởi khách", phone: "09" }, { requirePending: true })
     expect(result.changed).toBe(true)
+  })
+})
+
+describe("createOrder: coupon codes", () => {
+  it("applies no discount when no coupon_code is submitted", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 3)) // 105000
+    expect(res.total).toBe(105000)
+    const [[row]] = await db.query("SELECT coupon_code_snapshot, discount_amount FROM orders WHERE id = ?", [res.id])
+    expect(row.coupon_code_snapshot).toBeNull()
+    expect(row.discount_amount).toBe(0)
+  })
+
+  it("applies a percent discount, rounding down, and snapshots the code", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "SAVE10", type: "percent", value: 10 })
+    const res = await repo.createOrder(order(variantId, 3, { coupon_code: "save10" })) // 105000 * 10% = 10500
+
+    expect(res.total).toBe(94500)
+    const [[row]] = await db.query("SELECT coupon_code_snapshot, discount_amount FROM orders WHERE id = ?", [res.id])
+    expect(row.coupon_code_snapshot).toBe("SAVE10")
+    expect(row.discount_amount).toBe(10500)
+  })
+
+  it("applies a fixed discount clamped to the subtotal", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "BIG", type: "fixed", value: 200000 })
+    const res = await repo.createOrder(order(variantId, 1, { coupon_code: "BIG" })) // subtotal 35000
+
+    expect(res.total).toBe(0)
+    const [[row]] = await db.query("SELECT discount_amount FROM orders WHERE id = ?", [res.id])
+    expect(row.discount_amount).toBe(35000)
+  })
+
+  it("sets cod_amount to the post-discount total for a COD order", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "SAVE10", type: "percent", value: 10 })
+    const res = await repo.createOrder(order(variantId, 3, { coupon_code: "SAVE10", payment_method: "cod" }))
+    const [[row]] = await db.query("SELECT cod_amount FROM orders WHERE id = ?", [res.id])
+    expect(row.cod_amount).toBe(94500)
+  })
+
+  it("rejects an unknown coupon code", async () => {
+    const { variantId } = await seedVariant(5)
+    await expect(
+      repo.createOrder(order(variantId, 1, { coupon_code: "NOPE" }))
+    ).rejects.toMatchObject({ name: "InvalidCouponError", reason: "not_found" })
+  })
+
+  it("rejects a deactivated coupon", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "OFF", active: false })
+    await expect(
+      repo.createOrder(order(variantId, 1, { coupon_code: "OFF" }))
+    ).rejects.toMatchObject({ reason: "inactive" })
+  })
+
+  it("rejects an expired coupon", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "OLD", expiresAt: new Date(Date.now() - 1000) })
+    await expect(
+      repo.createOrder(order(variantId, 1, { coupon_code: "OLD" }))
+    ).rejects.toMatchObject({ reason: "expired" })
+  })
+
+  it("rejects a coupon that has hit its max_uses", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "LIMITED", maxUses: 1, timesUsed: 1 })
+    await expect(
+      repo.createOrder(order(variantId, 1, { coupon_code: "LIMITED" }))
+    ).rejects.toMatchObject({ reason: "limit_reached" })
+  })
+
+  it("rejects a coupon when the subtotal is below min_total", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "BIGORDER", minTotal: 200000 })
+    await expect(
+      repo.createOrder(order(variantId, 1, { coupon_code: "BIGORDER" })) // subtotal 35000
+    ).rejects.toMatchObject({ reason: "min_total_not_met" })
+  })
+
+  it("is case-insensitive when matching the submitted code", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "SAVE10", type: "percent", value: 10 })
+    const res = await repo.createOrder(order(variantId, 1, { coupon_code: "save10" }))
+    expect(res.reused).toBe(false)
+  })
+
+  it("increments times_used exactly once per successful order", async () => {
+    const { variantId } = await seedVariant(5)
+    const couponId = await seedCoupon({ code: "SAVE10", type: "percent", value: 10 })
+    await repo.createOrder(order(variantId, 1, { coupon_code: "SAVE10" }))
+    const [[row]] = await db.query("SELECT times_used FROM coupons WHERE id = ?", [couponId])
+    expect(row.times_used).toBe(1)
+  })
+
+  it("does not consume a use when the order is rejected for an unrelated reason", async () => {
+    const { variantId } = await seedVariant(1) // only 1 in stock
+    const couponId = await seedCoupon({ code: "SAVE10", type: "percent", value: 10 })
+    await expect(
+      repo.createOrder(order(variantId, 5, { coupon_code: "SAVE10" })) // wants 5, only 1 available
+    ).rejects.toThrow(repo.OutOfStockError)
+    const [[row]] = await db.query("SELECT times_used FROM coupons WHERE id = ?", [couponId])
+    expect(row.times_used).toBe(0)
+  })
+
+  it("second order fails once a max_uses: 1 coupon has been consumed by the first", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedCoupon({ code: "ONCE", type: "fixed", value: 1000, maxUses: 1 })
+    await repo.createOrder(order(variantId, 1, { coupon_code: "ONCE" }))
+    await expect(
+      repo.createOrder(order(variantId, 1, { coupon_code: "ONCE" }))
+    ).rejects.toMatchObject({ reason: "limit_reached" })
+  })
+
+  it("evaluates gift eligibility against the post-discount total", async () => {
+    const { variantId } = await seedVariant(10) // stock for two orders of 3 below; 35000 * 3 = 105000
+    await seedCoupon({ code: "SAVE50", type: "fixed", value: 50000 }) // -> 55000 post-discount
+    await seedGift({ enabled: true, name: "Postcard", minTotal: 60000 }) // above post-discount total
+    const res = await repo.createOrder(order(variantId, 3, { coupon_code: "SAVE50" }))
+
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ?", [res.id])
+    expect(items.some((i) => i.is_gift)).toBe(false) // 55000 < 60000, gift should not apply
+
+    await seedCoupon({ code: "TINY", type: "fixed", value: 1000 }) // -> 104000 post-discount, above 60000 gift threshold
+    const res2 = await repo.createOrder(order(variantId, 3, { coupon_code: "TINY" }))
+    const [items2] = await db.query("SELECT * FROM order_items WHERE order_id = ?", [res2.id])
+    expect(items2.some((i) => i.is_gift)).toBe(true)
+  })
+
+  it("does not affect COD eligibility", async () => {
+    const { variantId } = await seedDigitalVariant(5)
+    await seedCoupon({ code: "SAVE10", type: "percent", value: 10 })
+    await expect(
+      repo.createOrder({
+        items: [{ variant_id: variantId, qty: 1 }],
+        buyer, payment_method: "cod", fulfillment_method: "ship", coupon_code: "SAVE10",
+      })
+    ).rejects.toThrow(repo.NoCodForDigitalError)
   })
 })

@@ -127,6 +127,19 @@ export const adminGetGiftSettings = () =>
 export const adminSaveGiftSettings = (data) =>
   api.put("/api/admin/gift-settings", data).then((r) => r.data)
 
+// ── Coupons ──
+export const validateCoupon = (code, subtotal) =>
+  api.post("/api/shop/coupons/validate", { code, subtotal }).then((r) => r.data)
+
+export const adminListCoupons = () =>
+  api.get("/api/admin/coupons").then((r) => r.data)
+
+export const adminCreateCoupon = (data) =>
+  api.post("/api/admin/coupons", data).then((r) => r.data)
+
+export const adminUpdateCoupon = (id, data) =>
+  api.put(`/api/admin/coupons/${id}`, data).then((r) => r.data)
+
 // ── Email templates ──
 export const adminListEmailTemplates = () =>
   api.get("/api/admin/email-templates").then((r) => r.data)

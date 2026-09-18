@@ -222,6 +222,25 @@ describe("payment_proof_uploaded (admin template)", () => {
   })
 })
 
+describe("discount_row", () => {
+  it("renders a discount line when discount_amount is set", () => {
+    const withDiscount = { ...order, discount_amount: 10500, coupon_code_snapshot: "SAVE10" }
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(withDiscount))
+    expect(out.html).toContain("SAVE10")
+    expect(out.html).toContain("-10.500")
+  })
+
+  it("renders nothing when there is no discount", () => {
+    const vars = t.buildVars(order)
+    expect(vars.discount_row).toBe("")
+  })
+
+  it("renders nothing when discount_amount is exactly 0", () => {
+    const vars = t.buildVars({ ...order, discount_amount: 0, coupon_code_snapshot: null })
+    expect(vars.discount_row).toBe("")
+  })
+})
+
 describe("validatePlaceholders", () => {
   it("accepts known placeholders", () => {
     expect(t.validatePlaceholders("{{order_id}} {{buyer_name}} {{total}}")).toEqual([])

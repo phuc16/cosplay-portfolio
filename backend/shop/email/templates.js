@@ -5,7 +5,7 @@ const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
   "payment_note", "shop_name", "receiver_info", "shipping_fee_note", "prep_note",
-  "admin_url", "payment_proof_image",
+  "admin_url", "payment_proof_image", "discount_row",
 ]
 
 const SHOP_NAME = process.env.SHOP_NAME || "Shop"
@@ -96,10 +96,15 @@ function itemsHtml(items = [], { showDeliveryLink = false } = {}) {
 }
 
 // A visually distinct total row, reused across templates below - table-based
-// so it renders correctly in Outlook too. {{total}} is a literal placeholder
-// here, substituted at render time like everywhere else.
+// so it renders correctly in Outlook too. {{total}}/{{discount_row}} are
+// literal placeholders here, substituted at render time like everywhere
+// else. {{discount_row}} renders as an empty string for any order with no
+// coupon (see buildVars), so every template that already includes this
+// fragment picks up the discount line automatically, with no per-template
+// edit needed.
 const TOTAL_ROW = `
     <table style="width:100%;border-collapse:collapse">
+      {{discount_row}}
       <tr>
         <td style="padding:10px 0 0;font-weight:700;font-size:15px">Tổng cộng</td>
         <td style="padding:10px 0 0;font-weight:700;font-size:15px;text-align:right;color:${BRAND}">{{total}}</td>
@@ -131,6 +136,15 @@ function buildVars(order) {
     admin_url: `${SITE_URL}/admin`,
     payment_proof_image: order.payment_proof_url
       ? `<img src="${escapeHtml(SITE_URL + order.payment_proof_url)}" style="max-width:320px;width:100%;border-radius:8px;display:block;margin-top:8px" />`
+      : "",
+    // Empty for the vast majority of orders (no coupon redeemed) - only a
+    // discount_amount > 0 order gets this row, folded into TOTAL_ROW so
+    // every template using it shows "you saved X" without a per-template edit.
+    discount_row: order.discount_amount > 0
+      ? `<tr>
+          <td style="padding:2px 0;font-size:13px;color:#888">Mã giảm giá ${escapeHtml(order.coupon_code_snapshot || "")}</td>
+          <td style="padding:2px 0;font-size:13px;color:#888;text-align:right">-${formatVnd(order.discount_amount)}</td>
+        </tr>`
       : "",
     // Only a ship order has a shipper to pay at the door - a pickup order's
     // buyer never encounters this fee, so the note would just be confusing.

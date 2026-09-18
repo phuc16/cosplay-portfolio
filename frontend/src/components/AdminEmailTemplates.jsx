@@ -15,7 +15,7 @@ const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
   "payment_note", "shop_name", "receiver_info", "shipping_fee_note", "prep_note",
-  "admin_url", "payment_proof_image",
+  "admin_url", "payment_proof_image", "discount_row",
 ]
 
 // Keyed by tpl.type in the parent, so this mounts fresh (picking up
