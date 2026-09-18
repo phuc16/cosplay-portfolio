@@ -8,7 +8,7 @@ past work.
 ## 2026-09-18 - payment-reminder-email
 
 Branch: `feature/auto-payment-reminder-email`
-PR: (filled in after opening)
+PR: https://github.com/phuc16/cosplay-portfolio/pull/7
 
 Sends a one-time reminder email to a buyer whose pending, unpaid,
 non-COD order is approaching its payment deadline, reusing the existing
