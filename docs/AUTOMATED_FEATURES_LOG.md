@@ -19,7 +19,7 @@ existing tick loop (new `orders.payment_reminder_sent_at` guard column +
 ## 2026-09-18 - coupon-codes
 
 Branch: `feature/auto-coupon-codes`
-PR: (filled in after opening)
+PR: https://github.com/phuc16/cosplay-portfolio/pull/8
 
 Admin-creatable percent/fixed discount codes, redeemed once per order at
 checkout. Validated and applied inside `createOrder`'s existing
