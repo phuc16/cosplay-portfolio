@@ -226,6 +226,34 @@ describe("Shop - search, filter, sort", () => {
     expect(container.textContent).not.toContain("Ended One")
   })
 
+  it("filters by type (Digital/Physical)", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Digital One", status: "active", product_count: 1, has_digital_item: true },
+      { id: 2, slug: "b", title: "Physical One", status: "active", product_count: 1, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const typeTrigger = container.querySelector('button[aria-label="All types"]')
+    await act(async () => {
+      typeTrigger.click()
+    })
+
+    const optionButtons = container.querySelectorAll("li button")
+    const digitalOption = [...optionButtons].find((btn) => btn.textContent === "Digital")
+    await act(async () => {
+      digitalOption.click()
+    })
+
+    expect(container.textContent).toContain("Digital One")
+    expect(container.textContent).not.toContain("Physical One")
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Digital"])
+  })
+
   it("sorts by name A-Z", async () => {
     fetchCollections.mockResolvedValue([
       { id: 1, slug: "z", title: "Zebra Drop", status: "active", product_count: 1 },

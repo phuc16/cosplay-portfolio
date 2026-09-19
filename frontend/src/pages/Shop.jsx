@@ -105,6 +105,7 @@ export default function Shop() {
   const [collections, setCollections] = useState(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
+  const [typeFilter, setTypeFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
 
   useEffect(() => {
@@ -117,6 +118,8 @@ export default function Shop() {
     (collections || []).filter((c) => {
       if (search.trim() && !c.title.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (statusFilter && c.status !== statusFilter) return false
+      if (typeFilter === "digital" && !c.has_digital_item) return false
+      if (typeFilter === "physical" && c.has_digital_item) return false
       return true
     }),
     sortBy
@@ -141,7 +144,7 @@ export default function Shop() {
             placeholder={t("shopSearchCollections")}
             className="w-full sm:flex-1 min-w-0 h-[38px] px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
           />
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:shrink-0">
             <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
               value={statusFilter}
               onChange={setStatusFilter}
@@ -151,6 +154,16 @@ export default function Shop() {
                 { code: "closed", name: t("shopFilterEnded") },
               ]}
               placeholder={t("shopFilterAllStatus")}
+            />
+            <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={[
+                { code: "", name: t("shopFilterAllTypes") },
+                { code: "digital", name: t("shopGroupDigital") },
+                { code: "physical", name: t("shopGroupPhysical") },
+              ]}
+              placeholder={t("shopFilterAllTypes")}
             />
             <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
               value={sortBy}
