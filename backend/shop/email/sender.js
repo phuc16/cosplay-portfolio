@@ -226,4 +226,4 @@ async function listFailed() {
   return rows
 }
 
-module.exports = { sendQueued, isConfigured, listFailed }
+module.exports = { sendQueued, isConfigured, listFailed, getTransport }

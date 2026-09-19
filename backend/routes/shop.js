@@ -3,6 +3,7 @@ const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const giftSettings = require("../shop/giftSettings")
 const vnAddress = require("../shop/vnAddress")
+const stockNotify = require("../shop/stockNotify")
 
 /**
  * Public storefront routes. `publicLimiter` is applied by the caller so the
@@ -54,6 +55,28 @@ module.exports = function shopRoutes() {
       res.json(giftSettings.publicSettings(await giftSettings.getSettings()))
     } catch (err) {
       console.error("[SHOP] Lỗi lấy cấu hình quà tặng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Buyer-initiated: email them once a sold-out variant restocks. Rejects
+  // outright for a variant that isn't currently sold out, so the table never
+  // accumulates requests nobody needed (see stockNotify.js's design doc).
+  router.post("/variants/:id/notify-me", async (req, res) => {
+    try {
+      await stockNotify.requestNotify(req.params.id, req.body?.email)
+      res.json({ ok: true })
+    } catch (err) {
+      if (err instanceof stockNotify.VariantNotFoundError) {
+        return res.status(404).json({ error: "not_found", message: "Không tìm thấy phân loại sản phẩm" })
+      }
+      if (err instanceof stockNotify.NotSoldOutError) {
+        return res.status(409).json({ error: "not_sold_out", message: "Sản phẩm hiện đã có hàng" })
+      }
+      if (err.message === "invalid_email") {
+        return res.status(400).json({ error: "invalid_input", message: "Email không hợp lệ" })
+      }
+      console.error("[SHOP] Lỗi đăng ký báo hàng:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

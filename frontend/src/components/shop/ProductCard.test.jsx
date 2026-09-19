@@ -6,6 +6,11 @@ import { readCart } from "../../shop/cart"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
+const notifyMeWhenBackInStock = vi.fn()
+vi.mock("../../api/shop", () => ({
+  notifyMeWhenBackInStock: (...args) => notifyMeWhenBackInStock(...args),
+}))
+
 const { default: ProductCard, isProductSoldOut, isSoldOut } = await import("./ProductCard")
 
 function baseProduct(over = {}) {
@@ -37,6 +42,7 @@ async function renderCard(props = {}) {
 
 beforeEach(() => {
   localStorage.clear()
+  notifyMeWhenBackInStock.mockReset()
 })
 
 // The per-card pill list was removed - opening any variant's detail now goes
@@ -516,6 +522,77 @@ describe("ProductCard - full variant gallery", () => {
     const grid = container.querySelector('[role="dialog"] [class*="grid-cols-3"]')
     expect(grid).toBeTruthy()
     expect(grid.className).toContain("lg:grid-cols-8")
+  })
+})
+
+describe("ProductCard - notify me when back in stock", () => {
+  it("renders the notify form for a sold-out variant when orderable", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2") // stock_qty: 0 in baseProduct()
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="email"]')).toBeTruthy()
+    expect(dialog.textContent).toContain("Notify me when back in stock")
+  })
+
+  it("does not render the notify form for an in-stock variant", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1") // stock_qty: 5
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="email"]')).toBeNull()
+  })
+
+  it("does not render the notify form when the product isn't orderable", async () => {
+    const { container } = await renderCard({ orderable: false })
+    await openVariantDetail(container, "B2")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="email"]')).toBeNull()
+  })
+
+  it("submits the entered email for the open variant and shows a confirmation", async () => {
+    notifyMeWhenBackInStock.mockResolvedValue({ ok: true })
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const input = dialog.querySelector('input[type="email"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(input, "buyer@example.com")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+
+    const form = dialog.querySelector("form")
+    await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })) })
+
+    expect(notifyMeWhenBackInStock).toHaveBeenCalledWith(2, "buyer@example.com")
+    expect(dialog.textContent).toContain("You'll get an email when this is back in stock.")
+  })
+
+  it("shows the already-in-stock message on a 409 response", async () => {
+    notifyMeWhenBackInStock.mockRejectedValue({ response: { data: { error: "not_sold_out" } } })
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const form = dialog.querySelector("form")
+    await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })) })
+
+    expect(dialog.textContent).toContain("This is already back in stock")
+  })
+
+  it("shows a generic error message on any other failure", async () => {
+    notifyMeWhenBackInStock.mockRejectedValue(new Error("network down"))
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const form = dialog.querySelector("form")
+    await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })) })
+
+    expect(dialog.textContent).toContain("Couldn't save your request")
   })
 })
 

@@ -3,6 +3,7 @@ import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
 import { addToCart } from "../../shop/cart"
+import { notifyMeWhenBackInStock } from "../../api/shop"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
 function stockLabel(variant, t) {
@@ -75,6 +76,9 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const [view, setView] = useState(null)
   const [qty, setQty] = useState(1)
   const [activeImage, setActiveImage] = useState(0)
+  const [notifyEmail, setNotifyEmail] = useState("")
+  // idle | sending | sent | already_in_stock | error
+  const [notifyState, setNotifyState] = useState("idle")
   const detail = view && typeof view === "object" ? view : null
   const detailImages = detail ? variantImages(detail) : []
 
@@ -82,7 +86,20 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const openDetail = (v) => {
     setQty(1)
     setActiveImage(0)
+    setNotifyEmail("")
+    setNotifyState("idle")
     setView(v)
+  }
+
+  const submitNotifyMe = async (e) => {
+    e.preventDefault()
+    setNotifyState("sending")
+    try {
+      await notifyMeWhenBackInStock(detail.id, notifyEmail)
+      setNotifyState("sent")
+    } catch (err) {
+      setNotifyState(err.response?.data?.error === "not_sold_out" ? "already_in_stock" : "error")
+    }
   }
 
   const commitAdd = (v) => {
@@ -279,6 +296,39 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                   className="prose prose-sm max-w-none opacity-80"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(detail.description) }}
                 />
+              )}
+
+              {isSoldOut(detail) && orderable && (
+                notifyState === "sent" ? (
+                  <p className="text-sm text-[var(--brand)]">{t("shopNotifyMeSuccess")}</p>
+                ) : notifyState === "already_in_stock" ? (
+                  <p className="text-sm text-[var(--brand)]">{t("shopNotifyMeAlreadyInStock")}</p>
+                ) : (
+                  <form onSubmit={submitNotifyMe} className="flex flex-col gap-1.5">
+                    <p className="text-sm font-medium">{t("shopNotifyMe")}</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        required
+                        value={notifyEmail}
+                        onChange={(e) => setNotifyEmail(e.target.value)}
+                        placeholder={t("shopNotifyMeEmailPlaceholder")}
+                        aria-label={t("shopNotifyMeEmailPlaceholder")}
+                        className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent text-sm"
+                      />
+                      <button
+                        type="submit"
+                        disabled={notifyState === "sending"}
+                        className="px-3 py-2 rounded-xl bg-[var(--brand)] text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                      >
+                        {t("shopNotifyMeSubmit")}
+                      </button>
+                    </div>
+                    {notifyState === "error" && (
+                      <p className="text-xs text-red-500">{t("shopNotifyMeError")}</p>
+                    )}
+                  </form>
+                )
               )}
 
               {!isSoldOut(detail) && orderable && (

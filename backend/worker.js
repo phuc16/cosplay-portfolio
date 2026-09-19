@@ -5,6 +5,7 @@ const redis = require("./redis")
 const storage = require("./storage")
 const orderRepo = require("./shop/orders/orderRepo")
 const emailSender = require("./shop/email/sender")
+const stockNotify = require("./shop/stockNotify")
 const { createLease, TICK_INTERVAL_MS } = require("./workerLease")
 
 const THUMB_WIDTH = 400
@@ -50,6 +51,20 @@ async function sweepExpiredOrders() {
     return released
   } catch (err) {
     console.error("[WORKER] Lỗi quét đơn quá hạn:", err.message)
+    return 0
+  }
+}
+
+/** Emails buyers waiting on a sold-out variant that has since restocked. */
+async function notifyBackInStock() {
+  try {
+    const { sent } = await stockNotify.sendPendingNotifications()
+    if (sent > 0) {
+      console.log(`[WORKER] Đã gửi ${sent} email báo hàng lại`)
+    }
+    return sent
+  } catch (err) {
+    console.error("[WORKER] Lỗi gửi email báo hàng lại:", err.message)
     return 0
   }
 }
@@ -122,6 +137,7 @@ async function run() {
 
     await sweepExpiredOrders()
     await dispatchEmails()
+    await notifyBackInStock()
   } finally {
     running = false
   }
@@ -195,4 +211,4 @@ if (require.main === module) {
   setInterval(tick, TICK_INTERVAL_MS)
 }
 
-module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured, tick, lease }
+module.exports = { run, sweepExpiredOrders, dispatchEmails, notifyBackInStock, warnIfMailStuckUnconfigured, tick, lease }
