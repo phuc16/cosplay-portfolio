@@ -34,6 +34,12 @@ async function type(el, text) {
   })
 }
 
+async function keydown(el, key) {
+  await act(async () => {
+    el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }))
+  })
+}
+
 const shortOptions = [
   { code: "a", name: "Option A" },
   { code: "b", name: "Option B" },
@@ -149,5 +155,126 @@ describe("SearchableSelect - search query reset", () => {
     await click(trigger) // reopen
 
     expect(container.querySelectorAll("li button")).toHaveLength(longOptions.length)
+  })
+})
+
+describe("SearchableSelect - keyboard and ARIA", () => {
+  it("exposes combobox/listbox roles and aria-expanded on the trigger", async () => {
+    const container = await render({ value: "a", onChange: vi.fn(), options: shortOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+    expect(trigger.getAttribute("role")).toBe("combobox")
+    expect(trigger.getAttribute("aria-haspopup")).toBe("listbox")
+    expect(trigger.getAttribute("aria-expanded")).toBe("false")
+
+    await click(trigger)
+    expect(trigger.getAttribute("aria-expanded")).toBe("true")
+    expect(container.querySelector("ul").getAttribute("role")).toBe("listbox")
+  })
+
+  it("every option has role=option and a stable id matching aria-activedescendant", async () => {
+    const container = await render({ value: "a", onChange: vi.fn(), options: shortOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+    await click(trigger)
+
+    const options = [...container.querySelectorAll("li[role='option']")]
+    expect(options).toHaveLength(shortOptions.length)
+    options.forEach((li) => expect(li.id).toBeTruthy())
+
+    // Opening seeds the highlight to the currently selected option ("a").
+    const activeId = trigger.getAttribute("aria-activedescendant")
+    expect(activeId).toBe(options[0].id)
+    expect(options[0].getAttribute("aria-selected")).toBe("true")
+  })
+
+  it("ArrowDown from the closed trigger opens the list and highlights an option", async () => {
+    const container = await render({ value: "a", onChange: vi.fn(), options: shortOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+
+    await keydown(trigger, "ArrowDown")
+
+    expect(trigger.getAttribute("aria-expanded")).toBe("true")
+    expect(trigger.getAttribute("aria-activedescendant")).toBeTruthy()
+  })
+
+  it("ArrowDown/ArrowUp move the highlighted option and clamp at the ends (no wraparound)", async () => {
+    const container = await render({ value: "a", onChange: vi.fn(), options: shortOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+    await click(trigger)
+
+    const options = [...container.querySelectorAll("li[role='option']")]
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(options[0].id)
+
+    await keydown(trigger, "ArrowDown")
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(options[1].id)
+
+    // Already at the last option - another ArrowDown must not wrap back to the first.
+    await keydown(trigger, "ArrowDown")
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(options[1].id)
+
+    await keydown(trigger, "ArrowUp")
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(options[0].id)
+
+    // Already at the first option - another ArrowUp must not wrap to the last.
+    await keydown(trigger, "ArrowUp")
+    expect(trigger.getAttribute("aria-activedescendant")).toBe(options[0].id)
+  })
+
+  it("Enter commits the highlighted option and closes the list", async () => {
+    const onChange = vi.fn()
+    const container = await render({ value: "a", onChange, options: shortOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+    await click(trigger)
+    await keydown(trigger, "ArrowDown") // highlight "b"
+    await keydown(trigger, "Enter")
+
+    expect(onChange).toHaveBeenCalledWith("b")
+    expect(trigger.getAttribute("aria-expanded")).toBe("false")
+  })
+
+  it("Escape closes the list without calling onChange", async () => {
+    const onChange = vi.fn()
+    const container = await render({ value: "a", onChange, options: shortOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+    await click(trigger)
+    await keydown(trigger, "ArrowDown")
+    await keydown(trigger, "Escape")
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(trigger.getAttribute("aria-expanded")).toBe("false")
+  })
+
+  it("does nothing on any key when disabled", async () => {
+    const onChange = vi.fn()
+    const container = await render({ value: "a", onChange, options: shortOptions, placeholder: "Pick one", disabled: true })
+    const trigger = container.querySelector("button")
+    await keydown(trigger, "ArrowDown")
+
+    expect(trigger.getAttribute("aria-expanded")).toBe("false")
+  })
+
+  it("typing in the search box resets the highlight to the first filtered match", async () => {
+    const container = await render({ value: "opt0", onChange: vi.fn(), options: longOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+    await click(trigger)
+
+    const search = container.querySelector('input[type="text"]')
+    await type(search, "Option 3")
+
+    const remaining = [...container.querySelectorAll("li[role='option']")]
+    expect(remaining).toHaveLength(1)
+    expect(search.getAttribute("aria-activedescendant")).toBe(remaining[0].id)
+  })
+
+  it("Enter inside the search box commits the highlighted filtered option", async () => {
+    const onChange = vi.fn()
+    const container = await render({ value: "opt0", onChange, options: longOptions, placeholder: "Pick one" })
+    const trigger = container.querySelector("button")
+    await click(trigger)
+
+    const search = container.querySelector('input[type="text"]')
+    await type(search, "Option 3")
+    await keydown(search, "Enter")
+
+    expect(onChange).toHaveBeenCalledWith("opt3")
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useLanguage } from "../contexts/LanguageContext"
 
 // A short list (sort order, a yes/no filter, ~5 status values) doesn't need
@@ -20,8 +20,11 @@ export default function SearchableSelect({
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
+  const [activeIndex, setActiveIndex] = useState(-1)
   const rootRef = useRef(null)
   const showSearch = options.length > SEARCH_THRESHOLD
+  const listboxId = useId()
+  const optionId = (code) => `${listboxId}-opt-${code}`
 
   useEffect(() => {
     const onClickOutside = (e) => {
@@ -51,11 +54,88 @@ export default function SearchableSelect({
   const filtered = query.trim()
     ? options.filter((o) => o.name.toLowerCase().includes(query.trim().toLowerCase()))
     : options
+  // Defensive clamp (not just a reset-on-typing concern) - `options` can
+  // change out from under an already-open list (e.g. ward options reloading
+  // after a province pick), so a stale index must never point past the end
+  // of a shorter `filtered` array.
+  const activeOption = filtered.length === 0 ? null : filtered[Math.min(Math.max(activeIndex, 0), filtered.length - 1)]
 
   const pick = (code) => {
     onChange(code)
     setOpen(false)
     setQuery("")
+  }
+
+  // Seeds the highlighted option to whatever is currently selected (falling
+  // back to the first option) - mirrors how a native <select> already opens
+  // with its current value highlighted.
+  const openList = () => {
+    const idx = options.findIndex((o) => o.code === value)
+    setActiveIndex(idx >= 0 ? idx : options.length > 0 ? 0 : -1)
+    setOpen(true)
+    setQuery("")
+  }
+
+  const closeList = () => {
+    setOpen(false)
+    setQuery("")
+  }
+
+  const updateQuery = (next) => {
+    setQuery(next)
+    const nextFiltered = next.trim()
+      ? options.filter((o) => o.name.toLowerCase().includes(next.trim().toLowerCase()))
+      : options
+    setActiveIndex(nextFiltered.length > 0 ? 0 : -1)
+  }
+
+  const moveActive = (delta) => {
+    if (filtered.length === 0) return
+    setActiveIndex((idx) => {
+      const base = idx < 0 ? (delta > 0 ? -1 : filtered.length) : idx
+      return Math.min(Math.max(base + delta, 0), filtered.length - 1)
+    })
+  }
+
+  const handleKeyDown = (e) => {
+    if (disabled) return
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault()
+        if (!open) openList()
+        else moveActive(1)
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        if (!open) openList()
+        else moveActive(-1)
+        break
+      case "Home":
+        if (open && filtered.length > 0) {
+          e.preventDefault()
+          setActiveIndex(0)
+        }
+        break
+      case "End":
+        if (open && filtered.length > 0) {
+          e.preventDefault()
+          setActiveIndex(filtered.length - 1)
+        }
+        break
+      case "Enter":
+        e.preventDefault()
+        if (!open) openList()
+        else if (activeOption) pick(activeOption.code)
+        break
+      case "Escape":
+        if (open) {
+          e.preventDefault()
+          closeList()
+        }
+        break
+      default:
+        break
+    }
   }
 
   return (
@@ -83,11 +163,20 @@ export default function SearchableSelect({
           // filter - otherwise the next open silently starts pre-filtered
           // by whatever was typed last time, with no visible search box
           // (if showSearch) to explain why options are missing.
-          setOpen((o) => !o)
-          setQuery("")
+          if (open) closeList()
+          else openList()
         }}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
         aria-label={label || placeholder}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        // Only when this button itself holds keyboard focus - once a search
+        // box is shown, autoFocus moves real DOM focus there, and that
+        // element carries aria-activedescendant instead (see below).
+        aria-activedescendant={!showSearch && activeOption ? optionId(activeOption.code) : undefined}
         data-testid={dataTestId}
         // `height` (when given) pins the box to an exact pixel height,
         // matching a sibling <input> in the same row - matching padding
@@ -117,19 +206,27 @@ export default function SearchableSelect({
               autoFocus
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => updateQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder={t("selectSearchOption")}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={open}
+              aria-controls={listboxId}
+              aria-activedescendant={activeOption ? optionId(activeOption.code) : undefined}
               className={`w-full ${padding} border-b border-[var(--border-brand)] bg-transparent text-sm outline-none`}
             />
           )}
-          <ul className="max-h-56 overflow-y-auto">
+          <ul className="max-h-56 overflow-y-auto" role="listbox" id={listboxId}>
             {filtered.length === 0 && <li className={`${padding} text-sm opacity-60`}>{t("selectNoResults")}</li>}
             {filtered.map((o) => (
-              <li key={o.code}>
+              <li key={o.code} role="option" id={optionId(o.code)} aria-selected={o.code === value}>
                 <button
                   type="button"
                   onClick={() => pick(o.code)}
-                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${o.code === value ? "bg-[var(--brand-soft)] font-medium" : ""}`}
+                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${
+                    o.code === value || o.code === activeOption?.code ? "bg-[var(--brand-soft)] font-medium" : ""
+                  }`}
                 >
                   {o.name}
                 </button>
