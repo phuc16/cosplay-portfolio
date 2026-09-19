@@ -334,6 +334,7 @@ async function copyCollection(id) {
       price: p.price,
       images: p.images,
       type: p.type,
+      character_tag: p.character_tag,
       stock_qty: p.stock_qty,
       delivery_link: p.delivery_link,
       thumbnail_image: p.thumbnail_image,
@@ -402,8 +403,8 @@ async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
   const type = data.type === "digital" ? "digital" : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, character_tag, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
@@ -411,6 +412,7 @@ async function createProduct(data) {
       Number(data.price) || 0,
       JSON.stringify(data.images || []),
       type,
+      data.character_tag?.trim() || null,
       sortOrder,
     ]
   )
@@ -430,12 +432,20 @@ async function createProduct(data) {
 }
 
 async function updateProduct(id, data) {
-  const [[existing]] = await db.query("SELECT type FROM products WHERE id = ?", [id])
+  const [[existing]] = await db.query("SELECT type, character_tag FROM products WHERE id = ?", [id])
   if (!existing) return false
 
+  // Omitted (undefined) preserves the current tag - same "don't silently
+  // blank a field a partial-payload caller never mentioned" discipline as
+  // the digital hidden variant's stock_qty/delivery_link below. An explicit
+  // empty string still clears it.
+  const characterTag = data.character_tag === undefined
+    ? existing.character_tag
+    : (data.character_tag?.trim() || null)
+
   const [res] = await db.query(
-    "UPDATE products SET name = ?, description = ?, price = ?, images = ? WHERE id = ?",
-    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
+    "UPDATE products SET name = ?, description = ?, price = ?, images = ?, character_tag = ? WHERE id = ?",
+    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), characterTag, id]
   )
 
   if (existing.type === "digital") {

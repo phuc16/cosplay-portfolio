@@ -31,6 +31,7 @@ export default function Collection() {
   const [search, setSearch] = useState("")
   const [stockFilter, setStockFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
+  const [characterFilter, setCharacterFilter] = useState("")
 
   // Brief inline confirmation, matching this codebase's no-toast-library style -
   // cleared automatically a couple seconds after each add.
@@ -83,11 +84,18 @@ export default function Collection() {
   const closed = collection.status === "closed"
   const notStartedYet = !closed && collection.not_started_yet
   const unavailableLabel = closed ? t("shopClosed") : notStartedYet ? t("shopNotStarted") : null
+  // Only worth offering a filter when there's more than one character/series
+  // to actually narrow between - a collection with 0 or 1 distinct tags has
+  // nothing meaningful to filter (see the design doc's scope decision).
+  const characterTags = [...new Set(
+    collection.products.map((p) => p.character_tag?.trim()).filter(Boolean)
+  )]
   const visibleProducts = sortProducts(
     collection.products.filter((p) => {
       if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (stockFilter === "in_stock" && isProductSoldOut(p)) return false
       if (stockFilter === "sold_out" && !isProductSoldOut(p)) return false
+      if (characterFilter && p.character_tag?.trim() !== characterFilter) return false
       return true
     }),
     sortBy
@@ -175,6 +183,17 @@ export default function Collection() {
                   ]}
                   placeholder={t("shopFilterAllStock")}
                 />
+                {characterTags.length > 1 && (
+                  <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
+                    value={characterFilter}
+                    onChange={setCharacterFilter}
+                    options={[
+                      { code: "", name: t("shopFilterAllCharacters") },
+                      ...characterTags.map((tag) => ({ code: tag, name: tag })),
+                    ]}
+                    placeholder={t("shopFilterAllCharacters")}
+                  />
+                )}
                 <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
                   value={sortBy}
                   onChange={setSortBy}

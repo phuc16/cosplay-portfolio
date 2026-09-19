@@ -286,4 +286,68 @@ describe("AdminProducts - search, filter, sort", () => {
 
     expect(container.textContent).toContain("Không tìm thấy sản phẩm nào khớp")
   })
+
+  it("also matches character_tag when searching", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [
+        product({ id: 1, name: "Photocard A1", character_tag: "Raiden Shogun" }),
+        product({ id: 2, name: "Photocard B1", character_tag: "Yae Miko" }),
+      ],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Tìm theo tên..."]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(searchInput, "raiden")
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    expect(container.textContent).toContain("Photocard A1")
+    expect(container.textContent).not.toContain("Photocard B1")
+  })
+})
+
+describe("AdminProducts - character_tag", () => {
+  it("round-trips character_tag through edit and save", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Card", character_tag: "Raiden Shogun" })],
+    })
+    adminUpdateProduct.mockResolvedValue({ ok: true })
+
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const tagInput = container.querySelector('input[placeholder*="Nhân vật"]')
+    expect(tagInput.value).toBe("Raiden Shogun")
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Cập nhật")
+    await act(async () => { saveButton.click() })
+
+    expect(adminUpdateProduct).toHaveBeenCalledWith(1, expect.objectContaining({ character_tag: "Raiden Shogun" }))
+  })
+
+  it("includes an empty character_tag in the create payload when left blank", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+
+    const container = await renderProducts()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "New Card")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(expect.any(Number), expect.objectContaining({ character_tag: "" }))
+  })
 })

@@ -185,6 +185,56 @@ describe("Collection - search, filter, sort", () => {
   })
 })
 
+describe("Collection - character/series filter", () => {
+  function taggedProducts(tag1, tag2) {
+    return baseCollection({
+      products: [
+        { id: 1, name: "Photocard", price: 35000, description: null, images: [], variants: [{ id: 1, label: "A1", stock_qty: 5 }], character_tag: tag1 },
+        { id: 2, name: "Poster", price: 90000, description: null, images: [], variants: [{ id: 2, label: "A1", stock_qty: 5 }], character_tag: tag2 },
+      ],
+    })
+  }
+
+  it("does not render the character filter when every product shares the same (or no) tag", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts(null, null))
+    const container = await renderCollection()
+    expect(container.querySelector('button[aria-label="All characters"]')).toBeNull()
+  })
+
+  it("renders the character filter with one option per distinct tag when 2+ exist", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts("Raiden Shogun", "Yae Miko"))
+    const container = await renderCollection()
+
+    const trigger = container.querySelector('button[aria-label="All characters"]')
+    expect(trigger).toBeTruthy()
+    await act(async () => { trigger.click() })
+
+    const optionTexts = [...container.querySelectorAll("li button")].map((b) => b.textContent)
+    expect(optionTexts).toContain("Raiden Shogun")
+    expect(optionTexts).toContain("Yae Miko")
+  })
+
+  it("narrows the grid to the selected character", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts("Raiden Shogun", "Yae Miko"))
+    const container = await renderCollection()
+
+    const trigger = container.querySelector('button[aria-label="All characters"]')
+    await act(async () => { trigger.click() })
+    const option = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Raiden Shogun")
+    await act(async () => { option.click() })
+
+    expect(container.textContent).toContain("Photocard")
+    expect(container.textContent).not.toContain("Poster")
+  })
+
+  it("untagged products stay visible under the default 'All characters' selection", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts("Raiden Shogun", null))
+    const container = await renderCollection()
+    expect(container.textContent).toContain("Photocard")
+    expect(container.textContent).toContain("Poster")
+  })
+})
+
 describe("Collection - add-to-cart toast", () => {
   it("shows a toast linking to /cart after adding an item", async () => {
     fetchCollection.mockResolvedValue(baseCollection())

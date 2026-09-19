@@ -519,6 +519,29 @@ describe("ProductCard - full variant gallery", () => {
   })
 })
 
+describe("ProductCard - character_tag badge", () => {
+  it("shows the character_tag badge on the grid card when present", async () => {
+    const product = baseProduct({ character_tag: "Raiden Shogun" })
+    const { container } = await renderCard({ product })
+    expect(container.textContent).toContain("Raiden Shogun")
+  })
+
+  it("renders nothing extra when character_tag is absent", async () => {
+    const product = baseProduct({ character_tag: null })
+    const { container } = await renderCard({ product })
+    expect(container.textContent).not.toContain("Raiden Shogun")
+  })
+
+  it("shows the character_tag badge in the detail modal too", async () => {
+    const product = baseProduct({ character_tag: "Raiden Shogun" })
+    const { container } = await renderCard({ product })
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).toContain("Raiden Shogun")
+  })
+})
+
 describe("unavailableLabel", () => {
   it("shows the custom unavailableLabel instead of the stock line when not orderable", async () => {
     const { container } = await renderCard({

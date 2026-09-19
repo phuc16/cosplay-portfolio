@@ -146,6 +146,11 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 {t("shopDigitalBadge")}
               </span>
             )}
+            {product.character_tag && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--border-brand)] opacity-80">
+                {product.character_tag}
+              </span>
+            )}
           </div>
           <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
 
@@ -258,6 +263,11 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                   {isDigital && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
                       {t("shopDigitalBadge")}
+                    </span>
+                  )}
+                  {product.character_tag && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--border-brand)] opacity-80">
+                      {product.character_tag}
                     </span>
                   )}
                 </div>

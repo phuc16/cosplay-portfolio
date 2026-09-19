@@ -848,3 +848,65 @@ describe("collection scheduling", () => {
     expect(copy.end_at).toBeNull()
   })
 })
+
+describe("character_tag", () => {
+  it("createProduct persists a character_tag when given, trimmed", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, character_tag: "  Raiden Shogun  ",
+    })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBe("Raiden Shogun")
+  })
+
+  it("createProduct defaults to null when character_tag is omitted", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBeNull()
+  })
+
+  it("updateProduct sets character_tag", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.updateProduct(pid, { name: "Card", price: 35000, character_tag: "Yae Miko" })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBe("Yae Miko")
+  })
+
+  it("updateProduct preserves the existing character_tag when the field is omitted", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000, character_tag: "Yae Miko" })
+    await repo.updateProduct(pid, { name: "Card renamed", price: 35000 })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBe("Yae Miko")
+  })
+
+  it("updateProduct clears character_tag to null when explicitly sent empty", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000, character_tag: "Yae Miko" })
+    await repo.updateProduct(pid, { name: "Card", price: 35000, character_tag: "" })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBeNull()
+  })
+
+  it("is exposed on both the public and admin nested product detail", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000, character_tag: "Yae Miko" })
+    const [[{ slug }]] = await db.query("SELECT slug FROM collections WHERE id = ?", [cid])
+
+    const pub = await repo.getPublicCollectionBySlug(slug)
+    const admin = await repo.getCollectionDetailById(cid)
+    expect(pub.products[0].character_tag).toBe("Yae Miko")
+    expect(admin.products[0].character_tag).toBe("Yae Miko")
+  })
+
+  it("carries character_tag through copyCollection", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000, character_tag: "Yae Miko" })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].character_tag).toBe("Yae Miko")
+  })
+})
