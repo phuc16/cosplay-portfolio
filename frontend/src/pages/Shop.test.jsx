@@ -61,7 +61,7 @@ describe("Shop - collection ordering", () => {
     const container = await renderShop()
     await flush()
 
-    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    const titles = [...container.querySelectorAll("h3")].map((h) => h.textContent)
     expect(titles).toEqual(["Active A", "Active B", "Ended A", "Ended B"])
   })
 })
@@ -82,6 +82,57 @@ describe("Shop - digital badge", () => {
     const withoutDigital = cards.find((a) => a.textContent.includes("Spring Festival"))
     expect(withDigital.textContent).toContain("Digital")
     expect(withoutDigital.textContent).not.toContain("Digital")
+  })
+})
+
+describe("Shop - grouped by type", () => {
+  it("groups collections under Digital/Physical headings, each listing only its own collections", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "A", status: "active", product_count: 1, has_digital_item: true },
+      { id: 2, slug: "b", title: "B", status: "active", product_count: 1, has_digital_item: true },
+      { id: 3, slug: "c", title: "C", status: "active", product_count: 1, has_digital_item: true },
+      { id: 4, slug: "d", title: "D", status: "active", product_count: 1, has_digital_item: false },
+      { id: 5, slug: "e", title: "E", status: "active", product_count: 1, has_digital_item: false },
+      { id: 6, slug: "f", title: "F", status: "active", product_count: 1, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Digital", "Physical"])
+
+    const digitalGroup = groups[0].closest("div")
+    const physicalGroup = groups[1].closest("div")
+    expect([...digitalGroup.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["A", "B", "C"])
+    expect([...physicalGroup.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["D", "E", "F"])
+  })
+
+  it("omits the Digital group heading entirely when no collection has a digital item", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "d", title: "D", status: "active", product_count: 1, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Physical"])
+  })
+
+  it("omits the Physical group heading entirely when every collection has a digital item", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "A", status: "active", product_count: 1, has_digital_item: true },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Digital"])
   })
 })
 
@@ -122,7 +173,7 @@ describe("Shop - not-started preview", () => {
     const container = await renderShop()
     await flush()
 
-    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    const titles = [...container.querySelectorAll("h3")].map((h) => h.textContent)
     expect(titles).toEqual(["Live", "Upcoming", "Ended"])
   })
 })
@@ -197,7 +248,7 @@ describe("Shop - search, filter, sort", () => {
       nameAscOption.click()
     })
 
-    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    const titles = [...container.querySelectorAll("h3")].map((h) => h.textContent)
     expect(titles).toEqual(["Apple Drop", "Zebra Drop"])
   })
 
@@ -225,7 +276,7 @@ describe("Shop - search, filter, sort", () => {
       nameAscOption.click()
     })
 
-    const titles = [...container.querySelectorAll("h2")].map((h) => h.textContent)
+    const titles = [...container.querySelectorAll("h3")].map((h) => h.textContent)
     expect(titles).toEqual(["Zebra Drop", "Apple Drop"])
   })
 

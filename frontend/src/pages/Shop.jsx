@@ -27,6 +27,79 @@ function sortCollections(list, sortBy) {
   return sorted
 }
 
+// A collection can mix digital and physical products, but has_digital_item
+// (already computed server-side - see catalogRepo.listPublicCollections)
+// is the same "at least one digital item" signal the card's own badge
+// already uses, so grouping by it here stays consistent with what a buyer
+// sees on each card.
+function groupCollectionsByType(list) {
+  const digital = list.filter((c) => c.has_digital_item)
+  const physical = list.filter((c) => !c.has_digital_item)
+  return { digital, physical }
+}
+
+function CollectionCard({ c, t }) {
+  return (
+    <Link
+      to={`/merchandise/${c.slug}`}
+      className="rounded-2xl border border-[var(--border-brand)] overflow-hidden hover:shadow-[var(--shadow-pink-hover)] transition"
+    >
+      {(c.thumbnail_image || c.cover_image) && (
+        <div className="relative">
+          <img
+            src={c.thumbnail_image || c.cover_image}
+            alt={c.title}
+            loading="lazy"
+            className="w-full aspect-[4/3] object-cover"
+          />
+          {c.status === "closed" && (
+            <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-white font-semibold">
+              {t("shopClosed")}
+            </span>
+          )}
+          {c.status !== "closed" && c.not_started_yet && (
+            <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 text-white font-semibold text-center px-2">
+              <span>{t("shopNotStarted")}</span>
+              {c.start_at && (
+                <span className="text-xs font-normal">{t("shopOpensAt", { date: formatVnDateTime(c.start_at, { withYear: true }) })}</span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="p-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="font-semibold">{c.title}</h3>
+          {c.has_digital_item && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
+              {t("shopDigitalBadge")}
+            </span>
+          )}
+        </div>
+        <p className="text-sm opacity-70">{t("productsCount", { n: c.product_count })}</p>
+        {c.status === "closed" && (
+          <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopClosed")}</p>
+        )}
+        {c.status !== "closed" && c.not_started_yet && (
+          <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopNotStarted")}</p>
+        )}
+      </div>
+    </Link>
+  )
+}
+
+function CollectionGroup({ title, list, t }) {
+  if (list.length === 0) return null
+  return (
+    <div className="mb-8">
+      <h2 className="text-lg font-semibold mb-3" data-testid="collection-group-title">{title}</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+        {list.map((c) => <CollectionCard key={c.id} c={c} t={t} />)}
+      </div>
+    </div>
+  )
+}
+
 export default function Shop() {
   const { t } = useLanguage()
   const [collections, setCollections] = useState(null)
@@ -48,6 +121,7 @@ export default function Shop() {
     }),
     sortBy
   )
+  const { digital, physical } = groupCollectionsByType(visibleCollections)
 
   return (
     <>
@@ -98,56 +172,8 @@ export default function Shop() {
         <p className="opacity-60 mb-6">{t("shopNoCollectionsMatch")}</p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-        {visibleCollections.map((c) => (
-          <Link
-            key={c.id}
-            to={`/merchandise/${c.slug}`}
-            className="rounded-2xl border border-[var(--border-brand)] overflow-hidden hover:shadow-[var(--shadow-pink-hover)] transition"
-          >
-            {(c.thumbnail_image || c.cover_image) && (
-              <div className="relative">
-                <img
-                  src={c.thumbnail_image || c.cover_image}
-                  alt={c.title}
-                  loading="lazy"
-                  className="w-full aspect-[4/3] object-cover"
-                />
-                {c.status === "closed" && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-white font-semibold">
-                    {t("shopClosed")}
-                  </span>
-                )}
-                {c.status !== "closed" && c.not_started_yet && (
-                  <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 text-white font-semibold text-center px-2">
-                    <span>{t("shopNotStarted")}</span>
-                    {c.start_at && (
-                      <span className="text-xs font-normal">{t("shopOpensAt", { date: formatVnDateTime(c.start_at, { withYear: true }) })}</span>
-                    )}
-                  </span>
-                )}
-              </div>
-            )}
-            <div className="p-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-semibold">{c.title}</h2>
-                {c.has_digital_item && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
-                    {t("shopDigitalBadge")}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm opacity-70">{t("productsCount", { n: c.product_count })}</p>
-              {c.status === "closed" && (
-                <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopClosed")}</p>
-              )}
-              {c.status !== "closed" && c.not_started_yet && (
-                <p className="mt-2 text-xs uppercase tracking-wide opacity-60">{t("shopNotStarted")}</p>
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
+      <CollectionGroup title={t("shopGroupDigital")} list={digital} t={t} />
+      <CollectionGroup title={t("shopGroupPhysical")} list={physical} t={t} />
       </main>
 
       <ShopFooter />
