@@ -215,6 +215,71 @@ describe("AdminProducts - digital products", () => {
   })
 })
 
+describe("AdminProducts - tags", () => {
+  it("splits, trims, and dedupes comma-separated tags on save", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+
+    const container = await renderProducts()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    const tagsInput = container.querySelector('input[placeholder*="Tags"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Raiden Card")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+      setter.call(tagsInput, " Genshin Impact , Raiden Shogun, genshin impact ,, Raiden Shogun ")
+      tagsInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ tags: ["Genshin Impact", "Raiden Shogun"] })
+    )
+  })
+
+  it("pre-fills the tags field with the product's existing tags, joined by comma-space, when editing", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Card", tags: ["Genshin Impact", "Raiden Shogun"] })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const tagsInput = container.querySelector('input[placeholder*="Tags"]')
+    expect(tagsInput.value).toBe("Genshin Impact, Raiden Shogun")
+  })
+
+  it("saves an empty tag list when the tags field is left blank", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+
+    const container = await renderProducts()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Plain Card")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ tags: [] })
+    )
+  })
+})
+
 describe("AdminProducts - search, filter, sort", () => {
   it("filters the list by name, case-insensitively", async () => {
     adminGetCollection.mockResolvedValue({

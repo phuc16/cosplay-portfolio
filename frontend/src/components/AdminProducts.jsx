@@ -9,7 +9,24 @@ import { formatVnd } from "../utils/money"
 
 const blank = {
   name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "",
-  thumbnail_image: "",
+  thumbnail_image: "", tagsInput: "",
+}
+
+// Trims, drops blanks, and dedupes case-insensitively (first-seen casing
+// wins) - mirrors catalogRepo.js's normalizeTags exactly, so what's shown
+// after a save round-trip already matches what the backend stored.
+function parseTagsInput(text) {
+  const seen = new Set()
+  const out = []
+  for (const raw of (text || "").split(",")) {
+    const trimmed = raw.trim()
+    if (!trimmed) continue
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(trimmed)
+  }
+  return out
 }
 
 const SORTS = [
@@ -95,7 +112,8 @@ export default function AdminProducts({ collection }) {
   const save = async () => {
     setError("")
     try {
-      const payload = { ...draft, price: Number(draft.price) || 0 }
+      const { tagsInput, ...rest } = draft
+      const payload = { ...rest, price: Number(draft.price) || 0, tags: parseTagsInput(tagsInput) }
       if (editingId) await adminUpdateProduct(editingId, payload)
       else await adminCreateProduct(collection.id, payload)
 
@@ -112,7 +130,7 @@ export default function AdminProducts({ collection }) {
     setDraft({
       name: p.name, description: p.description || "", price: p.price, images: p.images || [],
       type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
-      thumbnail_image: p.thumbnail_image || "",
+      thumbnail_image: p.thumbnail_image || "", tagsInput: (p.tags || []).join(", "),
     })
   }
 
@@ -216,6 +234,12 @@ export default function AdminProducts({ collection }) {
         onChange={(e) => setDraft({ ...draft, description: e.target.value })}
         placeholder="Mô tả (markdown)"
         rows={3}
+        className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+      />
+      <input
+        value={draft.tagsInput}
+        onChange={(e) => setDraft({ ...draft, tagsInput: e.target.value })}
+        placeholder="Tags, cách nhau bởi dấu phẩy (ví dụ: Genshin Impact, Raiden Shogun)"
         className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
       />
       {draft.type === "digital" && (
