@@ -146,6 +146,14 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 {t("shopDigitalBadge")}
               </span>
             )}
+            {product.tags?.map((tag) => (
+              <span
+                key={tag}
+                className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--border-brand)]"
+              >
+                {tag}
+              </span>
+            ))}
           </div>
           <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
 

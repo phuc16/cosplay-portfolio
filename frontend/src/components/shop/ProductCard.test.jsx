@@ -519,6 +519,27 @@ describe("ProductCard - full variant gallery", () => {
   })
 })
 
+describe("ProductCard - tag badges", () => {
+  it("renders a small badge for each of the product's own tags", async () => {
+    const { container } = await renderCard({
+      product: baseProduct({ tags: ["Genshin Impact", "Raiden Shogun"] }),
+    })
+    expect(container.textContent).toContain("Genshin Impact")
+    expect(container.textContent).toContain("Raiden Shogun")
+  })
+
+  it("renders no tag badges for a product with no tags", async () => {
+    const { container } = await renderCard({ product: baseProduct({ tags: [] }) })
+    expect(container.textContent).not.toContain("Genshin")
+  })
+
+  it("renders no tag badges when tags is absent entirely", async () => {
+    const { container } = await renderCard({ product: baseProduct() })
+    // No throw, no stray tag text - baseProduct() carries no `tags` key at all.
+    expect(container.querySelector("article")).toBeTruthy()
+  })
+})
+
 describe("unavailableLabel", () => {
   it("shows the custom unavailableLabel instead of the stock line when not orderable", async () => {
     const { container } = await renderCard({

@@ -185,6 +185,74 @@ describe("Collection - search, filter, sort", () => {
   })
 })
 
+describe("Collection - tag filter chips", () => {
+  function taggedProducts() {
+    return baseCollection({
+      products: [
+        { id: 1, name: "Raiden", price: 35000, description: null, images: [], tags: ["Genshin Impact", "Raiden Shogun"], variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+        { id: 2, name: "Bocchi", price: 35000, description: null, images: [], tags: ["Bocchi the Rock"], variants: [{ id: 2, label: "A1", stock_qty: 5 }] },
+        { id: 3, name: "Untagged", price: 35000, description: null, images: [], variants: [{ id: 3, label: "A1", stock_qty: 5 }] },
+      ],
+    })
+  }
+
+  it("does not render a chip bar when no product has any tag", async () => {
+    fetchCollection.mockResolvedValue(baseCollection())
+    const container = await renderCollection()
+
+    expect(container.textContent).not.toContain("Genshin")
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "All")).toBe(false)
+  })
+
+  it("renders a chip per distinct tag, plus an All chip, when at least one product is tagged", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts())
+    const container = await renderCollection()
+
+    const chipLabels = ["All", "Genshin Impact", "Raiden Shogun", "Bocchi the Rock"]
+    for (const label of chipLabels) {
+      expect([...container.querySelectorAll("button")].some((b) => b.textContent === label)).toBe(true)
+    }
+  })
+
+  it("filters the grid to products carrying the clicked tag", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts())
+    const container = await renderCollection()
+
+    const chip = [...container.querySelectorAll("button")].find((b) => b.textContent === "Bocchi the Rock")
+    await act(async () => { chip.click() })
+
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent)
+    expect(names).toEqual(["Bocchi"])
+  })
+
+  it("toggles back to showing everything when the active chip is clicked again", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts())
+    const container = await renderCollection()
+
+    const chip = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "Bocchi the Rock")
+    await act(async () => { chip().click() })
+    expect([...container.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Bocchi"])
+
+    await act(async () => { chip().click() })
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent).sort()
+    expect(names).toEqual(["Bocchi", "Raiden", "Untagged"])
+  })
+
+  it("the All chip resets an active tag filter", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts())
+    const container = await renderCollection()
+
+    const tagChip = [...container.querySelectorAll("button")].find((b) => b.textContent === "Bocchi the Rock")
+    await act(async () => { tagChip.click() })
+    expect([...container.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Bocchi"])
+
+    const allChip = [...container.querySelectorAll("button")].find((b) => b.textContent === "All")
+    await act(async () => { allChip.click() })
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent).sort()
+    expect(names).toEqual(["Bocchi", "Raiden", "Untagged"])
+  })
+})
+
 describe("Collection - add-to-cart toast", () => {
   it("shows a toast linking to /cart after adding an item", async () => {
     fetchCollection.mockResolvedValue(baseCollection())

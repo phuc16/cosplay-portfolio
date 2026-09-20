@@ -23,6 +23,22 @@ function sortProducts(list, sortBy) {
   return sorted
 }
 
+// Distinct tags across a collection's products, preserving first-seen
+// order - no canonical sort imposed, same "don't police the seller's own
+// casing/ordering" approach the rest of this feature takes.
+function collectionTags(products) {
+  const seen = new Set()
+  const out = []
+  for (const p of products) {
+    for (const tag of p.tags || []) {
+      if (seen.has(tag)) continue
+      seen.add(tag)
+      out.push(tag)
+    }
+  }
+  return out
+}
+
 export default function Collection() {
   const { slug } = useParams()
   const { t } = useLanguage()
@@ -31,6 +47,16 @@ export default function Collection() {
   const [search, setSearch] = useState("")
   const [stockFilter, setStockFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
+  // Carries the slug it was set for, same "derive rather than reset via a
+  // setState-in-effect" pattern `result` above already uses - a tag chip
+  // selected on one collection must not silently carry into another.
+  const [tagFilterState, setTagFilterState] = useState({ slug: null, value: "" })
+  const tagFilter = tagFilterState.slug === slug ? tagFilterState.value : ""
+  const setTagFilter = (updater) =>
+    setTagFilterState((s) => ({
+      slug,
+      value: typeof updater === "function" ? updater(s.slug === slug ? s.value : "") : updater,
+    }))
 
   // Brief inline confirmation, matching this codebase's no-toast-library style -
   // cleared automatically a couple seconds after each add.
@@ -83,11 +109,13 @@ export default function Collection() {
   const closed = collection.status === "closed"
   const notStartedYet = !closed && collection.not_started_yet
   const unavailableLabel = closed ? t("shopClosed") : notStartedYet ? t("shopNotStarted") : null
+  const tags = collectionTags(collection.products)
   const visibleProducts = sortProducts(
     collection.products.filter((p) => {
       if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (stockFilter === "in_stock" && isProductSoldOut(p)) return false
       if (stockFilter === "sold_out" && !isProductSoldOut(p)) return false
+      if (tagFilter && !(p.tags || []).includes(tagFilter)) return false
       return true
     }),
     sortBy
@@ -188,6 +216,38 @@ export default function Collection() {
                   placeholder={t("shopSortDefault")}
                 />
               </div>
+            </div>
+          )}
+
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-5">
+              <button
+                type="button"
+                onClick={() => setTagFilter("")}
+                className={
+                  "px-3 py-1.5 rounded-full text-xs " +
+                  (tagFilter === ""
+                    ? "bg-[var(--brand)] text-white"
+                    : "border border-[var(--border-brand)] hover:border-[var(--brand)]")
+                }
+              >
+                {t("shopFilterAllTags")}
+              </button>
+              {tags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setTagFilter((current) => (current === tag ? "" : tag))}
+                  className={
+                    "px-3 py-1.5 rounded-full text-xs " +
+                    (tagFilter === tag
+                      ? "bg-[var(--brand)] text-white"
+                      : "border border-[var(--border-brand)] hover:border-[var(--brand)]")
+                  }
+                >
+                  {tag}
+                </button>
+              ))}
             </div>
           )}
 
