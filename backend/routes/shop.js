@@ -2,6 +2,7 @@ const express = require("express")
 const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const giftSettings = require("../shop/giftSettings")
+const discountCodes = require("../shop/discountCodes")
 const vnAddress = require("../shop/vnAddress")
 
 /**
@@ -54,6 +55,28 @@ module.exports = function shopRoutes() {
       res.json(giftSettings.publicSettings(await giftSettings.getSettings()))
     } catch (err) {
       console.error("[SHOP] Lỗi lấy cấu hình quà tặng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Client-side "Apply" feedback only - a client-side estimate, cosmetic
+  // only, exactly like the free gift's own public read. Never locks or
+  // increments used_count; createOrder is the sole authority and re-checks
+  // everything for real, under its own row lock, at order-creation time.
+  router.post("/discount-preview", async (req, res) => {
+    try {
+      const subtotal = Number(req.body?.subtotal)
+      if (!Number.isFinite(subtotal) || subtotal < 0) {
+        return res.status(400).json({ error: "invalid_input", message: "Giá trị đơn hàng không hợp lệ" })
+      }
+
+      const result = await discountCodes.previewCode(req.body?.code, subtotal)
+      if (!result.ok) {
+        return res.json({ valid: false, message: discountCodes.REASON_MESSAGES[result.reason] || "Mã giảm giá không hợp lệ" })
+      }
+      res.json({ valid: true, amount: result.amount, type: result.row.type, value: result.row.value })
+    } catch (err) {
+      console.error("[SHOP] Lỗi kiểm tra mã giảm giá:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
