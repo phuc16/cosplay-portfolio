@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
+import axios from "axios"
 import { fetchCollections } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import SearchableSelect from "../components/SearchableSelect"
 import { formatVnDateTime } from "../utils/orderDeadline"
+import { useSeoMeta } from "../hooks/useSeoMeta"
+import { getLocalized } from "../utils/localize"
 
 // Live/orderable first, then a not-yet-started preview, then closed (ended)
 // last - an upcoming drop is still worth surfacing prominently (that's the
@@ -101,18 +104,37 @@ function CollectionGroup({ title, list, t }) {
 }
 
 export default function Shop() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [collections, setCollections] = useState(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [typeFilter, setTypeFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
+  // Fetches its own copy rather than taking it as a prop, same as ShopFooter
+  // (see its own comment) - the shop page tree has no shared layout to hoist
+  // this into.
+  const [brandName, setBrandName] = useState("")
 
   useEffect(() => {
     fetchCollections()
       .then(setCollections)
       .catch(() => setCollections([]))
   }, [])
+
+  useEffect(() => {
+    axios.get("/api/settings")
+      .then((r) => setBrandName(getLocalized(r.data?.artistName, lang)))
+      .catch(() => {})
+  }, [lang])
+
+  const pageTitle = brandName ? `${t("shopTitle")} - ${brandName}` : t("shopTitle")
+  useSeoMeta(
+    {
+      title: pageTitle,
+      meta: [{ name: "description", content: t("shopDesc") }],
+    },
+    [pageTitle, t]
+  )
 
   const visibleCollections = sortCollections(
     (collections || []).filter((c) => {

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
+import axios from "axios"
 import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
 import { formatVnDateTime } from "../utils/orderDeadline"
@@ -61,6 +62,18 @@ async function renderCollection() {
 beforeEach(() => {
   localStorage.clear()
   fetchCollection.mockReset()
+  // Restore the default (some SEO-metadata tests below override this with a
+  // populated artistName/brand name, which would otherwise leak into every
+  // later test in this file since nothing else re-mocks it per test).
+  axios.get.mockReset().mockResolvedValue({ data: {} })
+  // useSeoMeta appends directly to document.head (outside React's own tree,
+  // which is otherwise never unmounted between tests in this file) - clear
+  // any tags a previous test's still-mounted Collection instance left
+  // behind, so document.head queries below only ever see the current test's
+  // own tags.
+  document.head.querySelectorAll(
+    'meta[name="description"], meta[property^="og:"], meta[name^="twitter:"], script[type="application/ld+json"]'
+  ).forEach((el) => el.remove())
 })
 
 describe("Collection - product ordering", () => {
@@ -216,6 +229,115 @@ describe("Collection - add-to-cart toast", () => {
     await act(async () => { vi.advanceTimersByTime(2000) })
     expect(container.querySelector('a[role="status"]')).toBeNull()
     vi.useRealTimers()
+  })
+})
+
+describe("Collection - SEO metadata", () => {
+  it("sets the title, description, Open Graph, Twitter Card, and JSON-LD ItemList from the collection's own data", async () => {
+    axios.get.mockResolvedValue({ data: { artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" } } })
+    fetchCollection.mockResolvedValue(baseCollection({
+      title: "Mid-Autumn Drop",
+      description: "**Limited** photocards for Mid-Autumn.",
+      cover_image: "/api/storage/cover.jpg",
+      products: [
+        { id: 1, name: "Card A", price: 35000, description: null, images: [], thumbnail_image: "/api/storage/a.jpg", variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+        { id: 2, name: "Card B (sold out)", price: 40000, description: null, images: [], variants: [{ id: 2, label: "A1", stock_qty: 0 }] },
+      ],
+    }))
+
+    await renderCollection()
+    await act(async () => {})
+
+    expect(document.title).toBe("Mid-Autumn Drop - Kamidayhehe")
+    expect(document.querySelector('meta[name="description"]').getAttribute("content")).toBe("Limited photocards for Mid-Autumn.")
+    expect(document.querySelector('meta[property="og:title"]').getAttribute("content")).toBe("Mid-Autumn Drop - Kamidayhehe")
+    expect(document.querySelector('meta[property="og:type"]').getAttribute("content")).toBe("website")
+    expect(document.querySelector('meta[property="og:image"]').getAttribute("content")).toBe(`${window.location.origin}/api/storage/cover.jpg`)
+    expect(document.querySelector('meta[name="twitter:card"]').getAttribute("content")).toBe("summary_large_image")
+    expect(document.querySelector('meta[name="twitter:title"]').getAttribute("content")).toBe("Mid-Autumn Drop - Kamidayhehe")
+
+    const script = document.querySelector('script[type="application/ld+json"]')
+    expect(script).toBeTruthy()
+    const jsonLd = JSON.parse(script.textContent)
+    expect(jsonLd["@type"]).toBe("ItemList")
+    expect(jsonLd.numberOfItems).toBe(2)
+    expect(jsonLd.itemListElement).toHaveLength(2)
+    const [first, second] = jsonLd.itemListElement
+    expect(first.item.name).toBe("Card A")
+    expect(first.item.offers.priceCurrency).toBe("VND")
+    expect(first.item.offers.price).toBe("35000")
+    expect(first.item.offers.availability).toBe("https://schema.org/InStock")
+    expect(first.item.image).toBe(`${window.location.origin}/api/storage/a.jpg`)
+    // Sold-out product: never claims InStock, even though the collection itself is open.
+    expect(second.item.offers.availability).toBe("https://schema.org/OutOfStock")
+  })
+
+  it("falls back to a generic description and omits og:image/twitter:image when the collection has no description or image anywhere", async () => {
+    axios.get.mockResolvedValue({ data: {} })
+    fetchCollection.mockResolvedValue(baseCollection({ description: null, cover_image: null }))
+
+    await renderCollection()
+    await act(async () => {})
+
+    expect(document.querySelector('meta[name="description"]').getAttribute("content")).toBe("Pick what you like, then place an order.")
+    expect(document.querySelector('meta[property="og:image"]')).toBeNull()
+    expect(document.querySelector('meta[name="twitter:card"]').getAttribute("content")).toBe("summary")
+  })
+
+  it("marks every product OutOfStock in JSON-LD when the collection hasn't started yet, even if individually in stock", async () => {
+    axios.get.mockResolvedValue({ data: {} })
+    fetchCollection.mockResolvedValue(baseCollection({
+      not_started_yet: true, start_at: "2026-12-25T13:00:00.000Z",
+      products: [
+        { id: 1, name: "Card A", price: 35000, description: null, images: [], variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+      ],
+    }))
+
+    await renderCollection()
+    await act(async () => {})
+
+    const script = document.querySelector('script[type="application/ld+json"]')
+    const jsonLd = JSON.parse(script.textContent)
+    expect(jsonLd.itemListElement[0].item.offers.availability).toBe("https://schema.org/OutOfStock")
+  })
+
+  it("marks every product OutOfStock in JSON-LD once the collection has closed", async () => {
+    axios.get.mockResolvedValue({ data: {} })
+    fetchCollection.mockResolvedValue(baseCollection({
+      status: "closed",
+      products: [
+        { id: 1, name: "Card A", price: 35000, description: null, images: [], variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+      ],
+    }))
+
+    await renderCollection()
+    await act(async () => {})
+
+    const script = document.querySelector('script[type="application/ld+json"]')
+    const jsonLd = JSON.parse(script.textContent)
+    expect(jsonLd.itemListElement[0].item.offers.availability).toBe("https://schema.org/OutOfStock")
+  })
+
+  it("emits no JSON-LD when the collection has no products", async () => {
+    axios.get.mockResolvedValue({ data: {} })
+    fetchCollection.mockResolvedValue(baseCollection({ products: [] }))
+
+    await renderCollection()
+    await act(async () => {})
+
+    expect(document.querySelector('script[type="application/ld+json"]')).toBeNull()
+  })
+
+  it("emits no title/meta/JSON-LD while the collection is still loading or wasn't found", async () => {
+    fetchCollection.mockImplementation(() => new Promise(() => {})) // never resolves - stays "loading"
+    document.title = "Kamidayhehe"
+
+    await renderCollection()
+    await act(async () => {})
+
+    expect(document.title).toBe("Kamidayhehe")
+    expect(document.querySelector('meta[property="og:title"]')).toBeNull()
+    expect(document.querySelector('script[type="application/ld+json"]')).toBeNull()
   })
 })
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
+import axios from "axios"
 import { fetchCollection } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { renderMarkdown } from "../utils/markdown"
@@ -9,6 +10,50 @@ import ShopFooter from "../components/shop/ShopFooter"
 import FitTitle from "../components/shop/FitTitle"
 import SearchableSelect from "../components/SearchableSelect"
 import { formatVnDateTime } from "../utils/orderDeadline"
+import { useSeoMeta } from "../hooks/useSeoMeta"
+import { getLocalized } from "../utils/localize"
+import { stripMarkdownToText, truncateText, toAbsoluteUrl, productSeoImage } from "../utils/seoContent"
+
+const SCHEMA_IN_STOCK = "https://schema.org/InStock"
+const SCHEMA_OUT_OF_STOCK = "https://schema.org/OutOfStock"
+
+/**
+ * ItemList/Product JSON-LD for the collection's actual catalog content -
+ * deliberately built from `collection.products` (every product this page
+ * ever renders), not the search/sort-filtered `visibleProducts` view, since
+ * a crawler never types into the search box and structured data should
+ * describe the page's real content, not one buyer's transient UI state.
+ * Availability follows the same "can this actually be bought right now"
+ * rule the visible page already enforces (`orderable`) layered under each
+ * product's own stock - a sold-out variant or an unstarted/closed
+ * collection never gets to claim InStock, per the design doc.
+ */
+function buildCollectionJsonLd(collection, orderable, pageUrl) {
+  const products = collection.products || []
+  if (products.length === 0) return null
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: collection.title,
+    numberOfItems: products.length,
+    itemListElement: products.map((p, idx) => {
+      const image = toAbsoluteUrl(productSeoImage(p))
+      const item = {
+        "@type": "Product",
+        name: p.name,
+        offers: {
+          "@type": "Offer",
+          priceCurrency: "VND",
+          price: String(p.price),
+          availability: orderable && !isProductSoldOut(p) ? SCHEMA_IN_STOCK : SCHEMA_OUT_OF_STOCK,
+          url: pageUrl,
+        },
+      }
+      if (image) item.image = image
+      return { "@type": "ListItem", position: idx + 1, item }
+    }),
+  }
+}
 
 // Sold-out products always sink to the end, under every sort mode - not
 // just the default - so switching to "Price: low to high" etc. never mixes
@@ -25,12 +70,16 @@ function sortProducts(list, sortBy) {
 
 export default function Collection() {
   const { slug } = useParams()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [result, setResult] = useState({ slug: null, collection: undefined })
   const [addedMsg, setAddedMsg] = useState(null)
   const [search, setSearch] = useState("")
   const [stockFilter, setStockFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
+  // Fetches its own copy rather than taking it as a prop, same as ShopFooter
+  // (see its own comment) - the shop page tree has no shared layout to hoist
+  // this into.
+  const [brandName, setBrandName] = useState("")
 
   // Brief inline confirmation, matching this codebase's no-toast-library style -
   // cleared automatically a couple seconds after each add.
@@ -53,9 +102,57 @@ export default function Collection() {
     }
   }, [slug])
 
+  useEffect(() => {
+    axios.get("/api/settings")
+      .then((r) => setBrandName(getLocalized(r.data?.artistName, lang)))
+      .catch(() => {})
+  }, [lang])
+
   // Until the fetch for the current slug resolves, treat it as loading rather
   // than showing a stale result from a previous slug.
   const collection = result.slug === slug ? result.collection : undefined
+
+  // SEO/social-preview metadata is only ever emitted once the collection has
+  // actually loaded (never during the loading state, and never for a
+  // not-found slug) - there is nothing truthful to describe until then, and
+  // the not-found page in particular has no reason to be indexable/shareable.
+  // Deliberately derived from `collection.products` (the full catalog this
+  // page renders), not the search/sort-filtered `visibleProducts` below -
+  // see buildCollectionJsonLd's own comment.
+  const seoOrderable = Boolean(collection) && collection.status !== "closed" && !collection.not_started_yet
+  const seoRawDescription = collection?.description ? stripMarkdownToText(collection.description) : ""
+  const seoDescription = collection ? truncateText(seoRawDescription || t("shopDesc"), 160) : undefined
+  const seoTitle = collection ? (brandName ? `${collection.title} - ${brandName}` : collection.title) : undefined
+  const seoImage = collection
+    ? toAbsoluteUrl(collection.cover_image || (collection.products || []).map(productSeoImage).find(Boolean))
+    : undefined
+  const seoUrl = typeof window !== "undefined" ? window.location.href : undefined
+  const seoJsonLd = collection ? buildCollectionJsonLd(collection, seoOrderable, seoUrl) : undefined
+
+  useSeoMeta(
+    {
+      title: seoTitle,
+      meta: [
+        { name: "description", content: seoDescription },
+        { property: "og:title", content: seoTitle },
+        { property: "og:description", content: seoDescription },
+        // "website", not "product": this page lists a whole collection's
+        // products (their per-item price/availability already live in the
+        // JSON-LD Offers below), not a single product committing to the OG
+        // product namespace's own required properties.
+        { property: "og:type", content: "website" },
+        { property: "og:url", content: seoUrl },
+        { property: "og:site_name", content: brandName },
+        { property: "og:image", content: seoImage },
+        { name: "twitter:card", content: seoImage ? "summary_large_image" : "summary" },
+        { name: "twitter:title", content: seoTitle },
+        { name: "twitter:description", content: seoDescription },
+        { name: "twitter:image", content: seoImage },
+      ],
+      jsonLd: seoJsonLd,
+    },
+    [collection, seoOrderable, brandName]
+  )
 
   if (collection === undefined) {
     return (

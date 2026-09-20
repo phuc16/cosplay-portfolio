@@ -46,6 +46,11 @@ async function flush() { await act(async () => {}) }
 beforeEach(() => {
   fetchCollections.mockReset()
   axios.get.mockReset()
+  // useSeoMeta appends directly to document.head (outside React's own tree,
+  // which is otherwise never unmounted between tests in this file) - clear
+  // any tags a previous test's still-mounted Shop instance left behind, so
+  // document.head queries below only ever see the current test's own tags.
+  document.head.querySelectorAll('meta[name="description"]').forEach((el) => el.remove())
 })
 
 describe("Shop - collection ordering", () => {
@@ -355,6 +360,29 @@ describe("Shop - closed drop overlay", () => {
 
     const img = container.querySelector('img[src="https://x/cover.jpg"]')
     expect(img.parentElement.querySelector("span")).toBeNull()
+  })
+})
+
+describe("Shop - SEO metadata", () => {
+  it("sets document.title to the section name plus the brand name from /api/settings, and a description meta tag", async () => {
+    fetchCollections.mockResolvedValue([])
+    axios.get.mockResolvedValue({ data: { artistName: { vi: "Kamidayhehe", en: "Kamidayhehe" } } })
+
+    await renderShop()
+    await flush()
+
+    expect(document.title).toBe("Merchandise - Kamidayhehe")
+    expect(document.querySelector('meta[name="description"]').getAttribute("content")).toBe("Pick what you like, then place an order.")
+  })
+
+  it("falls back to the section name alone while /api/settings hasn't resolved yet", async () => {
+    fetchCollections.mockResolvedValue([])
+    axios.get.mockImplementation(() => new Promise(() => {})) // never resolves
+
+    await renderShop()
+    await flush()
+
+    expect(document.title).toBe("Merchandise")
   })
 })
 
