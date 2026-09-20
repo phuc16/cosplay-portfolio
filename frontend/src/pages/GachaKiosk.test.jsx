@@ -286,6 +286,57 @@ describe("GachaKiosk", () => {
     expect(alert.textContent).not.toContain("server_error")
   })
 
+  it("adds a preset's turns on top of the current count and starts with the result", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+
+    const container = await renderKiosk()
+    const turnsInput = container.querySelector('input[type="number"]')
+    expect(turnsInput.value).toBe("5")
+
+    await act(async () => click(buttonMatching(container, /^\+10$/)))
+    expect(turnsInput.value).toBe("15")
+
+    await act(async () => click(buttonMatching(container, /^\+5$/)))
+    expect(turnsInput.value).toBe("20")
+
+    await act(async () => click(startButton(container)))
+
+    expect(adminStartBoothSession).toHaveBeenCalledWith(1, { buyerName: "", turnsTotal: 20 })
+  })
+
+  it("counts the session's remaining turns down in the header", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+    adminDrawSession.mockResolvedValue({
+      prize: prizes[0], turns_used: 1, turns_total: 3, session_completed: false,
+    })
+
+    const container = await renderKiosk()
+    const turnsInput = container.querySelector('input[type="number"]')
+    await act(async () => change(turnsInput, "3"))
+    await act(async () => click(startButton(container)))
+
+    const header = container.querySelector("header")
+    expect(header.textContent).toMatch(/LƯỢT CÒN\s*03/)
+
+    await act(async () => click(spinButton(container)))
+    await flush()
+
+    expect(container.querySelector("header").textContent).toMatch(/LƯỢT CÒN\s*02/)
+  })
+
+  it("sends staff back to the panel from the header while a session is running", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+
+    const container = await renderKiosk()
+    expect(buttonMatching(container, /nhân viên/i)).toBeUndefined()
+
+    await act(async () => click(startButton(container)))
+    await act(async () => click(buttonMatching(container, /nhân viên/i)))
+
+    expect(startButton(container)).toBeTruthy()
+    expect(spinButton(container)).toBeUndefined()
+  })
+
   it("shows the readable API message, not the machine error code, when starting a session fails", async () => {
     const err = new Error("Request failed with status code 409")
     err.response = { data: { error: "gacha_sold_out", message: "Gacha đã hết hàng." } }
