@@ -236,3 +236,24 @@
   .hero-title { font-size: 30px !important; }
   .album-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
 }
+
+/* ===========================================================================
+   GACHA - keyframes ported verbatim from the approved mockup
+   (Concept B - Case Reel.dc.html). Global because this codebase has no
+   per-component stylesheets; every gacha rule is prefixed b-/gacha-.
+   =========================================================================== */
+@keyframes b-flash { 0% { opacity: 0; } 10% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes b-card { 0% { transform: perspective(1400px) rotateX(14deg) translateY(36px) scale(.92); opacity: 0; } 70% { transform: perspective(1400px) rotateX(0) translateY(-5px) scale(1.02); opacity: 1; } 100% { transform: none; opacity: 1; } }
+@keyframes b-rise { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes b-sweep { 0% { transform: translateX(-140%) skewX(-16deg); } 100% { transform: translateX(300%) skewX(-16deg); } }
+@keyframes b-rays { to { transform: rotate(360deg); } }
+@keyframes b-blink { 0%,45% { opacity: 1; } 50%,95% { opacity: .2; } }
+.gacha-machine a { color: #21E6FF; }
+.gacha-machine a:hover { color: #8BF3FF; }
+.gacha-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.gacha-scroll::-webkit-scrollbar-thumb { background: #3A2456; border-radius: 4px; }
+.gacha-item:hover { transform: translateY(-3px); }
+.gacha-ghost:hover { border-color: #21E6FF !important; color: #21E6FF !important; }
+.gacha-ghost-pink:hover { border-color: #FF2E88 !important; color: #FF2E88 !important; }
+.gacha-bright:hover { filter: brightness(1.1); }
+.gacha-bright:active { transform: translateY(2px); }

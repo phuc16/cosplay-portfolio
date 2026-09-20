@@ -1,14 +1,8 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { generateRequestKey } from "../requestKey"
 import { cardWidthFor, spinProfile, stopFraction, spinProgress } from "./reelMechanics"
-
-const TIER_COLOR = {
-  common: "#E6E6E6",
-  rare: "#3E8BFF",
-  epic: "#A855F7",
-  legendary: "#E4383A",
-  ancient: "#E8B62C",
-}
+import { tierColor } from "./tiers"
+import { gachaAudio } from "./gachaAudio"
 
 const CARD_GAP = 14
 // Server-side outcomes that are settled: the turn is decided one way or the
@@ -62,6 +56,8 @@ export default function GachaMachine({
   const [spunReel, setSpunReel] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [flash, setFlash] = useState(false)
+  const flashTimer = useRef(null)
   const viewRef = useRef(null)
   const trackRef = useRef(null)
   const [cardWidth] = useState(() => cardWidthFor(typeof window !== "undefined" ? window.innerWidth : 900))
@@ -78,6 +74,16 @@ export default function GachaMachine({
   // instead of burning a second real turn. Cleared only once the server has
   // actually answered - success, or a settled failure.
   const pendingDrawKey = useRef(null)
+
+  // Which reel card last crossed the centre indicator. Ported from the
+  // mockup's lastTickIndex: one tick per card boundary is what makes the
+  // scroll read as a continuous ratchet instead of a fixed-rate beep.
+  const lastTickIndex = useRef(null)
+
+  useEffect(() => {
+    gachaAudio.preload()
+    return () => clearTimeout(flashTimer.current)
+  }, [])
 
   // A draw response advances turnsUsed locally so the counter is right the
   // instant the reel lands, but a caller that refetches its own turn count
@@ -100,6 +106,8 @@ export default function GachaMachine({
     const profile = spinProfile()
     const winIndex = profile.tiles
     setSpunReel(buildReel(prizes, winner, winIndex + TAIL_CELLS))
+    lastTickIndex.current = null
+    gachaAudio.crateOpen()
 
     requestAnimationFrame(() => {
       const width = viewRef.current ? viewRef.current.clientWidth : 900
@@ -111,13 +119,22 @@ export default function GachaMachine({
         const p = Math.min(1, (now - t0) / profile.durationMs)
         const x = end * spinProgress(p, profile.friction)
         if (trackRef.current) trackRef.current.style.transform = `translate3d(${x}px,0,0)`
+        const idx = Math.floor((x - width / 2) / stepPx)
+        if (lastTickIndex.current == null) lastTickIndex.current = idx
+        else if (idx !== lastTickIndex.current) {
+          lastTickIndex.current = idx
+          gachaAudio.tick()
+        }
         if (p < 1) {
           requestAnimationFrame(step)
           return
         }
         inFlight.current = false
+        gachaAudio.chime(winner.tier)
         setSpinning(false)
         setResult(winner)
+        setFlash(true)
+        flashTimer.current = setTimeout(() => setFlash(false), 600)
         setTurnsUsed(response.turns_used)
         if (onDrawResult) onDrawResult(response)
         if (response.session_completed && onSessionComplete) onSessionComplete()
@@ -128,6 +145,7 @@ export default function GachaMachine({
 
   async function handleSpin() {
     if (inFlight.current || turnsLeft <= 0) return
+    gachaAudio.click()
     inFlight.current = true
     setSpinning(true)
     setResult(null)
@@ -168,7 +186,7 @@ export default function GachaMachine({
                 left: i * (cardWidth + CARD_GAP),
               }}
             >
-              <div style={{ borderBottom: `7px solid ${TIER_COLOR[cell.tier] || TIER_COLOR.common}` }}>
+              <div style={{ borderBottom: `7px solid ${tierColor(cell.tier)}` }}>
                 {cell.image_url && <img src={cell.image_url} alt="" style={{ maxWidth: "100%" }} />}
                 {cell.name}
               </div>
@@ -192,7 +210,7 @@ export default function GachaMachine({
 
       {result && (
         <div role="dialog" aria-label="Kết quả">
-          <div style={{ color: TIER_COLOR[result.tier] || TIER_COLOR.common }}>{result.tier}</div>
+          <div style={{ color: tierColor(result.tier) }}>{result.tier}</div>
           <div>{result.name}</div>
           <div>{result.display_price}đ</div>
         </div>
