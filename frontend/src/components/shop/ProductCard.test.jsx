@@ -74,6 +74,32 @@ describe("ProductCard - variant description", () => {
   })
 })
 
+describe("ProductCard - credit_text", () => {
+  it("renders an italic credit line on the card when credit_text is set", async () => {
+    const product = baseProduct({ credit_text: "Ảnh: @tenphotographer" })
+    const { container } = await renderCard({ product })
+
+    const credit = [...container.querySelectorAll("p")].find((p) => p.textContent.includes("@tenphotographer"))
+    expect(credit).toBeTruthy()
+    expect(credit.textContent).toBe("Credit: Ảnh: @tenphotographer")
+    expect(credit.className).toContain("italic")
+  })
+
+  it("renders nothing extra on the card when credit_text is absent", async () => {
+    const { container } = await renderCard()
+    expect(container.textContent).not.toContain("Credit:")
+  })
+
+  it("renders the credit line in the variant detail modal too", async () => {
+    const product = baseProduct({ credit_text: "Artist: @someone" })
+    const { container } = await renderCard({ product })
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).toContain("Credit: Artist: @someone")
+  })
+})
+
 describe("isSoldOut (per-variant)", () => {
   it("is exported and reports true only for a variant whose stock_qty is a non-null number <= 0", () => {
     expect(isSoldOut({ stock_qty: 0 })).toBe(true)

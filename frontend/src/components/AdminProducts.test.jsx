@@ -141,6 +141,64 @@ describe("AdminProducts - reordering via drag and drop", () => {
   })
 })
 
+describe("AdminProducts - credit_text", () => {
+  function setInputValue(input, value) {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    setter.call(input, value)
+    input.dispatchEvent(new Event("change", { bubbles: true }))
+  }
+
+  it("submits credit_text when creating a product", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+
+    const container = await renderProducts()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => { setInputValue(nameInput, "Photocard") })
+    const creditInput = container.querySelector('input[placeholder="Credit tác giả / nhiếp ảnh gia (tuỳ chọn)"]')
+    expect(creditInput).toBeTruthy()
+    await act(async () => { setInputValue(creditInput, "Ảnh: @tenphotographer") })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ credit_text: "Ảnh: @tenphotographer" })
+    )
+  })
+
+  it("pre-fills credit_text when editing an existing product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Card", credit_text: "Artist: @foo" })],
+    })
+
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const creditInput = container.querySelector('input[placeholder="Credit tác giả / nhiếp ảnh gia (tuỳ chọn)"]')
+    expect(creditInput.value).toBe("Artist: @foo")
+  })
+
+  it("leaves credit_text blank when the product has none", async () => {
+    adminGetCollection.mockResolvedValue({ products: [product({ id: 1, name: "Card" })] })
+
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const creditInput = container.querySelector('input[placeholder="Credit tác giả / nhiếp ảnh gia (tuỳ chọn)"]')
+    expect(creditInput.value).toBe("")
+  })
+})
+
 describe("AdminProducts - digital products", () => {
   it("creates a digital product with stock_qty and delivery_link, no variant button", async () => {
     adminGetCollection.mockResolvedValue({ products: [] })

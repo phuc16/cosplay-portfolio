@@ -155,6 +155,10 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
               dangerouslySetInnerHTML={{ __html: renderMarkdown(product.description) }}
             />
           )}
+
+          {product.credit_text && (
+            <p className="text-xs italic opacity-60">{t("shopCreditPrefix")}: {product.credit_text}</p>
+          )}
         </div>
       </div>
 
@@ -279,6 +283,10 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                   className="prose prose-sm max-w-none opacity-80"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(detail.description) }}
                 />
+              )}
+
+              {product.credit_text && (
+                <p className="text-xs italic opacity-60">{t("shopCreditPrefix")}: {product.credit_text}</p>
               )}
 
               {!isSoldOut(detail) && orderable && (
