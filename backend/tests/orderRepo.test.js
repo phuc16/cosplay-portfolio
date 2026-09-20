@@ -36,6 +36,18 @@ async function seedGift({ enabled = true, name = "Postcard", minTotal = 100000, 
   )
 }
 
+async function seedDiscountCode({
+  code = "SAVE10", type = "percent", value = 10, enabled = true,
+  maxUses = null, usedCount = 0, minTotal = 0, expiresAt = null,
+} = {}) {
+  const [res] = await db.query(
+    `INSERT INTO discount_codes (code, type, value, enabled, max_uses, used_count, min_total, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [code.toUpperCase(), type, value, enabled, maxUses, usedCount, minTotal, expiresAt]
+  )
+  return res.insertId
+}
+
 const order = (variantId, qty = 1, over = {}) => ({
   items: [{ variant_id: variantId, qty }],
   buyer,
@@ -50,15 +62,20 @@ async function orderWithBuyer(over = {}) {
 }
 
 beforeEach(async () => {
-  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections", "gift_settings")
+  await resetTables(
+    "email_queue", "order_items", "orders", "product_variants", "products", "collections",
+    "gift_settings", "discount_codes"
+  )
 })
 
-// gift_settings is a table many other test files don't yet know to reset in
-// their own beforeEach - without this, a row left behind by this file's last
-// test would silently leak into whichever test file runs next and calls
-// createOrder, making every order in that file unexpectedly gift-eligible.
+// gift_settings/discount_codes are tables many other test files don't yet
+// know to reset in their own beforeEach - without this, a row left behind by
+// this file's last test would silently leak into whichever test file runs
+// next and calls createOrder, making every order in that file unexpectedly
+// gift-eligible or (for a matching code) unexpectedly discounted.
 afterAll(async () => {
   await db.query("DELETE FROM gift_settings")
+  await db.query("DELETE FROM discount_codes")
 })
 
 describe("createOrder", () => {
@@ -1397,5 +1414,133 @@ describe("updateBuyerInfo", () => {
     const res = await orderWithBuyer()
     const result = await repo.updateBuyerInfo(res.id, { buyer_name: "Sửa bởi khách", phone: "09" }, { requirePending: true })
     expect(result.changed).toBe(true)
+  })
+})
+
+describe("createOrder: discount codes", () => {
+  it("applies no discount when no code is sent", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+    expect(res.total).toBe(35000)
+    const [[o]] = await db.query(
+      "SELECT discount_code_snapshot, discount_amount_snapshot FROM orders WHERE id = ?", [res.id]
+    )
+    expect(o.discount_code_snapshot).toBeNull()
+    expect(o.discount_amount_snapshot).toBe(0)
+  })
+
+  it("applies a valid percent code, reducing total and storing the snapshot", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedDiscountCode({ code: "SAVE10", type: "percent", value: 10, minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 1, { discount_code: "save10" }))
+    expect(res.total).toBe(31500) // 35000 - 10%
+
+    const [[o]] = await db.query(
+      "SELECT discount_code_snapshot, discount_amount_snapshot, total FROM orders WHERE id = ?", [res.id]
+    )
+    expect(o.discount_code_snapshot).toBe("SAVE10")
+    expect(o.discount_amount_snapshot).toBe(3500)
+    expect(o.total).toBe(31500)
+
+    const [[code]] = await db.query("SELECT used_count FROM discount_codes WHERE code = 'SAVE10'")
+    expect(code.used_count).toBe(1)
+  })
+
+  it("applies a valid fixed code", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedDiscountCode({ code: "FIXED5K", type: "fixed", value: 5000, minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 2, { discount_code: "FIXED5K" }))
+    expect(res.total).toBe(65000) // 70000 - 5000
+  })
+
+  it("throws InvalidDiscountCodeError with reason below_minimum", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedDiscountCode({ code: "BIG", type: "percent", value: 10, minTotal: 1000000 })
+    await expect(
+      repo.createOrder(order(variantId, 1, { discount_code: "BIG" }))
+    ).rejects.toMatchObject({ name: "InvalidDiscountCodeError", reason: "below_minimum" })
+  })
+
+  it("throws InvalidDiscountCodeError with reason disabled", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedDiscountCode({ code: "OFF", enabled: false, minTotal: 1 })
+    await expect(
+      repo.createOrder(order(variantId, 1, { discount_code: "OFF" }))
+    ).rejects.toMatchObject({ name: "InvalidDiscountCodeError", reason: "disabled" })
+  })
+
+  it("throws InvalidDiscountCodeError with reason expired", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedDiscountCode({ code: "OLD", minTotal: 1, expiresAt: new Date(Date.now() - 60000) })
+    await expect(
+      repo.createOrder(order(variantId, 1, { discount_code: "OLD" }))
+    ).rejects.toMatchObject({ name: "InvalidDiscountCodeError", reason: "expired" })
+  })
+
+  it("throws InvalidDiscountCodeError with reason exhausted and does not over-increment used_count", async () => {
+    const { variantId } = await seedVariant(5)
+    const id = await seedDiscountCode({ code: "USEDUP", minTotal: 1, maxUses: 1, usedCount: 1 })
+    await expect(
+      repo.createOrder(order(variantId, 1, { discount_code: "USEDUP" }))
+    ).rejects.toMatchObject({ name: "InvalidDiscountCodeError", reason: "exhausted" })
+    const [[code]] = await db.query("SELECT used_count FROM discount_codes WHERE id = ?", [id])
+    expect(code.used_count).toBe(1)
+  })
+
+  it("throws InvalidDiscountCodeError with reason not_found for an unknown code", async () => {
+    const { variantId } = await seedVariant(5)
+    await expect(
+      repo.createOrder(order(variantId, 1, { discount_code: "NOPE" }))
+    ).rejects.toMatchObject({ name: "InvalidDiscountCodeError", reason: "not_found" })
+  })
+
+  it("clamps a 100%-off code so the total lands at exactly 0, order still creates", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedDiscountCode({ code: "FREE", type: "percent", value: 100, minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 1, { discount_code: "FREE" }))
+    expect(res.total).toBe(0)
+    const [[o]] = await db.query("SELECT discount_amount_snapshot FROM orders WHERE id = ?", [res.id])
+    expect(o.discount_amount_snapshot).toBe(35000)
+  })
+
+  it("looks codes up case-insensitively", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedDiscountCode({ code: "MIXEDCASE", minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 1, { discount_code: "mixedcase" }))
+    expect(res.total).toBeLessThan(35000)
+  })
+
+  it("does not change free-gift eligibility - still evaluated off the pre-discount subtotal", async () => {
+    // subtotal 35000 qualifies for the gift (min_total 30000); a 50% discount
+    // would otherwise bring the post-discount amount under that threshold,
+    // but eligibility must still be decided on the pre-discount number.
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: true, name: "Sticker", minTotal: 30000 })
+    await seedDiscountCode({ code: "HALF", type: "percent", value: 50, minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 1, { discount_code: "HALF" }))
+
+    const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ? ORDER BY id", [res.id])
+    expect(items).toHaveLength(2)
+    const gift = items[1]
+    // Raw SQL read, not attachItems' Boolean() normalization - mysql2
+    // returns TINYINT(1) as a JS number (0/1), not a boolean.
+    expect(Boolean(gift.is_gift)).toBe(true)
+    // The gift is never itself discounted - it's already 0đ.
+    expect(gift.unit_price_snapshot).toBe(0)
+    expect(res.total).toBe(17500) // 35000 - 50%, gift stays free either way
+  })
+
+  it("does not increment used_count for a losing/rolled-back attempt", async () => {
+    const { variantId } = await seedVariant(1)
+    await seedDiscountCode({ code: "RACE", minTotal: 1 })
+    // Second attempt loses the stock race (only 1 unit) and must roll back
+    // its entire transaction, including the used_count increment.
+    await repo.createOrder(order(variantId, 1, { discount_code: "RACE" }))
+    await expect(
+      repo.createOrder(order(variantId, 1, { discount_code: "RACE" }))
+    ).rejects.toThrow(repo.OutOfStockError)
+
+    const [[code]] = await db.query("SELECT used_count FROM discount_codes WHERE code = 'RACE'")
+    expect(code.used_count).toBe(1)
   })
 })

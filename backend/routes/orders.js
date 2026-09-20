@@ -178,6 +178,15 @@ module.exports = function orderRoutes() {
       if (err instanceof repo.FulfillmentNotOfferedError) return bad(res, err.message)
       if (err instanceof repo.NoCodForDigitalError) return bad(res, err.message)
       if (err instanceof repo.FulfillmentRequiredError) return bad(res, err.message)
+      // A discount code failed validation (not found/disabled/expired/
+      // below-minimum/exhausted) - a request-shape problem the buyer can fix
+      // themselves (remove the code and resubmit), so this is a 400 like the
+      // other pre-checks above, not a 409 race. `reason` lets the client
+      // react precisely (e.g. clear its own "applied" state) instead of only
+      // showing the message text.
+      if (err instanceof repo.InvalidDiscountCodeError) {
+        return res.status(400).json({ error: "invalid_discount_code", message: err.message, reason: err.reason })
+      }
       // A cart line's variant_id matches no row at all (deleted, or a stale
       // cart carrying an id that never existed) - distinct from a real
       // OutOfStockError, which always has an actual product label to quote.

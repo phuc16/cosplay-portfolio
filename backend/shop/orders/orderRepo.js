@@ -1,6 +1,7 @@
 const db = require("./../../db")
 const domain = require("./domain")
 const emailQueue = require("./../email/queue")
+const discountCodes = require("./../discountCodes")
 
 const TRANSITION_EMAILS = {
   confirmed: "payment_confirmed",
@@ -104,6 +105,20 @@ class FulfillmentRequiredError extends Error {
   constructor() {
     super("Hình thức nhận hàng không hợp lệ")
     this.name = "FulfillmentRequiredError"
+  }
+}
+
+/**
+ * A buyer-entered discount code failed validation - not found, disabled,
+ * expired, below the order's minimum, or already fully redeemed. `reason`
+ * matches one of discountCodes.REASON_MESSAGES' keys, letting the route (and
+ * the public preview endpoint) reuse the exact same wording for each case.
+ */
+class InvalidDiscountCodeError extends Error {
+  constructor(reason) {
+    super(discountCodes.REASON_MESSAGES[reason] || "Mã giảm giá không hợp lệ")
+    this.name = "InvalidDiscountCodeError"
+    this.reason = reason
   }
 }
 
@@ -283,14 +298,41 @@ async function createOrder(input) {
       })
     }
 
-    const total = domain.computeTotal(lines)
+    // Paid items only - before the free gift and before any discount. Both
+    // the gift's own threshold check and the discount code's threshold/
+    // computation are measured against this exact number (see the
+    // 2026-09-20 discount-codes design doc's independence decision).
+    const subtotal = domain.computeTotal(lines)
+
+    // Discount code - resolved before the free-gift decision below, but the
+    // two are deliberately independent: applying a code never changes gift
+    // eligibility (both are keyed off this same pre-discount subtotal), and
+    // the gift's own 0đ line is never itself discounted, since it doesn't
+    // exist in `lines` yet at this point.
+    let discountAmount = 0
+    let discountCodeSnapshot = null
+    if (input.discount_code) {
+      const normalizedCode = discountCodes.normalizeCode(input.discount_code)
+      // Locks only the discount_codes row (no joined table) - same
+      // discipline as the variant stock lock above - so two buyers racing
+      // to redeem the last use of a max_uses-limited code cannot both win.
+      const [[codeRow]] = await conn.query(
+        "SELECT * FROM discount_codes WHERE code = ? FOR UPDATE",
+        [normalizedCode]
+      )
+      const result = discountCodes.evaluateCode(codeRow, subtotal, now)
+      if (!result.ok) throw new InvalidDiscountCodeError(result.reason)
+      discountAmount = result.amount
+      discountCodeSnapshot = normalizedCode
+      await conn.query("UPDATE discount_codes SET used_count = used_count + 1 WHERE id = ?", [codeRow.id])
+    }
 
     // A free gift is not a catalog item: no stock, no collection, no
     // relationship to product_variants at all (see the 2026-09-14 free-gift
     // design doc). Looked up directly, inside this same transaction, so its
     // config can't change mid-request.
     const [[giftSettingsRow]] = await conn.query("SELECT * FROM gift_settings ORDER BY id LIMIT 1")
-    const giftApplies = Boolean(giftSettingsRow?.enabled) && total >= (giftSettingsRow?.min_total || 0)
+    const giftApplies = Boolean(giftSettingsRow?.enabled) && subtotal >= (giftSettingsRow?.min_total || 0)
     // Digital-vs-physical is inferred from delivery_link presence, not a
     // separate type column - one field that can't contradict itself.
     const giftIsPhysical = giftApplies && !giftSettingsRow.delivery_link
@@ -349,6 +391,11 @@ async function createOrder(input) {
       })
     }
 
+    // orders.total continues to mean "what the buyer actually pays" (per
+    // CLAUDE.md) - computed here, after the gift line (always 0đ) is
+    // already appended above, so the gift's presence can never affect it.
+    const total = subtotal - discountAmount
+
     const token = domain.generateOrderToken()
     // Falls back to domain.RESERVATION_HOURS (via computeExpiry's default
     // parameter) when the collection has no override configured. Reads
@@ -371,8 +418,8 @@ async function createOrder(input) {
          (order_token, request_key, buyer_name, phone, email, fulfillment_method,
           address_street, address_ward, address_district, address_province, address_raw,
           note, status, payment_method, total, cod_amount, collection_id, expires_at, pickup_code,
-          access_pin_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+          access_pin_hash, discount_code_snapshot, discount_amount_snapshot)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         token,
         input.request_key || null,
@@ -393,6 +440,8 @@ async function createOrder(input) {
         expiresAt,
         pickupCode,
         accessPinHash,
+        discountCodeSnapshot,
+        discountAmount,
       ]
     )
 
@@ -920,4 +969,5 @@ module.exports = {
   FulfillmentRequiredError,
   InvalidBuyerInfoError,
   OrderNotEditableError,
+  InvalidDiscountCodeError,
 }

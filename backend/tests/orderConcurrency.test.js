@@ -23,8 +23,15 @@ const attempt = (variantId, qty, extra = {}) =>
     ...extra,
   }).then((r) => ({ ok: true, r })).catch((e) => ({ ok: false, e }))
 
+async function seedDiscountCode({ code = "RACE10", type = "percent", value = 10, maxUses = 1, minTotal = 0 } = {}) {
+  await db.query(
+    "INSERT INTO discount_codes (code, type, value, enabled, max_uses, min_total) VALUES (?, ?, ?, 1, ?, ?)",
+    [code, type, value, maxUses, minTotal]
+  )
+}
+
 beforeEach(async () => {
-  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections")
+  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections", "discount_codes")
 })
 
 describe("concurrent reservation", () => {
@@ -93,6 +100,31 @@ describe("concurrent reservation", () => {
 
     const [[v]] = await db.query("SELECT stock_qty FROM product_variants WHERE id = ?", [variantId])
     expect(v.stock_qty).toBe(9) // reserved once
+  })
+
+  it("redeems a max_uses:1 discount code exactly once when 10 buyers race for it", async () => {
+    const variantId = await seedVariant(20)
+    await seedDiscountCode({ code: "RACE10", maxUses: 1, minTotal: 0 })
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => attempt(variantId, 1, { discount_code: "RACE10" }))
+    )
+
+    // Every attempt has plenty of stock to succeed on its own - the only
+    // thing that can make one lose is the discount_codes row lock deciding
+    // it arrived after the code's single use was already claimed.
+    const winners = results.filter((r) => r.ok && r.r.total < 35000)
+    expect(winners).toHaveLength(1)
+
+    const losers = results.filter((r) => !r.ok)
+    expect(losers.every((r) => r.e instanceof repo.InvalidDiscountCodeError && r.e.reason === "exhausted")).toBe(true)
+    // Every non-winning attempt either lost the code race (rejected outright,
+    // no order created) or, in principle, could have created an order with
+    // no discount - but with max_uses 1 and 10 racers, exactly 9 must lose.
+    expect(losers).toHaveLength(9)
+
+    const [[code]] = await db.query("SELECT used_count FROM discount_codes WHERE code = 'RACE10'")
+    expect(code.used_count).toBe(1)
   })
 
   it("credits stock once when an order is cancelled concurrently", async () => {
