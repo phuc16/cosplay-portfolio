@@ -222,6 +222,34 @@ describe("GachaKiosk", () => {
     expect(adminDrawSession.mock.calls[0][1]).not.toBe(adminDrawSession.mock.calls[1][1])
   })
 
+  it("triggers a draw when Space is pressed, for a physical USB button wired as a keyboard emulator", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+    adminDrawSession.mockResolvedValue({
+      prize: prizes[0], turns_used: 1, turns_total: 5, session_completed: false,
+    })
+
+    const container = await renderKiosk()
+    await act(async () => click(startButton(container)))
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }))
+    })
+    await flush()
+
+    expect(adminDrawSession).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not listen for Space before a session has started", async () => {
+    const container = await renderKiosk()
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }))
+    })
+
+    expect(adminDrawSession).not.toHaveBeenCalled()
+    expect(startButton(container)).toBeTruthy()
+  })
+
   it("keeps the final reveal on screen when the session completes, until staff taps next buyer", async () => {
     adminStartBoothSession.mockResolvedValue({ session_id: 5 })
     adminDrawSession.mockResolvedValue({

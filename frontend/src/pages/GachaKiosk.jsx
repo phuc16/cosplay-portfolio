@@ -65,6 +65,24 @@ export default function GachaKiosk() {
     loadPrizes()
   }, [loadPrizes])
 
+  // A physical USB "smash button" at the booth is just a keyboard emulator
+  // wired to send Space - this is the entire integration surface for it.
+  // GachaMachine owns the real click handler (and its own disabled/in-flight
+  // guards), so this only ever forwards a synthetic click to the same button
+  // a buyer's finger would press; it can never trigger a draw on its own.
+  useEffect(() => {
+    if (!session) return
+    function onKeyDown(e) {
+      if (e.code !== "Space" && e.key !== " ") return
+      const target = e.target
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return
+      e.preventDefault()
+      document.getElementById("gacha-machine-spin-button")?.click()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [session])
+
   if (!authorized) return null
 
   async function handleStart() {

@@ -177,7 +177,10 @@ export default function GachaMachine({
         </div>
       </div>
 
-      <button type="button" onClick={handleSpin} disabled={disabled}>
+      {/* Stable id so a host page (the booth kiosk) can trigger a spin from
+          a physical USB button wired as a keyboard emulator, without this
+          component needing to expose an imperative API. */}
+      <button id="gacha-machine-spin-button" type="button" onClick={handleSpin} disabled={disabled}>
         {spinning ? "Đang mở…" : turnsLeft <= 0 ? "Hết lượt" : "Mở hộp"}
       </button>
 
