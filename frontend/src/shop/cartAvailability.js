@@ -1,8 +1,14 @@
 import { fetchCollection } from "../api/shop"
 import { isProductSoldOut, isSoldOut } from "../components/shop/ProductCard"
 
-/** Finds this cart line's product within a fetched collection - digital products are flattened (variant_id lives on the product itself), physical products carry a real variants array. */
-function findProduct(collection, variantId) {
+/**
+ * Finds this cart line's product within a fetched collection - digital
+ * products are flattened (variant_id lives on the product itself), physical
+ * products carry a real variants array. Exported so other best-effort,
+ * client-side "is this variant still here" checks (e.g. reorder.js) can
+ * share the exact same matching rule instead of re-deriving it.
+ */
+export function findProduct(collection, variantId) {
   return collection.products.find((p) =>
     p.type === "digital" ? p.variant_id === variantId : p.variants?.some((v) => v.id === variantId)
   )

@@ -31,6 +31,16 @@ vi.mock("../api/shop", () => ({
   searchAddress: (...args) => searchAddress(...args),
 }))
 
+// hasReorderableItems is pure/no-network - kept real (via importOriginal) so
+// button-visibility tests exercise the actual gating logic. Only the
+// network-touching reorderOrderItems is mocked here; its own behavior is
+// covered by reorder.test.js.
+const reorderOrderItems = vi.fn()
+vi.mock("../shop/reorder", async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, reorderOrderItems: (...args) => reorderOrderItems(...args) }
+})
+
 // ShopFooter (rendered on every shop page) fetches /api/settings via `get`
 // - mocked here alongside `post` so tests don't attempt a real network call.
 vi.mock("axios", async (importOriginal) => {
@@ -87,6 +97,7 @@ beforeEach(() => {
   fetchOrderQrBlob.mockReset()
   fetchOrderQrBlob.mockResolvedValue(new Blob(["<svg></svg>"], { type: "image/svg+xml" }))
   updateOrderBuyerInfo.mockReset()
+  reorderOrderItems.mockReset()
   fetchProvinces.mockReset().mockResolvedValue([])
   fetchWards.mockReset().mockResolvedValue([])
   searchAddress.mockReset().mockResolvedValue({ predictions: [] })
@@ -1059,5 +1070,84 @@ describe("Order - buyer edits their own info", () => {
     await act(async () => { editBtn.click() })
 
     expect(container.querySelector('button[aria-label="Tỉnh/Thành phố"]')).toBeTruthy()
+  })
+})
+
+describe("Order - reorder (Order again)", () => {
+  const reorderableItems = [
+    { id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1, product_variant_id: 100 },
+  ]
+
+  function reorderButton(container) {
+    return [...container.querySelectorAll("button")].find((b) => b.textContent === "Order again")
+  }
+
+  it("shows the button when the order has at least one reorderable item", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ items: reorderableItems }))
+    const container = await renderOrder()
+    expect(reorderButton(container)).toBeTruthy()
+  })
+
+  it("hides the button when every item is a gift", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [{ id: 1, product_name_snapshot: "Postcard", variant_label_snapshot: "", unit_price_snapshot: 0, qty: 1, is_gift: true, product_variant_id: 100 }],
+    }))
+    const container = await renderOrder()
+    expect(reorderButton(container)).toBeUndefined()
+  })
+
+  it("hides the button when the item's variant has already been deleted (product_variant_id is null)", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1, product_variant_id: null }],
+    }))
+    const container = await renderOrder()
+    expect(reorderButton(container)).toBeUndefined()
+  })
+
+  it("calls reorderOrderItems with the order, shows a busy label while pending, then the added-count summary linking to /cart", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ items: reorderableItems }))
+    let resolveReorder
+    reorderOrderItems.mockReturnValue(new Promise((resolve) => { resolveReorder = resolve }))
+    const container = await renderOrder()
+
+    const btn = reorderButton(container)
+    await act(async () => { btn.click() })
+
+    expect(reorderOrderItems).toHaveBeenCalledWith(expect.objectContaining({ items: reorderableItems }))
+    expect(container.textContent).toContain("Adding...")
+
+    await act(async () => { resolveReorder({ addedCount: 1, skipped: [] }) })
+
+    expect(container.textContent).toContain("Added 1 item(s) to your cart.")
+    const toastLink = container.querySelector('a[role="status"]')
+    expect(toastLink).toBeTruthy()
+    expect(toastLink.getAttribute("href")).toBe("/cart")
+  })
+
+  it("shows the 'none added' message plus a named, per-item reason when everything was skipped", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ items: reorderableItems }))
+    reorderOrderItems.mockResolvedValue({ addedCount: 0, skipped: [{ name: "Card", reason: "sold_out" }] })
+    const container = await renderOrder()
+
+    await act(async () => { reorderButton(container).click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("None of these items could be added to your cart right now.")
+    expect(container.textContent).toContain("Couldn't add: Card (Sold out)")
+  })
+
+  it("shows both an added count and named skipped items together for a partial success", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ items: reorderableItems }))
+    reorderOrderItems.mockResolvedValue({
+      addedCount: 1,
+      skipped: [{ name: "Old Card", reason: "ended" }],
+    })
+    const container = await renderOrder()
+
+    await act(async () => { reorderButton(container).click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Added 1 item(s) to your cart.")
+    expect(container.textContent).toContain("Couldn't add: Old Card (This drop has ended)")
   })
 })

@@ -2,9 +2,10 @@
    exported alongside the component so its pure status->timestamp logic is
    directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo } from "../api/shop"
 import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../utils/orderAuth"
+import { hasReorderableItems, reorderOrderItems } from "../shop/reorder"
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
@@ -35,6 +36,17 @@ const STATUS_TIMESTAMP_FIELD = {
 
 export function statusTimestamp(order) {
   return order[STATUS_TIMESTAMP_FIELD[order.status]] || null
+}
+
+// Reuses Cart.jsx's own problem-reason vocabulary/copy (cartItemSoldOut et
+// al.) rather than a second, near-duplicate set of strings - reorderOrderItems
+// returns the same "sold_out"/"ended"/"unavailable"/"not_started" reasons
+// checkCartAvailability already uses.
+function reorderReasonLabel(reason, t) {
+  return {
+    sold_out: t("cartItemSoldOut"), ended: t("cartItemEnded"),
+    unavailable: t("cartItemUnavailable"), not_started: t("cartItemNotStarted"),
+  }[reason] || reason
 }
 
 // Well under the backend's 50MB limit - rejects an oversized photo before it burns a retry against the proof rate limiter.
@@ -235,6 +247,19 @@ export default function Order() {
   const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
   const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
   const [buyerInfoError, setBuyerInfoError] = useState("")
+  const [reordering, setReordering] = useState(false)
+  const [reorderSummary, setReorderSummary] = useState(null)
+
+  const handleReorder = async () => {
+    setReordering(true)
+    setReorderSummary(null)
+    try {
+      const result = await reorderOrderItems(order)
+      setReorderSummary(result)
+    } finally {
+      setReordering(false)
+    }
+  }
 
   const startEditBuyerInfo = () => {
     // Email is deliberately excluded - it's not editable (backend ignores
@@ -430,6 +455,17 @@ export default function Order() {
         </div>
       ))}
 
+      {hasReorderableItems(order.items) && (
+        <button
+          type="button"
+          onClick={handleReorder}
+          disabled={reordering}
+          className="mt-3 px-4 py-2 rounded-lg border border-[var(--border-brand)] text-sm font-medium disabled:opacity-50"
+        >
+          {reordering ? t("orderReorderInProgress") : t("orderReorderButton")}
+        </button>
+      )}
+
       <div className="flex justify-between mt-4 text-lg font-bold">
         <span>{t("orderTotalLabel")}</span>
         <span className="text-[var(--brand)]">{formatVnd(order.total)}</span>
@@ -536,6 +572,28 @@ export default function Order() {
             {t("orderQrCaptionShip")}
           </p>
         </div>
+      )}
+
+      {reorderSummary && (
+        <Link
+          to="/cart"
+          role="status"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-1 px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm shadow-lg hover:opacity-90 max-w-[90vw] text-center"
+        >
+          <span className="flex items-center gap-2">
+            {reorderSummary.addedCount > 0
+              ? t("orderReorderSummaryAdded", { n: reorderSummary.addedCount })
+              : t("orderReorderSummaryNone")}
+            <span className="underline">{t("cart")}</span>
+          </span>
+          {reorderSummary.skipped.length > 0 && (
+            <span className="opacity-90 text-xs">
+              {t("orderReorderSummarySkipped", {
+                list: reorderSummary.skipped.map((s) => `${s.name} (${reorderReasonLabel(s.reason, t)})`).join(", "),
+              })}
+            </span>
+          )}
+        </Link>
       )}
       </main>
       <ShopFooter />

@@ -122,6 +122,10 @@ export const translations = {
     orderPickupCodeHint: "Show or read this to event staff if the QR code can't be scanned.",
     orderTrackingCodeLabel: "ViettelPost tracking code",
     orderCancelReasonLabel: "Cancellation reason",
+    orderReorderButton: "Order again", orderReorderInProgress: "Adding...",
+    orderReorderSummaryAdded: "Added {n} item(s) to your cart.",
+    orderReorderSummaryNone: "None of these items could be added to your cart right now.",
+    orderReorderSummarySkipped: "Couldn't add: {list}",
 
     // Payment instructions
     paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
@@ -317,6 +321,10 @@ export const translations = {
     orderPickupCodeHint: "Đọc hoặc cho nhân viên xem mã này nếu không quét được mã QR.",
     orderTrackingCodeLabel: "Mã vận đơn Viettel Post",
     orderCancelReasonLabel: "Lý do hủy",
+    orderReorderButton: "Đặt lại", orderReorderInProgress: "Đang thêm...",
+    orderReorderSummaryAdded: "Đã thêm {n} sản phẩm vào giỏ hàng.",
+    orderReorderSummaryNone: "Hiện không có sản phẩm nào trong đơn này có thể thêm lại.",
+    orderReorderSummarySkipped: "Không thể thêm: {list}",
 
     // Payment instructions
     paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",
