@@ -76,41 +76,83 @@ export default function GachaPractice() {
   }
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold mb-2">Thử miễn phí</h1>
-      <p className="text-sm opacity-70 mb-6">
-        Quay thử không giới hạn theo đúng tỉ lệ thật. Kết quả ở đây chỉ để xem trước, không tính là phần thưởng.
-      </p>
-
-      {loadingPrizes && (
-        <div role="status" className="text-sm opacity-70">
-          Đang tải phần thưởng…
+    <main
+      className="gacha-machine"
+      style={{
+        minHeight: "100vh",
+        padding: "clamp(16px, 4vw, 40px)",
+        background: "radial-gradient(90% 70% at 50% -10%, #2A1147 0%, #130B21 55%, #0E0818 100%)",
+        color: "#F2ECFA",
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 11,
+            letterSpacing: ".3em",
+            color: "#FF2E88",
+          }}
+        >
+          QUAY THỬ
         </div>
-      )}
+        <h1
+          style={{
+            fontFamily: "'Bungee', cursive",
+            fontSize: "clamp(22px, 5vw, 32px)",
+            margin: "8px 0 0",
+            textTransform: "uppercase",
+          }}
+        >
+          Thử miễn phí
+        </h1>
+        <p style={{ fontSize: 14, color: "#9A86B8", margin: "10px 0 20px", lineHeight: 1.55 }}>
+          Quay thử không giới hạn theo đúng tỉ lệ thật. Kết quả ở đây chỉ để xem trước, không tính là phần thưởng.
+        </p>
 
-      {prizesFailed && (
-        <div role="alert" className="text-sm text-red-500">
-          {error}
-          <button type="button" className="ml-2 underline font-semibold" onClick={handleRetry}>
-            Thử lại
-          </button>
-        </div>
-      )}
+        {loadingPrizes && (
+          <div role="status" style={{ fontSize: 14, color: "#9A86B8" }}>
+            Đang tải phần thưởng…
+          </div>
+        )}
 
-      {!loadingPrizes && !prizesFailed && prizes.length === 0 && (
-        <div role="status" className="text-sm text-amber-600">
-          Sản phẩm này chưa được cấu hình phần thưởng nào.
-        </div>
-      )}
+        {prizesFailed && (
+          <div role="alert" style={{ fontSize: 14, color: "#FF6B8A" }}>
+            {error}
+            <button
+              type="button"
+              onClick={handleRetry}
+              style={{
+                marginLeft: 8,
+                textDecoration: "underline",
+                fontWeight: 600,
+                background: "transparent",
+                border: "none",
+                color: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
 
-      {!loadingPrizes && !prizesFailed && prizes.length > 0 && (
-        <GachaMachine
-          prizes={prizes}
-          turnsTotal={UNLIMITED_TURNS}
-          turnsUsed={0}
-          drawFn={handleDraw}
-        />
-      )}
+        {!loadingPrizes && !prizesFailed && prizes.length === 0 && (
+          <div role="status" style={{ fontSize: 14, color: "#E8B62C" }}>
+            Sản phẩm này chưa được cấu hình phần thưởng nào.
+          </div>
+        )}
+
+        {!loadingPrizes && !prizesFailed && prizes.length > 0 && (
+          <GachaMachine
+            prizes={prizes}
+            turnsTotal={UNLIMITED_TURNS}
+            turnsUsed={0}
+            drawFn={handleDraw}
+          />
+        )}
+      </div>
     </main>
   )
 }
