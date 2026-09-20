@@ -8,8 +8,9 @@ describe("isPrepaid", () => {
     expect(isPrepaid("paypal")).toBe(true)
   })
 
-  it("is false for cod", () => {
+  it("is false for cod and cash", () => {
     expect(isPrepaid("cod")).toBe(false)
+    expect(isPrepaid("cash")).toBe(false)
   })
 })
 
@@ -18,16 +19,23 @@ describe("isPrepaid", () => {
 //              pending            confirmed/shipped   completed   cancelled
 // prepaid   awaiting_payment      received            received    lost
 // cod       other                 to_collect          received    lost
+// cash      other                 received            received    lost
 //
-// Every one of the 20 combinations is asserted explicitly - this is the
+// cash is booth-counter money: staff take it at the point of sale, so a
+// booth-cash order exists as `confirmed` from birth with the money already in
+// the till - there is no transfer to verify (unlike prepaid) and no future
+// handover to wait on (unlike COD).
+//
+// Every one of the 25 combinations is asserted explicitly - this is the
 // highest-value test in the whole phase, per the spec's Testing section.
 const PREPAID_METHODS = ["bank", "momo", "paypal"]
 const CASES = []
-for (const method of [...PREPAID_METHODS, "cod"]) {
-  const prepaid = method !== "cod"
+for (const method of [...PREPAID_METHODS, "cod", "cash"]) {
+  const prepaid = !["cod", "cash"].includes(method)
+  const inHand = method === "cash"
   CASES.push([method, "pending", prepaid ? "awaiting_payment" : "other"])
-  CASES.push([method, "confirmed", prepaid ? "received" : "to_collect"])
-  CASES.push([method, "shipped", prepaid ? "received" : "to_collect"])
+  CASES.push([method, "confirmed", prepaid || inHand ? "received" : "to_collect"])
+  CASES.push([method, "shipped", prepaid || inHand ? "received" : "to_collect"])
   CASES.push([method, "completed", "received"])
   CASES.push([method, "cancelled", "lost"])
 }
@@ -39,8 +47,8 @@ describe("classify", () => {
     })
   }
 
-  it("covers exactly 20 combinations, so no case can silently go unwritten", () => {
-    expect(CASES).toHaveLength(20)
+  it("covers exactly 25 combinations, so no case can silently go unwritten", () => {
+    expect(CASES).toHaveLength(25)
   })
 })
 

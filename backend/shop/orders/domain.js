@@ -123,13 +123,14 @@ const TRANSITIONS = {
 }
 
 /**
- * Pickup orders go confirmed -> completed directly: there is nothing to ship
- * and no tracking code to give.
+ * Pickup, digital, and booth (a gacha handed over on the spot) orders go
+ * confirmed -> completed directly: there is nothing to ship and no
+ * tracking code to give.
  */
 function canTransition(from, to, fulfillment) {
   const allowed = TRANSITIONS[from]
   if (!allowed || !allowed.includes(to)) return false
-  if ((fulfillment === "pickup" || fulfillment === "digital") && to === "shipped") return false
+  if (["pickup", "digital", "booth"].includes(fulfillment) && to === "shipped") return false
   return true
 }
 

@@ -55,7 +55,7 @@ function validateProduct(body) {
   if (String(body.name).length > NAME_MAX_LEN) return `Tên sản phẩm không được quá ${NAME_MAX_LEN} ký tự`
   const price = Number(body.price)
   if (!Number.isInteger(price) || price < 0) return "Giá phải là số nguyên không âm (VND)"
-  if (body.type !== undefined && !["physical", "digital"].includes(body.type)) return "Loại sản phẩm không hợp lệ"
+  if (body.type !== undefined && !["physical", "digital", "gacha"].includes(body.type)) return "Loại sản phẩm không hợp lệ"
   if (body.type === "digital") {
     if (body.stock_qty !== null && body.stock_qty !== undefined && body.stock_qty !== "") {
       const stock = Number(body.stock_qty)

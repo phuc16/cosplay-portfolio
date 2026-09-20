@@ -9,6 +9,8 @@ const adminDeleteProduct = vi.fn()
 const adminUploadImage = vi.fn()
 const adminReorderProducts = vi.fn()
 const adminSaveVariants = vi.fn()
+const adminFetchPrizes = vi.fn()
+const adminSavePrizes = vi.fn()
 
 vi.mock("../api/shop", () => ({
   adminGetCollection: (...args) => adminGetCollection(...args),
@@ -18,6 +20,8 @@ vi.mock("../api/shop", () => ({
   adminUploadImage: (...args) => adminUploadImage(...args),
   adminReorderProducts: (...args) => adminReorderProducts(...args),
   adminSaveVariants: (...args) => adminSaveVariants(...args),
+  adminFetchPrizes: (...args) => adminFetchPrizes(...args),
+  adminSavePrizes: (...args) => adminSavePrizes(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -69,6 +73,8 @@ beforeEach(() => {
   adminUploadImage.mockReset()
   adminReorderProducts.mockReset()
   adminSaveVariants.mockReset()
+  adminFetchPrizes.mockReset()
+  adminSavePrizes.mockReset()
 })
 
 describe("AdminProducts - reordering via drag and drop", () => {
@@ -212,6 +218,44 @@ describe("AdminProducts - digital products", () => {
 
     expect(container.textContent).toContain("Digital Sold Out")
     expect(container.textContent).not.toContain("Digital In Stock")
+  })
+})
+
+describe("AdminProducts - gacha products", () => {
+  it("offers Gacha as a product type alongside the existing two", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    const container = await renderProducts()
+    await flush()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+
+    const options = [...container.querySelectorAll("li button")].map((b) => b.textContent)
+    expect(options).toEqual(["Vật lý", "Số (digital)", "Gacha"])
+  })
+
+  it("shows a prize toggle instead of the variant one, and expands into the prize editor", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Gachapon", price: 20000, type: "gacha", images: [], variants: [] }],
+    })
+    adminFetchPrizes.mockResolvedValue([
+      { id: 5, name: "Sticker", tier: "common", display_price: 5000, quantity_total: 10, quantity_remaining: 10 },
+    ])
+
+    const container = await renderProducts()
+    await flush()
+
+    const buttons = [...container.querySelectorAll("button")].map((b) => b.textContent)
+    expect(buttons).toContain("Phần thưởng")
+    expect(buttons).not.toContain("Phân loại")
+
+    const toggle = [...container.querySelectorAll("button")].find((b) => b.textContent === "Phần thưởng")
+    await act(async () => { toggle.click() })
+    await flush()
+
+    expect(adminFetchPrizes).toHaveBeenCalledWith(1)
+    expect(container.querySelector('input[placeholder="Tên phần thưởng"]')?.value).toBe("Sticker")
+    expect(container.querySelector('input[placeholder="Mã (A1) hoặc size (M)"]')).toBeNull()
   })
 })
 

@@ -48,6 +48,25 @@ function writeCart(cart) {
   return cart
 }
 
+/**
+ * A gacha turn can only ever be the sole line in its order: one order maps to
+ * exactly one gacha session, so createOrder rejects any cart mixing a gacha
+ * item with another product (or with a second gacha product) -
+ * MixedGachaCartError. Checked at add time so the buyer is told at the product
+ * card instead of after filling out the whole checkout form. Adding more turns
+ * of the gacha product already in the cart is fine - that merges into the one
+ * existing line.
+ *
+ * Returns null when the add is allowed, otherwise a reason code.
+ */
+export function gachaCartConflict(item, cart = readCart()) {
+  if (!cart.length) return null
+  if (item.is_gacha) {
+    return cart.length === 1 && cart[0].variant_id === item.variant_id ? null : "gacha_needs_own_order"
+  }
+  return cart.some((c) => c.is_gacha) ? "cart_has_gacha" : null
+}
+
 export function addToCart(item) {
   const cart = readCart()
   const existing = cart.find((c) => c.variant_id === item.variant_id)

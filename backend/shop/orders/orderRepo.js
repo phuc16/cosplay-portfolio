@@ -1,6 +1,7 @@
 const db = require("./../../db")
 const domain = require("./domain")
 const emailQueue = require("./../email/queue")
+const sessionRepo = require("./../gacha/sessionRepo")
 
 const TRANSITION_EMAILS = {
   confirmed: "payment_confirmed",
@@ -96,6 +97,30 @@ class NoCodForDigitalError extends Error {
   constructor() {
     super("Không hỗ trợ thanh toán COD cho đơn có sản phẩm số")
     this.name = "NoCodForDigitalError"
+  }
+}
+
+/** COD collects cash at physical delivery - a gacha turn is consumed online the moment the order is confirmed, so there is never a doorstep at which to collect. */
+class NoCodForGachaError extends Error {
+  constructor() {
+    super("Không hỗ trợ thanh toán COD cho lượt quay gacha")
+    this.name = "NoCodForGachaError"
+  }
+}
+
+/** A gacha turn can only ever be the sole item in its cart - one order maps to exactly one gacha session, so a second gacha product or any ordinary line in the same cart has no session to belong to. */
+class MixedGachaCartError extends Error {
+  constructor() {
+    super("Không thể mua lượt gacha cùng lúc với sản phẩm khác trong một đơn")
+    this.name = "MixedGachaCartError"
+  }
+}
+
+/** The turns bought must be backed by real prizes: unlike variant stock, a gacha turn draws from the shared gacha_prizes pool. */
+class GachaPoolSoldOutError extends Error {
+  constructor() {
+    super("Kho quà gacha không đủ cho số lượt bạn muốn mua")
+    this.name = "GachaPoolSoldOutError"
   }
 }
 
@@ -230,8 +255,72 @@ async function createOrder(input) {
     const allDigital = rows.every((r) => r.product_type === "digital")
     const anyDigital = rows.some((r) => r.product_type === "digital")
 
+    const anyGacha = rows.some((r) => r.product_type === "gacha")
+    if (anyGacha) {
+      // Spec: a gacha item can only ever be the SOLE item in its cart. Any
+      // second line item at all - another product, another gacha product, or
+      // even a second variant of the same gacha product - is rejected. This
+      // also guarantees exactly one gacha row for the pool check below, which
+      // would otherwise under-count turns against the pool while
+      // startOnlineSessionIfNeeded sums every gacha order_item.
+      if (rows.length > 1) {
+        throw new MixedGachaCartError()
+      }
+      if (input.payment_method === "cod") {
+        throw new NoCodForGachaError()
+      }
+    }
+
     if (anyDigital && input.payment_method === "cod") {
       throw new NoCodForDigitalError()
+    }
+
+    // The prize pool, not the variant's stock_qty, is what a gacha turn
+    // actually consumes. Locked here in the same transaction as the stock
+    // check so it cannot go stale between this check and the insert. No lock
+    // cycle with drawForSession (gacha_sessions -> orders -> gacha_prizes):
+    // this path only ever inserts a brand-new orders row afterwards, never
+    // locks an existing one.
+    //
+    // ACCEPTED RISK - turns can be oversold under concurrent orders. This
+    // checks the pool but reserves nothing, and the FOR UPDATE only
+    // serialises the two transactions, it doesn't make the second see a
+    // smaller pool: two buyers can each pass this check against the same
+    // remaining quantity, both pay, and whoever draws first drains it,
+    // leaving the other's paid order hitting GachaSoldOutError partway
+    // through its turns.
+    //
+    // Reserving properly is not a small change: a session row doesn't exist
+    // until the order reaches 'confirmed', so the racing orders are both
+    // 'pending' with nothing to count against - closing this needs real
+    // reservation state on gacha_prizes plus a release path on every
+    // cancel/expiry, mirroring stock_reserved. A cheaper derived
+    // reservation does exist - subtract the outstanding turns on
+    // order_items belonging to this product's LIVE_ORDER_STATUSES orders -
+    // but it was rejected because it makes this a locking read over
+    // orders/order_items during order CREATION, taken BEFORE the
+    // gacha_prizes FOR UPDATE below, while a DRAW takes gacha_prizes
+    // FOR UPDATE and only then inserts into order_items: the two paths would
+    // approach the same pair of tables in opposite orders, which is a
+    // deadlock cycle. The FOR UPDATE below serialises concurrent
+    // createOrder calls against each other, but it is taken too late to
+    // cover the order_items read and does nothing to order those two
+    // acquisitions. Not worth a new lock-ordering hazard to fix a race that
+    // is already visible via has_incomplete_gacha_session. Deliberately not built for
+    // v1: the festival's pool is sized well above a day's sales, and the
+    // failure is detectable and refundable rather than silent -
+    // listOrders' has_incomplete_gacha_session flags any confirmed order
+    // whose session still has undrawn turns, which is exactly the order a
+    // stuck buyer ends up in, so staff see it on the admin order list and
+    // can refund or restock by hand.
+    if (anyGacha) {
+      const gachaRow = rows.find((r) => r.product_type === "gacha")
+      const requestedTurns = wanted.get(gachaRow.id)
+      const [[pool]] = await conn.query(
+        "SELECT COALESCE(SUM(quantity_remaining), 0) AS total FROM gacha_prizes WHERE product_id = ? FOR UPDATE",
+        [gachaRow.product_id]
+      )
+      if (Number(pool.total) < requestedTurns) throw new GachaPoolSoldOutError()
     }
 
     // Collection open/scheduled check only here - the ship/pickup-offered
@@ -563,17 +652,30 @@ async function listOrders(filter = {}) {
   // gets "digital" (see createOrder). Without this flag, the admin list has
   // no way to show that a "ship" order still needs a delivery link sent;
   // staff would only discover it by opening every order's detail.
+  //
+  // has_incomplete_gacha_session is the same idea for the abandoned-session
+  // case: a buyer who paid, got confirmed, and never opened their case leaves
+  // turns owed indefinitely with nothing to pack. The session row stays
+  // 'active' until its last turn is drawn, so that alone is the signal.
   const [rows] = await db.query(
     `SELECT o.*,
             EXISTS (
               SELECT 1 FROM order_items oi
                WHERE oi.order_id = o.id AND oi.delivery_link_snapshot IS NOT NULL
-            ) AS has_digital_item
+            ) AS has_digital_item,
+            EXISTS (
+              SELECT 1 FROM gacha_sessions gs
+               WHERE gs.order_id = o.id AND gs.status = 'active'
+            ) AS has_incomplete_gacha_session
        FROM orders o ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY o.created_at DESC, o.id DESC`,
     params
   )
-  return rows.map((r) => ({ ...r, has_digital_item: Boolean(r.has_digital_item) }))
+  return rows.map((r) => ({
+    ...r,
+    has_digital_item: Boolean(r.has_digital_item),
+    has_incomplete_gacha_session: Boolean(r.has_incomplete_gacha_session),
+  }))
 }
 
 /** Return reserved stock. Caller must hold the order row lock. */
@@ -703,6 +805,26 @@ async function transitionOrder(id, toStatus, extra = {}) {
       await emailQueue.enqueue(id, notifyEmailType, notifyAddress)
     } catch (err) {
       console.error("[ORDERS] Không xếp được email:", err.message)
+    }
+  }
+
+  // Strictly post-commit, and - like the email enqueue above - only after
+  // the connection has been released, since it borrows its own. Two reasons
+  // it cannot move up into the transaction: an active gacha session must
+  // never survive a rolled-back status change, and holding `orders` while
+  // taking `gacha_sessions` is the exact inverse of drawForSession's lock
+  // order. It runs *after* the enqueue and is best-effort for the same
+  // reason the enqueue is: a session-creation hiccup must never fail a
+  // confirm the seller already performed, nor swallow the buyer's
+  // payment-confirmed email on its way out.
+  if (ok && toStatus === "confirmed") {
+    try {
+      await sessionRepo.startOnlineSessionIfNeeded(id)
+    } catch (err) {
+      // The order id is part of the message on purpose: this is the one trace
+      // of a confirmed gacha order left without a session, and the buyer's own
+      // gacha-session read path heals it silently afterwards.
+      console.error(`[ORDERS] Không tạo được phiên gacha cho đơn #${id}:`, err.message)
     }
   }
 
@@ -917,6 +1039,9 @@ module.exports = {
   FulfillmentNotOfferedError,
   CollectionNotActiveError,
   NoCodForDigitalError,
+  NoCodForGachaError,
+  MixedGachaCartError,
+  GachaPoolSoldOutError,
   FulfillmentRequiredError,
   InvalidBuyerInfoError,
   OrderNotEditableError,

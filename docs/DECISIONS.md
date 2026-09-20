@@ -858,3 +858,35 @@ an otherwise all-digital order into needing real shipping/pickup info even
 though none of the buyer's paid items require it. COD eligibility is
 deliberately left unaffected by the gift in either direction - COD is a
 property of the paid cart, not of a free add-on.
+
+## 2026-09-20 - Gacha turns are checked against the prize pool but not reserved
+
+`createOrder` verifies the gacha prize pool can cover the turns being bought,
+under `FOR UPDATE`, but reserves nothing. Two concurrent buyers can therefore
+each pass the check against the same remaining quantity, both pay, and
+whoever draws first drains the pool - leaving the other's paid order hitting
+`GachaSoldOutError` partway through its turns. Accepted for v1 rather than
+fixed: a session row doesn't exist until an order reaches `confirmed`, so the
+two racing orders are both `pending` with nothing to count against, and
+closing the race properly needs real reservation state on `gacha_prizes` plus
+a release path on every cancel/expiry, mirroring `stock_reserved`. A cheaper
+option was considered and rejected on a specific ground: the pool check could
+instead subtract the outstanding turns on `order_items` belonging to that
+product's orders in `LIVE_ORDER_STATUSES` (a derived reservation needing no
+new schema), but that turns this into a locking read over
+`orders`/`order_items` during order *creation*, taken *before* the
+`gacha_prizes FOR UPDATE`, while `drawForSession` takes
+`gacha_prizes FOR UPDATE` and only then inserts into `order_items` during a
+*draw*. The two paths would approach the same pair of tables in opposite
+orders - `order_items → gacha_prizes` on creation vs
+`gacha_prizes → order_items (INSERT)` on a draw - which is a deadlock cycle.
+The existing `FOR UPDATE` doesn't help: it serialises concurrent `createOrder`
+calls against each other, but it is taken too late to cover the `order_items`
+read and doesn't order those two acquisitions at all. A new lock-ordering
+hazard, taken on to fix a race that is already visible. The pool
+at a festival is sized well above a day's sales, and the failure mode is
+visible rather than silent: the admin order list's
+`has_incomplete_gacha_session` flag marks any confirmed order whose session
+still has undrawn turns, which is exactly the state a stuck buyer lands in,
+so staff can refund or restock by hand. Revisit if the pool is ever run close
+to the number of turns sold.

@@ -394,6 +394,14 @@ export default function AdminOrders() {
                       + Sản phẩm số
                     </span>
                   )}
+                  {o.has_incomplete_gacha_session && (
+                    <span
+                      title="Khách đã thanh toán nhưng chưa quay hết lượt - chưa có quà để đóng gói"
+                      className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]"
+                    >
+                      🎰 Chưa quay hết
+                    </span>
+                  )}
                   <span className="text-sm opacity-70">{labelFor(PAYMENT_METHOD_LABELS, o.payment_method)}</span>
                   <span className="text-sm opacity-70">{formatVnd(o.total)}</span>
                 </div>

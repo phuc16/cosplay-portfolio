@@ -581,3 +581,33 @@ describe("Checkout - free gift forces shipping info for a digital-only cart", ()
     expect(container.textContent).not.toContain("Limited to one per order")
   })
 })
+
+describe("Checkout - gacha cart", () => {
+  const gachaCartItem = {
+    variant_id: 77, qty: 3, price: 20000, product_name: "Mystery Case", variant_label: "",
+    collection_slug: "drop", is_digital: false, is_gacha: true,
+  }
+
+  // Gacha ships like a physical order (is_digital is false), so the digital
+  // exclusion above never covers it - the turns are still consumed online the
+  // moment the order is confirmed, leaving no doorstep to collect cash at.
+  it("does not offer cod when the cart holds gacha turns", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([gachaCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank", "cod"] })
+
+    const container = await renderCheckout()
+
+    const options = [...container.querySelectorAll('[role="radio"]')].map((b) => b.textContent)
+    expect(options).toEqual(["Bank transfer"])
+    expect(container.textContent).toContain("Cash on delivery isn't available for an order with gacha turns.")
+  })
+
+  it("still shows the fulfillment fieldset for a gacha cart - its prizes ship", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([gachaCartItem]))
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+
+    const container = await renderCheckout()
+
+    expect(container.querySelectorAll('input[name="fulfillment"]').length).toBeGreaterThan(0)
+  })
+})

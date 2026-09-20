@@ -18,6 +18,8 @@ const updateOrderBuyerInfo = vi.fn()
 const fetchProvinces = vi.fn()
 const fetchWards = vi.fn()
 const searchAddress = vi.fn()
+const fetchGachaSession = vi.fn()
+const drawGachaSession = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchOrder: (...args) => fetchOrder(...args),
@@ -29,6 +31,8 @@ vi.mock("../api/shop", () => ({
   fetchProvinces: (...args) => fetchProvinces(...args),
   fetchWards: (...args) => fetchWards(...args),
   searchAddress: (...args) => searchAddress(...args),
+  fetchGachaSession: (...args) => fetchGachaSession(...args),
+  drawGachaSession: (...args) => drawGachaSession(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings via `get`
@@ -90,6 +94,8 @@ beforeEach(() => {
   fetchProvinces.mockReset().mockResolvedValue([])
   fetchWards.mockReset().mockResolvedValue([])
   searchAddress.mockReset().mockResolvedValue({ predictions: [] })
+  fetchGachaSession.mockReset().mockResolvedValue({ session: null, drops: [] })
+  drawGachaSession.mockReset()
   axios.post.mockReset()
   sessionStorage.clear()
   localStorage.clear()
@@ -966,6 +972,70 @@ describe("Order - status timestamp", () => {
     // Just confirms no stray "Invalid Date" text renders - the absence of a
     // specific timestamp string isn't otherwise assertable here.
     expect(container.textContent).not.toContain("Invalid Date")
+  })
+})
+
+describe("Order - gacha section", () => {
+  const activeSession = { id: 7, product_id: 3, turns_total: 3, turns_used: 1, status: "active" }
+  const prizes = [{ id: 1, name: "Sticker", tier: "common", image_url: null, display_price: 5000 }]
+
+  function spinButton(container) {
+    return [...container.querySelectorAll("button")].find((b) => /mở hộp|đang mở|hết lượt/i.test(b.textContent))
+  }
+
+  it("shows the gacha machine when the confirmed order has an active session", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: activeSession, drops: [], prizes })
+
+    const container = await renderOrder()
+
+    expect(fetchGachaSession).toHaveBeenCalledWith("tok123")
+    expect(spinButton(container)).toBeTruthy()
+    expect(container.textContent).toContain("1/3")
+  })
+
+  it("renders no gacha section for a confirmed order with no session", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: null, drops: [] })
+
+    const container = await renderOrder()
+
+    expect(spinButton(container)).toBeUndefined()
+  })
+
+  it("does not look for a session while the order is still pending", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(fetchGachaSession).not.toHaveBeenCalled()
+    expect(spinButton(container)).toBeUndefined()
+  })
+
+  it("renders no gacha section once the session is completed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "completed" }))
+    fetchGachaSession.mockResolvedValue({
+      session: { ...activeSession, turns_used: 3, status: "completed" }, drops: [], prizes,
+    })
+
+    const container = await renderOrder()
+
+    expect(spinButton(container)).toBeUndefined()
+  })
+
+  it("draws through the order's own endpoint with a fresh idempotency key", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: activeSession, drops: [], prizes })
+    drawGachaSession.mockResolvedValue({
+      prize: prizes[0], turns_used: 2, turns_total: 3, session_completed: false,
+    })
+
+    const container = await renderOrder()
+    await act(async () => spinButton(container).dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(drawGachaSession).toHaveBeenCalledWith("tok123", expect.any(String))
+    expect(drawGachaSession.mock.calls[0][1].length).toBeGreaterThan(0)
   })
 })
 

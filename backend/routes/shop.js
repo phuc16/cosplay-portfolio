@@ -3,6 +3,9 @@ const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const giftSettings = require("../shop/giftSettings")
 const vnAddress = require("../shop/vnAddress")
+const prizeRepo = require("../shop/gacha/prizeRepo")
+const sessionRepo = require("../shop/gacha/sessionRepo")
+const gachaDomain = require("../shop/gacha/domain")
 
 /**
  * Public storefront routes. `publicLimiter` is applied by the caller so the
@@ -120,6 +123,35 @@ module.exports = function shopRoutes() {
       // shows no results, same as an empty response.
       console.error("[SHOP] Lỗi gọi Goong autocomplete:", err.message)
       res.json({ predictions: [] })
+    }
+  })
+
+  // Practice mode: a free demo spin that never consumes stock. Both routes
+  // read the live pool so the odds shown match the real product, but
+  // practiceDraw is deliberately write-free (no session, no draw row, no
+  // quantity_remaining decrement).
+  router.get("/gacha/:productId/practice", async (req, res) => {
+    try {
+      const prizes = await prizeRepo.listPublicPrizes(Number(req.params.productId))
+      if (!prizes.length) return res.status(404).json({ error: "not_found", message: "Không tìm thấy sản phẩm gacha" })
+      res.json({ prizes, tier_odds: gachaDomain.tierOdds(prizes) })
+    } catch (err) {
+      console.error("[SHOP] Lỗi đọc gacha demo:", err.message)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.post("/gacha/:productId/practice-draw", async (req, res) => {
+    try {
+      // Same publish gate as the listing route above - otherwise a draft
+      // product's prize lineup is still enumerable one spin at a time.
+      const prizes = await prizeRepo.listPublicPrizes(Number(req.params.productId))
+      if (!prizes.length) return res.status(404).json({ error: "not_found", message: "Không tìm thấy sản phẩm gacha" })
+      const result = await sessionRepo.practiceDraw(Number(req.params.productId))
+      res.json({ prize: result.prize })
+    } catch (err) {
+      console.error("[SHOP] Lỗi quay demo:", err.message)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
 

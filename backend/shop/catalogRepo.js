@@ -148,6 +148,24 @@ async function nestCollectionDetail(collection) {
     byProduct.get(v.product_id).push({ ...v, images: parseImages(v.images) })
   }
 
+  // A gacha product's hidden variant is deliberately unlimited (stock_qty
+  // null), so stock is not its sold-out signal - the prize pool is. Summed
+  // here so the storefront has one number to gate add-to-cart on, same shape
+  // as sessionRepo.getPoolRemaining. Absent from the map = no prize rows at
+  // all, which is "not stocked yet", not "sold out", so it stays null.
+  const gachaIds = products.filter((p) => p.type === "gacha").map((p) => p.id)
+  const poolByProduct = new Map()
+  if (gachaIds.length) {
+    const [poolRows] = await db.query(
+      `SELECT product_id, COALESCE(SUM(quantity_remaining), 0) AS total
+         FROM gacha_prizes
+        WHERE product_id IN (${gachaIds.map(() => "?").join(",")})
+        GROUP BY product_id`,
+      gachaIds
+    )
+    for (const r of poolRows) poolByProduct.set(r.product_id, Number(r.total))
+  }
+
   return {
     ...mapCollection(collection),
     products: products.map((p) => {
@@ -155,7 +173,7 @@ async function nestCollectionDetail(collection) {
       // Digital products have no variant list in any UI - the one hidden
       // variant they do have is flattened onto the product itself here so
       // nothing downstream needs to know it secretly exists.
-      if (p.type === "digital") {
+      if (p.type === "digital" || p.type === "gacha") {
         const hidden = productVariants[0] || null
         return {
           ...p,
@@ -165,12 +183,14 @@ async function nestCollectionDetail(collection) {
           stock_qty: hidden?.stock_qty ?? null,
           delivery_link: hidden?.delivery_link ?? null,
           thumbnail_image: hidden?.thumbnail_image ?? null,
+          gacha_pool_remaining: p.type === "gacha" ? (poolByProduct.get(p.id) ?? null) : null,
         }
       }
       return {
         ...p,
         images: parseImages(p.images),
         variants: productVariants,
+        gacha_pool_remaining: null,
       }
     }),
   }
@@ -373,6 +393,42 @@ async function blockedVariantsOnConn(conn, variantIds) {
   return rows
 }
 
+/**
+ * Gacha-specific reasons a product can't be deleted, as VariantInUseError
+ * labels. Two distinct reasons, kept distinguishable so an admin UI rendering
+ * `.labels` can explain which one applies:
+ *
+ *  - an active session holds prize reservations that live only in
+ *    gacha_sessions/gacha_draws; cascading them away strands a buyer mid-draw.
+ *  - ANY historical draw pins its gacha_prizes row via
+ *    gacha_draws.gacha_prize_id ON DELETE RESTRICT, so the DELETE would fail
+ *    anyway - as a raw ER_ROW_IS_REFERENCED_2 500 instead of the clean 409
+ *    this guard exists to produce.
+ */
+async function gachaBlockersOnConn(conn, productIds) {
+  if (!productIds.length) return []
+  const placeholders = productIds.map(() => "?").join(",")
+  const labels = []
+
+  const [activeSessions] = await conn.query(
+    `SELECT id FROM gacha_sessions
+      WHERE product_id IN (${placeholders}) AND status = 'active' FOR UPDATE`,
+    productIds
+  )
+  if (activeSessions.length) labels.push("phiên gacha đang hoạt động")
+
+  const [drawn] = await conn.query(
+    `SELECT 1 FROM gacha_draws d
+       JOIN gacha_prizes p ON p.id = d.gacha_prize_id
+      WHERE p.product_id IN (${placeholders})
+      LIMIT 1`,
+    productIds
+  )
+  if (drawn.length) labels.push("lịch sử quay gacha")
+
+  return labels
+}
+
 async function deleteCollection(id) {
   const conn = await db.getConnection()
   try {
@@ -387,6 +443,16 @@ async function deleteCollection(id) {
     const blocked = await blockedVariantsOnConn(conn, variants.map((v) => v.id))
     if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
 
+    // products.collection_id and gacha_sessions.product_id both cascade, so
+    // without this a collection delete would silently destroy an active
+    // session (or hit the gacha_draws RESTRICT as a raw 500).
+    const [products] = await conn.query(
+      "SELECT id FROM products WHERE collection_id = ? ORDER BY id ASC FOR UPDATE",
+      [id]
+    )
+    const gachaBlocked = await gachaBlockersOnConn(conn, products.map((p) => p.id))
+    if (gachaBlocked.length) throw new VariantInUseError(gachaBlocked)
+
     const [res] = await conn.query("DELETE FROM collections WHERE id = ?", [id])
     await conn.commit()
     return res.affectedRows > 0
@@ -400,7 +466,7 @@ async function deleteCollection(id) {
 
 async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
-  const type = data.type === "digital" ? "digital" : "physical"
+  const type = ["digital", "gacha"].includes(data.type) ? data.type : "physical"
   const [res] = await db.query(
     `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -418,11 +484,15 @@ async function createProduct(data) {
   // Digital products have no admin-managed variant list - this single
   // hidden row (no label) carries stock_qty/delivery_link through the same
   // variant_id-based cart/order_items/stock-decrement pipeline unchanged.
-  if (type === "digital") {
+  if (type === "digital" || type === "gacha") {
     await replaceVariants(productId, [{
       label: "",
-      stock_qty: data.stock_qty,
-      delivery_link: data.delivery_link,
+      // A gacha product's turns are never stock-limited at the variant
+      // level - the prize pool (gacha_prizes.quantity_remaining) is what
+      // actually caps how many turns can be sold (see createOrder's pool
+      // check). Unlimited here is intentional, not an oversight.
+      stock_qty: type === "gacha" ? null : data.stock_qty,
+      delivery_link: type === "gacha" ? null : data.delivery_link,
       thumbnail_image: data.thumbnail_image,
     }])
   }
@@ -438,7 +508,7 @@ async function updateProduct(id, data) {
     [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
   )
 
-  if (existing.type === "digital") {
+  if (existing.type === "digital" || existing.type === "gacha") {
     // Reuses the hidden variant's own id - replaceVariants must UPDATE it,
     // never delete-and-recreate: order_items.product_variant_id would SET
     // NULL on every edit, and a live order referencing it would make
@@ -455,8 +525,8 @@ async function updateProduct(id, data) {
     await replaceVariants(id, [{
       id: currentVariant ? currentVariant.id : undefined,
       label: "",
-      stock_qty: data.stock_qty !== undefined ? data.stock_qty : currentVariant?.stock_qty,
-      delivery_link: data.delivery_link !== undefined ? data.delivery_link : currentVariant?.delivery_link,
+      stock_qty: existing.type === "gacha" ? null : (data.stock_qty !== undefined ? data.stock_qty : currentVariant?.stock_qty),
+      delivery_link: existing.type === "gacha" ? null : (data.delivery_link !== undefined ? data.delivery_link : currentVariant?.delivery_link),
       thumbnail_image: data.thumbnail_image !== undefined ? data.thumbnail_image : currentVariant?.thumbnail_image,
     }])
   }
@@ -475,6 +545,11 @@ async function deleteProduct(id) {
     )
     const blocked = await blockedVariantsOnConn(conn, variants.map((v) => v.id))
     if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
+
+    // An active session or any historical draw blocks the delete the same way
+    // a live order blocks a variant's - see gachaBlockersOnConn.
+    const gachaBlocked = await gachaBlockersOnConn(conn, [id])
+    if (gachaBlocked.length) throw new VariantInUseError(gachaBlocked)
 
     const [res] = await conn.query("DELETE FROM products WHERE id = ?", [id])
     await conn.commit()
@@ -598,6 +673,7 @@ async function replaceVariants(productId, variants) {
 }
 
 module.exports = {
+  PUBLIC_STATUSES,
   listAllCollections,
   listPublicCollections,
   getPublicCollectionBySlug,

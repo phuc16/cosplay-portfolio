@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest"
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest"
 import db from "../db.js"
 import repo from "../shop/orders/orderRepo.js"
 import catalog from "../shop/catalogRepo.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const buyer = {
@@ -29,6 +31,20 @@ async function seedDigitalVariant(stock, deliveryLink = "https://drive.google.co
   return { cid, pid, variantId: detail.products[0].variant_id }
 }
 
+async function seedGachaVariant(prizeQuantity, collectionOver = {}) {
+  const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active", ...collectionOver })
+  const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+  // Temporary shim: catalogRepo.createProduct still coerces every non-digital
+  // type to 'physical' and only creates the hidden variant for digital. Task 6
+  // teaches it about 'gacha'; until then the seed writes the real type and the
+  // hidden variant itself. Redundant no-op once Task 6 lands.
+  await db.query("UPDATE products SET type = 'gacha' WHERE id = ?", [pid])
+  await catalog.replaceVariants(pid, [{ label: "", stock_qty: null }])
+  await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: prizeQuantity }])
+  const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ? LIMIT 1", [pid])
+  return { cid, pid, variantId: v.id }
+}
+
 async function seedGift({ enabled = true, name = "Postcard", minTotal = 100000, deliveryLink = null, imageUrl = null } = {}) {
   await db.query(
     "INSERT INTO gift_settings (enabled, name, min_total, delivery_link, image_url) VALUES (?, ?, ?, ?, ?)",
@@ -50,7 +66,7 @@ async function orderWithBuyer(over = {}) {
 }
 
 beforeEach(async () => {
-  await resetTables("email_queue", "order_items", "orders", "product_variants", "products", "collections", "gift_settings")
+  await resetTables("email_queue", "gacha_draws", "gacha_sessions", "gacha_prizes", "order_items", "orders", "product_variants", "products", "collections", "gift_settings")
 })
 
 // gift_settings is a table many other test files don't yet know to reset in
@@ -888,6 +904,47 @@ describe("listOrders has_digital_item", () => {
   })
 })
 
+describe("listOrders has_incomplete_gacha_session", () => {
+  const confirmedGachaOrder = async (turns, prizeQuantity) => {
+    const { variantId } = await seedGachaVariant(prizeQuantity)
+    const o = await repo.createOrder(order(variantId, turns, { payment_method: "bank", fulfillment_method: "ship" }))
+    await repo.transitionOrder(o.id, "confirmed")
+    return o
+  }
+
+  it("flags a confirmed gacha order whose buyer has not drawn every turn yet", async () => {
+    const o = await confirmedGachaOrder(2, 10)
+
+    const found = (await repo.listOrders({})).find((r) => r.id === o.id)
+    expect(found.has_incomplete_gacha_session).toBe(true)
+  })
+
+  it("stops flagging once the session's last turn is drawn", async () => {
+    const o = await confirmedGachaOrder(2, 10)
+    const session = await sessionRepo.getSessionByOrderId(o.id)
+    await sessionRepo.drawForSession(session.id, { drawKey: "k1" })
+
+    const partway = (await repo.listOrders({})).find((r) => r.id === o.id)
+    expect(partway.has_incomplete_gacha_session).toBe(true)
+
+    await sessionRepo.drawForSession(session.id, { drawKey: "k2" })
+
+    const done = (await repo.listOrders({})).find((r) => r.id === o.id)
+    expect(done.has_incomplete_gacha_session).toBe(false)
+  })
+
+  it("is false for a non-gacha order and for a gacha order still pending payment", async () => {
+    const { variantId } = await seedVariant(5)
+    const physical = await repo.createOrder(order(variantId, 1))
+    const { variantId: gachaVariantId } = await seedGachaVariant(10)
+    const unpaid = await repo.createOrder(order(gachaVariantId, 1, { payment_method: "bank", fulfillment_method: "ship" }))
+
+    const rows = await repo.listOrders({})
+    expect(rows.find((r) => r.id === physical.id).has_incomplete_gacha_session).toBe(false)
+    expect(rows.find((r) => r.id === unpaid.id).has_incomplete_gacha_session).toBe(false)
+  })
+})
+
 describe("listOrders search", () => {
   it("matches an exact numeric id, not just as a substring of something else", async () => {
     const { variantId: v1 } = await seedVariant(5)
@@ -1397,5 +1454,79 @@ describe("updateBuyerInfo", () => {
     const res = await orderWithBuyer()
     const result = await repo.updateBuyerInfo(res.id, { buyer_name: "Sửa bởi khách", phone: "09" }, { requirePending: true })
     expect(result.changed).toBe(true)
+  })
+})
+
+describe("createOrder - gacha", () => {
+  it("rejects COD for a gacha cart", async () => {
+    const { variantId } = await seedGachaVariant(10)
+    await expect(repo.createOrder(order(variantId, 2, { payment_method: "cod" }))).rejects.toThrow(repo.NoCodForGachaError)
+  })
+
+  it("rejects mixing a gacha item with a non-gacha item in the same cart", async () => {
+    const { variantId: gachaVariantId } = await seedGachaVariant(10)
+    const { variantId: physicalVariantId } = await seedVariant(10)
+    const mixed = {
+      items: [{ variant_id: gachaVariantId, qty: 1 }, { variant_id: physicalVariantId, qty: 1 }],
+      buyer, payment_method: "bank", fulfillment_method: "ship",
+    }
+    await expect(repo.createOrder(mixed)).rejects.toThrow(repo.MixedGachaCartError)
+  })
+
+  // The enforcement point is now `rows.length > 1`, not a gacha-vs-gacha
+  // product-id comparison: ANY second line item in a gacha cart is rejected,
+  // which makes the "same gacha product, two variants" case structurally
+  // impossible to reach (and impossible to construct via the catalog, which
+  // only ever gives a gacha product one hidden variant).
+  it("rejects a cart holding two gacha line items", async () => {
+    const { variantId: firstGachaVariantId } = await seedGachaVariant(10)
+    const { variantId: secondGachaVariantId } = await seedGachaVariant(10)
+    const twoGacha = {
+      items: [{ variant_id: firstGachaVariantId, qty: 1 }, { variant_id: secondGachaVariantId, qty: 1 }],
+      buyer, payment_method: "bank", fulfillment_method: "ship",
+    }
+    await expect(repo.createOrder(twoGacha)).rejects.toThrow(repo.MixedGachaCartError)
+  })
+
+  it("rejects buying more turns than the prize pool has remaining", async () => {
+    const { variantId } = await seedGachaVariant(2)
+    await expect(repo.createOrder(order(variantId, 3, { payment_method: "bank", fulfillment_method: "ship" })))
+      .rejects.toThrow(repo.GachaPoolSoldOutError)
+  })
+
+  it("creates a normal ship-fulfilled order for a valid gacha cart", async () => {
+    const { variantId } = await seedGachaVariant(10)
+    const result = await repo.createOrder(order(variantId, 3, { payment_method: "bank", fulfillment_method: "ship" }))
+    expect(result.total).toBe(60000)
+  })
+})
+
+describe("transitionOrder - gacha", () => {
+  it("creates a gacha session once the order is confirmed", async () => {
+    const { variantId } = await seedGachaVariant(10)
+    const result = await repo.createOrder(order(variantId, 2, { payment_method: "bank", fulfillment_method: "ship" }))
+    await repo.transitionOrder(result.id, "confirmed")
+
+    const session = await sessionRepo.getSessionByOrderId(result.id)
+    expect(session).not.toBeNull()
+    expect(session.turns_total).toBe(2)
+    expect(session.source).toBe("online")
+  })
+
+  it("still confirms and queues the buyer email when session creation throws", async () => {
+    const { variantId } = await seedVariant(5)
+    const result = await repo.createOrder(order(variantId, 1))
+
+    const spy = vi.spyOn(sessionRepo, "startOnlineSessionIfNeeded").mockRejectedValue(new Error("boom"))
+    try {
+      await expect(repo.transitionOrder(result.id, "confirmed")).resolves.toBe(true)
+    } finally {
+      spy.mockRestore()
+    }
+
+    const [[row]] = await db.query("SELECT status FROM orders WHERE id = ?", [result.id])
+    expect(row.status).toBe("confirmed")
+    const [queued] = await db.query("SELECT type FROM email_queue WHERE order_id = ?", [result.id])
+    expect(queued.map((r) => r.type)).toContain("payment_confirmed")
   })
 })

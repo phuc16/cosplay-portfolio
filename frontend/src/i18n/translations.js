@@ -77,6 +77,9 @@ export const translations = {
     checkoutFulfillment: "Delivery method", checkoutShip: "Ship nationwide",
     checkoutPickup: "Pickup at event", checkoutPayment: "Payment method",
     checkoutCodUnavailableDigital: "Cash on delivery isn't available for an order with a digital item.",
+    checkoutCodUnavailableGacha: "Cash on delivery isn't available for an order with gacha turns.",
+    cartGachaOwnOrder: "Gacha turns have to be ordered on their own. Empty your cart (or check out first), then add them.",
+    cartGachaBlocksOthers: "Your cart has gacha turns in it - they have to be ordered on their own. Check out or remove them first.",
     checkoutAddress: "Address", checkoutPlaceOrder: "Place order",
     checkoutShippingNote: "+ shipping fee, paid to the courier on delivery",
     orderReceiverInfoTitle: "Receiver info", orderReceiverName: "Name",
@@ -122,6 +125,7 @@ export const translations = {
     orderPickupCodeHint: "Show or read this to event staff if the QR code can't be scanned.",
     orderTrackingCodeLabel: "ViettelPost tracking code",
     orderCancelReasonLabel: "Cancellation reason",
+    orderGachaTitle: "Open your gacha box",
 
     // Payment instructions
     paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
@@ -272,6 +276,9 @@ export const translations = {
     checkoutFulfillment: "Hình thức nhận hàng", checkoutShip: "Giao toàn quốc",
     checkoutPickup: "Nhận tại sự kiện", checkoutPayment: "Hình thức thanh toán",
     checkoutCodUnavailableDigital: "COD không áp dụng cho đơn có sản phẩm số.",
+    checkoutCodUnavailableGacha: "COD không áp dụng cho đơn mua lượt quay gacha.",
+    cartGachaOwnOrder: "Lượt quay gacha phải đặt riêng một đơn. Hãy thanh toán hoặc xóa giỏ hàng hiện tại trước khi thêm.",
+    cartGachaBlocksOthers: "Giỏ hàng đang có lượt quay gacha - gacha phải đặt riêng một đơn. Hãy thanh toán hoặc xóa lượt quay trước.",
     checkoutAddress: "Địa chỉ", checkoutPlaceOrder: "Đặt hàng",
     checkoutShippingNote: "+ phí vận chuyển, thanh toán cho shipper khi nhận hàng",
     orderReceiverInfoTitle: "Thông tin nhận hàng", orderReceiverName: "Tên người nhận",
@@ -317,6 +324,7 @@ export const translations = {
     orderPickupCodeHint: "Đọc hoặc cho nhân viên xem mã này nếu không quét được mã QR.",
     orderTrackingCodeLabel: "Mã vận đơn Viettel Post",
     orderCancelReasonLabel: "Lý do hủy",
+    orderGachaTitle: "Mở hộp gacha",
 
     // Payment instructions
     paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",

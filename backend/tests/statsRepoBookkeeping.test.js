@@ -3,6 +3,8 @@ import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import statsRepo from "../shop/stats/statsRepo.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }
@@ -36,8 +38,23 @@ async function placeOrderAt(variantId, createdAt, over = {}) {
   return o
 }
 
+/** A booth-cash gacha order, exactly as the Staff Panel creates one: born
+ *  `confirmed`, payment_method `cash`, fulfillment_method `booth`. */
+async function startBoothCashOrderAt(createdAt, { turnsTotal = 1, price = 20000 } = {}) {
+  const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+  const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price, type: "gacha" })
+  await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: price, quantity_total: 10 }])
+
+  const { orderId, sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal })
+  await db.query("UPDATE orders SET created_at = ? WHERE id = ?", [createdAt, orderId])
+  return { collectionId: cid, productId: pid, orderId, sessionId }
+}
+
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables(
+    "gacha_draws", "gacha_sessions", "gacha_prizes",
+    "order_items", "orders", "product_variants", "products", "collections"
+  )
 })
 
 describe("parseLocalDateRange / statsRepo.InvalidRangeError", () => {
@@ -210,6 +227,36 @@ describe("getBookkeepingStats - money and buckets", () => {
     expect(stats.to_collect).toBe(70000)
     expect(stats.received.cod).toBe(0)
     expect(stats.received_total).toBe(0)
+  })
+
+  // Booth cash is in the till the moment the order exists - unlike a transfer
+  // an admin still has to verify, and unlike COD, which is collected on a
+  // future delivery. Counting it as to_collect reported money the seller
+  // already holds as still owed.
+  it("counts a still-being-drawn (confirmed) booth-cash order as received.cash, never to_collect", async () => {
+    const today = new Date()
+    await startBoothCashOrderAt(today, { turnsTotal: 2, price: 20000 })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    expect(stats.received.cash).toBe(40000)
+    expect(stats.received_total).toBe(40000)
+    expect(stats.to_collect).toBe(0)
+  })
+
+  it("counts a completed booth-cash order in received_total, not as a NaN that silently drops it", async () => {
+    const today = new Date()
+    const { orderId, sessionId } = await startBoothCashOrderAt(today, { turnsTotal: 1, price: 20000 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+    const [[order]] = await db.query("SELECT status FROM orders WHERE id = ?", [orderId])
+    expect(order.status).toBe("completed")
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    expect(stats.received.cash).toBe(20000)
+    expect(stats.received_total).toBe(20000)
+    expect(Number.isNaN(stats.received_total)).toBe(false)
+    expect(stats.to_collect).toBe(0)
   })
 })
 

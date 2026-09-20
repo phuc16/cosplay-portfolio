@@ -531,6 +531,22 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.textContent).toContain("Sản phẩm số")
   })
 
+  it("flags an under-drawn gacha order on its collapsed row", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship", has_incomplete_gacha_session: true })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).toContain("Chưa quay hết")
+  })
+
+  it("does not flag an order with no active gacha session", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship", has_incomplete_gacha_session: false })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).not.toContain("Chưa quay hết")
+  })
+
   it("fetches payment instructions by id under admin auth when opening the detail panel, not the buyer's public token route", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({ id: 1, email: "a@b.com", items: [] }))

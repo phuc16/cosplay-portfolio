@@ -3,7 +3,7 @@
    directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo } from "../api/shop"
+import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo, fetchGachaSession, drawGachaSession } from "../api/shop"
 import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../utils/orderAuth"
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
@@ -14,6 +14,7 @@ import AddressFields from "../components/shop/AddressFields"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import StatusBadge from "../components/StatusBadge"
+import GachaMachine from "../shop/gacha/GachaMachine"
 import { variantForStatus } from "../constants/statusVariant"
 
 const STATUS_KEY = {
@@ -36,6 +37,11 @@ const STATUS_TIMESTAMP_FIELD = {
 export function statusTimestamp(order) {
   return order[STATUS_TIMESTAMP_FIELD[order.status]] || null
 }
+
+// A gacha session is only created once the seller confirms the order, and it
+// stays openable afterwards - the buyer may not have spent every turn by the
+// time the parcel ships.
+const GACHA_STATUSES = ["confirmed", "shipped", "completed"]
 
 // Well under the backend's 50MB limit - rejects an oversized photo before it burns a retry against the proof rate limiter.
 const MAX_PROOF_BYTES = 8 * 1024 * 1024
@@ -235,6 +241,10 @@ export default function Order() {
   const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
   const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
   const [buyerInfoError, setBuyerInfoError] = useState("")
+  const [gachaSession, setGachaSession] = useState(null)
+  // Display pool for the reel's filler cells only - the winning prize always
+  // comes from the draw response, never from this list.
+  const [gachaPrizes, setGachaPrizes] = useState([])
 
   const startEditBuyerInfo = () => {
     // Email is deliberately excluded - it's not editable (backend ignores
@@ -300,6 +310,19 @@ export default function Order() {
   useEffect(() => {
     if (order?.status !== "pending") return
     fetchPaymentInstructions(token, orderAuthHeaders(token)).then(setInstructions).catch(() => setInstructions(null))
+  }, [order?.status, token])
+
+  useEffect(() => {
+    if (!GACHA_STATUSES.includes(order?.status)) return
+    fetchGachaSession(token)
+      .then((data) => {
+        setGachaSession(data.session)
+        setGachaPrizes(data.prizes || [])
+      })
+      .catch(() => {
+        setGachaSession(null)
+        setGachaPrizes([])
+      })
   }, [order?.status, token])
 
   const qrSrc = useBlobUrl(
@@ -437,6 +460,25 @@ export default function Order() {
 
       {order.fulfillment_method === "ship" && (
         <p className="text-xs opacity-70 mt-1">{t("checkoutShippingNote")}</p>
+      )}
+
+      {/* gachaPrizes gates the render too: the reel fills its non-winning
+          cells from that pool, so there is nothing to animate until it loads. */}
+      {gachaSession?.status === "active" && gachaPrizes.length > 0 && (
+        <section className="mt-6 p-4 rounded-xl border border-[var(--border-brand)]">
+          <h2 className="font-semibold mb-2">{t("orderGachaTitle")}</h2>
+          {/* Deliberately no onSessionComplete: flipping status here would
+              unmount the machine in the same commit that reveals the last
+              prize. The section disappears on the next load instead, once the
+              server reports the session as completed. */}
+          <GachaMachine
+            prizes={gachaPrizes}
+            turnsTotal={gachaSession.turns_total}
+            turnsUsed={gachaSession.turns_used}
+            drawFn={(drawKey) => drawGachaSession(token, drawKey)}
+            onDrawResult={(response) => setGachaSession((s) => (s ? { ...s, turns_used: response.turns_used } : s))}
+          />
+        </section>
       )}
 
       <div className="mt-4 p-4 rounded-xl border border-[var(--border-brand)] text-sm">

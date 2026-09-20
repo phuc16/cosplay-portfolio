@@ -4,6 +4,7 @@ import {
   adminReorderProducts,
 } from "../api/shop"
 import AdminVariants from "./AdminVariants"
+import AdminGachaPrizeEditor from "./AdminGachaPrizeEditor"
 import SearchableSelect from "./SearchableSelect"
 import { formatVnd } from "../utils/money"
 
@@ -27,6 +28,14 @@ const isProductSoldOut = (p) => {
   return p.variants?.length > 0 && p.variants.every(
     (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
   )
+}
+
+// Physical products are broken into variants; a gacha product has no variant
+// concept (its single turn-variant is hidden and server-managed) - its
+// expandable panel is the prize pool instead. Digital products have neither.
+const subEditorLabel = (type) => {
+  if (type === "digital") return null
+  return type === "gacha" ? "Phần thưởng" : "Phân loại"
 }
 
 function sortProducts(list, sortBy) {
@@ -193,6 +202,7 @@ export default function AdminProducts({ collection }) {
           options={[
             { code: "physical", name: "Vật lý" },
             { code: "digital", name: "Số (digital)" },
+            { code: "gacha", name: "Gacha" },
           ]}
           placeholder="Vật lý"
         />
@@ -382,20 +392,24 @@ export default function AdminProducts({ collection }) {
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
-              {p.type !== "digital" && (
+              {subEditorLabel(p.type) && (
                 <button
                   type="button"
                   onClick={() => setExpandedProductId(expandedProductId === p.id ? null : p.id)}
                   className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]"
                 >
-                  {expandedProductId === p.id ? "Thu gọn" : "Phân loại"}
+                  {expandedProductId === p.id ? "Thu gọn" : subEditorLabel(p.type)}
                 </button>
               )}
               <button type="button" onClick={() => edit(p)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Sửa</button>
               <button type="button" onClick={() => remove(p.id)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Xóa</button>
             </div>
           </div>
-          {p.type !== "digital" && expandedProductId === p.id && <AdminVariants product={p} onSaved={reload} />}
+          {subEditorLabel(p.type) && expandedProductId === p.id && (
+            p.type === "gacha"
+              ? <AdminGachaPrizeEditor productId={p.id} />
+              : <AdminVariants product={p} onSaved={reload} />
+          )}
           {editingId === p.id && <div className="mt-3">{form}</div>}
         </div>
       ))}

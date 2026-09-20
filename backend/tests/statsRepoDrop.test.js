@@ -136,7 +136,16 @@ describe("getDropStats", () => {
     await placeOrder(variantId, { fulfillment_method: "pickup" })
 
     const stats = await statsRepo.getDropStats(collectionId)
-    expect(stats.fulfillment_counts).toEqual({ ship: 1, pickup: 1, digital: 0 })
+    expect(stats.fulfillment_counts).toEqual({ ship: 1, pickup: 1, digital: 0, booth: 0 })
+  })
+
+  // A booth-cash gacha order's drawn items carry no collection snapshot today,
+  // so none reaches this query yet - but the bucket has to exist regardless,
+  // or the first one that does turns its count into NaN.
+  it("has a booth bucket, so a booth-cash order can never count as NaN", async () => {
+    const { collectionId } = await seed()
+    const stats = await statsRepo.getDropStats(collectionId)
+    expect(stats.fulfillment_counts.booth).toBe(0)
   })
 
   it("counts a digital order under fulfillment_counts.digital, not NaN", async () => {

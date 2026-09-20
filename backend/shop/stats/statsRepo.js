@@ -130,9 +130,9 @@ async function getDropStats(collectionId) {
     [collectionId]
   )
 
-  const received = { bank: 0, momo: 0, paypal: 0, cod: 0 }
+  const received = { bank: 0, momo: 0, paypal: 0, cod: 0, cash: 0 }
   const orderCounts = { pending: 0, confirmed: 0, shipped: 0, completed: 0, cancelled: 0 }
-  const fulfillmentCounts = { ship: 0, pickup: 0, digital: 0 }
+  const fulfillmentCounts = { ship: 0, pickup: 0, digital: 0, booth: 0 }
   let awaitingPayment = 0
   let toCollect = 0
   let lost = 0
@@ -190,7 +190,7 @@ async function getDropStats(collectionId) {
     collection_id: collection.id,
     collection_title: collection.title,
     received,
-    received_total: received.bank + received.momo + received.paypal + received.cod,
+    received_total: received.bank + received.momo + received.paypal + received.cod + received.cash,
     awaiting_payment: awaitingPayment,
     to_collect: toCollect,
     lost,
@@ -334,7 +334,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     [from, toExclusive]
   )
 
-  const received = { bank: 0, momo: 0, paypal: 0, cod: 0 }
+  const received = { bank: 0, momo: 0, paypal: 0, cod: 0, cash: 0 }
   let awaitingPayment = 0
   let toCollect = 0
   let lost = 0
@@ -378,7 +378,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     date_from: dateFrom,
     date_to: dateTo,
     received,
-    received_total: received.bank + received.momo + received.paypal + received.cod,
+    received_total: received.bank + received.momo + received.paypal + received.cod + received.cash,
     awaiting_payment: awaitingPayment,
     to_collect: toCollect,
     lost,

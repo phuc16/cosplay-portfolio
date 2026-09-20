@@ -1,5 +1,6 @@
 import { api } from "./api"
 import { uploadImage } from "./upload"
+import { orderAuthHeaders } from "../utils/orderAuth"
 
 // ── Public storefront ──
 export const fetchCollections = () =>
@@ -182,3 +183,38 @@ export const adminConfirmTrackingImport = (rows) =>
 
 export const adminGetPickupRoster = (collectionId) =>
   api.get(`/api/admin/shipping/roster/${collectionId}`).then((r) => r.data)
+
+// ── Gacha ──
+export const fetchPracticePrizes = (productId) =>
+  api.get(`/api/shop/gacha/${productId}/practice`).then((r) => r.data)
+
+export const practiceDraw = (productId) =>
+  api.post(`/api/shop/gacha/${productId}/practice-draw`).then((r) => r.data)
+
+export const fetchGachaSession = (token) =>
+  api.get(`/api/orders/${token}/gacha-session`, { headers: orderAuthHeaders(token) }).then((r) => r.data)
+
+export const drawGachaSession = (token, drawKey) =>
+  api.post(
+    `/api/orders/${token}/gacha-session/draw`,
+    { draw_key: drawKey },
+    { headers: orderAuthHeaders(token) },
+  ).then((r) => r.data)
+
+export const adminFetchPrizes = (productId) =>
+  api.get(`/api/admin/gacha-products/${productId}/prizes`).then((r) => r.data)
+
+export const adminSavePrizes = (productId, prizes) =>
+  api.put(`/api/admin/gacha-products/${productId}/prizes`, { prizes }).then((r) => r.data)
+
+export const adminStartBoothSession = (productId, { buyerName, turnsTotal }) =>
+  api.post(`/api/admin/gacha-products/${productId}/booth-sessions`, {
+    buyer_name: buyerName || null,
+    turns_total: turnsTotal,
+  }).then((r) => r.data)
+
+export const adminFetchSession = (sessionId) =>
+  api.get(`/api/admin/gacha-sessions/${sessionId}`).then((r) => r.data)
+
+export const adminDrawSession = (sessionId, drawKey) =>
+  api.post(`/api/admin/gacha-sessions/${sessionId}/draw`, { draw_key: drawKey }).then((r) => r.data)

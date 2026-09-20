@@ -27,7 +27,7 @@ const { default: StatsBookkeeping } = await import("./StatsBookkeeping")
 function bookkeepingStats(over = {}) {
   return {
     date_from: "2026-08-01", date_to: "2026-08-08",
-    received: { bank: 100000, momo: 20000, paypal: 0, cod: 30000 }, received_total: 150000,
+    received: { bank: 100000, momo: 20000, paypal: 0, cod: 30000, cash: 0 }, received_total: 150000,
     awaiting_payment: 40000, to_collect: 10000, lost: 5000, pending_cod: 15000, shipping_cost: 25000,
     by_collection: [
       { collection_id: 1, collection_title: "Drop hè", received_total: 150000, awaiting_payment: 40000, to_collect: 10000, lost: 5000, pending_cod: 15000 },

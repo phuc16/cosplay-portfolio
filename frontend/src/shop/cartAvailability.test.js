@@ -24,6 +24,14 @@ const digitalCollection = (overrides = {}) => ({
   ...overrides,
 })
 
+const gachaCollection = (overrides = {}) => ({
+  status: "active",
+  products: [
+    { type: "gacha", variant_id: 20, stock_qty: null, variants: [], gacha_pool_remaining: 10 },
+  ],
+  ...overrides,
+})
+
 beforeEach(() => {
   fetchCollection.mockReset()
 })
@@ -59,6 +67,27 @@ describe("checkCartAvailability", () => {
 
     const problems = await checkCartAvailability(cart)
     expect(problems.size).toBe(0)
+  })
+
+  // A gacha product is flattened exactly like a digital one (variant_id on the
+  // product, empty variants array), so matching it needs the same branch - and
+  // its sold-out signal is the prize pool, not stock_qty (always null).
+  it("matches a gacha line by its flattened variant_id and does not flag it while the pool has prizes", async () => {
+    fetchCollection.mockResolvedValue(gachaCollection())
+    const cart = [{ variant_id: 20, collection_slug: "drop" }]
+
+    const problems = await checkCartAvailability(cart)
+    expect(problems.size).toBe(0)
+  })
+
+  it("flags a gacha line as sold_out when its prize pool is exhausted", async () => {
+    fetchCollection.mockResolvedValue(gachaCollection({
+      products: [{ type: "gacha", variant_id: 20, stock_qty: null, variants: [], gacha_pool_remaining: 0 }],
+    }))
+    const cart = [{ variant_id: 20, collection_slug: "drop" }]
+
+    const problems = await checkCartAvailability(cart)
+    expect(problems.get(20)).toBe("sold_out")
   })
 
   it("flags a line as unavailable when the collection fetch fails (404 - hidden, deleted, or not started)", async () => {
