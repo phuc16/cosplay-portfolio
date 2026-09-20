@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useLanguage } from "../contexts/LanguageContext"
 
 // A short list (sort order, a yes/no filter, ~5 status values) doesn't need
@@ -20,14 +20,27 @@ export default function SearchableSelect({
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
+  // The *code* (not index) of the keyboard-highlighted option, or null when
+  // nothing is highlighted. Storing the code rather than an index means a
+  // typed query that reshuffles/shrinks the filtered list can't leave the
+  // highlight silently pointing at the wrong option - the index below is
+  // re-derived from this code against the current `filtered` array on every
+  // render instead. Reset to null everywhere `query`/`open` already get
+  // reset, so a stale highlight never silently carries into the next open
+  // (same reasoning as the existing query-reset-on-close).
+  const [highlightedCode, setHighlightedCode] = useState(null)
   const rootRef = useRef(null)
+  const triggerRef = useRef(null)
+  const listboxId = useId()
   const showSearch = options.length > SEARCH_THRESHOLD
+  const optionId = (code) => `${listboxId}-option-${code}`
 
   useEffect(() => {
     const onClickOutside = (e) => {
       if (rootRef.current && !rootRef.current.contains(e.target)) {
         setOpen(false)
         setQuery("")
+        setHighlightedCode(null)
       }
     }
     document.addEventListener("mousedown", onClickOutside)
@@ -52,10 +65,104 @@ export default function SearchableSelect({
     ? options.filter((o) => o.name.toLowerCase().includes(query.trim().toLowerCase()))
     : options
 
+  // Re-derived from `highlightedCode` on every render rather than stored as
+  // an index directly (see the state comment above) - if the highlighted
+  // option's code no longer appears in `filtered` (the query just narrowed
+  // it out), this falls back to the first filtered option, or -1 once the
+  // list itself is empty.
+  let highlightedIndex = highlightedCode == null ? -1 : filtered.findIndex((o) => o.code === highlightedCode)
+  if (highlightedCode != null && highlightedIndex === -1) {
+    highlightedIndex = filtered.length > 0 ? 0 : -1
+  }
+  const highlightedOption = highlightedIndex >= 0 ? filtered[highlightedIndex] : null
+
   const pick = (code) => {
     onChange(code)
     setOpen(false)
     setQuery("")
+    setHighlightedCode(null)
+  }
+
+  const close = ({ restoreFocus = false } = {}) => {
+    setOpen(false)
+    setQuery("")
+    setHighlightedCode(null)
+    if (restoreFocus) triggerRef.current?.focus()
+  }
+
+  const moveHighlight = (delta) => {
+    if (filtered.length === 0) return
+    // No current highlight: ArrowDown lands on the first option, ArrowUp on
+    // the last - implemented as picking the base index the wrap-around math
+    // below would naturally land on either side of.
+    const base = highlightedIndex === -1 ? (delta > 0 ? -1 : 0) : highlightedIndex
+    const next = (base + delta + filtered.length) % filtered.length
+    setHighlightedCode(filtered[next].code)
+  }
+
+  const highlightFirst = () => {
+    if (filtered.length > 0) setHighlightedCode(filtered[0].code)
+  }
+
+  const highlightLast = () => {
+    if (filtered.length > 0) setHighlightedCode(filtered[filtered.length - 1].code)
+  }
+
+  // Shared between the trigger button and the search input - once the
+  // dropdown is open, both need identical Arrow/Home/End/Enter/Escape
+  // handling. Focus moves to the search input the moment it renders
+  // (autoFocus below), so keying only the button would silently break
+  // keyboard nav for any list long enough to show a search box.
+  const handleOpenKeyDown = (e) => {
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault()
+        moveHighlight(1)
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        moveHighlight(-1)
+        break
+      case "Home":
+        e.preventDefault()
+        highlightFirst()
+        break
+      case "End":
+        e.preventDefault()
+        highlightLast()
+        break
+      case "Enter":
+        e.preventDefault()
+        // No-op when nothing is highlighted (e.g. the filtered list is
+        // empty) - Enter must never silently "select" nothing.
+        if (highlightedOption) pick(highlightedOption.code)
+        break
+      case "Escape":
+        e.preventDefault()
+        // Selection is left exactly as it was before opening - Escape never
+        // calls onChange.
+        close({ restoreFocus: true })
+        break
+      default:
+        break
+    }
+  }
+
+  const handleTriggerKeyDown = (e) => {
+    if (disabled) return
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter") {
+        e.preventDefault()
+        setOpen(true)
+        setQuery("")
+        // Pre-highlight the current selection so opening via keyboard shows
+        // where you are immediately, rather than nothing highlighted -
+        // falls back to the first option when nothing is selected yet.
+        setHighlightedCode(selected ? selected.code : (options[0]?.code ?? null))
+      }
+      return
+    }
+    handleOpenKeyDown(e)
   }
 
   return (
@@ -76,6 +183,7 @@ export default function SearchableSelect({
         {!options.some((o) => o.name === placeholder) && <div>{placeholder}</div>}
       </div>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => {
           if (disabled) return
@@ -85,10 +193,17 @@ export default function SearchableSelect({
           // (if showSearch) to explain why options are missing.
           setOpen((o) => !o)
           setQuery("")
+          setHighlightedCode(null)
         }}
+        onKeyDown={handleTriggerKeyDown}
         disabled={disabled}
         aria-label={label || placeholder}
         data-testid={dataTestId}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={open && highlightedOption ? optionId(highlightedOption.code) : undefined}
         // `height` (when given) pins the box to an exact pixel height,
         // matching a sibling <input> in the same row - matching padding
         // alone kept failing in practice (font-size inheritance, form
@@ -118,18 +233,25 @@ export default function SearchableSelect({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleOpenKeyDown}
               placeholder={t("selectSearchOption")}
+              aria-autocomplete="list"
+              aria-controls={listboxId}
+              aria-activedescendant={highlightedOption ? optionId(highlightedOption.code) : undefined}
               className={`w-full ${padding} border-b border-[var(--border-brand)] bg-transparent text-sm outline-none`}
             />
           )}
-          <ul className="max-h-56 overflow-y-auto">
+          <ul id={listboxId} role="listbox" className="max-h-56 overflow-y-auto">
             {filtered.length === 0 && <li className={`${padding} text-sm opacity-60`}>{t("selectNoResults")}</li>}
-            {filtered.map((o) => (
+            {filtered.map((o, i) => (
               <li key={o.code}>
                 <button
                   type="button"
+                  id={optionId(o.code)}
+                  role="option"
+                  aria-selected={o.code === value}
                   onClick={() => pick(o.code)}
-                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${o.code === value ? "bg-[var(--brand-soft)] font-medium" : ""}`}
+                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${o.code === value ? "bg-[var(--brand-soft)] font-medium" : ""} ${i === highlightedIndex ? "bg-[var(--brand-soft)]" : ""}`}
                 >
                   {o.name}
                 </button>
