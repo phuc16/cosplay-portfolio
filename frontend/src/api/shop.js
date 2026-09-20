@@ -127,6 +127,22 @@ export const adminGetGiftSettings = () =>
 export const adminSaveGiftSettings = (data) =>
   api.put("/api/admin/gift-settings", data).then((r) => r.data)
 
+// ── Discount codes ──
+export const adminListDiscountCodes = () =>
+  api.get("/api/admin/discount-codes").then((r) => r.data)
+
+export const adminCreateDiscountCode = (data) =>
+  api.post("/api/admin/discount-codes", data).then((r) => r.data)
+
+export const adminUpdateDiscountCode = (id, data) =>
+  api.put(`/api/admin/discount-codes/${id}`, data).then((r) => r.data)
+
+export const adminDeleteDiscountCode = (id) =>
+  api.delete(`/api/admin/discount-codes/${id}`).then((r) => r.data)
+
+export const previewDiscountCode = (code, subtotal) =>
+  api.post("/api/shop/discount-preview", { code, subtotal }).then((r) => r.data)
+
 // ── Email templates ──
 export const adminListEmailTemplates = () =>
   api.get("/api/admin/email-templates").then((r) => r.data)

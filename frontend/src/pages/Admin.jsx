@@ -7,6 +7,7 @@ import AdminCollections from "../components/AdminCollections"
 import AdminOrders from "../components/AdminOrders"
 import AdminPaymentSettings from "../components/AdminPaymentSettings"
 import AdminGiftSettings from "../components/AdminGiftSettings"
+import AdminDiscountCodes from "../components/AdminDiscountCodes"
 import AdminEmailTemplates from "../components/AdminEmailTemplates"
 import AdminStats from "../components/AdminStats"
 import AdminShipping from "../components/AdminShipping"
@@ -147,6 +148,12 @@ export default function Admin() {
               Thanh toán
             </button>
             <button
+              onClick={() => setTab("discounts")}
+              className={`text-sm ${tab === "discounts" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
+            >
+              Mã giảm giá
+            </button>
+            <button
               onClick={() => setTab("email")}
               className={`text-sm ${tab === "email" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
             >
@@ -197,6 +204,7 @@ export default function Admin() {
             <AdminGiftSettings />
           </>
         )}
+        {tab === "discounts" && <AdminDiscountCodes />}
         {tab === "email" && <AdminEmailTemplates />}
         {tab === "stats" && <AdminStats />}
         {tab === "shipping" && <AdminShipping />}
