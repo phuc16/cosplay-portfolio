@@ -196,6 +196,27 @@ describe("Order - free gift line", () => {
   })
 })
 
+describe("Order - discount code line", () => {
+  it("shows the applied code and amount when a discount was applied", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      total: 31500, discount_code_snapshot: "SAVE10", discount_amount_snapshot: 3500,
+    }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).toContain("SAVE10")
+    expect(container.textContent).toContain("-3.500")
+  })
+
+  it("renders no discount line when no code was applied", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ discount_code_snapshot: null, discount_amount_snapshot: 0 }))
+
+    const container = await renderOrder()
+
+    expect(container.textContent).not.toContain("Mã giảm giá")
+  })
+})
+
 describe("Order - tracking code", () => {
   it("labels the tracking code as a ViettelPost code, not just a bare number", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "shipped", tracking_code: "151045353461" }))

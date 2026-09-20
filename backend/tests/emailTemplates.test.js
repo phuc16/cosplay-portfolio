@@ -268,3 +268,28 @@ describe("DEFAULT_TEMPLATES", () => {
     }
   })
 })
+
+describe("discount_row", () => {
+  const orderWithDiscount = {
+    ...order, discount_code_snapshot: "SAVE10", discount_amount_snapshot: 10500,
+  }
+
+  it("renders a discount line for order_placed/payment_confirmed/cancelled/payment_proof_uploaded when a code was applied", () => {
+    for (const type of ["order_placed", "payment_confirmed", "cancelled", "payment_proof_uploaded"]) {
+      const out = t.renderTemplate(t.DEFAULT_TEMPLATES[type], t.buildVars(orderWithDiscount))
+      expect(out.html, type).toContain("SAVE10")
+      expect(out.html, type).toContain("10.500")
+    }
+  })
+
+  it("renders nothing when no code was applied", () => {
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(order))
+    expect(out.html).not.toContain("Mã giảm giá")
+  })
+
+  it("escapes the stored code before substitution", () => {
+    const evil = { ...order, discount_code_snapshot: "<script>alert(1)</script>", discount_amount_snapshot: 1000 }
+    const out = t.renderTemplate(t.DEFAULT_TEMPLATES.order_placed, t.buildVars(evil))
+    expect(out.html).not.toContain("<script>")
+  })
+})

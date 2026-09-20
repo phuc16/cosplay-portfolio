@@ -430,6 +430,13 @@ export default function Order() {
         </div>
       ))}
 
+      {order.discount_code_snapshot && (
+        <div className="flex justify-between mt-2 text-sm opacity-70">
+          <span>{t("orderDiscountLabel", { code: order.discount_code_snapshot })}</span>
+          <span>-{formatVnd(order.discount_amount_snapshot)}</span>
+        </div>
+      )}
+
       <div className="flex justify-between mt-4 text-lg font-bold">
         <span>{t("orderTotalLabel")}</span>
         <span className="text-[var(--brand)]">{formatVnd(order.total)}</span>

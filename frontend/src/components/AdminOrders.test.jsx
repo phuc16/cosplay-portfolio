@@ -490,6 +490,40 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.textContent).not.toMatch(/₫0(?!\d)/)
   })
 
+  it("shows the applied discount code and amount when present", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, email: "a@b.com", total: 31500,
+      discount_code_snapshot: "SAVE10", discount_amount_snapshot: 3500,
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1 }],
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).toContain("SAVE10")
+    expect(container.textContent).toContain("-3.500")
+  })
+
+  it("renders no discount line when no code was applied", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    adminGetOrder.mockResolvedValue(order({
+      id: 1, email: "a@b.com", discount_code_snapshot: null, discount_amount_snapshot: 0,
+      items: [{ id: 1, product_name_snapshot: "Card", variant_label_snapshot: "A1", unit_price_snapshot: 35000, qty: 1 }],
+    }))
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    const detailBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Chi tiết")
+    await act(async () => { detailBtn.click() })
+    await flush()
+
+    expect(container.textContent).not.toContain("Mã giảm giá")
+  })
+
   it("shows no digital badge or link for a physical line item", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({

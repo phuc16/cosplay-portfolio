@@ -512,6 +512,12 @@ export default function AdminOrders() {
                   </li>
                 ))}
               </ul>
+
+              {detail.discount_code_snapshot && (
+                <p className="mt-2 opacity-70">
+                  Mã giảm giá <strong>{detail.discount_code_snapshot}</strong>: -{formatVnd(detail.discount_amount_snapshot)}
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -66,6 +66,10 @@ function toPublicOrder(order) {
     // to bookmark an order that's already dead. Same field the admin's own
     // view and the cancellation email already show.
     cancel_reason,
+    // The code actually applied (if any) and the exact amount subtracted -
+    // orders.total already reflects this (see orderRepo.createOrder), this
+    // is purely so the order page can show *why* the total is what it is.
+    discount_code_snapshot, discount_amount_snapshot,
   } = order
   // The code is only meaningful once the order is actually paid for - an
   // unpaid pending order (or one that got cancelled after confirming) has
@@ -95,6 +99,8 @@ function toPublicOrder(order) {
     // reference when contacting support, only the opaque URL token.
     order_code: formatOrderCode(id, created_at),
     cancel_reason: cancel_reason || null,
+    discount_code_snapshot: discount_code_snapshot || null,
+    discount_amount_snapshot: discount_amount_snapshot || 0,
   }
 }
 

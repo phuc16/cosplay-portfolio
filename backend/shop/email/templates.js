@@ -5,7 +5,7 @@ const PLACEHOLDERS = [
   "order_id", "order_token", "order_url", "buyer_name", "total", "items",
   "status", "payment_method", "fulfillment_method", "tracking_code",
   "payment_note", "shop_name", "receiver_info", "shipping_fee_note", "prep_note",
-  "admin_url", "payment_proof_image",
+  "admin_url", "payment_proof_image", "discount_row",
 ]
 
 const SHOP_NAME = process.env.SHOP_NAME || "Shop"
@@ -132,6 +132,16 @@ function buildVars(order) {
     payment_proof_image: order.payment_proof_url
       ? `<img src="${escapeHtml(SITE_URL + order.payment_proof_url)}" style="max-width:320px;width:100%;border-radius:8px;display:block;margin-top:8px" />`
       : "",
+    // Display-only - orders.total is already computed post-discount at
+    // createOrder time (see the discount-codes design doc), so this is
+    // purely showing the buyer *why* the total is what it is, not
+    // recomputing anything. Empty when no code was applied.
+    discount_row: order.discount_code_snapshot
+      ? `<table style="width:100%;border-collapse:collapse"><tr>
+           <td style="padding:2px 0;font-size:13px;color:#888">Mã giảm giá ${escapeHtml(order.discount_code_snapshot)}</td>
+           <td style="padding:2px 0;font-size:13px;color:#888;text-align:right">-${formatVnd(order.discount_amount_snapshot)}</td>
+         </tr></table>`
+      : "",
     // Only a ship order has a shipper to pay at the door - a pickup order's
     // buyer never encounters this fee, so the note would just be confusing.
     shipping_fee_note: order.fulfillment_method === "ship"
@@ -196,6 +206,7 @@ const DEFAULT_TEMPLATES = {
       <p style="margin:0 0 12px">Cảm ơn <strong>{{buyer_name}}</strong> đã đặt hàng! <strong>Đơn hàng đang chờ thanh toán</strong>.</p>
       <p style="margin:0 0 12px">Vui lòng chuyển khoản rồi tải ảnh chuyển khoản lên trang đơn hàng - đơn sẽ chuyển sang <strong>Chờ xác nhận</strong> ngay khi bạn gửi ảnh. Gửi nhầm ảnh cũng không sao, bạn có thể thay ảnh khác sau đó.</p>
       {{items}}
+      {{discount_row}}
       ${TOTAL_ROW}
       {{shipping_fee_note}}`),
   },
@@ -204,6 +215,7 @@ const DEFAULT_TEMPLATES = {
     body_html: wrap(`
       <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, mình đã xác nhận thanh toán - {{prep_note}}</p>
       {{items}}
+      {{discount_row}}
       ${TOTAL_ROW}`),
   },
   shipped: {
@@ -222,6 +234,7 @@ const DEFAULT_TEMPLATES = {
     body_html: wrap(`
       <p style="margin:0 0 12px">Chào <strong>{{buyer_name}}</strong>, đơn hàng của bạn đã bị hủy. Nếu bạn đã thanh toán, vui lòng liên hệ để mình hoàn tiền.</p>
       {{items}}
+      {{discount_row}}
       ${TOTAL_ROW}`),
   },
   payment_proof_uploaded: {
@@ -229,6 +242,7 @@ const DEFAULT_TEMPLATES = {
     body_html: wrap(`
       <p style="margin:0 0 12px"><strong>{{buyer_name}}</strong> vừa tải ảnh chuyển khoản cho đơn hàng này - kiểm tra và xác nhận khi có thể.</p>
       {{items}}
+      {{discount_row}}
       ${TOTAL_ROW}
       {{payment_proof_image}}`, "admin_url"),
   },
