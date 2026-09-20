@@ -96,6 +96,106 @@ describe("variant description", () => {
   })
 })
 
+describe("product credit_text", () => {
+  it("saves and returns a product's credit_text, independent of description", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Photocard", price: 35000,
+      description: "Bộ ảnh giới hạn", credit_text: "Ảnh: @tenphotographer",
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].description).toBe("Bộ ảnh giới hạn")
+    expect(detail.products[0].credit_text).toBe("Ảnh: @tenphotographer")
+    expect(pid).toBeTruthy()
+  })
+
+  it("defaults to null when not submitted", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].credit_text).toBeNull()
+  })
+
+  it("trims surrounding whitespace on create and update", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, credit_text: "  Artist: @foo (Twitter)  ",
+    })
+
+    let detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].credit_text).toBe("Artist: @foo (Twitter)")
+
+    await repo.updateProduct(pid, { name: "Card", price: 35000, credit_text: "  Updated Credit  " })
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].credit_text).toBe("Updated Credit")
+  })
+
+  it("stores an empty or whitespace-only string as NULL, same convention as description", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, credit_text: "Someone",
+    })
+
+    await repo.updateProduct(pid, { name: "Card", price: 35000, credit_text: "   " })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].credit_text).toBeNull()
+  })
+
+  it("can be cleared on update by omitting the field entirely (update is not a partial patch here)", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, credit_text: "Someone",
+    })
+
+    await repo.updateProduct(pid, { name: "Card", price: 35000 })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].credit_text).toBeNull()
+  })
+
+  it("is publicly exposed on getPublicCollectionBySlug, same as admin's getCollectionDetailById", async () => {
+    const cid = await repo.createCollection({ title: "Public Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Photocard", price: 35000, credit_text: "Artist: @someone",
+    })
+
+    const detail = await repo.getPublicCollectionBySlug("public-drop")
+    expect(detail.products[0].credit_text).toBe("Artist: @someone")
+  })
+
+  it("is publicly exposed for a digital product too", async () => {
+    const cid = await repo.createCollection({ title: "Digital Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Wallpaper Pack", price: 20000, type: "digital",
+      stock_qty: 10, delivery_link: "https://example.com/d", credit_text: "Artist: @digitalartist",
+    })
+
+    const detail = await repo.getPublicCollectionBySlug("digital-drop")
+    expect(detail.products[0].credit_text).toBe("Artist: @digitalartist")
+  })
+
+  it("copyCollection preserves a product's credit_text", async () => {
+    const cid = await repo.createCollection({ title: "Fes", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Photocard", price: 35000, credit_text: "Ảnh: @tenphotographer",
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].credit_text).toBe("Ảnh: @tenphotographer")
+  })
+
+  it("copyCollection preserves a null credit_text as null (not an empty string)", async () => {
+    const cid = await repo.createCollection({ title: "Fes", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Photocard", price: 35000 })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].credit_text).toBeNull()
+  })
+})
+
 describe("digital products", () => {
   it("creates a digital product with a hidden variant carrying stock_qty and delivery_link", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })

@@ -337,6 +337,7 @@ async function copyCollection(id) {
       stock_qty: p.stock_qty,
       delivery_link: p.delivery_link,
       thumbnail_image: p.thumbnail_image,
+      credit_text: p.credit_text,
     })
     if (p.type !== "digital" && p.variants.length) {
       await replaceVariants(
@@ -398,12 +399,19 @@ async function deleteCollection(id) {
   }
 }
 
+/** Trims a free-text optional field, storing an empty/whitespace-only string as NULL. */
+function normalizeCreditText(value) {
+  if (value === undefined || value === null) return null
+  const trimmed = String(value).trim()
+  return trimmed || null
+}
+
 async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
   const type = data.type === "digital" ? "digital" : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, credit_text)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
@@ -412,6 +420,7 @@ async function createProduct(data) {
       JSON.stringify(data.images || []),
       type,
       sortOrder,
+      normalizeCreditText(data.credit_text),
     ]
   )
   const productId = res.insertId
@@ -434,8 +443,15 @@ async function updateProduct(id, data) {
   if (!existing) return false
 
   const [res] = await db.query(
-    "UPDATE products SET name = ?, description = ?, price = ?, images = ? WHERE id = ?",
-    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
+    "UPDATE products SET name = ?, description = ?, price = ?, images = ?, credit_text = ? WHERE id = ?",
+    [
+      data.name,
+      data.description || null,
+      Number(data.price) || 0,
+      JSON.stringify(data.images || []),
+      normalizeCreditText(data.credit_text),
+      id,
+    ]
   )
 
   if (existing.type === "digital") {

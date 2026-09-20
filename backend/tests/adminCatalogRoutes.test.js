@@ -343,6 +343,33 @@ describe("products and variants", () => {
     expect(res.body.error).toBe("invalid_input")
   })
 
+  it("creates a product with a credit_text, trimmed", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Photocard", price: 35000, credit_text: "  Ảnh: @tenphotographer  " })
+
+    expect(res.status).toBe(201)
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].credit_text).toBe("Ảnh: @tenphotographer")
+  })
+
+  it("accepts a credit_text at exactly the 255-char column limit", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const credit_text = "a".repeat(255)
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Photocard", price: 1000, credit_text })
+    expect(res.status).toBe(201)
+  })
+
+  it("rejects a credit_text one character over the 255-char column limit with 400, not 500", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const credit_text = "a".repeat(256)
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Photocard", price: 1000, credit_text })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
   it("bulk replaces variants, preserving null stock as unlimited", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
     const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
@@ -472,6 +499,23 @@ describe("PUT /api/admin/products/:id", () => {
 
     expect(res.status).toBe(404)
     expect(res.body.error).toBe("not_found")
+  })
+
+  it("updates and clears a product's credit_text", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000, credit_text: "Old credit" })
+
+    let res = await authed(request(app).put(`/api/admin/products/${pid}`))
+      .send({ name: "Card", price: 35000, credit_text: "  New credit  " })
+    expect(res.status).toBe(200)
+    let detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].credit_text).toBe("New credit")
+
+    res = await authed(request(app).put(`/api/admin/products/${pid}`))
+      .send({ name: "Card", price: 35000, credit_text: "" })
+    expect(res.status).toBe(200)
+    detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].credit_text).toBeNull()
   })
 })
 

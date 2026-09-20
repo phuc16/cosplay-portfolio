@@ -19,6 +19,7 @@ const STATUSES = ["draft", "active", "closed", "archived"]
 // title is the tighter of the two: min(255, 191) = 191.
 const TITLE_MAX_LEN = 191
 const NAME_MAX_LEN = 255
+const CREDIT_TEXT_MAX_LEN = 255
 const LABEL_MAX_LEN = 191
 
 const bad = (res, message) => res.status(400).json({ error: "invalid_input", message })
@@ -56,6 +57,9 @@ function validateProduct(body) {
   const price = Number(body.price)
   if (!Number.isInteger(price) || price < 0) return "Giá phải là số nguyên không âm (VND)"
   if (body.type !== undefined && !["physical", "digital"].includes(body.type)) return "Loại sản phẩm không hợp lệ"
+  if (body.credit_text !== undefined && body.credit_text !== null && String(body.credit_text).length > CREDIT_TEXT_MAX_LEN) {
+    return `Credit tác giả / nhiếp ảnh gia không được quá ${CREDIT_TEXT_MAX_LEN} ký tự`
+  }
   if (body.type === "digital") {
     if (body.stock_qty !== null && body.stock_qty !== undefined && body.stock_qty !== "") {
       const stock = Number(body.stock_qty)
