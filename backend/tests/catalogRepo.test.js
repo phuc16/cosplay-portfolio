@@ -275,6 +275,97 @@ describe("digital products", () => {
   })
 })
 
+describe("product tags", () => {
+  it("creates a product with tags, trimmed and returned on read", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Raiden Card", price: 35000,
+      tags: [" Genshin Impact ", "Raiden Shogun"],
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).tags).toEqual(["Genshin Impact", "Raiden Shogun"])
+  })
+
+  it("drops blank/whitespace-only entries", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000, tags: ["", "   ", "Genshin"] })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].tags).toEqual(["Genshin"])
+  })
+
+  it("dedupes case-insensitively, keeping the first-seen casing", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000,
+      tags: ["Genshin Impact", "genshin impact", "GENSHIN IMPACT"],
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].tags).toEqual(["Genshin Impact"])
+  })
+
+  it("defaults to [] when not submitted at creation", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].tags).toEqual([])
+  })
+
+  it("updateProduct replaces the full tag list, same convention as images", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, tags: ["Genshin Impact"],
+    })
+
+    await repo.updateProduct(pid, { name: "Card", price: 35000, tags: ["Bocchi the Rock", "Bocchi"] })
+    let detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].tags).toEqual(["Bocchi the Rock", "Bocchi"])
+
+    // Omitting tags on a later update clears them back to [] - a plain
+    // resent-in-full array field, same as images, not a patched field.
+    await repo.updateProduct(pid, { name: "Card", price: 35000 })
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].tags).toEqual([])
+  })
+
+  it("exposes tags on the public path, unlike delivery_link", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 5, delivery_link: "https://drive.google.com/x", tags: ["Genshin Impact"],
+    })
+
+    const publicDetail = await repo.getPublicCollectionBySlug("drop")
+    expect(publicDetail.products[0].tags).toEqual(["Genshin Impact"])
+    expect(publicDetail.products[0].delivery_link).toBeUndefined()
+  })
+
+  it("carries tags through copyCollection", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, tags: ["Genshin Impact", "Raiden Shogun"],
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].tags).toEqual(["Genshin Impact", "Raiden Shogun"])
+  })
+
+  it("tags on a digital product's flattened read path", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Digital Album", price: 99000, type: "digital",
+      stock_qty: 5, tags: ["Bocchi the Rock"],
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].tags).toEqual(["Bocchi the Rock"])
+  })
+})
+
 describe("createCollection", () => {
   it("generates a slug from the Vietnamese title", async () => {
     const id = await repo.createCollection({ title: "Bộ sưu tập Hè", status: "active" })

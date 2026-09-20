@@ -60,6 +60,49 @@ function parseImages(value) {
   return []
 }
 
+/**
+ * Trims, drops blanks, and dedupes an array of tag strings case-
+ * insensitively while keeping the first-seen casing - "genshin" and
+ * "Genshin" typed on different rows count as the same tag, but which
+ * casing wins is whichever appeared first, not a forced canonical form.
+ * Non-array/nullish input normalizes to [].
+ */
+function normalizeTags(rawTags) {
+  const list = Array.isArray(rawTags) ? rawTags : []
+  const seen = new Set()
+  const out = []
+  for (const raw of list) {
+    if (typeof raw !== "string") continue
+    const trimmed = raw.trim()
+    if (!trimmed) continue
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(trimmed)
+  }
+  return out
+}
+
+/**
+ * products.tags is a JSON column with the same string-vs-array driver
+ * quirk parseImages works around for `images` - but unlike images, a
+ * value already in the DB was already normalized at write time
+ * (normalizeTags), so running normalizeTags again on read is a no-op in
+ * practice while keeping read and write on one shared rule instead of two.
+ */
+function parseTags(value) {
+  if (Array.isArray(value)) return normalizeTags(value)
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value)
+      return normalizeTags(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 async function nextSortOrder(table, whereSql = "", params = []) {
   const [[{ next }]] = await db.query(
     `SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM \`${table}\` ${whereSql}`,
@@ -160,6 +203,7 @@ async function nestCollectionDetail(collection) {
         return {
           ...p,
           images: parseImages(p.images),
+          tags: parseTags(p.tags),
           variants: [],
           variant_id: hidden?.id ?? null,
           stock_qty: hidden?.stock_qty ?? null,
@@ -170,6 +214,7 @@ async function nestCollectionDetail(collection) {
       return {
         ...p,
         images: parseImages(p.images),
+        tags: parseTags(p.tags),
         variants: productVariants,
       }
     }),
@@ -333,6 +378,7 @@ async function copyCollection(id) {
       description: p.description,
       price: p.price,
       images: p.images,
+      tags: p.tags,
       type: p.type,
       stock_qty: p.stock_qty,
       delivery_link: p.delivery_link,
@@ -402,14 +448,15 @@ async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
   const type = data.type === "digital" ? "digital" : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, tags, type, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
       data.description || null,
       Number(data.price) || 0,
       JSON.stringify(data.images || []),
+      JSON.stringify(normalizeTags(data.tags)),
       type,
       sortOrder,
     ]
@@ -434,8 +481,15 @@ async function updateProduct(id, data) {
   if (!existing) return false
 
   const [res] = await db.query(
-    "UPDATE products SET name = ?, description = ?, price = ?, images = ? WHERE id = ?",
-    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
+    "UPDATE products SET name = ?, description = ?, price = ?, images = ?, tags = ? WHERE id = ?",
+    [
+      data.name,
+      data.description || null,
+      Number(data.price) || 0,
+      JSON.stringify(data.images || []),
+      JSON.stringify(normalizeTags(data.tags)),
+      id,
+    ]
   )
 
   if (existing.type === "digital") {
