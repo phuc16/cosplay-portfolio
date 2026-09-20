@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { readCart, cartTotal, clearCart, removeFromCart } from "../shop/cart"
 import { generateRequestKey } from "../shop/requestKey"
-import { createOrder, fetchCollection, fetchPaymentMethods, fetchGiftSettings } from "../api/shop"
+import { createOrder, fetchCollection, fetchPaymentMethods, fetchGiftSettings, previewDiscountCode } from "../api/shop"
 import { setOrderSessionToken } from "../utils/orderAuth"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
@@ -190,6 +190,43 @@ export default function Checkout() {
   // otherwise every retry would resend the same colliding key and get stuck.
   const [requestKey, setRequestKey] = useState(() => generateRequestKey())
 
+  // Checkout-only (Cart.jsx has no discount UI - see the discount-codes
+  // design doc's scope decisions). `appliedDiscount` is a client-side
+  // estimate from the non-locking preview endpoint, cosmetic only - the
+  // server (createOrder) is still the sole authority and re-validates for
+  // real under its own lock at submit time.
+  const [discountInput, setDiscountInput] = useState("")
+  const [appliedDiscount, setAppliedDiscount] = useState(null)
+  const [discountError, setDiscountError] = useState("")
+  const [applyingDiscount, setApplyingDiscount] = useState(false)
+
+  const applyDiscount = async () => {
+    const code = discountInput.trim()
+    if (!code) return
+    setDiscountError("")
+    setApplyingDiscount(true)
+    try {
+      const res = await previewDiscountCode(code, cartTotal(cart))
+      if (res.valid) {
+        setAppliedDiscount({ code: code.toUpperCase(), amount: res.amount })
+      } else {
+        setAppliedDiscount(null)
+        setDiscountError(res.message || "Mã giảm giá không hợp lệ")
+      }
+    } catch (e) {
+      setAppliedDiscount(null)
+      setDiscountError(e.response?.data?.message || "Không kiểm tra được mã giảm giá")
+    } finally {
+      setApplyingDiscount(false)
+    }
+  }
+
+  const removeDiscount = () => {
+    setAppliedDiscount(null)
+    setDiscountError("")
+    setDiscountInput("")
+  }
+
   const submit = async () => {
     setError("")
     setSubmitting(true)
@@ -201,6 +238,7 @@ export default function Checkout() {
         payment_method: payment,
         note,
         request_key: requestKey,
+        discount_code: appliedDiscount ? appliedDiscount.code : undefined,
       })
       clearCart()
       // Skips the PIN gate for this one browser session - this is the exact
@@ -244,6 +282,16 @@ export default function Checkout() {
         setForceShipping(true)
         fetchGiftSettings().then(setGiftSettings).catch(() => {})
         setError(t("checkoutFulfillmentNowRequired"))
+        return
+      }
+      // The code's state changed between "Apply" and this submit (exhausted
+      // by another buyer, disabled by the admin, expired) - the preview's
+      // green checkmark is now stale. Drop it so the buyer isn't stuck
+      // resubmitting into the same rejection forever; the server's own
+      // message explains why.
+      if (e.response?.data?.error === "invalid_discount_code") {
+        setAppliedDiscount(null)
+        setError(e.response.data.message)
         return
       }
       setError(
@@ -383,9 +431,44 @@ export default function Checkout() {
           className="w-full px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent" />
       </label>
 
+      <div className="mb-4">
+        <span className="block text-sm mb-1">{t("checkoutDiscountLabel")}</span>
+        {appliedDiscount ? (
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-[var(--brand)]">
+              {t("checkoutDiscountApplied", { code: appliedDiscount.code, amount: formatVnd(appliedDiscount.amount) })}
+            </span>
+            <button type="button" onClick={removeDiscount} className="text-xs underline opacity-70">
+              {t("checkoutDiscountRemove")}
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={discountInput}
+              onChange={(e) => setDiscountInput(e.target.value)}
+              placeholder={t("checkoutDiscountPlaceholder")}
+              className="flex-1 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent"
+            />
+            <button
+              type="button"
+              onClick={applyDiscount}
+              disabled={applyingDiscount || !discountInput.trim()}
+              className="px-4 py-2 rounded-lg border border-[var(--border-brand)] text-sm disabled:opacity-50"
+            >
+              {applyingDiscount ? t("checkoutDiscountApplying") : t("checkoutDiscountApply")}
+            </button>
+          </div>
+        )}
+        {discountError && <p className="text-sm text-[var(--text-error)] mt-1">{discountError}</p>}
+      </div>
+
       <div className="flex justify-between items-center mb-4">
         <span className="opacity-70">{t("cartTotal")}</span>
-        <span className="text-xl font-bold text-[var(--brand)]">{formatVnd(cartTotal(cart))}</span>
+        <span className="text-xl font-bold text-[var(--brand)]">
+          {formatVnd(cartTotal(cart) - (appliedDiscount?.amount || 0))}
+        </span>
       </div>
 
       {giftSettings?.enabled && (

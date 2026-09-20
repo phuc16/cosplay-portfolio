@@ -15,6 +15,7 @@ const fetchProvinces = vi.fn().mockResolvedValue([])
 const fetchWards = vi.fn().mockResolvedValue([])
 const searchAddress = vi.fn().mockResolvedValue({ predictions: [] })
 const fetchGiftSettings = vi.fn()
+const previewDiscountCode = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchPaymentMethods: (...args) => fetchPaymentMethods(...args),
@@ -24,6 +25,7 @@ vi.mock("../api/shop", () => ({
   fetchWards: (...args) => fetchWards(...args),
   searchAddress: (...args) => searchAddress(...args),
   fetchGiftSettings: (...args) => fetchGiftSettings(...args),
+  previewDiscountCode: (...args) => previewDiscountCode(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings - mocked
@@ -72,6 +74,7 @@ beforeEach(() => {
   fetchCollection.mockResolvedValue({ allow_ship: true, allow_pickup: true, pickup_location: null, pickup_note: null })
   fetchGiftSettings.mockReset()
   fetchGiftSettings.mockResolvedValue({ enabled: false, min_total: 0, name: "", image_url: null, note: null, is_digital: false })
+  previewDiscountCode.mockReset()
 })
 
 describe("Checkout payment methods", () => {
@@ -579,5 +582,154 @@ describe("Checkout - free gift forces shipping info for a digital-only cart", ()
     await act(async () => {})
 
     expect(container.textContent).not.toContain("Limited to one per order")
+  })
+})
+
+describe("Checkout - discount code", () => {
+  it("calls the preview endpoint with the cart subtotal when Apply is clicked", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    previewDiscountCode.mockResolvedValue({ valid: true, amount: 3500, type: "percent", value: 10 })
+
+    const container = await renderCheckout()
+    const input = container.querySelector('input[placeholder="Enter code"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(input, "SAVE10")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    const applyBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Apply")
+    await act(async () => { applyBtn.click() })
+
+    expect(previewDiscountCode).toHaveBeenCalledWith("SAVE10", 35000)
+  })
+
+  it("shows the discount inline and reduces the displayed total on a valid code", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    previewDiscountCode.mockResolvedValue({ valid: true, amount: 3500, type: "percent", value: 10 })
+
+    const container = await renderCheckout()
+    const input = container.querySelector('input[placeholder="Enter code"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(input, "save10")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    const applyBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Apply")
+    await act(async () => { applyBtn.click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("SAVE10")
+    expect(container.textContent).toContain("31.500")
+  })
+
+  it("shows the server's message and applies nothing on an invalid code", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    previewDiscountCode.mockResolvedValue({ valid: false, message: "Mã giảm giá không tồn tại" })
+
+    const container = await renderCheckout()
+    const input = container.querySelector('input[placeholder="Enter code"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(input, "NOPE")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    const applyBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Apply")
+    await act(async () => { applyBtn.click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Mã giảm giá không tồn tại")
+    expect(container.textContent).toContain("35.000")
+  })
+
+  it("includes discount_code in the order payload only when a code was successfully applied", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    previewDiscountCode.mockResolvedValue({ valid: true, amount: 3500, type: "percent", value: 10 })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 31500 })
+
+    const container = await renderCheckout()
+    const input = container.querySelector('input[placeholder="Enter code"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(input, "SAVE10")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    const applyBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Apply")
+    await act(async () => { applyBtn.click() })
+    await act(async () => {})
+
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ discount_code: "SAVE10" }))
+  })
+
+  it("omits discount_code from the payload when no code was applied", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 35000 })
+
+    const container = await renderCheckout()
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ discount_code: undefined }))
+  })
+
+  it("clearing an applied code removes it from the next submission's payload", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    previewDiscountCode.mockResolvedValue({ valid: true, amount: 3500, type: "percent", value: 10 })
+    createOrder.mockResolvedValue({ order_token: "tok123", total: 35000 })
+
+    const container = await renderCheckout()
+    const input = container.querySelector('input[placeholder="Enter code"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(input, "SAVE10")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    const applyBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Apply")
+    await act(async () => { applyBtn.click() })
+    await act(async () => {})
+
+    const removeBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Remove")
+    await act(async () => { removeBtn.click() })
+
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+
+    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ discount_code: undefined }))
+  })
+
+  it("drops a stale applied code and surfaces the server's message when order creation rejects it", async () => {
+    seedCart()
+    fetchPaymentMethods.mockResolvedValue({ methods: ["bank"] })
+    previewDiscountCode.mockResolvedValue({ valid: true, amount: 3500, type: "percent", value: 10 })
+    createOrder.mockRejectedValue({
+      response: { data: { error: "invalid_discount_code", message: "Mã giảm giá đã hết lượt sử dụng", reason: "exhausted" } },
+    })
+
+    const container = await renderCheckout()
+    const input = container.querySelector('input[placeholder="Enter code"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(input, "SAVE10")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    const applyBtn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Apply")
+    await act(async () => { applyBtn.click() })
+    await act(async () => {})
+
+    const placeOrderBtn = container.querySelector("button.w-full.rounded-xl")
+    await act(async () => { placeOrderBtn.click() })
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Mã giảm giá đã hết lượt sử dụng")
+    // The stale "applied" chip is gone - the Apply button/input is back.
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Apply")).toBe(true)
   })
 })
