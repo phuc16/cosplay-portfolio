@@ -2,11 +2,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import GachaMachine from "./GachaMachine"
+import { gachaAudio } from "./gachaAudio"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const prizes = [
   { id: 1, name: "Sticker", tier: "common", image_url: null, display_price: 5000, quantity_remaining: 10 },
+]
+
+// Three tiers, uneven stock: enough to prove the legend only lists tiers that
+// actually have prizes and that the rates come out of tierOdds().
+const catalogPrizes = [
+  { id: 1, name: "Sticker", tier: "common", image_url: null, display_price: 5000, quantity_remaining: 50, description: "Sticker die-cut" },
+  { id: 2, name: "Poster", tier: "rare", image_url: null, display_price: 20000, quantity_remaining: 30, description: "Poster A2" },
+  { id: 3, name: "Figure", tier: "ancient", image_url: null, display_price: 900000, quantity_remaining: 20, description: "Figure 1/7" },
 ]
 
 const winner = { id: 1, name: "Sticker", tier: "common", display_price: 5000 }
@@ -36,10 +45,13 @@ async function flush() {
   }
 }
 
+const roots = []
+
 async function renderMachine(props) {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const root = createRoot(container)
+  roots.push(root)
   await act(async () => {
     root.render(<GachaMachine prizes={prizes} {...props} />)
   })
@@ -60,9 +72,17 @@ beforeEach(() => {
   restoreRaf = installFastRaf()
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // Unmount before resetting the audio singleton: its subscriber list would
+  // otherwise call setState on a still-mounted root after teardown.
+  await act(async () => {
+    roots.splice(0).forEach((root) => root.unmount())
+  })
   restoreRaf()
   document.body.innerHTML = ""
+  // gachaAudio is a module singleton whose on/off state is persisted, so a
+  // toggle in one test would otherwise leak into the next.
+  gachaAudio.setEnabled(true)
 })
 
 describe("GachaMachine", () => {
@@ -231,5 +251,107 @@ describe("GachaMachine", () => {
 
     expect(container.textContent).toContain("Lỗi server. Thử lại sau.")
     expect(container.textContent).not.toContain("server_error")
+  })
+})
+
+describe("GachaMachine - catalogue panel", () => {
+  function peekDialog(container) {
+    return container.querySelector('[aria-label="Chi tiết phần thưởng"]')
+  }
+
+  function catalogButton(container, name) {
+    return [...container.querySelectorAll("button")].find((b) => b.textContent.includes(name))
+  }
+
+  it("lists every prize with its name, price and tier label", async () => {
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(),
+    })
+
+    expect(container.textContent).toContain("3 món")
+    expect(container.textContent).toContain("Figure")
+    expect(container.textContent).toContain("900.000₫")
+    expect(container.textContent).toContain("CỔ VẬT")
+  })
+
+  it("shows a tier legend of only the tiers that have prizes, with their live odds", async () => {
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(),
+    })
+
+    const legend = [...container.querySelectorAll("span")]
+      .map((s) => s.textContent)
+      .join(" ")
+    expect(legend).toContain("THƯỜNG 50%")
+    expect(legend).toContain("HIẾM 30%")
+    expect(legend).toContain("CỔ VẬT 20%")
+    expect(legend).not.toContain("SỬ THI")
+  })
+
+  it("paints each tier in the mockup's colour", async () => {
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(),
+    })
+
+    const swatches = [...container.querySelectorAll("i")].map((i) => i.style.background)
+    expect(swatches).toEqual([
+      "rgb(230, 230, 230)",
+      "rgb(62, 139, 255)",
+      "rgb(232, 182, 44)",
+    ])
+  })
+
+  it("opens a peek modal for the tapped prize and closes it again", async () => {
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(),
+    })
+    expect(peekDialog(container)).toBeNull()
+
+    await act(async () => click(catalogButton(container, "Poster")))
+
+    const peek = peekDialog(container)
+    expect(peek).not.toBeNull()
+    expect(peek.textContent).toContain("Poster A2")
+    expect(peek.textContent).toContain("×30")
+
+    await act(async () => click(peek))
+    expect(peekDialog(container)).toBeNull()
+  })
+
+  it("never calls drawFn from the catalogue, only from the spin button", async () => {
+    const drawFn = vi.fn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn,
+    })
+
+    await act(async () => click(catalogButton(container, "Figure")))
+
+    expect(drawFn).not.toHaveBeenCalled()
+  })
+})
+
+describe("GachaMachine - sound toggle", () => {
+  function soundButton(container) {
+    return container.querySelector('button[aria-pressed]')
+  }
+
+  it("toggles the shared sound preference and reflects it in the control", async () => {
+    const container = await renderMachine({ turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn() })
+
+    const button = soundButton(container)
+    expect(button.getAttribute("aria-pressed")).toBe("true")
+
+    await act(async () => click(button))
+
+    expect(gachaAudio.enabled).toBe(false)
+    expect(soundButton(container).getAttribute("aria-pressed")).toBe("false")
+  })
+
+  it("hides its own toggle when the host page renders one", async () => {
+    const container = await renderMachine({
+      turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(), showSoundToggle: false,
+    })
+
+    expect(soundButton(container)).toBeNull()
   })
 })
