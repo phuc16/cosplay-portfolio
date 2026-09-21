@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useLanguage } from "../contexts/LanguageContext"
 
 // A short list (sort order, a yes/no filter, ~5 status values) doesn't need
@@ -20,14 +20,31 @@ export default function SearchableSelect({
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
+  const [activeIndex, setActiveIndex] = useState(0)
   const rootRef = useRef(null)
+  const triggerRef = useRef(null)
   const showSearch = options.length > SEARCH_THRESHOLD
+  // useId (not a plain string constant) so two SearchableSelect instances on
+  // the same page - e.g. two filters side by side - never collide on the
+  // aria-controls/aria-activedescendant ids below.
+  const baseId = useId()
+  const listboxId = `${baseId}-listbox`
+  const optionId = (code) => `${baseId}-option-${code}`
+
+  const openMenu = () => {
+    const idx = options.findIndex((o) => o.code === value)
+    setActiveIndex(idx >= 0 ? idx : 0)
+    setOpen(true)
+  }
+  const closeMenu = () => {
+    setOpen(false)
+    setQuery("")
+  }
 
   useEffect(() => {
     const onClickOutside = (e) => {
       if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false)
-        setQuery("")
+        closeMenu()
       }
     }
     document.addEventListener("mousedown", onClickOutside)
@@ -54,8 +71,56 @@ export default function SearchableSelect({
 
   const pick = (code) => {
     onChange(code)
-    setOpen(false)
-    setQuery("")
+    closeMenu()
+    // The popover (and whatever inside it had focus - the search input, or
+    // an option button) unmounts on close; without this, focus silently
+    // falls back to <body> instead of staying somewhere sensible.
+    triggerRef.current?.focus()
+  }
+
+  // One handler, on the root wrapper, catches keydown bubbling from either
+  // the trigger button or the internal search input (when showSearch) -
+  // covers both interaction states without duplicating the switch twice.
+  const handleKeyDown = (e) => {
+    if (disabled) return
+    if (!open) {
+      if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
+        e.preventDefault()
+        openMenu()
+      }
+      return
+    }
+    switch (e.key) {
+      case "Escape":
+        e.preventDefault()
+        closeMenu()
+        triggerRef.current?.focus()
+        break
+      case "ArrowDown":
+        e.preventDefault()
+        setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        setActiveIndex((i) => Math.max(i - 1, 0))
+        break
+      case "Home":
+        e.preventDefault()
+        setActiveIndex(0)
+        break
+      case "End":
+        e.preventDefault()
+        setActiveIndex(filtered.length - 1)
+        break
+      case "Enter":
+        e.preventDefault()
+        if (filtered[activeIndex]) pick(filtered[activeIndex].code)
+        break
+      default:
+        // Deliberately falls through untouched - notably " " (space), so
+        // typing a literal space into the open search box still works.
+        break
+    }
   }
 
   return (
@@ -70,25 +135,31 @@ export default function SearchableSelect({
     // it out of the visible layout while still counting toward its width -
     // see the `sizerPadding` comment above for why its vertical padding is
     // deliberately dropped instead of reusing `padding` as-is.
-    <div className="relative" ref={rootRef}>
+    <div className="relative" ref={rootRef} onKeyDown={handleKeyDown}>
       <div className={`invisible pointer-events-none h-0 overflow-hidden ${sizerPadding} whitespace-nowrap`} aria-hidden="true">
         {options.map((o) => <div key={o.code}>{o.name}</div>)}
         {!options.some((o) => o.name === placeholder) && <div>{placeholder}</div>}
       </div>
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => {
           if (disabled) return
           // Re-clicking the trigger to close must also drop any typed
           // filter - otherwise the next open silently starts pre-filtered
           // by whatever was typed last time, with no visible search box
           // (if showSearch) to explain why options are missing.
-          setOpen((o) => !o)
-          setQuery("")
+          if (open) closeMenu()
+          else openMenu()
         }}
         disabled={disabled}
         aria-label={label || placeholder}
         data-testid={dataTestId}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={open && filtered[activeIndex] ? optionId(filtered[activeIndex].code) : undefined}
         // `height` (when given) pins the box to an exact pixel height,
         // matching a sibling <input> in the same row - matching padding
         // alone kept failing in practice (font-size inheritance, form
@@ -117,19 +188,26 @@ export default function SearchableSelect({
               autoFocus
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              // Reset the keyboard highlight to the first result whenever the
+              // filtered list changes - otherwise a highlight from before
+              // typing could point past the end of a now-shorter list.
+              onChange={(e) => { setQuery(e.target.value); setActiveIndex(0) }}
               placeholder={t("selectSearchOption")}
               className={`w-full ${padding} border-b border-[var(--border-brand)] bg-transparent text-sm outline-none`}
             />
           )}
-          <ul className="max-h-56 overflow-y-auto">
+          <ul className="max-h-56 overflow-y-auto" id={listboxId} role="listbox">
             {filtered.length === 0 && <li className={`${padding} text-sm opacity-60`}>{t("selectNoResults")}</li>}
-            {filtered.map((o) => (
+            {filtered.map((o, idx) => (
               <li key={o.code}>
                 <button
                   type="button"
+                  role="option"
+                  id={optionId(o.code)}
+                  aria-selected={o.code === value}
                   onClick={() => pick(o.code)}
-                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${o.code === value ? "bg-[var(--brand-soft)] font-medium" : ""}`}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${o.code === value || idx === activeIndex ? "bg-[var(--brand-soft)] font-medium" : ""}`}
                 >
                   {o.name}
                 </button>
