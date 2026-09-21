@@ -421,7 +421,17 @@ export default function GachaMachine({
                 top: 0,
                 left: 0,
                 height: "100%",
-                width: "100%",
+                // An explicit width covering every card, not "100%" (the
+                // viewport's own width). Every card is `position: absolute`
+                // and escapes normal flow anyway, but a layer's compositing
+                // bounds are still derived from its OWN box plus overflowing
+                // descendants - leaving that box far narrower than the ~40
+                // cards it actually contains means the browser has to keep
+                // recomputing those bounds as translate3d scrolls new
+                // "overflow" into view each frame, instead of rasterizing the
+                // whole strip once up front into a layer already sized to
+                // fit it.
+                width: reel.length * (cardWidth + CARD_GAP),
                 willChange: "transform",
                 transform: "translate3d(0,0,0)",
                 backfaceVisibility: "hidden",
