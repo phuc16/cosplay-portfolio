@@ -7,14 +7,14 @@ const CLIP_BASE = "/sounds/gacha/"
 // their original names from the mockup's asset set, so the mapping is by
 // position in TIER_ORDER rather than by filename.
 const REVEAL_CLIPS = [
-  "reveal.wav",
-  "reveal-mythical.wav",
-  "reveal-legendary.wav",
-  "reveal-ancient.wav",
-  "reveal-orange.wav",
+  "reveal.mp3",
+  "reveal-mythical.mp3",
+  "reveal-legendary.mp3",
+  "reveal-ancient.mp3",
+  "reveal-orange.mp3",
 ]
 
-const CLIPS = ["tick.wav", "opening.wav", ...REVEAL_CLIPS]
+const CLIPS = ["tick.mp3", "opening.mp3", ...REVEAL_CLIPS]
 
 const STORAGE_KEY = "gacha_sound_on"
 
@@ -139,11 +139,11 @@ class GachaAudio {
   }
 
   tick() {
-    this.play("tick.wav")
+    this.play("tick.mp3")
   }
 
   crateOpen() {
-    this.play("opening.wav")
+    this.play("opening.mp3")
   }
 
   chime(tier) {
