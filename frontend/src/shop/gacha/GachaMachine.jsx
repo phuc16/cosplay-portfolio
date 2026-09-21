@@ -18,6 +18,10 @@ const SETTLED_DRAW_ERRORS = new Set([
 ])
 const IDLE_REEL_CELLS = 14
 const TAIL_CELLS = 4
+// turnsLeft is plain arithmetic, so "unlimited" has to be spelled as a real
+// number. Any turnsTotal at or above this ceiling is treated as unlimited and
+// the count is hidden from buyer-facing copy rather than printed raw.
+export const UNLIMITED_TURNS_SENTINEL = 1_000_000
 
 function randomPrize(prizes) {
   return prizes[Math.floor(Math.random() * prizes.length)]
@@ -108,6 +112,9 @@ export default function GachaMachine({
 
   const turnsLeft = turnsTotal - turnsUsed
   const disabled = spinning || turnsLeft <= 0
+  // GachaPractice has no real turn limit and passes a sentinel turnsTotal, which
+  // must never reach the buyer as a literal "còn 1000000 lượt".
+  const unlimited = turnsTotal >= UNLIMITED_TURNS_SENTINEL
 
   const odds = useMemo(() => tierOdds(prizes), [prizes])
   const legend = useMemo(
@@ -245,7 +252,9 @@ export default function GachaMachine({
               ? "Đang quay…"
               : turnsLeft <= 0
                 ? "Hết lượt"
-                : `Chạm để mở · còn ${turnsLeft} lượt`}
+                : unlimited
+                  ? "Chạm để mở"
+                  : `Chạm để mở · còn ${turnsLeft} lượt`}
           </div>
           <div
             style={{
@@ -814,7 +823,11 @@ export default function GachaMachine({
                     textTransform: "uppercase",
                   }}
                 >
-                  {turnsLeft <= 0 ? "Xong" : `Lượt tiếp (còn ${turnsLeft})`}
+                  {turnsLeft <= 0
+                    ? "Xong"
+                    : unlimited
+                      ? "Lượt tiếp"
+                      : `Lượt tiếp (còn ${turnsLeft})`}
                 </button>
               </div>
             </div>

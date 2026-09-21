@@ -355,3 +355,60 @@ describe("GachaMachine - sound toggle", () => {
     expect(soundButton(container)).toBeNull()
   })
 })
+
+describe("GachaMachine - unlimited turns", () => {
+  const UNLIMITED_TURNS = 1_000_000
+
+  async function spinOnce(container) {
+    await act(async () => {
+      click(spinButton(container))
+    })
+    await flush()
+  }
+
+  function eyebrow(container) {
+    return container.querySelector(".gacha-machine section > div > div").textContent
+  }
+
+  function continueButton(container) {
+    return [...container.querySelectorAll('[role="dialog"] button')].find((b) =>
+      /lượt tiếp|xong/i.test(b.textContent),
+    )
+  }
+
+  it("keeps the sentinel turn count out of the header and the continue button", async () => {
+    const drawFn = vi.fn().mockResolvedValue({
+      prize: winner,
+      turns_used: 1,
+      turns_total: UNLIMITED_TURNS,
+      session_completed: false,
+    })
+    const container = await renderMachine({
+      turnsTotal: UNLIMITED_TURNS, turnsUsed: 0, drawFn,
+    })
+
+    expect(eyebrow(container)).toBe("Chạm để mở")
+
+    await spinOnce(container)
+
+    expect(continueButton(container).textContent).toBe("Lượt tiếp")
+    expect(container.textContent).not.toContain("999999")
+    expect(container.textContent).not.toContain("1000000 lượt")
+  })
+
+  it("still shows the real count for a finite session", async () => {
+    const drawFn = vi.fn().mockResolvedValue({
+      prize: winner,
+      turns_used: 1,
+      turns_total: 3,
+      session_completed: false,
+    })
+    const container = await renderMachine({ turnsTotal: 3, turnsUsed: 0, drawFn })
+
+    expect(eyebrow(container)).toBe("Chạm để mở · còn 3 lượt")
+
+    await spinOnce(container)
+
+    expect(continueButton(container).textContent).toBe("Lượt tiếp (còn 2)")
+  })
+})

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import { fetchPracticePrizes, practiceDraw } from "../api/shop"
-import GachaMachine from "../shop/gacha/GachaMachine"
+import GachaMachine, { UNLIMITED_TURNS_SENTINEL } from "../shop/gacha/GachaMachine"
 
-// GachaMachine's turnsLeft math (turnsTotal - turnsUsed) needs a real number,
-// so "unlimited" is spelled as a ceiling nobody reaches by hand. Practice draws
-// never touch real stock, so the number is a UI conceit, not a limit.
-const UNLIMITED_TURNS = 1_000_000
+// Practice draws never touch real stock, so the number is a UI conceit, not a
+// limit: GachaMachine recognises the sentinel and hides the count from buyer
+// -facing copy.
+const UNLIMITED_TURNS = UNLIMITED_TURNS_SENTINEL
 
 /**
  * Public, unauthenticated "try before you buy" page: the same reel the buyer
