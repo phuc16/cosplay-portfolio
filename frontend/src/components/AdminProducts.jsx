@@ -9,7 +9,7 @@ import { formatVnd } from "../utils/money"
 
 const blank = {
   name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "",
-  thumbnail_image: "",
+  thumbnail_image: "", character_tag: "",
 }
 
 const SORTS = [
@@ -112,7 +112,7 @@ export default function AdminProducts({ collection }) {
     setDraft({
       name: p.name, description: p.description || "", price: p.price, images: p.images || [],
       type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
-      thumbnail_image: p.thumbnail_image || "",
+      thumbnail_image: p.thumbnail_image || "", character_tag: p.character_tag || "",
     })
   }
 
@@ -202,6 +202,12 @@ export default function AdminProducts({ collection }) {
         value={draft.name}
         onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         placeholder="Tên sản phẩm"
+        className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+      />
+      <input
+        value={draft.character_tag}
+        onChange={(e) => setDraft({ ...draft, character_tag: e.target.value })}
+        placeholder="Nhân vật / Series (tùy chọn)"
         className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
       />
       <input

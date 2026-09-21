@@ -287,3 +287,46 @@ describe("AdminProducts - search, filter, sort", () => {
     expect(container.textContent).toContain("Không tìm thấy sản phẩm nào khớp")
   })
 })
+
+describe("AdminProducts - character_tag", () => {
+  it("includes character_tag in the create payload", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+    const container = await renderProducts({ id: 7 })
+    await flush()
+
+    const setValue = (el, value) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(el, value)
+      el.dispatchEvent(new Event("change", { bubbles: true }))
+    }
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => { setValue(nameInput, "Card") })
+
+    const tagInput = container.querySelector('input[placeholder="Nhân vật / Series (tùy chọn)"]')
+    await act(async () => { setValue(tagInput, "Raiden Shogun") })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ character_tag: "Raiden Shogun" })
+    )
+  })
+
+  it("pre-fills the tag field when editing an existing product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Card", character_tag: "Series A" })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const tagInput = container.querySelector('input[placeholder="Nhân vật / Series (tùy chọn)"]')
+    expect(tagInput.value).toBe("Series A")
+  })
+})
