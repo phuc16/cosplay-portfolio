@@ -260,6 +260,64 @@ describe("getBookkeepingStats - money and buckets", () => {
   })
 })
 
+describe("getBookkeepingStats - gacha by_collection attribution", () => {
+  it("attributes a booth-cash order's real total to its product's collection, not 'Không thuộc bộ sưu tập'", async () => {
+    const today = new Date()
+    const { collectionId } = await startBoothCashOrderAt(today, { turnsTotal: 2, price: 20000 })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+
+    const bucket = stats.by_collection.find((c) => c.collection_id === collectionId)
+    expect(bucket).toBeDefined()
+    expect(bucket.received_total).toBe(40000)
+
+    const noneBucket = stats.by_collection.find((c) => c.collection_id === null)
+    expect(noneBucket).toBeUndefined()
+  })
+
+  it("does not inflate by_collection when a booth session's turns are actually drawn", async () => {
+    const today = new Date()
+    const { collectionId, sessionId } = await startBoothCashOrderAt(today, { turnsTotal: 2, price: 20000 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "k1" })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "k2" })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+
+    const bucket = stats.by_collection.find((c) => c.collection_id === collectionId)
+    expect(bucket.received_total).toBe(40000)
+    expect(stats.received_total).toBe(40000)
+
+    const sumReceived = stats.by_collection.reduce((s, c) => s + c.received_total, 0)
+    expect(sumReceived).toBe(stats.received_total)
+  })
+
+  it("does not double-count an online gacha order's purchase-line item against its own draw rows", async () => {
+    const cid = await catalog.createCollection({ title: "Online Gacha", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 999999, quantity_total: 10 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 2 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+    const today = new Date()
+    await db.query("UPDATE orders SET created_at = ? WHERE id = ?", [today, o.id])
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const session = await sessionRepo.getSessionByOrderId(o.id)
+    await sessionRepo.drawForSession(session.id, { drawKey: "k1", ownerOrderId: o.id })
+    await sessionRepo.drawForSession(session.id, { drawKey: "k2", ownerOrderId: o.id })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    const bucket = stats.by_collection.find((c) => c.collection_id === cid)
+    expect(bucket.received_total).toBe(40000)
+  })
+})
+
 describe("reconciliation - the highest-value test in this phase", () => {
   it("per-collection sums (plus the no-collection bucket) equal the bookkeeping total for the same range", async () => {
     const today = new Date()

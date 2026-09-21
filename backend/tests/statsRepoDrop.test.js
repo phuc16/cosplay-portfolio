@@ -3,6 +3,8 @@ import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import statsRepo from "../shop/stats/statsRepo.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }
@@ -23,7 +25,10 @@ async function placeOrder(variantId, over = {}) {
 }
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables(
+    "gacha_draws", "gacha_sessions", "gacha_prizes",
+    "order_items", "orders", "product_variants", "products", "collections"
+  )
 })
 
 describe("getDropStats", () => {
@@ -227,5 +232,32 @@ describe("getDropStats", () => {
     expect(statsB.order_counts.completed).toBe(1)
     expect(statsA.units_sold).toBe(1)
     expect(statsB.units_sold).toBe(1)
+  })
+})
+
+describe("getDropStats - booth-cash gacha revenue", () => {
+  it("counts a booth-cash gacha order's real total for its product's collection", async () => {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 999999, quantity_total: 10 }])
+
+    await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal: 2 })
+
+    const stats = await statsRepo.getDropStats(cid)
+    expect(stats.received_total).toBe(40000)
+    expect(stats.received.cash).toBe(40000)
+    expect(stats.order_counts.confirmed).toBe(1)
+  })
+
+  it("does not inflate drop stats once a booth session's turns are actually drawn", async () => {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 999999, quantity_total: 10 }])
+
+    const { sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal: 1 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "k1" })
+
+    const stats = await statsRepo.getDropStats(cid)
+    expect(stats.received_total).toBe(20000)
   })
 })

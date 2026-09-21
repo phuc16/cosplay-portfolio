@@ -108,7 +108,7 @@ async function startBoothSession({ productId, buyerName, turnsTotal }) {
     await conn.beginTransaction()
 
     const [[product]] = await conn.query(
-      "SELECT id, price FROM products WHERE id = ? AND type = 'gacha' FOR UPDATE",
+      "SELECT id, price, collection_id FROM products WHERE id = ? AND type = 'gacha' FOR UPDATE",
       [productId]
     )
     if (!product) throw new GachaProductNotFoundError()
@@ -124,8 +124,8 @@ async function startBoothSession({ productId, buyerName, turnsTotal }) {
     const [orderRes] = await conn.query(
       `INSERT INTO orders
          (order_token, buyer_name, phone, email, fulfillment_method, status, payment_method, total, cod_amount, collection_id, confirmed_at)
-       VALUES (?, ?, '', '', 'booth', 'confirmed', 'cash', ?, NULL, NULL, NOW())`,
-      [token, buyerName || "Khách tại quầy", total]
+       VALUES (?, ?, '', '', 'booth', 'confirmed', 'cash', ?, NULL, ?, NOW())`,
+      [token, buyerName || "Khách tại quầy", total, product.collection_id]
     )
     const orderId = orderRes.insertId
 

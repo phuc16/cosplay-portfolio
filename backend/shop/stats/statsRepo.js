@@ -121,13 +121,25 @@ async function getDropStats(collectionId) {
   // first. Money is computed from order_items' own per-line collection
   // snapshot instead - one row per order it touches, scoped to just the
   // revenue this collection's items represent within that order.
+  // Mirrors getBookkeepingStats' same split: a gacha draw's order_items row
+  // is a decorative prize value, not money paid, and a booth order never gets
+  // a real purchase-line item at all - so booth revenue is pulled from the
+  // order's own o.total/collection_id instead (set at startBoothSession
+  // time), in a second branch scoped to this collection.
   const [orderRows] = await db.query(
     `SELECT o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at,
             SUM(oi.unit_price_snapshot * oi.qty) AS collection_total
        FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id AND oi.collection_id_snapshot = ?
-      GROUP BY o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at`,
-    [collectionId]
+       JOIN order_items oi ON oi.order_id = o.id AND oi.collection_id_snapshot = ? AND oi.gacha_draw_id IS NULL
+      GROUP BY o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at
+
+      UNION ALL
+
+      SELECT o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at,
+             o.total AS collection_total
+        FROM orders o
+       WHERE o.collection_id = ? AND o.fulfillment_method = 'booth'`,
+    [collectionId, collectionId]
   )
 
   const received = { bank: 0, momo: 0, paypal: 0, cod: 0, cash: 0 }
@@ -322,16 +334,35 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     [from, toExclusive]
   )
 
+  // A gacha draw's order_items row carries a prize's decorative display_price,
+  // not money paid, and never snapshots a collection - so it's excluded here
+  // (`gacha_draw_id IS NULL`) rather than summed as if it were revenue. Booth
+  // orders never get a real purchase-line item at all (startBoothSession
+  // writes none - only drawForSession's decorative draw rows), so they'd
+  // otherwise vanish entirely from by_collection; the second branch attributes
+  // a booth order's real o.total to its own collection_id instead. An online
+  // gacha order isn't double-counted: its real purchase-line item already
+  // reconciles in the first branch, and the second branch only fires for
+  // fulfillment_method = 'booth'.
   const [collectionRows] = await db.query(
     `SELECT o.id AS order_id, o.status, o.payment_method,
             oi.collection_id_snapshot AS collection_id, c.title AS collection_title,
             SUM(oi.unit_price_snapshot * oi.qty) AS amount
        FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id
+       JOIN order_items oi ON oi.order_id = o.id AND oi.gacha_draw_id IS NULL
        LEFT JOIN collections c ON c.id = oi.collection_id_snapshot
       WHERE o.created_at >= ? AND o.created_at < ?
-      GROUP BY o.id, o.status, o.payment_method, oi.collection_id_snapshot, c.title`,
-    [from, toExclusive]
+      GROUP BY o.id, o.status, o.payment_method, oi.collection_id_snapshot, c.title
+
+      UNION ALL
+
+      SELECT o.id AS order_id, o.status, o.payment_method,
+             o.collection_id AS collection_id, c.title AS collection_title,
+             o.total AS amount
+        FROM orders o
+        LEFT JOIN collections c ON c.id = o.collection_id
+       WHERE o.created_at >= ? AND o.created_at < ? AND o.fulfillment_method = 'booth'`,
+    [from, toExclusive, from, toExclusive]
   )
 
   const received = { bank: 0, momo: 0, paypal: 0, cod: 0, cash: 0 }
