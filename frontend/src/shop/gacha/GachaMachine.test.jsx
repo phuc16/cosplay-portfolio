@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { act } from "react"
 import GachaMachine from "./GachaMachine"
 import { gachaAudio } from "./gachaAudio"
+import { formatVnd } from "../../utils/money"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -410,6 +411,102 @@ describe("GachaMachine - unlimited turns", () => {
     await spinOnce(container)
 
     expect(continueButton(container).textContent).toBe("Lượt tiếp (còn 2)")
+  })
+})
+
+describe("GachaMachine - session summary", () => {
+  const first = { id: 1, name: "Sticker", tier: "common", image_url: null, display_price: 5000 }
+  const second = { id: 2, name: "Poster", tier: "rare", image_url: null, display_price: 20000 }
+
+  function summaryDialog(container) {
+    return container.querySelector('[aria-label="Quà của bạn"]')
+  }
+
+  function summaryButton(container) {
+    return [...summaryDialog(container).querySelectorAll("button")].find((b) =>
+      /khách tiếp theo|đóng/i.test(b.textContent),
+    )
+  }
+
+  async function playSession(container, drawFn, turns) {
+    for (let i = 0; i < turns; i++) {
+      await act(async () => click(spinButton(container)))
+      await flush()
+      await act(async () => click(continueOut(container)))
+    }
+  }
+
+  function twoDrawFn() {
+    return vi
+      .fn()
+      .mockResolvedValueOnce({ prize: first, turns_used: 1, turns_total: 2, session_completed: false })
+      .mockResolvedValueOnce({ prize: second, turns_used: 2, turns_total: 2, session_completed: true })
+  }
+
+  it("lists every drop of the session, its total value and a claim code, after the final turn", async () => {
+    const drawFn = twoDrawFn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn,
+    })
+
+    await playSession(container, drawFn, 2)
+
+    const summary = summaryDialog(container)
+    expect(summary).not.toBeNull()
+    expect(summary.textContent).toContain("Quà của bạn")
+    expect(summary.textContent).toContain("Sticker")
+    expect(summary.textContent).toContain("Poster")
+    expect(summary.textContent).toContain("2 món")
+    expect(summary.textContent).toContain(`Tổng giá trị ${formatVnd(25000)}`)
+    expect(summary.textContent).toContain("Lượt 1")
+    expect(summary.textContent).toContain("Lượt 2")
+    expect(summary.textContent).toMatch(/Mã nhận quà [ACDEFHJKLMNPRTUVWXY3479]{3}-[ACDEFHJKLMNPRTUVWXY3479]{3}/)
+  })
+
+  it("returns to the idle reel, with no summary, when turns remain", async () => {
+    const drawFn = twoDrawFn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn,
+    })
+
+    await playSession(container, drawFn, 1)
+
+    expect(summaryDialog(container)).toBeNull()
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(spinButton(container).disabled).toBe(false)
+  })
+
+  it("hands the summary's action to onFinish when the host owns the reset", async () => {
+    const drawFn = twoDrawFn()
+    const onFinish = vi.fn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn, onFinish,
+    })
+
+    await playSession(container, drawFn, 2)
+    const button = summaryButton(container)
+    expect(button.textContent).toBe("Khách tiếp theo")
+
+    await act(async () => click(button))
+
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    expect(summaryDialog(container)).not.toBeNull()
+  })
+
+  it("dismisses itself back to the idle reel when no onFinish is supplied", async () => {
+    const drawFn = twoDrawFn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn,
+    })
+
+    await playSession(container, drawFn, 2)
+    const button = summaryButton(container)
+    expect(button.textContent).toBe("Đóng")
+
+    await act(async () => click(button))
+
+    expect(summaryDialog(container)).toBeNull()
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 })
 

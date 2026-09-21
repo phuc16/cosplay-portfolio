@@ -23,6 +23,18 @@ const TAIL_CELLS = 4
 // the count is hidden from buyer-facing copy rather than printed raw.
 export const UNLIMITED_TURNS_SENTINEL = 1_000_000
 
+// Ambiguous glyphs (0/O, 1/I, B/8, S/5, 2/Z, G/6, Q) are left out so staff can
+// read a code off the buyer's screen without mistyping it.
+const CLAIM_CODE_ALPHABET = "ACDEFHJKLMNPRTUVWXY3479"
+
+function generateClaimCode() {
+  let code = ""
+  for (let i = 0; i < 6; i++) {
+    code += CLAIM_CODE_ALPHABET[Math.floor(Math.random() * CLAIM_CODE_ALPHABET.length)]
+  }
+  return `${code.slice(0, 3)}-${code.slice(3)}`
+}
+
 function randomPrize(prizes) {
   return prizes[Math.floor(Math.random() * prizes.length)]
 }
@@ -56,6 +68,11 @@ export default function GachaMachine({
   drawFn,
   onDrawResult,
   onSessionComplete,
+  // Owns what happens when the end-of-session summary is dismissed. The booth
+  // kiosk passes its "next buyer" reset (which unmounts this component); the
+  // order and practice pages have no such concept, so the summary just closes
+  // itself locally.
+  onFinish,
   // The booth kiosk carries the toggle in its own header bar, where the
   // mockup puts it; the order and practice pages have no such chrome, so the
   // machine renders its own.
@@ -65,6 +82,12 @@ export default function GachaMachine({
   const [spinning, setSpinning] = useState(false)
   const [spunReel, setSpunReel] = useState(null)
   const [result, setResult] = useState(null)
+  // Every prize drawFn has returned since this component mounted. Never seeded
+  // from anywhere else: a page reloaded mid-session can only ever summarise the
+  // draws it actually witnessed.
+  const [drops, setDrops] = useState([])
+  const [showSummary, setShowSummary] = useState(false)
+  const [claimCode] = useState(generateClaimCode)
   const [error, setError] = useState(null)
   const [flash, setFlash] = useState(false)
   const [peek, setPeek] = useState(null)
@@ -121,6 +144,7 @@ export default function GachaMachine({
     () => TIER_ORDER.filter((tier) => prizes.some((p) => p.tier === tier)),
     [prizes],
   )
+  const dropsTotal = drops.reduce((sum, d) => sum + Number(d.prize.display_price || 0), 0)
   const resultColor = result ? tierColor(result.tier) : tierColor("common")
   const resultStock = result
     ? prizes.find((p) => p.id === result.id)?.quantity_remaining ?? result.quantity_remaining
@@ -158,6 +182,7 @@ export default function GachaMachine({
         gachaAudio.chime(winner.tier)
         setSpinning(false)
         setResult(winner)
+        setDrops((prev) => [...prev, { prize: winner, index: response.turns_used }])
         setFlash(true)
         flashTimer.current = setTimeout(() => setFlash(false), 600)
         setTurnsUsed(response.turns_used)
@@ -196,6 +221,21 @@ export default function GachaMachine({
   function handleContinue() {
     gachaAudio.click()
     if (trackRef.current) trackRef.current.style.transform = "translate3d(0,0,0)"
+    setSpunReel(null)
+    setResult(null)
+    if (turnsLeft <= 0) setShowSummary(true)
+  }
+
+  function handleFinish() {
+    gachaAudio.click()
+    // The parent owns teardown when it supplied onFinish - it typically
+    // unmounts this component, so clearing local state here would only queue an
+    // update on a dying tree.
+    if (onFinish) {
+      onFinish()
+      return
+    }
+    setShowSummary(false)
     setSpunReel(null)
     setResult(null)
   }
@@ -830,6 +870,200 @@ export default function GachaMachine({
                       : `Lượt tiếp (còn ${turnsLeft})`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSummary && (
+        <div
+          role="dialog"
+          aria-label="Quà của bạn"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 55,
+            background: "rgba(6,3,12,.96)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 26,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 940,
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              border: "1px solid rgba(255,46,136,.4)",
+              borderRadius: 18,
+              background: "#100A1C",
+              overflow: "hidden",
+              animation: "b-card .5s cubic-bezier(.2,.8,.25,1) both",
+            }}
+          >
+            <div
+              style={{
+                padding: "22px 26px",
+                borderBottom: "1px solid rgba(242,236,250,.1)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: 11,
+                    letterSpacing: ".3em",
+                    color: "#9A86B8",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Phiên hoàn tất
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'Bungee', cursive",
+                    fontSize: 28,
+                    marginTop: 7,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Quà của bạn
+                </div>
+              </div>
+              <div
+                style={{
+                  textAlign: "right",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 11,
+                  letterSpacing: ".16em",
+                  color: "#9A86B8",
+                  textTransform: "uppercase",
+                }}
+              >
+                <div>
+                  {drops.length} món · Tổng giá trị {formatVnd(dropsTotal)}
+                </div>
+                <div style={{ color: "#FF2E88", marginTop: 6 }}>Mã nhận quà {claimCode}</div>
+              </div>
+            </div>
+
+            <div
+              className="gacha-scroll"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "18px 22px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              {drops.map((drop, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "10px 14px",
+                    padding: 10,
+                    border: "1px solid rgba(242,236,250,.1)",
+                    borderLeft: `4px solid ${tierColor(drop.prize.tier)}`,
+                    borderRadius: 10,
+                    background: "rgba(255,255,255,.02)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 74,
+                      height: 74,
+                      borderRadius: 8,
+                      flex: "none",
+                      backgroundColor: "#0E0A16",
+                      backgroundImage: drop.prize.image_url ? `url('${drop.prize.image_url}')` : "none",
+                      backgroundSize: "cover",
+                      backgroundPosition: "center 15%",
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 17, fontWeight: 600 }}>{drop.prize.name}</div>
+                    <div
+                      style={{
+                        fontFamily: "'Space Mono', monospace",
+                        fontSize: 10,
+                        letterSpacing: ".16em",
+                        color: tierColor(drop.prize.tier),
+                        marginTop: 5,
+                      }}
+                    >
+                      {tierLabel(drop.prize.tier)} · {formatRate(odds[drop.prize.tier])}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      textAlign: "right",
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 12,
+                      color: "#C9B8E4",
+                    }}
+                  >
+                    <div>{formatVnd(drop.prize.display_price)}</div>
+                    <div style={{ color: "#7C6B96", marginTop: 5 }}>Lượt {drop.index}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                padding: "18px 22px",
+                borderTop: "1px solid rgba(242,236,250,.1)",
+                display: "flex",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 220,
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 10,
+                  letterSpacing: ".14em",
+                  color: "#7C6B96",
+                  alignSelf: "center",
+                  textTransform: "uppercase",
+                }}
+              >
+                Đưa màn hình này cho nhân viên để nhận quà
+              </div>
+              <button
+                type="button"
+                className="gacha-bright"
+                onClick={handleFinish}
+                style={{
+                  minHeight: 62,
+                  padding: "0 30px",
+                  border: "none",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  background: "#FF2E88",
+                  color: "#0E0818",
+                  fontFamily: "'Bungee', cursive",
+                  fontSize: 18,
+                  textTransform: "uppercase",
+                }}
+              >
+                {onFinish ? "Khách tiếp theo" : "Đóng"}
+              </button>
             </div>
           </div>
         </div>
