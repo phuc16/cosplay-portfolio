@@ -303,8 +303,7 @@ export default function GachaMachine({
           </div>
           <div
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontStyle: "italic",
+              fontFamily: "'Bungee', cursive",
               fontSize: "clamp(22px, 5vw, 32px)",
               marginTop: 8,
               textTransform: "uppercase",
@@ -501,8 +500,7 @@ export default function GachaMachine({
               minHeight: 78,
               border: "none",
               borderRadius: 14,
-              fontFamily: "'Playfair Display', serif",
-              fontStyle: "italic",
+              fontFamily: "'Bungee', cursive",
               fontSize: 24,
               letterSpacing: ".05em",
               textTransform: "uppercase",
@@ -563,8 +561,7 @@ export default function GachaMachine({
           </div>
           <div
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontStyle: "italic",
+              fontFamily: "'Bungee', cursive",
               fontSize: 20,
               marginTop: 6,
               textTransform: "uppercase",
@@ -818,8 +815,7 @@ export default function GachaMachine({
                 </div>
                 <div
                   style={{
-                    fontFamily: "'Playfair Display', serif",
-                    fontStyle: "italic",
+                    fontFamily: "'Bungee', cursive",
                     fontSize: "clamp(22px, 4vw, 34px)",
                     lineHeight: 1.05,
                     animation: "b-rise .35s ease .25s both",
@@ -866,8 +862,7 @@ export default function GachaMachine({
                     cursor: "pointer",
                     background: resultColor,
                     color: "#0E0818",
-                    fontFamily: "'Playfair Display', serif",
-                    fontStyle: "italic",
+                    fontFamily: "'Bungee', cursive",
                     fontSize: 19,
                     letterSpacing: ".04em",
                     textTransform: "uppercase",
@@ -939,8 +934,7 @@ export default function GachaMachine({
                 </div>
                 <div
                   style={{
-                    fontFamily: "'Playfair Display', serif",
-                    fontStyle: "italic",
+                    fontFamily: "'Bungee', cursive",
                     fontSize: 28,
                     marginTop: 7,
                     textTransform: "uppercase",
@@ -1073,8 +1067,7 @@ export default function GachaMachine({
                   cursor: "pointer",
                   background: "#FF2E88",
                   color: "#0E0818",
-                  fontFamily: "'Playfair Display', serif",
-                  fontStyle: "italic",
+                  fontFamily: "'Bungee', cursive",
                   fontSize: 18,
                   textTransform: "uppercase",
                 }}
@@ -1133,7 +1126,7 @@ export default function GachaMachine({
               >
                 {tierLabel(peek.tier)} · {formatRate(odds[peek.tier])}
               </div>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: 24, marginTop: 10 }}>
+              <div style={{ fontFamily: "'Bungee', cursive", fontSize: 24, marginTop: 10 }}>
                 {peek.name}
               </div>
               {peek.description && (
