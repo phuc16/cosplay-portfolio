@@ -848,3 +848,34 @@ describe("collection scheduling", () => {
     expect(copy.end_at).toBeNull()
   })
 })
+
+describe("products.character_tag", () => {
+  it("defaults to null when not submitted", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBeNull()
+  })
+
+  it("persists a character/series tag set at creation", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, character_tag: "Genshin Impact - Raiden Shogun",
+    })
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBe("Genshin Impact - Raiden Shogun")
+  })
+
+  it("can be set and cleared via updateProduct", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+
+    await repo.updateProduct(pid, { name: "Card", price: 35000, images: [], character_tag: "Series A" })
+    let detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBe("Series A")
+
+    await repo.updateProduct(pid, { name: "Card", price: 35000, images: [], character_tag: "" })
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products[0].character_tag).toBeNull()
+  })
+})

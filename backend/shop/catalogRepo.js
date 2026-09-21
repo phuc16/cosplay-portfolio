@@ -402,8 +402,8 @@ async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
   const type = data.type === "digital" ? "digital" : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, character_tag)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
@@ -412,6 +412,7 @@ async function createProduct(data) {
       JSON.stringify(data.images || []),
       type,
       sortOrder,
+      data.character_tag || null,
     ]
   )
   const productId = res.insertId
@@ -434,8 +435,8 @@ async function updateProduct(id, data) {
   if (!existing) return false
 
   const [res] = await db.query(
-    "UPDATE products SET name = ?, description = ?, price = ?, images = ? WHERE id = ?",
-    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
+    "UPDATE products SET name = ?, description = ?, price = ?, images = ?, character_tag = ? WHERE id = ?",
+    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), data.character_tag || null, id]
   )
 
   if (existing.type === "digital") {
