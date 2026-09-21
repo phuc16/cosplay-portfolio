@@ -8,6 +8,7 @@ import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
+import { groupOrderItems } from "../utils/groupOrderItems"
 import { formatDeadline, formatVnDateTime } from "../utils/orderDeadline"
 import PaymentInstructions from "../components/shop/PaymentInstructions"
 import AddressFields from "../components/shop/AddressFields"
@@ -429,7 +430,10 @@ export default function Order() {
       )}
 
       <h2 className="font-semibold mb-2">{t("orderItems")}</h2>
-      {order.items.map((i) => (
+      {groupOrderItems(
+        order.items,
+        (i) => `${i.product_name_snapshot}|${i.variant_label_snapshot}|${i.unit_price_snapshot}|${i.is_gift}|${i.gacha_tier_snapshot || ""}`
+      ).map((i) => (
         <div key={i.id} className="flex justify-between items-center gap-3 py-2 border-b border-[var(--border-brand)]">
           <div className="flex items-center gap-3 min-w-0">
             {i.image_url

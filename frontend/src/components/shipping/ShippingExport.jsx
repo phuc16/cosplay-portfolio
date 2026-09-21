@@ -4,6 +4,7 @@ import {
   adminListCollections,
 } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
+import { groupOrderItems } from "../../utils/groupOrderItems"
 import SearchableSelect from "../SearchableSelect"
 
 const LOAI_HANG_HOA_OPTIONS = ["Bưu kiện", "Tài liệu"]
@@ -321,7 +322,10 @@ export default function ShippingExport() {
                             {itemsByOrderId[o.id] === null && <p className="text-red-500">Không tải được sản phẩm.</p>}
                             {Array.isArray(itemsByOrderId[o.id]) && (
                               <ul className="pl-0">
-                                {itemsByOrderId[o.id].map((i) => (
+                                {groupOrderItems(
+                                  itemsByOrderId[o.id],
+                                  (i) => `${i.product_name_snapshot}|${i.variant_label_snapshot}|${i.is_gift}|${i.image_url || ""}`
+                                ).map((i) => (
                                   <li key={i.id} className="flex items-center gap-1.5 py-0.5">
                                     {i.image_url
                                       ? <img src={i.image_url} alt="" className="w-6 h-6 object-cover rounded" />

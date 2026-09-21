@@ -4,6 +4,7 @@ import {
   adminBulkCancelOrders, adminBulkCompleteOrders, adminListCollections, adminUpdateOrderBuyerInfo,
 } from "../api/shop"
 import { formatVnd } from "../utils/money"
+import { groupOrderItems } from "../utils/groupOrderItems"
 import AddressFields from "./shop/AddressFields"
 import OrderTimeline from "./OrderTimeline"
 import StatusBadge from "./StatusBadge"
@@ -497,7 +498,10 @@ export default function AdminOrders() {
               )}
 
               <ul className="mt-2">
-                {detail.items.map((i) => (
+                {groupOrderItems(
+                  detail.items,
+                  (i) => `${i.product_name_snapshot}|${i.variant_label_snapshot}|${i.unit_price_snapshot}|${i.is_gift}|${i.gacha_tier_snapshot || ""}`
+                ).map((i) => (
                   <li key={i.id}>
                     {i.product_name_snapshot}{i.variant_label_snapshot ? ` · ${i.variant_label_snapshot}` : ""} × {i.qty} -{" "}
                     {formatVnd(i.unit_price_snapshot * i.qty)}
