@@ -43,6 +43,11 @@ export default function GachaKiosk() {
   const [loadingPrizes, setLoadingPrizes] = useState(true)
   const [prizesFailed, setPrizesFailed] = useState(false)
   const [session, setSession] = useState(null)
+  // Purely a display counter for the summary screen's "PHIÊN #003" line
+  // (mockup semantics: how many buyers this kiosk has run since it was
+  // opened) - not the DB session id, which starts wherever the table
+  // happens to be.
+  const [sessionCount, setSessionCount] = useState(0)
   const [sessionComplete, setSessionComplete] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
@@ -110,6 +115,7 @@ export default function GachaKiosk() {
     try {
       const result = await adminStartBoothSession(numericProductId, { buyerName, turnsTotal })
       setSessionComplete(false)
+      setSessionCount((n) => n + 1)
       setSession({ id: result.session_id, turnsTotal, turnsUsed: 0 })
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "Không bắt đầu được phiên")
@@ -411,6 +417,25 @@ export default function GachaKiosk() {
                 >
                   +
                 </button>
+                <button
+                  type="button"
+                  className="gacha-ghost-pink"
+                  onClick={() => setTurnsTotal(DEFAULT_TURNS)}
+                  style={{
+                    height: 62,
+                    padding: "0 18px",
+                    borderRadius: 14,
+                    cursor: "pointer",
+                    background: "transparent",
+                    border: "1px solid rgba(242,236,250,.2)",
+                    color: "#9A86B8",
+                    fontFamily: MONO,
+                    fontSize: 11,
+                    letterSpacing: ".12em",
+                  }}
+                >
+                  Đặt lại
+                </button>
               </div>
 
               <div
@@ -532,6 +557,8 @@ export default function GachaKiosk() {
             // and the header one.
             onFinish={handleNextBuyer}
             showSoundToggle={false}
+            buyerName={buyerName}
+            sessionNumber={sessionCount}
           />
 
           <button

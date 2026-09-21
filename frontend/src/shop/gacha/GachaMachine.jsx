@@ -77,6 +77,12 @@ export default function GachaMachine({
   // mockup puts it; the order and practice pages have no such chrome, so the
   // machine renders its own.
   showSoundToggle = true,
+  // Booth-only, like onFinish/isBoothContext below - the summary screen's
+  // eyebrow line (mockup: "{{ buyerLabel }} — PHIÊN {{ sessionId }} HOÀN TẤT")
+  // only makes sense where there's a named buyer and a running kiosk session
+  // count to show.
+  buyerName,
+  sessionNumber,
 }) {
   const [turnsUsed, setTurnsUsed] = useState(initialTurnsUsed)
   const [spinning, setSpinning] = useState(false)
@@ -930,7 +936,9 @@ export default function GachaMachine({
                     textTransform: "uppercase",
                   }}
                 >
-                  Phiên hoàn tất
+                  {isBoothContext
+                    ? `${(buyerName || "").trim() || "CHƯA ĐẶT"} — PHIÊN #${String(sessionNumber || 0).padStart(3, "0")} HOÀN TẤT`
+                    : "Phiên hoàn tất"}
                 </div>
                 <div
                   style={{
@@ -1023,7 +1031,7 @@ export default function GachaMachine({
                     }}
                   >
                     <div>{formatVnd(drop.prize.display_price)}</div>
-                    <div style={{ color: "#7C6B96", marginTop: 5 }}>Lượt {drop.index}</div>
+                    <div style={{ color: "#7C6B96", marginTop: 5 }}>LƯỢT {drop.index}</div>
                   </div>
                 </div>
               ))}

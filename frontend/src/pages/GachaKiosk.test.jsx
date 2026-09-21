@@ -137,6 +137,23 @@ describe("GachaKiosk", () => {
     expect(spinButton(container)).toBeUndefined()
   })
 
+  it("resets the turn count back to the default via the reset button", async () => {
+    const container = await renderKiosk()
+
+    const turnsInput = container.querySelector("#kiosk-turns")
+    expect(turnsInput.value).toBe("5")
+
+    const plusButton = buttonMatching(container, /^\+$/)
+    await act(async () => click(plusButton))
+    await act(async () => click(plusButton))
+    expect(turnsInput.value).toBe("7")
+
+    const resetButton = buttonMatching(container, /đặt lại/i)
+    expect(resetButton).toBeTruthy()
+    await act(async () => click(resetButton))
+    expect(turnsInput.value).toBe("5")
+  })
+
   it("explains a failed prize fetch in the alert region and offers a retry, keeping start disabled", async () => {
     adminFetchPrizes.mockRejectedValue(new Error("Network Error"))
 

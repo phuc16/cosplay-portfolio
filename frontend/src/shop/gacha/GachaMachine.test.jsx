@@ -458,8 +458,32 @@ describe("GachaMachine - session summary", () => {
     expect(summary.textContent).toContain("Poster")
     expect(summary.textContent).toContain("2 món")
     expect(summary.textContent).toContain(`Tổng giá trị ${formatVnd(25000)}`)
-    expect(summary.textContent).toContain("Lượt 1")
-    expect(summary.textContent).toContain("Lượt 2")
+    expect(summary.textContent).toContain("LƯỢT 1")
+    expect(summary.textContent).toContain("LƯỢT 2")
+  })
+
+  it("shows the buyer name and session number in the summary's eyebrow line at the booth kiosk", async () => {
+    const drawFn = twoDrawFn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn, onFinish: vi.fn(),
+      buyerName: "Phúc", sessionNumber: 3,
+    })
+
+    await playSession(container, drawFn, 2)
+
+    expect(summaryDialog(container).textContent).toContain("Phúc — PHIÊN #003 HOÀN TẤT")
+  })
+
+  it("falls back to the mockup's unset-buyer label when no buyer name was entered", async () => {
+    const drawFn = twoDrawFn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn, onFinish: vi.fn(),
+      buyerName: "", sessionNumber: 1,
+    })
+
+    await playSession(container, drawFn, 2)
+
+    expect(summaryDialog(container).textContent).toContain("CHƯA ĐẶT — PHIÊN #001 HOÀN TẤT")
   })
 
   it("shows the staff-handover footer and the claim code at the booth kiosk", async () => {
