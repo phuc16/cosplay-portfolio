@@ -535,3 +535,18 @@ describe("unavailableLabel", () => {
     expect(container.textContent).toContain("Chưa mở bán")
   })
 })
+
+describe("ProductCard - character/series tag badge", () => {
+  it("shows the character/series tag as a badge when set", async () => {
+    const { container } = await renderCard({ product: baseProduct({ character_tag: "Raiden Shogun" }) })
+    expect(container.textContent).toContain("Raiden Shogun")
+  })
+
+  it("shows no tag badge when character_tag is unset", async () => {
+    const { container } = await renderCard({ product: baseProduct({ character_tag: null }) })
+    const tagBadges = [...container.querySelectorAll("span")].filter(
+      (s) => s.className.includes("border-[var(--border-brand)]") && s.className.includes("font-semibold")
+    )
+    expect(tagBadges).toHaveLength(0)
+  })
+})

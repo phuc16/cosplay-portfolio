@@ -31,6 +31,7 @@ export default function Collection() {
   const [search, setSearch] = useState("")
   const [stockFilter, setStockFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
+  const [tagFilter, setTagFilter] = useState("")
 
   // Brief inline confirmation, matching this codebase's no-toast-library style -
   // cleared automatically a couple seconds after each add.
@@ -83,11 +84,17 @@ export default function Collection() {
   const closed = collection.status === "closed"
   const notStartedYet = !closed && collection.not_started_yet
   const unavailableLabel = closed ? t("shopClosed") : notStartedYet ? t("shopNotStarted") : null
+  // Only offered once there's an actual choice to narrow - a collection
+  // with 0 or 1 distinct tags gains nothing from a filter with at most one
+  // real option, same reasoning as the whole filter row's own
+  // products.length > 1 gate below.
+  const distinctTags = [...new Set(collection.products.map((p) => p.character_tag).filter(Boolean))].sort()
   const visibleProducts = sortProducts(
     collection.products.filter((p) => {
       if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (stockFilter === "in_stock" && isProductSoldOut(p)) return false
       if (stockFilter === "sold_out" && !isProductSoldOut(p)) return false
+      if (tagFilter && p.character_tag !== tagFilter) return false
       return true
     }),
     sortBy
@@ -187,6 +194,17 @@ export default function Collection() {
                   ]}
                   placeholder={t("shopSortDefault")}
                 />
+                {distinctTags.length > 1 && (
+                  <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
+                    value={tagFilter}
+                    onChange={setTagFilter}
+                    options={[
+                      { code: "", name: t("shopFilterAllTags") },
+                      ...distinctTags.map((tag) => ({ code: tag, name: tag })),
+                    ]}
+                    placeholder={t("shopFilterAllTags")}
+                  />
+                )}
               </div>
             </div>
           )}

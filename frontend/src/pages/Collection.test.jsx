@@ -261,3 +261,41 @@ describe("Collection - not-started preview", () => {
     expect(addButton.disabled).toBe(true)
   })
 })
+
+describe("Collection - character/series tag filter", () => {
+  it("does not render the tag filter with fewer than 2 distinct tags", async () => {
+    fetchCollection.mockResolvedValue(baseCollection({
+      products: [
+        { id: 1, name: "A", price: 1000, description: null, images: [], character_tag: "Series A", variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+        { id: 2, name: "B", price: 1000, description: null, images: [], character_tag: "Series A", variants: [{ id: 2, label: "B1", stock_qty: 5 }] },
+      ],
+    }))
+    const container = await renderCollection()
+
+    expect(container.querySelector('button[aria-label="All characters/series"]')).toBeNull()
+  })
+
+  it("renders and narrows by tag with 2+ distinct tags", async () => {
+    fetchCollection.mockResolvedValue(baseCollection({
+      products: [
+        { id: 1, name: "Card A", price: 1000, description: null, images: [], character_tag: "Series A", variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+        { id: 2, name: "Card B", price: 1000, description: null, images: [], character_tag: "Series B", variants: [{ id: 2, label: "B1", stock_qty: 5 }] },
+      ],
+    }))
+    const container = await renderCollection()
+
+    expect(container.textContent).toContain("Card A")
+    expect(container.textContent).toContain("Card B")
+
+    const tagTrigger = container.querySelector('button[aria-label="All characters/series"]')
+    expect(tagTrigger).toBeTruthy()
+    await act(async () => { tagTrigger.click() })
+
+    const optionButtons = container.querySelectorAll("li button")
+    const seriesAOption = [...optionButtons].find((btn) => btn.textContent === "Series A")
+    await act(async () => { seriesAOption.click() })
+
+    expect(container.textContent).toContain("Card A")
+    expect(container.textContent).not.toContain("Card B")
+  })
+})
