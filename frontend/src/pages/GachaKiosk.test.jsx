@@ -326,6 +326,7 @@ describe("GachaKiosk", () => {
 
   it("sends staff back to the panel from the header while a session is running", async () => {
     adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true)
 
     const container = await renderKiosk()
     expect(buttonMatching(container, /nhân viên/i)).toBeUndefined()
@@ -333,8 +334,71 @@ describe("GachaKiosk", () => {
     await act(async () => click(startButton(container)))
     await act(async () => click(buttonMatching(container, /nhân viên/i)))
 
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
     expect(startButton(container)).toBeTruthy()
     expect(spinButton(container)).toBeUndefined()
+
+    confirmSpy.mockRestore()
+  })
+
+  it("keeps the session alive when staff decline the header button's confirmation", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false)
+
+    const container = await renderKiosk()
+    await act(async () => click(startButton(container)))
+    await act(async () => click(buttonMatching(container, /nhân viên/i)))
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/còn lượt/i)
+    expect(startButton(container)).toBeUndefined()
+    expect(spinButton(container)).toBeTruthy()
+
+    confirmSpy.mockRestore()
+  })
+
+  it("does not confirm on the header button once the buyer has no turns left", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+    adminDrawSession.mockResolvedValue({
+      prize: prizes[0], turns_used: 1, turns_total: 1, session_completed: true,
+    })
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false)
+
+    const container = await renderKiosk()
+    const turnsInput = container.querySelector('input[type="number"]')
+    await act(async () => change(turnsInput, "1"))
+    await act(async () => click(startButton(container)))
+    await act(async () => click(spinButton(container)))
+    await flush()
+
+    await act(async () => click(buttonMatching(container, /nhân viên/i)))
+
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(startButton(container)).toBeTruthy()
+
+    confirmSpy.mockRestore()
+  })
+
+  it("does not confirm on the bottom next-buyer button", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+    adminDrawSession.mockResolvedValue({
+      prize: prizes[0], turns_used: 1, turns_total: 3, session_completed: false,
+    })
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false)
+
+    const container = await renderKiosk()
+    const turnsInput = container.querySelector('input[type="number"]')
+    await act(async () => change(turnsInput, "3"))
+    await act(async () => click(startButton(container)))
+    await act(async () => click(spinButton(container)))
+    await flush()
+
+    await act(async () => click(nextBuyerButton(container)))
+
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(startButton(container)).toBeTruthy()
+
+    confirmSpy.mockRestore()
   })
 
   it("shows the readable API message, not the machine error code, when starting a session fails", async () => {

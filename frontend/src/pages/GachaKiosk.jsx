@@ -127,6 +127,16 @@ export default function GachaKiosk() {
 
   const turnsLeft = session ? session.turnsTotal - session.turnsUsed : 0
 
+  // The tablet is in the BUYER's hands for the whole session, and this button
+  // sits in the persistent header right next to the sound toggle, so a stray
+  // tap would silently bin turns the buyer already paid for. The deliberate
+  // "Khách tiếp theo" button at the bottom of the reel is staff-driven and
+  // stays unguarded.
+  function handleHeaderStaffExit() {
+    if (turnsLeft > 0 && !confirm("Khách vẫn còn lượt quay. Chắc chắn muốn quay lại bảng nhân viên?")) return
+    handleNextBuyer()
+  }
+
   const header = (
     <header
       style={{
@@ -246,7 +256,7 @@ export default function GachaKiosk() {
           <button
             type="button"
             className="gacha-ghost-pink"
-            onClick={handleNextBuyer}
+            onClick={handleHeaderStaffExit}
             style={ghostButton}
           >
             NHÂN VIÊN
