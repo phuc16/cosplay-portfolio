@@ -11,7 +11,7 @@ Adds keyboard navigation (arrows/Home/End/Enter/Escape) and combobox/
 listbox/option ARIA semantics to `SearchableSelect`, closing the gap
 explicitly tracked as a follow-up in `docs/DECISIONS.md` (2026-09-11).
 
-## 2026-09-21 - order-reorder - `feature/auto-order-reorder` - PR: (pending) - Shopping/e-commerce trend (one-click reorder)
+## 2026-09-21 - order-reorder - `feature/auto-order-reorder` - PR: https://github.com/phuc16/cosplay-portfolio/pull/20 - Shopping/e-commerce trend (one-click reorder)
 
 Adds a "Dat lai" (Reorder) button to the buyer's order page that re-adds
 the order's real items to the cart via the existing cart.js/addToCart,
