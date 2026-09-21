@@ -24,8 +24,10 @@ describe("PAYMENT_METHOD_LABELS", () => {
 })
 
 describe("FULFILLMENT_METHOD_LABELS", () => {
-  it("labels ship, pickup, and digital", () => {
-    expect(FULFILLMENT_METHOD_LABELS).toEqual({ ship: "Giao hàng", pickup: "Nhận tại chỗ", digital: "Sản phẩm số" })
+  it("labels ship, pickup, digital, and booth", () => {
+    expect(FULFILLMENT_METHOD_LABELS).toEqual({
+      ship: "Giao hàng", pickup: "Nhận tại chỗ", digital: "Sản phẩm số", booth: "Gacha tại quầy",
+    })
   })
 })
 

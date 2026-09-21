@@ -23,6 +23,7 @@ export const FULFILLMENT_METHOD_LABELS = {
   ship: "Giao hàng",
   pickup: "Nhận tại chỗ",
   digital: "Sản phẩm số",
+  booth: "Gacha tại quầy",
 }
 
 export const ACTION_LABELS = {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { LanguageProvider } from "../contexts/LanguageContext"
-import { STATUS_LABELS, labelFor } from "../admin/orderLabels"
+import { STATUS_LABELS, FULFILLMENT_METHOD_LABELS, labelFor } from "../admin/orderLabels"
 
 const adminListOrders = vi.fn()
 const adminListCollections = vi.fn()
@@ -116,13 +116,15 @@ describe("AdminOrders filters", () => {
     }
 
     await pickOption("Trạng thái", labelFor(STATUS_LABELS, "pending"))
+    await pickOption("Hình thức nhận hàng", labelFor(FULFILLMENT_METHOD_LABELS, "booth"))
     await pickOption("Bộ sưu tập", "Fes Drop")
     await act(async () => setInputValue(dateFromInput, "2026-08-01"))
     await act(async () => setInputValue(dateToInput, "2026-08-08"))
 
     const lastCall = adminListOrders.mock.calls.at(-1)[0]
     expect(lastCall).toEqual({
-      status: "pending", collection_id: "7", date_from: "2026-08-01", date_to: "2026-08-08",
+      status: "pending", fulfillment_method: "booth", collection_id: "7",
+      date_from: "2026-08-01", date_to: "2026-08-08",
     })
   })
 
@@ -503,7 +505,11 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     await act(async () => { detailBtn.click() })
     await flush()
 
-    expect(container.textContent).not.toContain("Sản phẩm số")
+    // Scoped to the item list, not the whole page - the fulfillment-method
+    // filter dropdown also renders the string "Sản phẩm số" as one of its
+    // options, which would make a container-wide assertion falsely fail.
+    const itemList = container.querySelector("ul")
+    expect(itemList.textContent).not.toContain("Sản phẩm số")
   })
 
   it("shows a '+ Sản phẩm số' badge on a mixed ship+digital order's collapsed row", async () => {

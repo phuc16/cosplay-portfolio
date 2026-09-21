@@ -608,6 +608,7 @@ async function listOrders(filter = {}) {
   const where = []
   const params = []
   if (filter.status) { where.push("status = ?"); params.push(filter.status) }
+  if (filter.fulfillment_method) { where.push("fulfillment_method = ?"); params.push(filter.fulfillment_method) }
   // A cart (and so an order) can span multiple collections - matching on the
   // order's own collection_id (set to only the first cart line's collection
   // at createOrder time) would silently miss an order for every collection

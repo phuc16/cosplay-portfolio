@@ -881,6 +881,24 @@ describe("listOrders collection filter", () => {
   })
 })
 
+describe("listOrders fulfillment_method filter", () => {
+  it("returns only booth-cash gacha orders when filtered to fulfillment_method 'booth'", async () => {
+    const { variantId } = await seedVariant(5)
+    const shipOrder = await repo.createOrder(order(variantId, 1))
+
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 999999, quantity_total: 10 }])
+    const { orderId: boothOrderId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal: 1 })
+
+    const rows = await repo.listOrders({ fulfillment_method: "booth" })
+    const ids = rows.map((r) => r.id)
+    expect(ids).toContain(boothOrderId)
+    expect(ids).not.toContain(shipOrder.id)
+    expect(rows.every((r) => r.fulfillment_method === "booth")).toBe(true)
+  })
+})
+
 describe("listOrders has_digital_item", () => {
   it("flags a mixed ship+digital order, whose fulfillment_method is still 'ship'", async () => {
     const { variantId: shipVariant } = await seedVariant(5)

@@ -21,6 +21,7 @@ import {
 const AdminQrScanner = lazy(() => import("./AdminQrScanner"))
 
 const STATUSES = ["", "pending", "confirmed", "shipped", "completed", "cancelled"]
+const FULFILLMENT_METHODS = ["", "ship", "pickup", "digital", "booth"]
 
 // The legal next-statuses come straight from the API's allowed_transitions
 // field (computed server-side from the real canTransition state machine in
@@ -48,9 +49,10 @@ function byActionableFirst(a, b) {
 
 /** Strips filter params that are empty, so the query string only ever
  * carries what the seller actually chose. */
-function buildFilterParams({ status, collectionId, dateFrom, dateTo, search }) {
+function buildFilterParams({ status, fulfillmentMethod, collectionId, dateFrom, dateTo, search }) {
   const params = {}
   if (status) params.status = status
+  if (fulfillmentMethod) params.fulfillment_method = fulfillmentMethod
   if (collectionId) params.collection_id = collectionId
   if (dateFrom) params.date_from = dateFrom
   if (dateTo) params.date_to = dateTo
@@ -62,6 +64,7 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState([])
   const [collections, setCollections] = useState([])
   const [filter, setFilter] = useState("")
+  const [fulfillmentMethod, setFulfillmentMethod] = useState("")
   const [collectionId, setCollectionId] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
@@ -92,7 +95,7 @@ export default function AdminOrders() {
   const [bulkAction, setBulkAction] = useState(null)
   const [bulkBusy, setBulkBusy] = useState(false)
 
-  const filters = { status: filter, collectionId, dateFrom, dateTo, search }
+  const filters = { status: filter, fulfillmentMethod, collectionId, dateFrom, dateTo, search }
   const reload = () => adminListOrders(buildFilterParams(filters)).then(setOrders)
   const refresh = async () => {
     setRefreshing(true)
@@ -115,7 +118,7 @@ export default function AdminOrders() {
     setSelected(new Set())
     setBulkResults(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, collectionId, dateFrom, dateTo, search])
+  }, [filter, fulfillmentMethod, collectionId, dateFrom, dateTo, search])
 
   const openDetail = async (id) => {
     // Switching to a different order must drop any in-progress edit form -
@@ -292,6 +295,17 @@ export default function AdminOrders() {
             options={STATUSES.map((s) => ({ code: s, name: s ? labelFor(STATUS_LABELS, s) : "Tất cả" }))}
             placeholder="Tất cả"
             label="Trạng thái"
+          />
+        </label>
+
+        <label className="flex flex-col text-xs gap-1">
+          Hình thức nhận hàng
+          <SearchableSelect padding="px-2 py-1" height="h-[38px]"
+            value={fulfillmentMethod}
+            onChange={setFulfillmentMethod}
+            options={FULFILLMENT_METHODS.map((m) => ({ code: m, name: m ? labelFor(FULFILLMENT_METHOD_LABELS, m) : "Tất cả" }))}
+            placeholder="Tất cả"
+            label="Hình thức nhận hàng"
           />
         </label>
 
