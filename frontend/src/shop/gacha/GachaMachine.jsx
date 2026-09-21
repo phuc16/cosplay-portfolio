@@ -145,6 +145,11 @@ export default function GachaMachine({
     [prizes],
   )
   const dropsTotal = drops.reduce((sum, d) => sum + Number(d.prize.display_price || 0), 0)
+  // Only the booth kiosk passes onFinish, and only at the booth is there a
+  // counter to hand the screen over at. The claim code is decorative - staff
+  // eyeball it, nothing records it - so on the order/practice pages it would
+  // read as a real claim token next to an instruction nobody can act on.
+  const isBoothContext = Boolean(onFinish)
   const resultColor = result ? tierColor(result.tier) : tierColor("common")
   const resultStock = result
     ? prizes.find((p) => p.id === result.id)?.quantity_remaining ?? result.quantity_remaining
@@ -951,7 +956,9 @@ export default function GachaMachine({
                 <div>
                   {drops.length} món · Tổng giá trị {formatVnd(dropsTotal)}
                 </div>
-                <div style={{ color: "#FF2E88", marginTop: 6 }}>Mã nhận quà {claimCode}</div>
+                {isBoothContext && (
+                  <div style={{ color: "#FF2E88", marginTop: 6 }}>Mã nhận quà {claimCode}</div>
+                )}
               </div>
             </div>
 
@@ -1029,22 +1036,25 @@ export default function GachaMachine({
                 display: "flex",
                 gap: 12,
                 flexWrap: "wrap",
+                justifyContent: isBoothContext ? "flex-start" : "flex-end",
               }}
             >
-              <div
-                style={{
-                  flex: 1,
-                  minWidth: 220,
-                  fontFamily: "'Space Mono', monospace",
-                  fontSize: 10,
-                  letterSpacing: ".14em",
-                  color: "#7C6B96",
-                  alignSelf: "center",
-                  textTransform: "uppercase",
-                }}
-              >
-                Đưa màn hình này cho nhân viên để nhận quà
-              </div>
+              {isBoothContext && (
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 220,
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: 10,
+                    letterSpacing: ".14em",
+                    color: "#7C6B96",
+                    alignSelf: "center",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Đưa màn hình này cho nhân viên để nhận quà
+                </div>
+              )}
               <button
                 type="button"
                 className="gacha-bright"

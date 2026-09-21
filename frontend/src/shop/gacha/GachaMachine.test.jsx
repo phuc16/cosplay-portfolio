@@ -443,7 +443,7 @@ describe("GachaMachine - session summary", () => {
       .mockResolvedValueOnce({ prize: second, turns_used: 2, turns_total: 2, session_completed: true })
   }
 
-  it("lists every drop of the session, its total value and a claim code, after the final turn", async () => {
+  it("lists every drop of the session and its total value after the final turn", async () => {
     const drawFn = twoDrawFn()
     const container = await renderMachine({
       prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn,
@@ -460,7 +460,37 @@ describe("GachaMachine - session summary", () => {
     expect(summary.textContent).toContain(`Tổng giá trị ${formatVnd(25000)}`)
     expect(summary.textContent).toContain("Lượt 1")
     expect(summary.textContent).toContain("Lượt 2")
+  })
+
+  it("shows the staff-handover footer and the claim code at the booth kiosk", async () => {
+    const drawFn = twoDrawFn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn, onFinish: vi.fn(),
+    })
+
+    await playSession(container, drawFn, 2)
+
+    const summary = summaryDialog(container)
     expect(summary.textContent).toMatch(/Mã nhận quà [ACDEFHJKLMNPRTUVWXY3479]{3}-[ACDEFHJKLMNPRTUVWXY3479]{3}/)
+    expect(summary.textContent).toContain("Đưa màn hình này cho nhân viên để nhận quà")
+  })
+
+  it("hides the staff-handover footer and the claim code off the booth kiosk", async () => {
+    const drawFn = twoDrawFn()
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn,
+    })
+
+    await playSession(container, drawFn, 2)
+
+    const summary = summaryDialog(container)
+    expect(summary.textContent).not.toContain("Mã nhận quà")
+    expect(summary.textContent).not.toContain("nhân viên")
+    expect(summary.textContent).toContain("Sticker")
+    expect(summary.textContent).toContain("Poster")
+    expect(summary.textContent).toContain("2 món")
+    expect(summary.textContent).toContain(`Tổng giá trị ${formatVnd(25000)}`)
+    expect(summaryButton(container).textContent).toBe("Đóng")
   })
 
   it("returns to the idle reel, with no summary, when turns remain", async () => {
