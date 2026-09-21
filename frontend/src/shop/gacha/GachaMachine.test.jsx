@@ -412,3 +412,69 @@ describe("GachaMachine - unlimited turns", () => {
     expect(continueButton(container).textContent).toBe("Lượt tiếp (còn 2)")
   })
 })
+
+describe("GachaMachine - audio failures", () => {
+  afterEach(() => {
+    delete window.AudioContext
+    gachaAudio.ctx = null
+    gachaAudio.buffers = {}
+  })
+
+  it("completes a spin when the AudioContext constructor throws", async () => {
+    window.AudioContext = function ThrowingAudioContext() {
+      throw new Error("AudioContext is not allowed")
+    }
+    const drawFn = vi.fn().mockResolvedValue({
+      prize: winner,
+      turns_used: 1,
+      turns_total: 3,
+      session_completed: false,
+    })
+    const container = await renderMachine({ turnsTotal: 3, turnsUsed: 0, drawFn })
+
+    await act(async () => {
+      click(spinButton(container))
+    })
+    await flush()
+
+    expect(container.querySelector('[role="dialog"]').textContent).toContain("Sticker")
+
+    await act(async () => {
+      click(continueOut(container))
+    })
+    expect(spinButton(container).disabled).toBe(false)
+
+    await act(async () => {
+      click(spinButton(container))
+    })
+    expect(drawFn).toHaveBeenCalledTimes(2)
+  })
+
+  it("swallows a throw from any node the AudioContext hands out", async () => {
+    window.AudioContext = function BrokenAudioContext() {
+      this.state = "running"
+      this.currentTime = 0
+      this.destination = {}
+      this.createGain = () => ({ gain: {}, connect: () => {} })
+      this.createOscillator = () => {
+        throw new Error("no oscillators for you")
+      }
+      this.createBufferSource = () => {
+        throw new Error("no sources for you")
+      }
+    }
+    gachaAudio.buffers["tick.mp3"] = {}
+
+    expect(() => gachaAudio.click()).not.toThrow()
+    expect(() => gachaAudio.tick()).not.toThrow()
+    expect(() => gachaAudio.crateOpen()).not.toThrow()
+    expect(() => gachaAudio.chime("common")).not.toThrow()
+    expect(() => gachaAudio.preload()).not.toThrow()
+  })
+})
+
+function continueOut(container) {
+  return [...container.querySelectorAll('[role="dialog"] button')].find((b) =>
+    /lượt tiếp|xong/i.test(b.textContent),
+  )
+}
