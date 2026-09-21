@@ -274,6 +274,37 @@ describe("GachaKiosk", () => {
     expect(startButton(container)).toBeTruthy()
   })
 
+  it("resets the session from the summary screen's own next-buyer button", async () => {
+    adminStartBoothSession.mockResolvedValue({ session_id: 5 })
+    adminDrawSession.mockResolvedValue({
+      prize: prizes[1], turns_used: 1, turns_total: 1, session_completed: true,
+    })
+
+    const container = await renderKiosk()
+    const turnsInput = container.querySelector('input[type="number"]')
+    await act(async () => change(turnsInput, "1"))
+    await act(async () => click(startButton(container)))
+    await act(async () => click(spinButton(container)))
+    await flush()
+
+    const done = [...container.querySelectorAll('[role="dialog"] button')].find((b) =>
+      /xong/i.test(b.textContent),
+    )
+    await act(async () => click(done))
+
+    const summary = container.querySelector('[aria-label="Quà của bạn"]')
+    expect(summary).not.toBeNull()
+    expect(summary.textContent).toContain("Poster")
+
+    await act(async () => {
+      click([...summary.querySelectorAll("button")].find((b) => /khách tiếp theo/i.test(b.textContent)))
+    })
+
+    expect(container.querySelector('[aria-label="Quà của bạn"]')).toBeNull()
+    expect(spinButton(container)).toBeUndefined()
+    expect(startButton(container)).toBeTruthy()
+  })
+
   it("shows the readable API message, not the machine error code, when the prize fetch fails", async () => {
     const err = new Error("Request failed with status code 500")
     err.response = { data: { error: "server_error", message: "Lỗi server. Thử lại sau." } }

@@ -527,6 +527,10 @@ export default function GachaKiosk() {
             // would yank the last prize reveal off-screen in the same commit that
             // renders it - staff moves on by tapping "Khách tiếp theo" instead.
             onSessionComplete={() => setSessionComplete(true)}
+            // The summary screen's own button is the mockup's primary "next
+            // buyer" action; it lands on the same reset as the bottom button
+            // and the header one.
+            onFinish={handleNextBuyer}
             showSoundToggle={false}
           />
 
