@@ -332,6 +332,28 @@ describe("GachaMachine - catalogue panel", () => {
     ])
   })
 
+  it("sorts the catalog by tier rarity on demand, and back to the original order", async () => {
+    const outOfTierOrder = [
+      { id: 1, name: "Figure", tier: "ancient", image_url: null, display_price: 900000, quantity_remaining: 20 },
+      { id: 2, name: "Sticker", tier: "common", image_url: null, display_price: 5000, quantity_remaining: 50 },
+      { id: 3, name: "Poster", tier: "rare", image_url: null, display_price: 20000, quantity_remaining: 30 },
+    ]
+    const container = await renderMachine({
+      prizes: outOfTierOrder, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(),
+    })
+    const namesInOrder = () =>
+      [...container.querySelectorAll(".gacha-item")].map((b) => b.textContent.match(/Figure|Sticker|Poster/)?.[0])
+
+    expect(namesInOrder()).toEqual(["Figure", "Sticker", "Poster"])
+
+    const sortButton = catalogButton(container, "Sắp xếp theo độ hiếm")
+    await act(async () => click(sortButton))
+    expect(namesInOrder()).toEqual(["Sticker", "Poster", "Figure"])
+
+    await act(async () => click(catalogButton(container, "Mặc định")))
+    expect(namesInOrder()).toEqual(["Figure", "Sticker", "Poster"])
+  })
+
   it("opens a peek modal for the tapped prize and closes it again", async () => {
     const container = await renderMachine({
       prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(),
@@ -363,7 +385,7 @@ describe("GachaMachine - catalogue panel", () => {
 
 describe("GachaMachine - sound toggle", () => {
   function soundButton(container) {
-    return container.querySelector('button[aria-pressed]')
+    return container.querySelector('button[aria-label="Bật âm thanh"], button[aria-label="Tắt âm thanh"]')
   }
 
   it("toggles the shared sound preference and reflects it in the control", async () => {

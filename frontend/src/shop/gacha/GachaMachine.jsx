@@ -168,6 +168,11 @@ export default function GachaMachine({
     () => TIER_ORDER.filter((tier) => prizes.some((p) => p.tier === tier)),
     [prizes],
   )
+  const [sortByTier, setSortByTier] = useState(false)
+  const catalogPrizes = useMemo(() => {
+    if (!sortByTier) return prizes
+    return [...prizes].sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))
+  }, [prizes, sortByTier])
   const dropsTotal = drops.reduce((sum, d) => sum + Number(d.prize.display_price || 0), 0)
   // Only the booth kiosk passes onFinish, and only at the booth is there a
   // counter to hand the screen over at. The claim code is decorative - staff
@@ -595,13 +600,43 @@ export default function GachaMachine({
           </div>
           <div
             style={{
-              fontFamily: "'Bungee', cursive",
-              fontSize: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
               marginTop: 6,
-              textTransform: "uppercase",
             }}
           >
-            {prizes.length} món
+            <div
+              style={{
+                fontFamily: "'Bungee', cursive",
+                fontSize: 20,
+                textTransform: "uppercase",
+              }}
+            >
+              {prizes.length} món
+            </div>
+            <button
+              type="button"
+              className="gacha-ghost"
+              onClick={() => setSortByTier((v) => !v)}
+              aria-pressed={sortByTier}
+              style={{
+                flex: "none",
+                cursor: "pointer",
+                background: "transparent",
+                border: "1px solid rgba(242,236,250,.25)",
+                color: "#C9B8E4",
+                fontFamily: "'Space Mono', monospace",
+                fontSize: 10,
+                letterSpacing: ".1em",
+                padding: "7px 11px",
+                borderRadius: 8,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {sortByTier ? "Mặc định" : "Sắp xếp theo độ hiếm"}
+            </button>
           </div>
           <div
             style={{
@@ -648,7 +683,7 @@ export default function GachaMachine({
             alignContent: "start",
           }}
         >
-          {prizes.map((prize) => (
+          {catalogPrizes.map((prize) => (
             <button
               key={prize.id}
               type="button"
