@@ -2,9 +2,10 @@
    exported alongside the component so its pure status->timestamp logic is
    directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, Link } from "react-router-dom"
 import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo } from "../api/shop"
 import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../utils/orderAuth"
+import { addToCart } from "../shop/cart"
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
@@ -235,6 +236,7 @@ export default function Order() {
   const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
   const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
   const [buyerInfoError, setBuyerInfoError] = useState("")
+  const [reorderedCount, setReorderedCount] = useState(null)
 
   const startEditBuyerInfo = () => {
     // Email is deliberately excluded - it's not editable (backend ignores
@@ -329,6 +331,31 @@ export default function Order() {
         <ShopFooter />
       </>
     )
+  }
+
+  // Only the buyer's real, paid items - never the free gift (not a catalog
+  // item, no product_variant_id to add) and never a legacy pre-snapshot
+  // item with no collection_slug to resolve. No live stock/status check
+  // here: /cart already revalidates every line against the live catalog on
+  // load (checkCartAvailability), the same recovery path a stale cart from
+  // any other source already goes through.
+  const reorderableItems = order.items.filter(
+    (i) => !i.is_gift && i.product_variant_id && i.collection_slug
+  )
+  const reorder = () => {
+    for (const i of reorderableItems) {
+      addToCart({
+        variant_id: i.product_variant_id,
+        qty: i.qty,
+        product_name: i.product_name_snapshot,
+        variant_label: i.variant_label_snapshot,
+        price: i.unit_price_snapshot,
+        image_url: i.image_url,
+        collection_slug: i.collection_slug,
+      })
+    }
+    setReorderedCount(reorderableItems.length)
+    setTimeout(() => setReorderedCount(null), 4000)
   }
 
   const isPending = order.status === "pending"
@@ -434,6 +461,23 @@ export default function Order() {
         <span>{t("orderTotalLabel")}</span>
         <span className="text-[var(--brand)]">{formatVnd(order.total)}</span>
       </div>
+
+      {reorderableItems.length > 0 && (
+        <div className="mt-3 flex items-center flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={reorder}
+            className="px-4 py-2 rounded-lg border border-[var(--border-brand)] hover:bg-[var(--brand-soft)] text-sm font-medium"
+          >
+            {t("orderReorder")}
+          </button>
+          {reorderedCount !== null && (
+            <Link to="/cart" className="text-sm text-[var(--text-link)] underline">
+              {t("orderReorderedMsg", { count: reorderedCount })}
+            </Link>
+          )}
+        </div>
+      )}
 
       {order.fulfillment_method === "ship" && (
         <p className="text-xs opacity-70 mt-1">{t("checkoutShippingNote")}</p>

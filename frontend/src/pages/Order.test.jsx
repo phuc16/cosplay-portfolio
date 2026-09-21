@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom"
 import axios from "axios"
 import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
+import { readCart } from "../shop/cart"
 
 const fetchOrder = vi.fn()
 const fetchPaymentInstructions = vi.fn()
@@ -1059,5 +1060,68 @@ describe("Order - buyer edits their own info", () => {
     await act(async () => { editBtn.click() })
 
     expect(container.querySelector('button[aria-label="Tỉnh/Thành phố"]')).toBeTruthy()
+  })
+})
+
+describe("Order - reorder", () => {
+  it("shows a Reorder button and adds the order's real items to the cart", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [
+        { id: 1, product_variant_id: 10, product_name_snapshot: "Card", variant_label_snapshot: "A1",
+          unit_price_snapshot: 35000, qty: 2, image_url: "https://x/a1.png", collection_slug: "drop-1", is_gift: false },
+      ],
+    }))
+    const container = await renderOrder()
+
+    const btn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Reorder")
+    expect(btn).toBeTruthy()
+    await act(async () => { btn.click() })
+
+    const cart = readCart()
+    expect(cart).toHaveLength(1)
+    expect(cart[0]).toMatchObject({ variant_id: 10, qty: 2, price: 35000, collection_slug: "drop-1" })
+  })
+
+  it("excludes the free gift line from reorder", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [
+        { id: 1, product_variant_id: 10, product_name_snapshot: "Card", variant_label_snapshot: "A1",
+          unit_price_snapshot: 35000, qty: 1, image_url: null, collection_slug: "drop-1", is_gift: false },
+        { id: 2, product_variant_id: null, product_name_snapshot: "Postcard", variant_label_snapshot: "",
+          unit_price_snapshot: 0, qty: 1, image_url: null, collection_slug: null, is_gift: true },
+      ],
+    }))
+    const container = await renderOrder()
+    const btn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Reorder")
+    await act(async () => { btn.click() })
+
+    expect(readCart()).toHaveLength(1)
+    expect(readCart()[0].variant_id).toBe(10)
+  })
+
+  it("does not render the Reorder button when nothing in the order is reorderable", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [
+        { id: 1, product_variant_id: null, product_name_snapshot: "Postcard", variant_label_snapshot: "",
+          unit_price_snapshot: 0, qty: 1, image_url: null, collection_slug: null, is_gift: true },
+      ],
+    }))
+    const container = await renderOrder()
+    expect([...container.querySelectorAll("button")].find((b) => b.textContent === "Reorder")).toBeUndefined()
+  })
+
+  it("shows an inline confirmation linking to /cart after reordering", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({
+      items: [
+        { id: 1, product_variant_id: 10, product_name_snapshot: "Card", variant_label_snapshot: "A1",
+          unit_price_snapshot: 35000, qty: 1, image_url: null, collection_slug: "drop-1", is_gift: false },
+      ],
+    }))
+    const container = await renderOrder()
+    const btn = [...container.querySelectorAll("button")].find((b) => b.textContent === "Reorder")
+    await act(async () => { btn.click() })
+
+    const link = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/cart")
+    expect(link).toBeTruthy()
   })
 })
