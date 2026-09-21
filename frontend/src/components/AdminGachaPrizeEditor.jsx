@@ -4,9 +4,9 @@ import { adminFetchPrizes, adminSavePrizes, adminUploadImage } from "../api/shop
 const TIERS = [
   { code: "common", name: "Thường" },
   { code: "rare", name: "Hiếm" },
-  { code: "epic", name: "Cực hiếm" },
+  { code: "epic", name: "Sử thi" },
   { code: "legendary", name: "Huyền thoại" },
-  { code: "ancient", name: "Cổ đại" },
+  { code: "ancient", name: "Cổ vật" },
 ]
 
 const blankRow = () => ({ name: "", tier: "common", display_price: "", quantity_total: "", image_url: "", description: "" })
