@@ -126,6 +126,24 @@ export default function GachaMachine({
     return () => clearTimeout(flashTimer.current)
   }, [])
 
+  // The reel only ever shows images already in `prizes` (buildReel picks
+  // filler cells from this same list), but until now nothing fetched them
+  // before a card carrying one first scrolled into view - each of these is a
+  // full-catalog-resolution photo (up to 1920px wide), so decoding one for
+  // the first time mid-scroll was landing right as the reel decelerated and
+  // new cards kept entering view, reading as stutter. Warming the browser's
+  // image cache as soon as the prize list is known moves that decode cost
+  // off the animation's critical path entirely.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    for (const p of prizes) {
+      if (!p.image_url) continue
+      const img = new window.Image()
+      img.decoding = "async"
+      img.src = p.image_url
+    }
+  }, [prizes])
+
   // A draw response advances turnsUsed locally so the counter is right the
   // instant the reel lands, but a caller that refetches its own turn count
   // stays authoritative. React's documented "adjust state on prop change"

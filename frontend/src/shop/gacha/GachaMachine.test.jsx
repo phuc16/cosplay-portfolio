@@ -107,6 +107,36 @@ describe("GachaMachine", () => {
     expect(result.textContent).toContain("Sticker")
   })
 
+  it("preloads every prize's image up front, so a first-time reveal never decodes mid-spin", async () => {
+    const created = []
+    class FakeImage {
+      set src(value) {
+        created.push(value)
+      }
+    }
+    const originalImage = window.Image
+    window.Image = FakeImage
+
+    try {
+      await renderMachine({ prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn() })
+      // catalogPrizes has one prize with no image_url (Sticker) - never worth
+      // a request, so it must be skipped rather than preloaded as "undefined".
+      expect(created).toEqual([])
+    } finally {
+      window.Image = originalImage
+    }
+
+    const withImages = catalogPrizes.map((p, i) => ({ ...p, image_url: `https://cdn.example/${i}.webp` }))
+    created.length = 0
+    window.Image = FakeImage
+    try {
+      await renderMachine({ prizes: withImages, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn() })
+      expect(created).toEqual(withImages.map((p) => p.image_url))
+    } finally {
+      window.Image = originalImage
+    }
+  })
+
   it("disables the spin button once turnsUsed reaches turnsTotal", async () => {
     const container = await renderMachine({ turnsTotal: 1, turnsUsed: 1, drawFn: vi.fn() })
     expect(spinButton(container).disabled).toBe(true)
