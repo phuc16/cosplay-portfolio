@@ -18,7 +18,7 @@ the order's real items to the cart via the existing cart.js/addToCart,
 relying on /cart's existing live-availability revalidation instead of a
 new check.
 
-## 2026-09-21 - product-character-tag - `feature/auto-product-character-tag` - PR: (pending) - Cosplay-community trend (character/series tagging & filtering)
+## 2026-09-21 - product-character-tag - `feature/auto-product-character-tag` - PR: https://github.com/phuc16/cosplay-portfolio/pull/21 - Cosplay-community trend (character/series tagging & filtering)
 
 Adds an optional `products.character_tag` free-text field, an admin form
 field to set it, a buyer-facing badge, and a collection-page filter
