@@ -1399,3 +1399,22 @@ describe("updateBuyerInfo", () => {
     expect(result.changed).toBe(true)
   })
 })
+
+describe("attachItems: collection_slug", () => {
+  it("includes the item's collection slug, resolved from collection_id_snapshot", async () => {
+    const { variantId, cid } = await seedVariant(5)
+    const collection = await catalog.getCollectionDetailById(cid)
+    const res = await repo.createOrder(order(variantId, 1))
+    const full = await repo.getOrderById(res.id)
+    expect(full.items[0].collection_slug).toBe(collection.slug)
+  })
+
+  it("is null for a gift line, which has no collection", async () => {
+    const { variantId } = await seedVariant(5)
+    await seedGift({ enabled: true, minTotal: 1 })
+    const res = await repo.createOrder(order(variantId, 1))
+    const full = await repo.getOrderById(res.id)
+    const gift = full.items.find((i) => i.is_gift)
+    expect(gift.collection_slug).toBeNull()
+  })
+})

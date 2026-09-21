@@ -441,11 +441,17 @@ async function attachItems(order) {
   // variant/product being deleted later, which a completed order's own
   // history must not depend on. The live join is a fallback only for orders
   // placed before this snapshot column existed.
+  // collection_slug (via collection_id_snapshot) rides through into the
+  // buyer's order response unprojected - used to let the order page re-add
+  // items to the cart (reorder), which is keyed by slug, not id, same as
+  // every other cart.js entry.
   const [rows] = await db.query(
-    `SELECT oi.*, pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
+    `SELECT oi.*, pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url,
+            p.images AS product_images, col.slug AS collection_slug
        FROM order_items oi
        LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
        LEFT JOIN products p ON p.id = pv.product_id
+       LEFT JOIN collections col ON col.id = oi.collection_id_snapshot
       WHERE oi.order_id = ? ORDER BY oi.id ASC`,
     [order.id]
   )
