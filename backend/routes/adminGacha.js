@@ -9,7 +9,7 @@ const oops = (res, err, where) => {
 }
 
 const BOOTH_SOURCE = "booth_cash"
-const TIERS = ["common", "rare", "epic", "legendary", "ancient"]
+const TIERS = ["common", "rare", "mythical", "legendary", "ancient"]
 const NAME_MAX_LEN = 191
 
 function validatePrizes(prizes) {

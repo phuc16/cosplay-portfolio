@@ -9,7 +9,7 @@ exports.up = function (knex) {
     table.string("image_url", 512).nullable()
     // Display-only grouping (badge color + summed odds) - never an
     // independent weight. Odds are always quantity_remaining-driven.
-    table.enu("tier", ["common", "rare", "epic", "legendary", "ancient"]).notNullable().defaultTo("common")
+    table.enu("tier", ["common", "rare", "mythical", "legendary", "ancient"]).notNullable().defaultTo("common")
     // VND. Shown as the prize's "value" card - informational only, a prize
     // is never sold individually.
     table.integer("display_price").unsigned().notNullable().defaultTo(0)

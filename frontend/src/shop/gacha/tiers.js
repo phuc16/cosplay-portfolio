@@ -1,12 +1,12 @@
 // Tier labels/colours ported from the approved mockup
 // (Concept B - Case Reel.dc.html's TIERS array), mapped onto this repo's
 // gacha_prizes.tier enum. Shared by GachaMachine and the booth kiosk chrome.
-export const TIER_ORDER = ["common", "rare", "epic", "legendary", "ancient"]
+export const TIER_ORDER = ["common", "rare", "mythical", "legendary", "ancient"]
 
 export const TIERS = {
   common: { label: "THƯỜNG", color: "#E6E6E6" },
   rare: { label: "HIẾM", color: "#3E8BFF" },
-  epic: { label: "SỬ THI", color: "#A855F7" },
+  mythical: { label: "SỬ THI", color: "#A855F7" },
   legendary: { label: "HUYỀN THOẠI", color: "#E4383A" },
   ancient: { label: "CỔ VẬT", color: "#E8B62C" },
 }

@@ -4,7 +4,7 @@ import { adminFetchPrizes, adminSavePrizes, adminUploadImage } from "../api/shop
 const TIERS = [
   { code: "common", name: "Thường" },
   { code: "rare", name: "Hiếm" },
-  { code: "epic", name: "Sử thi" },
+  { code: "mythical", name: "Sử thi" },
   { code: "legendary", name: "Huyền thoại" },
   { code: "ancient", name: "Cổ vật" },
 ]
