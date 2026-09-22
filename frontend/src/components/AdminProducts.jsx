@@ -13,6 +13,12 @@ const blank = {
   thumbnail_image: "", gacha_booth_only: false,
 }
 
+const PRODUCT_TYPE_OPTIONS = [
+  { code: "physical", name: "Vật lý" },
+  { code: "digital", name: "Số (digital)" },
+  { code: "gacha", name: "Gacha" },
+]
+
 const SORTS = [
   { value: "default", label: "Thứ tự kéo thả" },
   { value: "name_asc", label: "Tên A-Z" },
@@ -199,11 +205,8 @@ export default function AdminProducts({ collection }) {
         <SearchableSelect padding="px-2 py-1" height="h-[38px]"
           value={draft.type}
           onChange={(type) => setDraft({ ...draft, type, gacha_booth_only: false })}
-          options={[
-            { code: "physical", name: "Vật lý" },
-            { code: "digital", name: "Số (digital)" },
-            { code: "gacha", name: "Gacha" },
-          ]}
+          options={PRODUCT_TYPE_OPTIONS}
+          label={PRODUCT_TYPE_OPTIONS.find((o) => o.code === draft.type)?.name}
           placeholder="Vật lý"
         />
       )}

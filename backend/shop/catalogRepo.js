@@ -99,7 +99,7 @@ async function listAllCollections() {
 
 async function listPublicCollections() {
   const [rows] = await db.query(
-    `SELECT c.*, COUNT(p.id) AS product_count,
+    `SELECT c.*, COUNT(CASE WHEN NOT (p.type = 'gacha' AND p.gacha_booth_only) THEN p.id END) AS product_count,
             EXISTS (SELECT 1 FROM products dp WHERE dp.collection_id = c.id AND dp.type = 'digital') AS has_digital_item,
             EXISTS (
               SELECT 1 FROM products gp WHERE gp.collection_id = c.id AND gp.type = 'gacha' AND gp.gacha_booth_only = false
@@ -370,6 +370,7 @@ async function copyCollection(id) {
       stock_qty: p.stock_qty,
       delivery_link: p.delivery_link,
       thumbnail_image: p.thumbnail_image,
+      gacha_booth_only: p.gacha_booth_only,
     })
     if (p.type !== "digital" && p.variants.length) {
       await replaceVariants(
@@ -517,12 +518,17 @@ async function updateProduct(id, data) {
   const [[existing]] = await db.query("SELECT type FROM products WHERE id = ?", [id])
   if (!existing) return false
 
+  const setClauses = ["name = ?", "description = ?", "price = ?", "images = ?"]
+  const params = [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || [])]
+  if (data.gacha_booth_only !== undefined) {
+    setClauses.push("gacha_booth_only = ?")
+    params.push(Boolean(data.gacha_booth_only))
+  }
+  params.push(id)
+
   const [res] = await db.query(
-    "UPDATE products SET name = ?, description = ?, price = ?, images = ?, gacha_booth_only = ? WHERE id = ?",
-    [
-      data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []),
-      Boolean(data.gacha_booth_only), id,
-    ]
+    `UPDATE products SET ${setClauses.join(", ")} WHERE id = ?`,
+    params
   )
 
   if (existing.type === "digital" || existing.type === "gacha") {

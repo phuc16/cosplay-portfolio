@@ -385,6 +385,18 @@ describe("gacha products", () => {
     expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(false)
   })
 
+  it("does not clear gacha_booth_only when updateProduct's payload omits the field", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    await repo.updateProduct(pid, { name: "Mystery Case", price: 20000, images: [] })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(true)
+  })
+
   it("excludes a booth-only gacha product from the public read path", async () => {
     const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
     const boothOnlyId = await repo.createProduct({
@@ -465,6 +477,17 @@ describe("listPublicCollections", () => {
 
     const [c] = await repo.listPublicCollections()
     expect(c.product_count).toBe(2)
+  })
+
+  it("excludes booth-only gacha products from product_count", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+    await repo.createProduct({ collection_id: cid, name: "Online Case", price: 20000, type: "gacha" })
+
+    const [c] = await repo.listPublicCollections()
+    expect(c.product_count).toBe(1)
   })
 
   it("flags has_digital_item so the storefront can badge a collection without relying on title/description text", async () => {
@@ -872,6 +895,20 @@ describe("copyCollection", () => {
     const source = await repo.getCollectionDetailById(cid)
     expect(source.products).toHaveLength(1)
     expect(source.products[0].id).not.toBe(copy.products[0].id)
+  })
+
+  it("carries gacha_booth_only over to the copied product", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+
+    expect(copy.products).toHaveLength(1)
+    expect(copy.products[0].type).toBe("gacha")
+    expect(copy.products[0].gacha_booth_only).toBe(true)
   })
 
   it("second copy of the same source gets a further-deduplicated slug", async () => {

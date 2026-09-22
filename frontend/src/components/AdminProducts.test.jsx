@@ -349,9 +349,8 @@ describe("AdminProducts - gacha products", () => {
     await act(async () => { checkbox.click() })
     await flush()
 
-    // Switch back to physical - find the type trigger by looking for the first aria-labeled button
-    const allButtons = [...container.querySelectorAll("button")]
-    const gachaTypeTrigger = allButtons.find((b) => b.getAttribute("aria-label") && b.textContent !== "Thêm" && b.textContent !== "Hủy" && b.textContent !== "Sửa" && b.textContent !== "Xóa")
+    // Switch back to physical
+    const gachaTypeTrigger = container.querySelector('[aria-label="Gacha"]')
     await act(async () => { gachaTypeTrigger.click() })
     await flush()
     const physicalOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Vật lý")

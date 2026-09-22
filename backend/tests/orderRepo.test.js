@@ -1528,6 +1528,21 @@ describe("createOrder - gacha", () => {
       .rejects.toThrow(repo.VariantNotFoundError)
   })
 
+  // The anti-oracle invariant the whole feature rests on: a cart mixing a
+  // booth-only gacha item with a physical item must fail the same way an
+  // unknown-variant cart would (VariantNotFoundError), never
+  // MixedGachaCartError - the latter would leak to an outside prober that
+  // the gacha item exists, just can't be combined with something else.
+  it("rejects a mixed booth-only-gacha + physical cart as VariantNotFoundError, not MixedGachaCartError", async () => {
+    const { variantId: boothOnlyGachaVariantId } = await seedGachaVariant(10, {}, { boothOnly: true })
+    const { variantId: physicalVariantId } = await seedVariant(10)
+    const mixed = {
+      items: [{ variant_id: boothOnlyGachaVariantId, qty: 1 }, { variant_id: physicalVariantId, qty: 1 }],
+      buyer, payment_method: "bank", fulfillment_method: "ship",
+    }
+    await expect(repo.createOrder(mixed)).rejects.toThrow(repo.VariantNotFoundError)
+  })
+
   it("still allows a purchase once gacha_booth_only is turned back off", async () => {
     const { pid, variantId } = await seedGachaVariant(10, {}, { boothOnly: true })
     await catalog.updateProduct(pid, { name: "Mystery Case", price: 20000, images: [], gacha_booth_only: false })
