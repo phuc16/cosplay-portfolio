@@ -480,15 +480,24 @@ export default function Order() {
           {/* Deliberately no onSessionComplete: flipping status here would
               unmount the machine in the same commit that reveals the last
               prize. onDismissSummary instead hides this section the moment
-              the buyer closes that summary screen, not before - the "Sản
-              phẩm" list below already shows the same drawn items for good. */}
+              the buyer closes that summary screen, not before - and refetches
+              the order at that same moment, so the "Sản phẩm" list below
+              picks up the newly-drawn item(s) instead of showing the
+              page-load snapshot (just the purchase line) until a reload. */}
           <GachaMachine
             prizes={gachaPrizes}
             turnsTotal={gachaSession.turns_total}
             turnsUsed={gachaSession.turns_used}
             drawFn={(drawKey) => drawGachaSession(token, drawKey)}
             onDrawResult={(response) => setGachaSession((s) => (s ? { ...s, turns_used: response.turns_used } : s))}
-            onDismissSummary={() => setGachaFinished(true)}
+            // order.items was only ever fetched once, at page load - before
+            // any draws happened. Hiding the widget without refetching would
+            // leave the "Sản phẩm" list stuck showing just the purchase line
+            // (no drawn prizes) until the buyer manually reloads the page.
+            onDismissSummary={() => {
+              setGachaFinished(true)
+              fetchOrder(token, orderAuthHeaders(token)).then(setOrder).catch(() => {})
+            }}
           />
         </section>
       )}

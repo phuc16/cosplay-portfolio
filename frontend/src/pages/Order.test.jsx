@@ -1039,7 +1039,18 @@ describe("Order - gacha section", () => {
 
     try {
       const oneTurnSession = { id: 7, product_id: 3, turns_total: 1, turns_used: 0, status: "active" }
-      fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+      // The initial load only has the purchase line - order.items is never
+      // refetched mid-session, so the drawn prize only shows up once the
+      // dismiss handler re-fetches the order.
+      const staleOrder = baseOrder({ status: "confirmed" })
+      const freshOrder = baseOrder({
+        status: "confirmed",
+        items: [
+          ...staleOrder.items,
+          { id: 99, product_name_snapshot: "Sticker", variant_label_snapshot: "", unit_price_snapshot: 5000, qty: 1 },
+        ],
+      })
+      fetchOrder.mockResolvedValueOnce(staleOrder).mockResolvedValueOnce(freshOrder)
       fetchGachaSession.mockResolvedValue({ session: oneTurnSession, drops: [], prizes })
       drawGachaSession.mockResolvedValue({
         prize: prizes[0], turns_used: 1, turns_total: 1, session_completed: true,
@@ -1059,11 +1070,25 @@ describe("Order - gacha section", () => {
       const summary = container.querySelector('[aria-label="Quà của bạn"]')
       expect(summary).not.toBeNull()
 
+      // Scoped to the "Sản phẩm"/Items list rows specifically - "Sticker" is
+      // also a real prize name inside the still-visible catalog/summary, so
+      // asserting against the whole page would pass regardless of the bug.
+      const itemRows = () =>
+        [...container.querySelectorAll("div")]
+          .filter((el) => el.className.includes("justify-between") && el.className.includes("border-b"))
+          .map((r) => r.textContent).join(" ")
+      expect(itemRows()).not.toContain("Sticker")
+
       const closeBtn = [...summary.querySelectorAll("button")].find((b) => /đóng/i.test(b.textContent))
       await act(async () => closeBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+      await act(async () => {})
 
       expect(container.querySelector('[aria-label="Quà của bạn"]')).toBeNull()
       expect(spinButton(container)).toBeUndefined()
+      // The refetch after dismiss picks up the real drawn item, not just the
+      // stale purchase-line snapshot from page load.
+      expect(fetchOrder).toHaveBeenCalledTimes(2)
+      expect(itemRows()).toContain("Sticker")
     } finally {
       globalThis.requestAnimationFrame = originalRaf
     }
