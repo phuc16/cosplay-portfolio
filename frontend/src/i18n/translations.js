@@ -59,6 +59,17 @@ export const translations = {
     shopFaqTitle: "Frequently asked questions",
     shopFaqDesc: "Payment, shipping, pickup - answers to what buyers ask most.",
 
+    // Wishlist
+    wishlistNavLabel: "Wishlist",
+    wishlistTitle: "Wishlist",
+    wishlistDesc: "Items you've saved for later.",
+    wishlistEmpty: "Your wishlist is empty.",
+    wishlistAdd: "Save to wishlist",
+    wishlistRemove: "Remove from wishlist",
+    wishlistRemoveItem: "Remove",
+    wishlistUnavailable: "No longer available",
+    wishlistAddedToCart: "Added to cart",
+
     // Cart & Checkout
     cart: "Cart", cartEmpty: "Your cart is empty.", cartTotal: "Total",
     cartCheckout: "Checkout", cartRemove: "Remove", cartQty: "Qty",
@@ -253,6 +264,17 @@ export const translations = {
     shopFaqLink: "Hỏi đáp",
     shopFaqTitle: "Câu hỏi thường gặp",
     shopFaqDesc: "Thanh toán, vận chuyển, nhận hàng - giải đáp những câu hỏi phổ biến nhất.",
+
+    // Wishlist
+    wishlistNavLabel: "Yêu thích",
+    wishlistTitle: "Danh sách yêu thích",
+    wishlistDesc: "Những sản phẩm bạn đã lưu để xem sau.",
+    wishlistEmpty: "Danh sách yêu thích của bạn đang trống.",
+    wishlistAdd: "Lưu vào yêu thích",
+    wishlistRemove: "Bỏ khỏi yêu thích",
+    wishlistRemoveItem: "Xóa",
+    wishlistUnavailable: "Không còn khả dụng",
+    wishlistAddedToCart: "Đã thêm vào giỏ hàng",
 
     // Cart & Checkout
     cart: "Giỏ hàng", cartEmpty: "Giỏ hàng của bạn đang trống.", cartTotal: "Tổng cộng",
