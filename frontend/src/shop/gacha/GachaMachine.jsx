@@ -393,10 +393,9 @@ export default function GachaMachine({
                 background: "transparent",
                 border: "1px solid rgba(242,236,250,.25)",
                 color: "#C9B8E4",
-                fontFamily: "'Space Mono', monospace",
-                fontSize: 10,
-                letterSpacing: ".18em",
-                padding: "9px 13px",
+                fontSize: 22,
+                lineHeight: 1,
+                padding: "14px 18px",
                 borderRadius: 8,
               }}
             >
