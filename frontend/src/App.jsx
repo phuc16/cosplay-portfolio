@@ -9,6 +9,7 @@ import Collection from "./pages/Collection"
 import Cart from "./pages/Cart"
 import Checkout from "./pages/Checkout"
 import Order from "./pages/Order"
+import Wishlist from "./pages/Wishlist"
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/merchandise" element={<Shop />} />
             <Route path="/merchandise/faq" element={<Faq />} />
+            <Route path="/merchandise/wishlist" element={<Wishlist />} />
             <Route path="/merchandise/:slug" element={<Collection />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
