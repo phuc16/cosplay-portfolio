@@ -14,6 +14,7 @@ vi.mock("../api/shop", () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: GachaPractice } = await import("./GachaPractice")
+const { gachaAudio } = await import("../shop/gacha/gachaAudio")
 
 const prizes = [
   { id: 1, name: "Sticker", tier: "common", image_url: null, display_price: 5000 },
@@ -89,6 +90,15 @@ afterEach(() => {
 })
 
 describe("GachaPractice", () => {
+  it("starts the ambient BGM on mount", async () => {
+    const startSpy = vi.spyOn(gachaAudio, "startBgm")
+
+    await renderPractice()
+
+    expect(startSpy).toHaveBeenCalledTimes(1)
+    startSpy.mockRestore()
+  })
+
   it("loads the product's prize list and shows the machine", async () => {
     const container = await renderPractice()
 

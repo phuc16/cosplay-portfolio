@@ -54,6 +54,12 @@ class GachaAudio {
     this.listeners = new Set()
     this.buffers = {}
     this.ctx = null
+    // Whether the CURRENT page wants BGM playing at all (kiosk/practice call
+    // startBgm() on mount, the order page never does) - kept separate from
+    // `enabled` so toggling sound off and back on resumes BGM only on a page
+    // that actually asked for it, never starts it unprompted.
+    this.bgmWanted = false
+    this.bgmNode = null
   }
 
   subscribe(fn) {
@@ -68,7 +74,12 @@ class GachaAudio {
     } catch {
       // A kiosk browser with storage disabled still gets the in-memory toggle.
     }
-    if (next) this.ensure()
+    if (next) {
+      this.ensure()
+      if (this.bgmWanted) this.startBgm()
+    } else {
+      this.stopBgm({ keepWanted: true })
+    }
     this.listeners.forEach((fn) => fn(next))
   }
 
@@ -90,6 +101,10 @@ class GachaAudio {
         this.sfx = ctx.createGain()
         this.sfx.gain.value = 0.65
         this.sfx.connect(ctx.destination)
+        // Quiet enough to sit under every tick/chime, never compete with them.
+        this.bgm = ctx.createGain()
+        this.bgm.gain.value = 0.22
+        this.bgm.connect(ctx.destination)
         // Assigned only once the buses are wired, so a half-built context is
         // never cached and then reused as if it were ready.
         this.ctx = ctx
@@ -177,6 +192,44 @@ class GachaAudio {
     const i = TIER_ORDER.indexOf(tier)
     this.play(REVEAL_CLIPS[i] || REVEAL_CLIPS[0])
   }
+
+  // Booth kiosk and the free practice page only - never the online order
+  // page, which is an ordinary checkout flow, not a festival-stand
+  // experience. `loadBuffer` decodes async and may not have the track ready
+  // on the very first call right after mount; this retries a few times
+  // rather than giving up on a call that just landed slightly too early.
+  startBgm(attempt = 0) {
+    neverThrows("startBgm", () => {
+      this.bgmWanted = true
+      if (this.bgmNode || !this.enabled) return
+      const ctx = this.ensure()
+      if (!ctx) return
+      const buf = this.loadBuffer("bgm.mp3")
+      if (!buf || ctx.state !== "running") {
+        if (this.bgmWanted && attempt < 20) {
+          setTimeout(() => this.startBgm(attempt + 1), 300)
+        }
+        return
+      }
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      src.connect(this.bgm)
+      src.start()
+      this.bgmNode = src
+    })
+  }
+
+  stopBgm({ keepWanted = false } = {}) {
+    neverThrows("stopBgm", () => {
+      if (!keepWanted) this.bgmWanted = false
+      if (this.bgmNode) {
+        this.bgmNode.stop()
+        this.bgmNode.disconnect()
+        this.bgmNode = null
+      }
+    })
+  }
 }
 
 export const gachaAudio = new GachaAudio()
@@ -185,4 +238,14 @@ export function useGachaSound() {
   const [enabled, setEnabled] = useState(gachaAudio.enabled)
   useEffect(() => gachaAudio.subscribe(setEnabled), [])
   return [enabled, () => gachaAudio.toggle()]
+}
+
+// Booth kiosk and practice page mount this once for their whole visit -
+// ambient background music for the festival-stand experience. The online
+// order page never calls this, so it never plays there.
+export function useGachaBgm() {
+  useEffect(() => {
+    gachaAudio.startBgm()
+    return () => gachaAudio.stopBgm()
+  }, [])
 }

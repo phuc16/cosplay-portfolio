@@ -27,6 +27,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: GachaKiosk } = await import("./GachaKiosk")
+const { gachaAudio } = await import("../shop/gacha/gachaAudio")
 
 const prizes = [
   { id: 1, name: "Sticker", tier: "common", image_url: null, display_price: 5000 },
@@ -119,6 +120,15 @@ afterEach(() => {
 })
 
 describe("GachaKiosk", () => {
+  it("starts the ambient BGM on mount", async () => {
+    const startSpy = vi.spyOn(gachaAudio, "startBgm")
+
+    await renderKiosk()
+
+    expect(startSpy).toHaveBeenCalledTimes(1)
+    startSpy.mockRestore()
+  })
+
   it("redirects to /admin without rendering the staff panel when there is no admin session", async () => {
     hasAdminSession.mockReturnValue(false)
 

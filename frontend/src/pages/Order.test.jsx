@@ -50,6 +50,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: Order, statusTimestamp } = await import("./Order")
 const { formatVnDateTime } = await import("../utils/orderDeadline")
+const { gachaAudio } = await import("../shop/gacha/gachaAudio")
 
 function baseOrder(over = {}) {
   return {
@@ -982,6 +983,17 @@ describe("Order - gacha section", () => {
   function spinButton(container) {
     return [...container.querySelectorAll("button")].find((b) => /mở hộp|đang mở|hết lượt/i.test(b.textContent))
   }
+
+  it("never starts the ambient BGM - that's booth kiosk/practice only, this is an ordinary checkout page", async () => {
+    const startSpy = vi.spyOn(gachaAudio, "startBgm")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: activeSession, drops: [], prizes })
+
+    await renderOrder()
+
+    expect(startSpy).not.toHaveBeenCalled()
+    startSpy.mockRestore()
+  })
 
   it("shows the gacha machine when the confirmed order has an active session", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))

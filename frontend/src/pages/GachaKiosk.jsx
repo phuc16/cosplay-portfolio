@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { adminStartBoothSession, adminDrawSession, adminFetchPrizes } from "../api/shop"
 import { hasAdminSession } from "../utils/orderAuth"
 import GachaMachine from "../shop/gacha/GachaMachine"
-import { useGachaSound } from "../shop/gacha/gachaAudio"
+import { useGachaSound, useGachaBgm } from "../shop/gacha/gachaAudio"
 
 const DEFAULT_TURNS = 5
 const TURN_PRESETS = [5, 10, 20, 50]
@@ -52,6 +52,7 @@ export default function GachaKiosk() {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
   const [soundOn, toggleSound] = useGachaSound()
+  useGachaBgm()
 
   useEffect(() => {
     if (!authorized) navigate("/admin")

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import { fetchPracticePrizes, practiceDraw } from "../api/shop"
 import GachaMachine, { UNLIMITED_TURNS_SENTINEL } from "../shop/gacha/GachaMachine"
+import { useGachaBgm } from "../shop/gacha/gachaAudio"
 
 // Practice draws never touch real stock, so the number is a UI conceit, not a
 // limit: GachaMachine recognises the sentinel and hides the count from buyer
@@ -22,6 +23,7 @@ export default function GachaPractice() {
   const [prizesFailed, setPrizesFailed] = useState(false)
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0)
+  useGachaBgm()
 
   // GachaMachine takes its turn counter from each draw response rather than
   // incrementing its own, so practice has to hand it a running total; a ref
