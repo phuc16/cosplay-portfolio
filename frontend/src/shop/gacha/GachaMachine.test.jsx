@@ -352,7 +352,7 @@ describe("GachaMachine - catalogue panel", () => {
     ])
   })
 
-  it("sorts the catalog by tier rarity on demand, and back to the original order", async () => {
+  it("defaults the catalog to rarest-first, and toggles to ascending and back", async () => {
     const outOfTierOrder = [
       { id: 1, name: "Figure", tier: "ancient", image_url: null, display_price: 900000, quantity_remaining: 20 },
       { id: 2, name: "Sticker", tier: "common", image_url: null, display_price: 5000, quantity_remaining: 50 },
@@ -364,14 +364,43 @@ describe("GachaMachine - catalogue panel", () => {
     const namesInOrder = () =>
       [...container.querySelectorAll(".gacha-item")].map((b) => b.textContent.match(/Figure|Sticker|Poster/)?.[0])
 
-    expect(namesInOrder()).toEqual(["Figure", "Sticker", "Poster"])
+    // Default: rarest first (ancient > rare > common) - no more "admin
+    // insertion order" default.
+    expect(namesInOrder()).toEqual(["Figure", "Poster", "Sticker"])
 
-    const sortButton = catalogButton(container, "Sắp xếp theo độ hiếm")
+    const sortButton = catalogButton(container, "Độ hiếm")
     await act(async () => click(sortButton))
     expect(namesInOrder()).toEqual(["Sticker", "Poster", "Figure"])
 
-    await act(async () => click(catalogButton(container, "Mặc định")))
-    expect(namesInOrder()).toEqual(["Figure", "Sticker", "Poster"])
+    await act(async () => click(sortButton))
+    expect(namesInOrder()).toEqual(["Figure", "Poster", "Sticker"])
+  })
+
+  it("shows each prize's remaining quantity on its catalog card", async () => {
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn: vi.fn(),
+    })
+
+    const stickerCard = catalogButton(container, "Sticker")
+    expect(stickerCard.textContent).toContain("Còn lại ×50")
+  })
+
+  it("refreshes the catalog's remaining count and tier odds after a draw, from the draw response alone", async () => {
+    const drawFn = vi.fn().mockResolvedValue({
+      prize: { ...catalogPrizes[0], quantity_remaining: 49 },
+      turns_used: 1, turns_total: 3, session_completed: false,
+    })
+    const container = await renderMachine({
+      prizes: catalogPrizes, turnsTotal: 3, turnsUsed: 0, drawFn,
+    })
+
+    await act(async () => click(spinButton(container)))
+    await flush()
+    await act(async () => click(continueOut(container)))
+
+    const stickerCard = catalogButton(container, "Sticker")
+    expect(stickerCard.textContent).toContain("Còn lại ×49")
+    expect(stickerCard.textContent).not.toContain("Còn lại ×50")
   })
 
   it("opens a peek modal for the tapped prize and closes it again", async () => {

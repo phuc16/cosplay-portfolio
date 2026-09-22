@@ -161,7 +161,19 @@ export default function GachaMachine({
     setTurnsUsed(initialTurnsUsed)
   }
 
-  const idleReel = useMemo(() => buildReel(prizes, null, IDLE_REEL_CELLS), [prizes])
+  // The catalog (odds %, per-item "còn lại" counts) reads from this, not the
+  // `prizes` prop directly - patched after every draw with that exact prize's
+  // real post-decrement quantity_remaining (see runReel below), so the
+  // percentages and counts a buyer sees stay accurate turn over turn instead
+  // of frozen at whatever they were when the session/page first loaded. Reset
+  // whenever the prop itself changes identity (a genuinely new prize list -
+  // initial async load resolving, or a new session), not on every render.
+  const [livePrizes, setLivePrizes] = useState(prizes)
+  useEffect(() => {
+    setLivePrizes(prizes)
+  }, [prizes])
+
+  const idleReel = useMemo(() => buildReel(livePrizes, null, IDLE_REEL_CELLS), [livePrizes])
   const reel = spunReel || idleReel
 
   const turnsLeft = turnsTotal - turnsUsed
@@ -170,16 +182,19 @@ export default function GachaMachine({
   // must never reach the buyer as a literal "còn 1000000 lượt".
   const unlimited = turnsTotal >= UNLIMITED_TURNS_SENTINEL
 
-  const odds = useMemo(() => tierOdds(prizes), [prizes])
+  const odds = useMemo(() => tierOdds(livePrizes), [livePrizes])
   const legend = useMemo(
-    () => TIER_ORDER.filter((tier) => prizes.some((p) => p.tier === tier)),
-    [prizes],
+    () => TIER_ORDER.filter((tier) => livePrizes.some((p) => p.tier === tier)),
+    [livePrizes],
   )
-  const [sortByTier, setSortByTier] = useState(false)
+  // Rarest-first by default (spec: no more "admin insertion order" default) -
+  // TIER_ORDER itself runs common -> ancient (ascending rarity), so "desc"
+  // (rarest first) is TIER_ORDER reversed.
+  const [sortDirection, setSortDirection] = useState("desc")
   const catalogPrizes = useMemo(() => {
-    if (!sortByTier) return prizes
-    return [...prizes].sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))
-  }, [prizes, sortByTier])
+    const sorted = [...livePrizes].sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))
+    return sortDirection === "desc" ? sorted.reverse() : sorted
+  }, [livePrizes, sortDirection])
   const dropsTotal = drops.reduce((sum, d) => sum + Number(d.prize.display_price || 0), 0)
   // Only the booth kiosk passes onFinish, and only at the booth is there a
   // counter to hand the screen over at. The claim code is decorative - staff
@@ -194,14 +209,14 @@ export default function GachaMachine({
   // first would mean this count never reflects anything drawn since the
   // page loaded, including the very turn that just landed.
   const resultStock = result
-    ? result.quantity_remaining ?? prizes.find((p) => p.id === result.id)?.quantity_remaining
+    ? result.quantity_remaining ?? livePrizes.find((p) => p.id === result.id)?.quantity_remaining
     : null
 
   function runReel(response) {
     const winner = response.prize
     const profile = spinProfile()
     const winIndex = profile.tiles
-    setSpunReel(buildReel(prizes, winner, winIndex + TAIL_CELLS))
+    setSpunReel(buildReel(livePrizes, winner, winIndex + TAIL_CELLS))
     lastTickIndex.current = null
     gachaAudio.crateOpen()
 
@@ -229,6 +244,14 @@ export default function GachaMachine({
         gachaAudio.chime(winner.tier)
         setSpinning(false)
         setResult(winner)
+        // winner.quantity_remaining is the real post-decrement count for
+        // exactly this prize (see backend/shop/gacha/sessionRepo.js's
+        // drawForSession) - patching just this one entry keeps the catalog's
+        // odds % and per-item "còn lại" counts accurate after every turn,
+        // without needing a full prize-list refetch.
+        if (winner.quantity_remaining != null) {
+          setLivePrizes((prev) => prev.map((p) => (p.id === winner.id ? { ...p, quantity_remaining: winner.quantity_remaining } : p)))
+        }
         setDrops((prev) => [...prev, { prize: winner, index: response.turns_used }])
         setFlash(true)
         flashTimer.current = setTimeout(() => setFlash(false), 600)
@@ -628,13 +651,13 @@ export default function GachaMachine({
                 textTransform: "uppercase",
               }}
             >
-              {prizes.length} món
+              {livePrizes.length} món
             </div>
             <button
               type="button"
               className="gacha-ghost"
-              onClick={() => setSortByTier((v) => !v)}
-              aria-pressed={sortByTier}
+              onClick={() => setSortDirection((d) => (d === "desc" ? "asc" : "desc"))}
+              aria-label={sortDirection === "desc" ? "Độ hiếm: cao đến thấp" : "Độ hiếm: thấp đến cao"}
               style={{
                 flex: "none",
                 cursor: "pointer",
@@ -649,7 +672,7 @@ export default function GachaMachine({
                 whiteSpace: "nowrap",
               }}
             >
-              {sortByTier ? "Mặc định" : "Sắp xếp theo độ hiếm"}
+              Độ hiếm {sortDirection === "desc" ? "↓" : "↑"}
             </button>
           </div>
           <div
@@ -767,6 +790,18 @@ export default function GachaMachine({
                     {tierLabel(prize.tier)}
                   </span>
                 </div>
+                {prize.quantity_remaining != null && (
+                  <div
+                    style={{
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 10,
+                      letterSpacing: ".12em",
+                      color: "#7C6B96",
+                    }}
+                  >
+                    Còn lại ×{prize.quantity_remaining}
+                  </div>
+                )}
               </div>
             </button>
           ))}
