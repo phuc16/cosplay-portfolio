@@ -187,8 +187,14 @@ export default function GachaMachine({
   // read as a real claim token next to an instruction nobody can act on.
   const isBoothContext = Boolean(onFinish)
   const resultColor = result ? tierColor(result.tier) : tierColor("common")
+  // result.quantity_remaining (from the draw response) is the true
+  // post-decrement count for the prize just won; the stale prizes list
+  // (fetched once at session start) is only a fallback for a shape the
+  // server response somehow omitted it from - preferring the stale list
+  // first would mean this count never reflects anything drawn since the
+  // page loaded, including the very turn that just landed.
   const resultStock = result
-    ? prizes.find((p) => p.id === result.id)?.quantity_remaining ?? result.quantity_remaining
+    ? result.quantity_remaining ?? prizes.find((p) => p.id === result.id)?.quantity_remaining
     : null
 
   function runReel(response) {

@@ -254,7 +254,12 @@ async function drawForSession(sessionId, { drawKey, ownerOrderId, requireSource 
     }
 
     await conn.commit()
-    return { prize: winner, turnsUsed, turnsTotal: session.turns_total, sessionCompleted, orderId: session.order_id }
+    // `winner` was read before the decrement above, so its own
+    // quantity_remaining is stale by exactly the turn that was just taken -
+    // the buyer's reveal shows "how many are left" for the prize they just
+    // won, and reporting the pre-draw count there would overstate it by one.
+    const wonPrize = { ...winner, quantity_remaining: winner.quantity_remaining - 1 }
+    return { prize: wonPrize, turnsUsed, turnsTotal: session.turns_total, sessionCompleted, orderId: session.order_id }
   } catch (err) {
     await conn.rollback()
     throw err

@@ -87,6 +87,26 @@ afterEach(async () => {
 })
 
 describe("GachaMachine", () => {
+  it("shows the draw response's own (post-decrement) stock count, not the stale page-load snapshot", async () => {
+    // prizes' own entry for id 1 (declared above) says quantity_remaining: 10,
+    // a stale count from before this draw - the fresh response says 7 (what
+    // it actually is right now), which must win.
+    const drawFn = vi.fn().mockResolvedValue({
+      prize: { ...winner, quantity_remaining: 7 },
+      turns_used: 1,
+      turns_total: 3,
+      session_completed: false,
+    })
+    const container = await renderMachine({ turnsTotal: 3, turnsUsed: 0, drawFn })
+
+    await act(async () => { click(spinButton(container)) })
+    await flush()
+
+    const result = container.querySelector('[role="dialog"]')
+    expect(result.textContent).toContain("×7")
+    expect(result.textContent).not.toContain("×10")
+  })
+
   it("calls drawFn when the spin button is pressed, and shows the result", async () => {
     const drawFn = vi.fn().mockResolvedValue({
       prize: winner,

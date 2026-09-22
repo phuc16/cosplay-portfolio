@@ -78,6 +78,21 @@ describe("drawForSession", () => {
     expect(order.status).toBe("completed")
   })
 
+  // The prize row is read (for weightedPick) BEFORE the decrement - the
+  // response must not hand back that pre-decrement count as if it were
+  // current, or the buyer's reveal screen overstates "how many are left" by
+  // exactly the turn they just took.
+  it("reports the winning prize's post-decrement quantity_remaining, not the pre-draw count", async () => {
+    const pid = await seedGachaProduct([{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 5 }])
+    const { sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: null, turnsTotal: 1 })
+
+    const result = await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+
+    expect(result.prize.quantity_remaining).toBe(4)
+    const [[prizeRow]] = await db.query("SELECT quantity_remaining FROM gacha_prizes WHERE product_id = ?", [pid])
+    expect(prizeRow.quantity_remaining).toBe(4)
+  })
+
   it("is idempotent: replaying the same draw_key returns the original result without drawing again", async () => {
     const pid = await seedGachaProduct([
       { name: "Common", tier: "common", display_price: 1000, quantity_total: 100 },
