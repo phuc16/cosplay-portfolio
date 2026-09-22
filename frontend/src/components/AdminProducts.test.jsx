@@ -330,6 +330,52 @@ describe("AdminProducts - gacha products", () => {
 
     expect(container.querySelector('input[type="checkbox"]')).toBeNull()
   })
+
+  it("resets gacha_booth_only to false when switching type away from gacha", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+    const container = await renderProducts()
+    await flush()
+
+    // Switch to gacha
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const gachaOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { gachaOption.click() })
+    await flush()
+
+    // Check the booth-only checkbox
+    const checkbox = container.querySelector('input[type="checkbox"]')
+    await act(async () => { checkbox.click() })
+    await flush()
+
+    // Switch back to physical - find the type trigger by looking for the first aria-labeled button
+    const allButtons = [...container.querySelectorAll("button")]
+    const gachaTypeTrigger = allButtons.find((b) => b.getAttribute("aria-label") && b.textContent !== "Thêm" && b.textContent !== "Hủy" && b.textContent !== "Sửa" && b.textContent !== "Xóa")
+    await act(async () => { gachaTypeTrigger.click() })
+    await flush()
+    const physicalOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Vật lý")
+    await act(async () => { physicalOption.click() })
+    await flush()
+
+    // Fill in product name
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Physical Product")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    // Save
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    // Assert gacha_booth_only is false
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Physical Product", type: "physical", gacha_booth_only: false })
+    )
+  })
 })
 
 describe("AdminProducts - search, filter, sort", () => {

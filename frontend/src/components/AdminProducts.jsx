@@ -198,7 +198,7 @@ export default function AdminProducts({ collection }) {
       {!editingId && (
         <SearchableSelect padding="px-2 py-1" height="h-[38px]"
           value={draft.type}
-          onChange={(type) => setDraft({ ...draft, type })}
+          onChange={(type) => setDraft({ ...draft, type, gacha_booth_only: false })}
           options={[
             { code: "physical", name: "Vật lý" },
             { code: "digital", name: "Số (digital)" },
