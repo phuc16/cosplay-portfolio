@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { LanguageProvider } from "../../contexts/LanguageContext"
 import { readCart } from "../../shop/cart"
+import { readWishlist } from "../../shop/wishlist"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -533,5 +534,111 @@ describe("unavailableLabel", () => {
     await act(async () => { card?.click() })
 
     expect(container.textContent).toContain("Chưa mở bán")
+  })
+})
+
+describe("ProductCard - wishlist toggle", () => {
+  it("shows an unsaved heart in the detail modal by default", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const heart = dialog.querySelector('button[aria-label="Save to wishlist"]')
+    expect(heart).toBeTruthy()
+    expect(heart.getAttribute("aria-pressed")).toBe("false")
+  })
+
+  it("saves the variant to the wishlist when the detail-modal heart is clicked", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const heart = dialog.querySelector('button[aria-label="Save to wishlist"]')
+    await act(async () => { heart.click() })
+
+    const wishlist = readWishlist()
+    expect(wishlist).toHaveLength(1)
+    expect(wishlist[0]).toMatchObject({ variant_id: 1, product_id: 1, collection_slug: "drop" })
+  })
+
+  it("un-saves the variant when the heart is clicked again", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    let dialog = container.querySelector('[role="dialog"]')
+    let heart = dialog.querySelector('button[aria-label="Save to wishlist"]')
+    await act(async () => { heart.click() })
+
+    dialog = container.querySelector('[role="dialog"]')
+    heart = dialog.querySelector('button[aria-label="Remove from wishlist"]')
+    expect(heart).toBeTruthy()
+    await act(async () => { heart.click() })
+
+    expect(readWishlist()).toEqual([])
+  })
+
+  it("does not add to cart just from toggling the wishlist heart", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const heart = dialog.querySelector('button[aria-label="Save to wishlist"]')
+    await act(async () => { heart.click() })
+
+    expect(readCart()).toEqual([])
+  })
+
+  it("stays enabled and toggleable for a sold-out variant - unlike Add to cart", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const heart = dialog.querySelector('button[aria-label="Save to wishlist"]')
+    expect(heart.disabled).toBeFalsy()
+    await act(async () => { heart.click() })
+
+    expect(readWishlist()).toHaveLength(1)
+  })
+
+  it("stays enabled for a closed (not orderable) collection", async () => {
+    const { container } = await renderCard({ orderable: false })
+    await openVariantDetail(container, "A1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    const heart = dialog.querySelector('button[aria-label="Save to wishlist"]')
+    expect(heart.disabled).toBeFalsy()
+  })
+
+  it("toggles a variant's wishlist state from its thumbnail in the full gallery, without opening the detail modal", async () => {
+    const { container } = await renderCard()
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const gallery = container.querySelector('[role="dialog"]')
+    const hearts = [...gallery.querySelectorAll('button[aria-label="Save to wishlist"]')]
+    expect(hearts.length).toBe(2) // one per variant (A1, B2)
+
+    await act(async () => { hearts[0].click() })
+
+    // Still on the gallery, not the detail modal - the click didn't bubble
+    // into the underlying thumbnail button.
+    expect(container.querySelector('[role="dialog"]').textContent).not.toMatch(/^Poster · /)
+    expect(readWishlist()).toHaveLength(1)
+  })
+
+  it("reflects a wishlist change made elsewhere without a remount", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    let dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('button[aria-label="Save to wishlist"]')).toBeTruthy()
+
+    const { toggleWishlist } = await import("../../shop/wishlist")
+    await act(async () => {
+      toggleWishlist({ variant_id: 1, product_id: 1, collection_slug: "drop" })
+    })
+
+    dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('button[aria-label="Remove from wishlist"]')).toBeTruthy()
   })
 })

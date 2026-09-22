@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
 import { addToCart } from "../../shop/cart"
+import { readWishlist, subscribeWishlist, toggleWishlist, isWishlisted } from "../../shop/wishlist"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
 function stockLabel(variant, t) {
@@ -54,6 +55,34 @@ function galleryGridClasses(count) {
   return "grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8"
 }
 
+const heartIcon = (filled) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-6.716-4.35-9.428-8.06C.78 10.42 1.05 6.9 3.6 5.06 5.9 3.4 8.9 3.9 10.6 6.1L12 7.8l1.4-1.7c1.7-2.2 4.7-2.7 7-1.04 2.55 1.84 2.82 5.36 1.03 7.88C18.716 16.65 12 21 12 21z" />
+  </svg>
+)
+
+/**
+ * Heart/bookmark toggle for a single variant. Deliberately never disabled by
+ * stock/orderable state (unlike "Add to cart") - a wishlisted item is
+ * exactly the kind of thing someone wants to track *because* it's sold out
+ * or they're not ready to buy yet.
+ */
+function WishlistToggle({ variant, wishlisted, onToggle, className, idleColorClass = "text-[var(--text-body)]" }) {
+  const { t } = useLanguage()
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onToggle(variant) }}
+      aria-label={wishlisted ? t("wishlistRemove") : t("wishlistAdd")}
+      aria-pressed={wishlisted}
+      title={wishlisted ? t("wishlistRemove") : t("wishlistAdd")}
+      className={"flex items-center justify-center " + (className || "") + (wishlisted ? " text-[var(--brand)]" : " " + idleColorClass)}
+    >
+      {heartIcon(wishlisted)}
+    </button>
+  )
+}
+
 export default function ProductCard({ product, collectionSlug, orderable, unavailableLabel, onAdded }) {
   const { t } = useLanguage()
   const isDigital = product.type === "digital"
@@ -75,8 +104,31 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const [view, setView] = useState(null)
   const [qty, setQty] = useState(1)
   const [activeImage, setActiveImage] = useState(0)
+  const [wishlist, setWishlist] = useState(() => readWishlist())
   const detail = view && typeof view === "object" ? view : null
   const detailImages = detail ? variantImages(detail) : []
+
+  // Kept live the same way ShopHeader keeps its cart-count badge live - a
+  // mount-only read would go stale the moment the same variant is toggled
+  // from elsewhere (e.g. the header's own wishlist page).
+  useEffect(() => {
+    const sync = () => setWishlist(readWishlist())
+    sync()
+    return subscribeWishlist(sync)
+  }, [])
+
+  const handleToggleWishlist = (v) => {
+    toggleWishlist({
+      variant_id: v.id,
+      product_id: product.id,
+      collection_slug: collectionSlug,
+      product_name: product.name,
+      variant_label: v.label,
+      price: product.price,
+      image_url: variantCover(v) || product.images?.[0] || null,
+      is_digital: isDigital,
+    })
+  }
 
   // Every path to a variant's detail goes through this, so qty/photo never carry over stale from a prior variant.
   const openDetail = (v) => {
@@ -188,25 +240,33 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 {[...variants].sort((a, b) => Number(isSoldOut(a)) - Number(isSoldOut(b))).map((v) => {
                   const img = variantCover(v) || cover
                   return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => openDetail(v)}
-                      title={stockLabel(v, t)}
-                      className="group relative block w-full rounded-xl overflow-hidden border border-[var(--border-brand)] transition hover:border-[var(--brand)] hover:shadow-lg"
-                    >
-                      {img && <img src={img} alt={v.label} className="w-full aspect-square object-cover block" />}
-                      <div className="absolute inset-x-0 bottom-0 pt-4 pb-1.5 px-1.5 bg-gradient-to-t from-black/80 to-transparent">
-                        <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[var(--brand)] text-white shadow-sm">
-                          {v.label}
-                        </span>
-                      </div>
-                      {isSoldOut(v) && (
-                        <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] text-white">
-                          {t("shopSoldOut")}
-                        </span>
-                      )}
-                    </button>
+                    <div key={v.id} className="group relative">
+                      <button
+                        type="button"
+                        onClick={() => openDetail(v)}
+                        title={stockLabel(v, t)}
+                        className="block w-full rounded-xl overflow-hidden border border-[var(--border-brand)] transition hover:border-[var(--brand)] hover:shadow-lg"
+                      >
+                        {img && <img src={img} alt={v.label} className="w-full aspect-square object-cover block" />}
+                        <div className="absolute inset-x-0 bottom-0 pt-4 pb-1.5 px-1.5 bg-gradient-to-t from-black/80 to-transparent">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[var(--brand)] text-white shadow-sm">
+                            {v.label}
+                          </span>
+                        </div>
+                        {isSoldOut(v) && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] text-white">
+                            {t("shopSoldOut")}
+                          </span>
+                        )}
+                      </button>
+                      <WishlistToggle
+                        variant={v}
+                        wishlisted={isWishlisted(v.id, wishlist)}
+                        onToggle={handleToggleWishlist}
+                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60"
+                        idleColorClass="text-white"
+                      />
+                    </div>
                   )
                 })}
               </div>
@@ -261,15 +321,23 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                     </span>
                   )}
                 </div>
-                {variants.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setView("grid")}
-                    className="text-xs text-[var(--text-link)] shrink-0"
-                  >
-                    {t("shopViewAll")}
-                  </button>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {variants.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setView("grid")}
+                      className="text-xs text-[var(--text-link)]"
+                    >
+                      {t("shopViewAll")}
+                    </button>
+                  )}
+                  <WishlistToggle
+                    variant={detail}
+                    wishlisted={isWishlisted(detail.id, wishlist)}
+                    onToggle={handleToggleWishlist}
+                    className="w-8 h-8 rounded-lg border border-[var(--border-brand)]"
+                  />
+                </div>
               </div>
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
               <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : (unavailableLabel || t("shopClosed"))}</p>
