@@ -219,6 +219,80 @@ describe("Collection - add-to-cart toast", () => {
   })
 })
 
+describe("Collection - share deep link", () => {
+  function twoVariantProduct(over = {}) {
+    return baseCollection({
+      products: [
+        {
+          id: 7, name: "Photocard Set", price: 35000, description: null, images: ["https://x/cover.jpg"],
+          variants: [
+            { id: 71, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg" },
+            { id: 72, label: "B1", stock_qty: 5, image_url: "https://x/b1.jpg" },
+          ],
+          ...over,
+        },
+      ],
+    })
+  }
+
+  async function renderCollectionAt(path) {
+    const container = document.createElement("div")
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={[path]}>
+          <ThemeProvider>
+            <LanguageProvider>
+              <Routes>
+                <Route path="/merchandise/:slug" element={<Collection />} />
+              </Routes>
+            </LanguageProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      )
+    })
+    return container
+  }
+
+  it("auto-opens the specific variant's detail view when ?product=&variant= match", async () => {
+    fetchCollection.mockResolvedValue(twoVariantProduct())
+    const container = await renderCollectionAt("/merchandise/drop?product=7&variant=72")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog).toBeTruthy()
+    expect(dialog.textContent).toContain("Photocard Set · B1")
+  })
+
+  it("opens the single-variant product's detail directly when ?product= matches but has only one variant", async () => {
+    fetchCollection.mockResolvedValue(baseCollection())
+    const container = await renderCollectionAt("/merchandise/drop?product=1")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog).toBeTruthy()
+    expect(dialog.textContent).toContain("Card")
+  })
+
+  it("opens the full gallery when ?product= matches a multi-variant product with no/invalid variant param", async () => {
+    fetchCollection.mockResolvedValue(twoVariantProduct())
+    const container = await renderCollectionAt("/merchandise/drop?product=7")
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog).toBeTruthy()
+    const labels = [...dialog.querySelectorAll("span")].map((s) => s.textContent)
+    expect(labels).toContain("A1")
+    expect(labels).toContain("B1")
+  })
+
+  it("falls back to the plain grid, no crash, when ?product= matches no product in the collection", async () => {
+    fetchCollection.mockResolvedValue(twoVariantProduct())
+    const container = await renderCollectionAt("/merchandise/drop?product=999")
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(container.textContent).toContain("Photocard Set")
+  })
+})
+
 describe("Collection - not-started preview", () => {
   it("shows a not-started banner with the open date, and still renders products", async () => {
     fetchCollection.mockResolvedValue(baseCollection({

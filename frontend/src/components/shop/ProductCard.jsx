@@ -55,7 +55,7 @@ function galleryGridClasses(count) {
   return "grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8"
 }
 
-export default function ProductCard({ product, collectionSlug, orderable, unavailableLabel, onAdded }) {
+export default function ProductCard({ product, collectionSlug, orderable, unavailableLabel, onAdded, deepLinkVariantId }) {
   const { t } = useLanguage()
   const isDigital = product.type === "digital"
   // A digital product is treated exactly like a product with one variant -
@@ -73,7 +73,23 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const cover = product.thumbnail_image || product.images?.[0] || variantCover(variants.find((v) => variantCover(v)) || {})
   const hasVariants = variants.length > 0
   // null = closed, "grid" = full variant gallery, an object = single-variant detail.
-  const [view, setView] = useState(null)
+  // deepLinkVariantId seeds this once at mount, from a shared ?product=&variant=
+  // URL (see Collection.jsx): undefined means no deep link targets this card
+  // (the default - unchanged behavior), null means it targets this product
+  // with no specific/valid variant (fall back to the same thing a card click
+  // would do), a number means it targets that exact variant - unless that
+  // variant no longer exists (deleted since the link was shared), in which
+  // case this falls back the same way null would.
+  const [view, setView] = useState(() => {
+    if (deepLinkVariantId === undefined) return null
+    if (deepLinkVariantId !== null) {
+      const match = variants.find((v) => v.id === deepLinkVariantId)
+      if (match) return match
+    }
+    if (variants.length === 1) return variants[0]
+    if (variants.length > 1) return "grid"
+    return null
+  })
   const [qty, setQty] = useState(1)
   const [activeImage, setActiveImage] = useState(0)
   const [shareCopied, setShareCopied] = useState(false)
