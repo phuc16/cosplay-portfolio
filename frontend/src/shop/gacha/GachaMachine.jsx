@@ -73,6 +73,13 @@ export default function GachaMachine({
   // order and practice pages have no such concept, so the summary just closes
   // itself locally.
   onFinish,
+  // Fired when the summary is dismissed WITHOUT onFinish (order/practice
+  // pages) - lets a caller like Order.jsx stop rendering this whole section
+  // afterward (its own "Sản phẩm" list already shows the same drawn items
+  // permanently) instead of falling back to the idle reel's "Hết lượt" state
+  // for the rest of the page view. Deliberately separate from onFinish/
+  // isBoothContext: passing it must never turn on the booth-only chrome.
+  onDismissSummary,
   // The booth kiosk carries the toggle in its own header bar, where the
   // mockup puts it; the order and practice pages have no such chrome, so the
   // machine renders its own.
@@ -272,6 +279,7 @@ export default function GachaMachine({
     setShowSummary(false)
     setSpunReel(null)
     setResult(null)
+    if (onDismissSummary) onDismissSummary()
   }
 
   function openPeek(prize) {

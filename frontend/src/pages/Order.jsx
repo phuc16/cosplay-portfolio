@@ -246,6 +246,11 @@ export default function Order() {
   // Display pool for the reel's filler cells only - the winning prize always
   // comes from the draw response, never from this list.
   const [gachaPrizes, setGachaPrizes] = useState([])
+  // Flips once the buyer dismisses the end-of-session summary, so this whole
+  // section stops rendering right away rather than falling back to the idle
+  // reel's "Hết lượt" state for the rest of this page view - the "Sản phẩm"
+  // list further down already shows the same drawn items permanently.
+  const [gachaFinished, setGachaFinished] = useState(false)
 
   const startEditBuyerInfo = () => {
     // Email is deliberately excluded - it's not editable (backend ignores
@@ -319,6 +324,7 @@ export default function Order() {
       .then((data) => {
         setGachaSession(data.session)
         setGachaPrizes(data.prizes || [])
+        setGachaFinished(false)
       })
       .catch(() => {
         setGachaSession(null)
@@ -468,19 +474,21 @@ export default function Order() {
 
       {/* gachaPrizes gates the render too: the reel fills its non-winning
           cells from that pool, so there is nothing to animate until it loads. */}
-      {gachaSession?.status === "active" && gachaPrizes.length > 0 && (
+      {gachaSession?.status === "active" && gachaPrizes.length > 0 && !gachaFinished && (
         <section className="mt-6 p-4 rounded-xl border border-[var(--border-brand)]">
           <h2 className="font-semibold mb-2">{t("orderGachaTitle")}</h2>
           {/* Deliberately no onSessionComplete: flipping status here would
               unmount the machine in the same commit that reveals the last
-              prize. The section disappears on the next load instead, once the
-              server reports the session as completed. */}
+              prize. onDismissSummary instead hides this section the moment
+              the buyer closes that summary screen, not before - the "Sản
+              phẩm" list below already shows the same drawn items for good. */}
           <GachaMachine
             prizes={gachaPrizes}
             turnsTotal={gachaSession.turns_total}
             turnsUsed={gachaSession.turns_used}
             drawFn={(drawKey) => drawGachaSession(token, drawKey)}
             onDrawResult={(response) => setGachaSession((s) => (s ? { ...s, turns_used: response.turns_used } : s))}
+            onDismissSummary={() => setGachaFinished(true)}
           />
         </section>
       )}

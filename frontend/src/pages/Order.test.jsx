@@ -1024,6 +1024,51 @@ describe("Order - gacha section", () => {
     expect(spinButton(container)).toBeUndefined()
   })
 
+  it("hides the whole gacha section once the buyer dismisses the end-of-session summary, without waiting for the next load", async () => {
+    // The real reel runs for 7.5-9.5s of wall clock - drive
+    // requestAnimationFrame off the microtask queue with a coarse clock so a
+    // full spin finishes inside a handful of act() flushes.
+    const originalRaf = globalThis.requestAnimationFrame
+    let now = 0
+    globalThis.requestAnimationFrame = (cb) => {
+      now += 1000
+      const at = now
+      queueMicrotask(() => cb(at))
+      return at
+    }
+
+    try {
+      const oneTurnSession = { id: 7, product_id: 3, turns_total: 1, turns_used: 0, status: "active" }
+      fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+      fetchGachaSession.mockResolvedValue({ session: oneTurnSession, drops: [], prizes })
+      drawGachaSession.mockResolvedValue({
+        prize: prizes[0], turns_used: 1, turns_total: 1, session_completed: true,
+      })
+
+      const container = await renderOrder()
+      await act(async () => spinButton(container).dispatchEvent(new MouseEvent("click", { bubbles: true })))
+      for (let i = 0; i < 20; i++) await act(async () => {})
+
+      // The reel lands on a reveal modal first ("Kết quả") - only tapping its
+      // own continue button, since this was the last turn, advances to the
+      // end-of-session summary.
+      const reveal = container.querySelector('[aria-label="Kết quả"]')
+      const continueBtn = [...reveal.querySelectorAll("button")].find((b) => /lượt tiếp|xong/i.test(b.textContent))
+      await act(async () => continueBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+      const summary = container.querySelector('[aria-label="Quà của bạn"]')
+      expect(summary).not.toBeNull()
+
+      const closeBtn = [...summary.querySelectorAll("button")].find((b) => /đóng/i.test(b.textContent))
+      await act(async () => closeBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+      expect(container.querySelector('[aria-label="Quà của bạn"]')).toBeNull()
+      expect(spinButton(container)).toBeUndefined()
+    } finally {
+      globalThis.requestAnimationFrame = originalRaf
+    }
+  })
+
   it("draws through the order's own endpoint with a fresh idempotency key", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
     fetchGachaSession.mockResolvedValue({ session: activeSession, drops: [], prizes })
