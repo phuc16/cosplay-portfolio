@@ -19,7 +19,10 @@ for what booth staff actually care about: who paid, what they won, has it been h
   `PATCH .../orders/:id/prepared` endpoint already cover the prepared checkbox.
 - No "today's booth totals" mini-dashboard (buyer count, cash collected) - Stats/Bookkeeping
   already covers that; duplicating it here risks drifting out of sync.
-- No live/auto-refresh - a manual refresh button, same as the main Orders tab.
+- No push-based live updates (WebSocket/SSE) - this app has no real-time infra anywhere, and
+  building one just for this view isn't worth it at booth scale (a few buyers per minute).
+  Polling instead (see §4) - re-fetch on an interval, same request the manual refresh button
+  already makes, no new infra.
 
 ## 3a. Correction found during implementation
 
@@ -49,6 +52,10 @@ tab in `Admin.jsx` alongside the existing `orders`/`shipping`/etc. tabs.
   empty (= all collections) - same option-list shape as `AdminOrders.jsx`'s own collection
   filter.
 - **Refresh button**: same "Làm mới" pattern as `AdminOrders.jsx`.
+- **Auto-refresh**: a `setInterval` (15s) re-runs the same fetch while the tab is mounted,
+  paused whenever `document.visibilityState !== "visible"` (a backgrounded browser tab or
+  switched-away admin section never polls). No new infra - same endpoint the manual refresh
+  button and the initial load already use.
 - **Order list**: each row shows buyer name, order total, timestamp, status badge, and -
   unlike the main Orders tab - the grouped drawn items (via the already-existing
   `groupOrderItems` helper) rendered directly, not behind a "Chi tiết" expand click.

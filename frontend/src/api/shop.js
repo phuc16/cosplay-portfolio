@@ -73,6 +73,9 @@ export const verifyOrderPin = (token, pin) =>
 export const adminListOrders = (params = {}) =>
   api.get("/api/admin/orders", { params }).then((r) => r.data)
 
+export const adminListBoothOrders = (params = {}) =>
+  api.get("/api/admin/booth-orders", { params }).then((r) => r.data)
+
 export const adminGetOrder = (id) =>
   api.get(`/api/admin/orders/${id}`).then((r) => r.data)
 
