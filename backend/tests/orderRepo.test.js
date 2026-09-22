@@ -1030,6 +1030,14 @@ describe("getOrderByToken", () => {
     expect(await repo.getOrderByToken("deadbeef".repeat(4))).toBeNull()
   })
 
+  it("exposes the joined product_type per item, so the confirmation email knows a line is a gacha purchase", async () => {
+    const { variantId } = await seedVariant(5)
+    const res = await repo.createOrder(order(variantId, 1))
+
+    const found = await repo.getOrderByToken(res.order_token)
+    expect(found.items[0].product_type).toBe("physical")
+  })
+
   it("still reads correctly after its variant is deleted", async () => {
     const { pid, variantId } = await seedVariant(5)
     const res = await repo.createOrder(order(variantId, 1))

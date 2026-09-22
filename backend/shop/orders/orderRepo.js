@@ -531,7 +531,8 @@ async function attachItems(order) {
   // history must not depend on. The live join is a fallback only for orders
   // placed before this snapshot column existed.
   const [rows] = await db.query(
-    `SELECT oi.*, pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
+    `SELECT oi.*, pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url,
+            p.images AS product_images, p.type AS product_type
        FROM order_items oi
        LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
        LEFT JOIN products p ON p.id = pv.product_id
