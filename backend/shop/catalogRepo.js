@@ -184,6 +184,7 @@ async function nestCollectionDetail(collection) {
           delivery_link: hidden?.delivery_link ?? null,
           thumbnail_image: hidden?.thumbnail_image ?? null,
           gacha_pool_remaining: p.type === "gacha" ? (poolByProduct.get(p.id) ?? null) : null,
+          gacha_booth_only: Boolean(p.gacha_booth_only),
         }
       }
       return {
@@ -191,6 +192,7 @@ async function nestCollectionDetail(collection) {
         images: parseImages(p.images),
         variants: productVariants,
         gacha_pool_remaining: null,
+        gacha_booth_only: Boolean(p.gacha_booth_only),
       }
     }),
   }
@@ -468,8 +470,8 @@ async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
   const type = ["digital", "gacha"].includes(data.type) ? data.type : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, gacha_booth_only)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
@@ -478,6 +480,7 @@ async function createProduct(data) {
       JSON.stringify(data.images || []),
       type,
       sortOrder,
+      Boolean(data.gacha_booth_only),
     ]
   )
   const productId = res.insertId
@@ -504,8 +507,11 @@ async function updateProduct(id, data) {
   if (!existing) return false
 
   const [res] = await db.query(
-    "UPDATE products SET name = ?, description = ?, price = ?, images = ? WHERE id = ?",
-    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
+    "UPDATE products SET name = ?, description = ?, price = ?, images = ?, gacha_booth_only = ? WHERE id = ?",
+    [
+      data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []),
+      Boolean(data.gacha_booth_only), id,
+    ]
   )
 
   if (existing.type === "digital" || existing.type === "gacha") {

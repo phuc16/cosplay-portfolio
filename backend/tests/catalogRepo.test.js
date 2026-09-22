@@ -347,6 +347,43 @@ describe("gacha products", () => {
     const product = detail.products.find((p) => p.id === pid)
     expect(product.gacha_pool_remaining).toBeNull()
   })
+
+  it("defaults gacha_booth_only to false for a newly created gacha product", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_booth_only).toBe(false)
+  })
+
+  it("persists gacha_booth_only: true when set at creation", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_booth_only).toBe(true)
+  })
+
+  it("toggles gacha_booth_only via updateProduct", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+
+    await repo.updateProduct(pid, {
+      name: "Mystery Case", price: 20000, images: [], gacha_booth_only: true,
+    })
+    let detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(true)
+
+    await repo.updateProduct(pid, {
+      name: "Mystery Case", price: 20000, images: [], gacha_booth_only: false,
+    })
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(false)
+  })
 })
 
 describe("createCollection", () => {
