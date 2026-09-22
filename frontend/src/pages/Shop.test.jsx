@@ -134,6 +134,51 @@ describe("Shop - grouped by type", () => {
     const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
     expect(groups.map((g) => g.textContent)).toEqual(["Digital"])
   })
+
+  it("groups a gacha collection under its own Gacha heading, ahead of Digital and Physical", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Gacha One", status: "active", product_count: 1, has_gacha_item: true, has_digital_item: false },
+      { id: 2, slug: "b", title: "Digital One", status: "active", product_count: 1, has_gacha_item: false, has_digital_item: true },
+      { id: 3, slug: "c", title: "Physical One", status: "active", product_count: 1, has_gacha_item: false, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Gacha", "Digital", "Physical"])
+
+    const gachaGroup = groups[0].closest("div")
+    expect([...gachaGroup.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Gacha One"])
+  })
+
+  it("puts a collection mixing gacha and digital items into the Gacha group, not Digital", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Mixed", status: "active", product_count: 2, has_gacha_item: true, has_digital_item: true },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Gacha"])
+  })
+
+  it("badges a gacha collection's card with Gacha instead of Digital", async () => {
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Gacha One", status: "active", product_count: 1, has_gacha_item: true, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const card = [...container.querySelectorAll("a")].find((a) => a.textContent.includes("Gacha One"))
+    expect(card.textContent).toContain("Gacha")
+    expect(card.textContent).not.toContain("Digital")
+  })
 })
 
 describe("Shop - not-started preview", () => {

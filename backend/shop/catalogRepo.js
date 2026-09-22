@@ -100,7 +100,10 @@ async function listAllCollections() {
 async function listPublicCollections() {
   const [rows] = await db.query(
     `SELECT c.*, COUNT(p.id) AS product_count,
-            EXISTS (SELECT 1 FROM products dp WHERE dp.collection_id = c.id AND dp.type = 'digital') AS has_digital_item
+            EXISTS (SELECT 1 FROM products dp WHERE dp.collection_id = c.id AND dp.type = 'digital') AS has_digital_item,
+            EXISTS (
+              SELECT 1 FROM products gp WHERE gp.collection_id = c.id AND gp.type = 'gacha' AND gp.gacha_booth_only = false
+            ) AS has_gacha_item
        FROM collections c
        LEFT JOIN products p ON p.collection_id = c.id
       WHERE c.status IN (?, ?)
@@ -117,6 +120,7 @@ async function listPublicCollections() {
   const now = new Date()
   return updated.map((r) => ({
     ...mapCollection(r), product_count: Number(r.product_count), has_digital_item: Boolean(r.has_digital_item),
+    has_gacha_item: Boolean(r.has_gacha_item),
     not_started_yet: Boolean(r.start_at) && new Date(r.start_at) > now,
   }))
 }

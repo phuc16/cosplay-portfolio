@@ -481,6 +481,30 @@ describe("listPublicCollections", () => {
     expect(collections.find((c) => c.id === cidPhysical).has_digital_item).toBe(false)
   })
 
+  it("flags has_gacha_item so the storefront can group a gacha collection separately from physical", async () => {
+    const cidGacha = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    await repo.createProduct({ collection_id: cidGacha, name: "Mystery Case", price: 20000, type: "gacha" })
+    const cidPhysical = await repo.createCollection({ title: "Physical Drop", status: "active" })
+    await repo.createProduct({ collection_id: cidPhysical, name: "Card", price: 35000 })
+
+    const collections = await repo.listPublicCollections()
+    expect(collections.find((c) => c.id === cidGacha).has_gacha_item).toBe(true)
+    expect(collections.find((c) => c.id === cidPhysical).has_gacha_item).toBe(false)
+  })
+
+  // A booth-only gacha product is already invisible in the collection's own
+  // product list (getPublicCollectionBySlug) - has_gacha_item must agree,
+  // or the collection would land in the "Gacha" group and then show none.
+  it("does not flag has_gacha_item for a collection whose only gacha product is booth-only", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const collections = await repo.listPublicCollections()
+    expect(collections.find((c) => c.id === cid).has_gacha_item).toBe(false)
+  })
+
   it("includes a collection whose start_at hasn't arrived yet, flagged as not_started_yet", async () => {
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000)
     const cid = await repo.createCollection({ title: "Upcoming Drop", status: "active", start_at: future })
