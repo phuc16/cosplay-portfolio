@@ -3,6 +3,7 @@ import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
 import { addToCart } from "../../shop/cart"
+import { buildShareUrl, buildShareText } from "../../shop/share"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
 function stockLabel(variant, t) {
@@ -75,6 +76,7 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const [view, setView] = useState(null)
   const [qty, setQty] = useState(1)
   const [activeImage, setActiveImage] = useState(0)
+  const [shareCopied, setShareCopied] = useState(false)
   const detail = view && typeof view === "object" ? view : null
   const detailImages = detail ? variantImages(detail) : []
 
@@ -82,7 +84,31 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const openDetail = (v) => {
     setQty(1)
     setActiveImage(0)
+    setShareCopied(false)
     setView(v)
+  }
+
+  // Only meaningful once a specific variant is pinned down - the button
+  // only ever renders inside the detail modal below. A multi-variant
+  // product needs `variant` in the link to disambiguate which code is
+  // being shared; a single-variant product's `product` id alone already
+  // fully determines the detail view, so the param is omitted there.
+  const handleShare = async () => {
+    const shareUrl = buildShareUrl(collectionSlug, product.id, variants.length > 1 ? detail.id : null)
+    const { title, text } = buildShareText(t, product.name, detail.label, product.price)
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url: shareUrl })
+      } catch {
+        // Buyer dismissed the native share sheet - not an error, nothing to show.
+      }
+      return
+    }
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    }
   }
 
   const commitAdd = (v) => {
@@ -261,16 +287,26 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                     </span>
                   )}
                 </div>
-                {variants.length > 1 && (
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setView("grid")}
-                    className="text-xs text-[var(--text-link)] shrink-0"
+                    onClick={handleShare}
+                    className="text-xs text-[var(--text-link)]"
                   >
-                    {t("shopViewAll")}
+                    {t("shopShareButton")}
                   </button>
-                )}
+                  {variants.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setView("grid")}
+                      className="text-xs text-[var(--text-link)]"
+                    >
+                      {t("shopViewAll")}
+                    </button>
+                  )}
+                </div>
               </div>
+              {shareCopied && <p className="text-xs opacity-70">{t("shopShareLinkCopied")}</p>}
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
               <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : (unavailableLabel || t("shopClosed"))}</p>
 
