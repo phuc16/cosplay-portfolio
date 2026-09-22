@@ -384,6 +384,31 @@ describe("gacha products", () => {
     detail = await repo.getCollectionDetailById(cid)
     expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(false)
   })
+
+  it("excludes a booth-only gacha product from the public read path", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const boothOnlyId = await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+    const onlineId = await repo.createProduct({
+      collection_id: cid, name: "Online Case", price: 20000, type: "gacha",
+    })
+
+    const publicDetail = await repo.getPublicCollectionBySlug("gacha-drop")
+    const ids = publicDetail.products.map((p) => p.id)
+    expect(ids).not.toContain(boothOnlyId)
+    expect(ids).toContain(onlineId)
+  })
+
+  it("still shows a booth-only gacha product on the admin read path", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const boothOnlyId = await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const adminDetail = await repo.getCollectionDetailById(cid)
+    expect(adminDetail.products.map((p) => p.id)).toContain(boothOnlyId)
+  })
 })
 
 describe("createCollection", () => {

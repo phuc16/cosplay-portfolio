@@ -218,7 +218,14 @@ async function getPublicCollectionBySlug(slug) {
   return {
     ...detail,
     not_started_yet: notStartedYet,
-    products: detail.products.map(({ delivery_link, ...rest }) => rest),
+    // A booth-only gacha product is never meant to exist for an online buyer
+    // at all - filtered out here, not just left unlinked, so it can't be
+    // browsed via a shared/bookmarked collection URL either. The admin path
+    // (getCollectionDetailById) shares nestCollectionDetail but never calls
+    // this function, so it keeps showing every gacha product regardless.
+    products: detail.products
+      .filter((p) => !(p.type === "gacha" && p.gacha_booth_only))
+      .map(({ delivery_link, ...rest }) => rest),
   }
 }
 
