@@ -236,7 +236,7 @@ async function createOrder(input) {
     const [rows] = await conn.query(
       `SELECT v.id, v.label, v.stock_qty, v.delivery_link, v.thumbnail_image, v.image_url,
               p.id AS product_id, p.name AS product_name, p.type AS product_type, p.images AS product_images,
-              p.price, p.collection_id, c.status AS collection_status,
+              p.price, p.collection_id, p.gacha_booth_only, c.status AS collection_status,
               c.start_at AS collection_start_at, c.end_at AS collection_end_at,
               c.allow_ship, c.allow_pickup, c.payment_deadline_hours
          FROM product_variants v
@@ -250,6 +250,17 @@ async function createOrder(input) {
     if (rows.length !== ids.length) {
       const foundIds = new Set(rows.map((r) => r.id))
       throw new VariantNotFoundError(ids.filter((id) => !foundIds.has(id)))
+    }
+    // A booth-only gacha product must never be purchasable online - hidden
+    // from the public storefront (see catalogRepo.getPublicCollectionBySlug),
+    // but "hidden from the UI" is never treated as a security boundary on its
+    // own in this codebase, so it's rejected here too, the same way an
+    // unknown variant_id is: same error, same message, same 409 response -
+    // deliberately NOT a distinguishing error, so a booth-only product can't
+    // be told apart from a nonexistent one by probing.
+    const boothOnlyRow = rows.find((r) => r.product_type === "gacha" && r.gacha_booth_only)
+    if (boothOnlyRow) {
+      throw new VariantNotFoundError([boothOnlyRow.id])
     }
 
     const allDigital = rows.every((r) => r.product_type === "digital")

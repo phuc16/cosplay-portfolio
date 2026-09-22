@@ -31,15 +31,11 @@ async function seedDigitalVariant(stock, deliveryLink = "https://drive.google.co
   return { cid, pid, variantId: detail.products[0].variant_id }
 }
 
-async function seedGachaVariant(prizeQuantity, collectionOver = {}) {
+async function seedGachaVariant(prizeQuantity, collectionOver = {}, { boothOnly = false } = {}) {
   const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active", ...collectionOver })
-  const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
-  // Temporary shim: catalogRepo.createProduct still coerces every non-digital
-  // type to 'physical' and only creates the hidden variant for digital. Task 6
-  // teaches it about 'gacha'; until then the seed writes the real type and the
-  // hidden variant itself. Redundant no-op once Task 6 lands.
-  await db.query("UPDATE products SET type = 'gacha' WHERE id = ?", [pid])
-  await catalog.replaceVariants(pid, [{ label: "", stock_qty: null }])
+  const pid = await catalog.createProduct({
+    collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha", gacha_booth_only: boothOnly,
+  })
   await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: prizeQuantity }])
   const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ? LIMIT 1", [pid])
   return { cid, pid, variantId: v.id }
@@ -1524,6 +1520,34 @@ describe("createOrder - gacha", () => {
     const { variantId } = await seedGachaVariant(10)
     const result = await repo.createOrder(order(variantId, 3, { payment_method: "bank", fulfillment_method: "ship" }))
     expect(result.total).toBe(60000)
+  })
+
+  it("rejects a booth-only gacha product the same way it rejects an unknown variant", async () => {
+    const { variantId } = await seedGachaVariant(10, {}, { boothOnly: true })
+    await expect(repo.createOrder(order(variantId, 1, { payment_method: "bank", fulfillment_method: "ship" })))
+      .rejects.toThrow(repo.VariantNotFoundError)
+  })
+
+  it("still allows a purchase once gacha_booth_only is turned back off", async () => {
+    const { pid, variantId } = await seedGachaVariant(10, {}, { boothOnly: true })
+    await catalog.updateProduct(pid, { name: "Mystery Case", price: 20000, images: [], gacha_booth_only: false })
+
+    const result = await repo.createOrder(order(variantId, 1, { payment_method: "bank", fulfillment_method: "ship" }))
+    expect(result.total).toBe(20000)
+  })
+
+  // The "never retroactive" invariant from the spec: flipping the flag on
+  // must never strand a buyer who already paid and is mid-session.
+  it("lets an already-active session keep drawing after its product is flipped booth-only", async () => {
+    const { pid, variantId } = await seedGachaVariant(10)
+    const result = await repo.createOrder(order(variantId, 2, { payment_method: "bank", fulfillment_method: "ship" }))
+    await repo.transitionOrder(result.id, "confirmed")
+    const session = await sessionRepo.getSessionByOrderId(result.id)
+
+    await catalog.updateProduct(pid, { name: "Mystery Case", price: 20000, images: [], gacha_booth_only: true })
+
+    const draw = await sessionRepo.drawForSession(session.id, { drawKey: "k1", ownerOrderId: result.id })
+    expect(draw.prize).toBeDefined()
   })
 })
 

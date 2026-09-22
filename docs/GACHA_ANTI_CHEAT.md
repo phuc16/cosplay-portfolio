@@ -64,6 +64,12 @@ locked `FOR UPDATE`, so two concurrent draws can never both win the same last un
 - COD is rejected for any cart containing a gacha item (`NoCodForGachaError`) - a turn is
   consumed the moment the order is confirmed, so there's never a doorstep at which to collect
   payment after the fact.
+- A gacha product an admin has marked `gacha_booth_only` is rejected by `createOrder` the
+  same way an unknown variant_id is - it reuses `VariantNotFoundError` verbatim, never a
+  distinguishing message, so a booth-only product can't be told apart from a nonexistent one
+  by probing. It's also excluded from `getPublicCollectionBySlug`'s response entirely, but
+  that's a UI convenience, not the actual boundary - "hidden from the UI" is never treated as
+  a security control on its own in this codebase.
 
 ## Retries can't mint extra turns (idempotency)
 
