@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom"
 import { LanguageProvider } from "../../contexts/LanguageContext"
 import { ThemeProvider } from "../../contexts/ThemeContext"
 import { addToCart, clearCart } from "../../shop/cart"
+import { addToWishlist, removeFromWishlist } from "../../shop/wishlist"
 import ShopHeader from "./ShopHeader"
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -28,6 +29,7 @@ async function renderHeader() {
 }
 
 const cartLink = (c) => [...c.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/cart")
+const wishlistLink = (c) => [...c.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/merchandise/wishlist")
 
 beforeEach(() => localStorage.clear())
 
@@ -84,6 +86,51 @@ describe("ShopHeader", () => {
       clearCart()
     })
     expect(cartLink(container).textContent.trim()).toBe("")
+  })
+})
+
+describe("ShopHeader - wishlist link", () => {
+  it("renders a link to the wishlist page", async () => {
+    const container = await renderHeader()
+    expect(wishlistLink(container)).toBeTruthy()
+  })
+
+  it("shows no count badge for an empty wishlist", async () => {
+    const container = await renderHeader()
+    expect(wishlistLink(container).textContent.trim()).toBe("")
+  })
+
+  it("shows the item count for a wishlist that already has items at mount", async () => {
+    addToWishlist({ variant_id: 1, product_id: 10, collection_slug: "drop" })
+    addToWishlist({ variant_id: 2, product_id: 10, collection_slug: "drop" })
+    const container = await renderHeader()
+    expect(wishlistLink(container).textContent).toContain("2")
+  })
+
+  // Same regression class as the cart badge: an item can be wishlisted from
+  // the collection page without navigating, so a mount-only read would go
+  // stale until a full reload.
+  it("updates the count when the wishlist changes without a remount", async () => {
+    const container = await renderHeader()
+    expect(wishlistLink(container).textContent.trim()).toBe("")
+
+    await act(async () => {
+      addToWishlist({ variant_id: 1, product_id: 10, collection_slug: "drop" })
+    })
+    expect(wishlistLink(container).textContent).toContain("1")
+
+    await act(async () => {
+      removeFromWishlist(1)
+    })
+    expect(wishlistLink(container).textContent.trim()).toBe("")
+  })
+
+  it("counts the cart and wishlist badges independently", async () => {
+    addToCart({ variant_id: 1, qty: 5, price: 1000, product_name: "A", variant_label: "A1" })
+    addToWishlist({ variant_id: 2, product_id: 10, collection_slug: "drop" })
+    const container = await renderHeader()
+    expect(cartLink(container).textContent).toContain("5")
+    expect(wishlistLink(container).textContent).toContain("1")
   })
 })
 

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { useTheme } from "../../contexts/ThemeContext"
 import { readCart, cartCount, subscribeCart } from "../../shop/cart"
+import { readWishlist, wishlistCount, subscribeWishlist } from "../../shop/wishlist"
 
 const sunIcon = (
   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -31,6 +32,12 @@ const cartIcon = (
   </svg>
 )
 
+const wishlistIcon = (
+  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 21s-6.716-4.35-9.428-8.06C.78 10.42 1.05 6.9 3.6 5.06 5.9 3.4 8.9 3.9 10.6 6.1L12 7.8l1.4-1.7c1.7-2.2 4.7-2.7 7-1.04 2.55 1.84 2.82 5.36 1.03 7.88C18.716 16.65 12 21 12 21z" />
+  </svg>
+)
+
 /**
  * Header shown on every shop-facing page (/shop, /shop/:slug, /cart,
  * /checkout, /order/:token). The cart count is read from localStorage on
@@ -42,11 +49,18 @@ export default function ShopHeader() {
   const { t, lang, setLang } = useLanguage()
   const { theme, toggleTheme } = useTheme()
   const [count, setCount] = useState(() => cartCount(readCart()))
+  const [wishCount, setWishCount] = useState(() => wishlistCount(readWishlist()))
 
   useEffect(() => {
     const sync = () => setCount(cartCount(readCart()))
     sync()
     return subscribeCart(sync)
+  }, [])
+
+  useEffect(() => {
+    const sync = () => setWishCount(wishlistCount(readWishlist()))
+    sync()
+    return subscribeWishlist(sync)
   }, [])
 
   return (
@@ -93,6 +107,19 @@ export default function ShopHeader() {
           >
             {theme === "dark" ? sunIcon : moonIcon}
           </button>
+          <Link
+            to="/merchandise/wishlist"
+            aria-label={t("wishlistNavLabel")}
+            title={t("wishlistNavLabel")}
+            className="relative flex items-center justify-center w-9 h-9 rounded-lg text-[var(--text-body)] hover:text-[var(--text-link)]"
+          >
+            {wishlistIcon}
+            {wishCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--brand)] text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                {wishCount}
+              </span>
+            )}
+          </Link>
           <Link
             to="/cart"
             aria-label={t("cart")}
