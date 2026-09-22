@@ -10,7 +10,7 @@ import { formatVnd } from "../utils/money"
 
 const blank = {
   name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "",
-  thumbnail_image: "",
+  thumbnail_image: "", gacha_booth_only: false,
 }
 
 const SORTS = [
@@ -121,7 +121,7 @@ export default function AdminProducts({ collection }) {
     setDraft({
       name: p.name, description: p.description || "", price: p.price, images: p.images || [],
       type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
-      thumbnail_image: p.thumbnail_image || "",
+      thumbnail_image: p.thumbnail_image || "", gacha_booth_only: Boolean(p.gacha_booth_only),
     })
   }
 
@@ -228,6 +228,16 @@ export default function AdminProducts({ collection }) {
         rows={3}
         className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
       />
+      {draft.type === "gacha" && (
+        <label className="flex items-center gap-2 mb-2 text-sm">
+          <input
+            type="checkbox"
+            checked={Boolean(draft.gacha_booth_only)}
+            onChange={(e) => setDraft({ ...draft, gacha_booth_only: e.target.checked })}
+          />
+          Chỉ bán tại quầy (ẩn khỏi shop online)
+        </label>
+      )}
       {draft.type === "digital" && (
         <>
           <input

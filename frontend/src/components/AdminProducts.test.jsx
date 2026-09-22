@@ -257,6 +257,79 @@ describe("AdminProducts - gacha products", () => {
     expect(container.querySelector('input[placeholder="Tên phần thưởng"]')?.value).toBe("Sticker")
     expect(container.querySelector('input[placeholder="Mã (A1) hoặc size (M)"]')).toBeNull()
   })
+
+  it("shows the booth-only checkbox only for a gacha product being created", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    const container = await renderProducts()
+    await flush()
+
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const gachaOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { gachaOption.click() })
+
+    expect(container.querySelector('input[type="checkbox"]')).not.toBeNull()
+    expect(container.textContent).toContain("Chỉ bán tại quầy")
+  })
+
+  it("saves gacha_booth_only: true when the checkbox is checked", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+    const container = await renderProducts()
+    await flush()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const gachaOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { gachaOption.click() })
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Booth Case")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const checkbox = container.querySelector('input[type="checkbox"]')
+    await act(async () => { checkbox.click() })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Booth Case", type: "gacha", gacha_booth_only: true })
+    )
+  })
+
+  it("pre-checks the checkbox when editing an existing booth-only product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Booth Case", price: 20000, type: "gacha", images: [], variants: [], gacha_booth_only: true }],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const checkbox = container.querySelector('input[type="checkbox"]')
+    expect(checkbox.checked).toBe(true)
+  })
+
+  it("never shows the checkbox for a physical product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Card", price: 35000, type: "physical", images: [], variants: [] }],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull()
+  })
 })
 
 describe("AdminProducts - search, filter, sort", () => {
