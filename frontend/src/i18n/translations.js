@@ -126,6 +126,7 @@ export const translations = {
     orderTrackingCodeLabel: "ViettelPost tracking code",
     orderCancelReasonLabel: "Cancellation reason",
     orderGachaTitle: "Open your gacha box",
+    gachaTryLink: "Try it for free",
 
     // Payment instructions
     paymentBank: "Bank transfer", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Cash on delivery",
@@ -325,6 +326,7 @@ export const translations = {
     orderTrackingCodeLabel: "Mã vận đơn Viettel Post",
     orderCancelReasonLabel: "Lý do hủy",
     orderGachaTitle: "Mở hộp gacha",
+    gachaTryLink: "Thử trước miễn phí",
 
     // Payment instructions
     paymentBank: "Chuyển khoản ngân hàng", paymentMomo: "Momo", paymentPaypal: "PayPal", paymentCod: "Thanh toán khi nhận hàng",

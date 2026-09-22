@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { MemoryRouter } from "react-router-dom"
 import { LanguageProvider } from "../../contexts/LanguageContext"
 import { readCart } from "../../shop/cart"
 
@@ -27,9 +28,11 @@ async function renderCard(props = {}) {
   const product = props.product || baseProduct()
   await act(async () => {
     root.render(
-      <LanguageProvider>
-        <ProductCard product={product} collectionSlug="drop" orderable={true} onAdded={onAdded} {...props} />
-      </LanguageProvider>
+      <MemoryRouter>
+        <LanguageProvider>
+          <ProductCard product={product} collectionSlug="drop" orderable={true} onAdded={onAdded} {...props} />
+        </LanguageProvider>
+      </MemoryRouter>
     )
   })
   return { container, onAdded }
@@ -409,6 +412,25 @@ describe("gacha products", () => {
 
     expect(container.querySelector('[role="dialog"]')).toBeTruthy()
     expect(container.textContent).toContain("Mystery Case")
+  })
+
+  it("links to the practice page for the product, on both the teaser card and the detail view", async () => {
+    const { container } = await renderCard({ product: gachaProduct() })
+
+    const teaserLink = container.querySelector('a[href="/merchandise/gacha/3/try"]')
+    expect(teaserLink).not.toBeNull()
+    expect(teaserLink.textContent).toMatch(/try it for free/i)
+
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const detailLinks = [...container.querySelectorAll('a[href="/merchandise/gacha/3/try"]')]
+    expect(detailLinks.length).toBe(2)
+  })
+
+  it("never shows the practice link for a non-gacha product", async () => {
+    const { container } = await renderCard({ product: baseProduct() })
+    expect(container.querySelector('a[href*="/try"]')).toBeNull()
   })
 
   it("adds turns to cart using the flattened variant_id", async () => {

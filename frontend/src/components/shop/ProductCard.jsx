@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
@@ -184,6 +185,15 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
             )}
           </div>
           <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
+          {isGacha && (
+            <Link
+              to={`/merchandise/gacha/${product.id}/try`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm text-[var(--text-link)] underline w-fit"
+            >
+              {t("gachaTryLink")}
+            </Link>
+          )}
 
           {product.description && (
             <div
@@ -309,6 +319,15 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
               </div>
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
               <p className="text-sm opacity-70">{orderable ? (detailSoldOut ? t("shopSoldOut") : stockLabel(detail, t)) : (unavailableLabel || t("shopClosed"))}</p>
+              {isGacha && (
+                <Link
+                  to={`/merchandise/gacha/${product.id}/try`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm text-[var(--text-link)] underline w-fit"
+                >
+                  {t("gachaTryLink")}
+                </Link>
+              )}
 
               {detail.description && (
                 <div
