@@ -59,6 +59,15 @@ module.exports = function adminOrderRoutes() {
     } catch (err) { oops(res, err, "Lỗi liệt kê đơn") }
   })
 
+  // fulfillment_method is hardcoded to 'booth' inside listBoothOrdersWithItems,
+  // never taken from req.query - this route can never list anything else.
+  router.get("/booth-orders", async (req, res) => {
+    try {
+      const orders = await repo.listBoothOrdersWithItems({ collection_id: req.query.collection_id })
+      res.json(orders.map(withAllowedTransitions))
+    } catch (err) { oops(res, err, "Lỗi liệt kê đơn tại quầy") }
+  })
+
   // Backs the admin QR scanner: it only ever extracts a token from the
   // buyer's public order URL, so the lookup has to happen server-side here
   // rather than the admin's browser matching against order_token client-side

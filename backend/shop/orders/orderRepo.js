@@ -626,9 +626,19 @@ async function listOrders(filter = {}) {
   // at createOrder time) would silently miss an order for every collection
   // but the first one its items belong to. EXISTS against order_items'
   // per-line snapshot catches every collection the order actually touches.
+  //
+  // A booth-cash order is the one exception: startBoothSession never writes
+  // a purchase-line order_items row at all (only drawForSession's decorative
+  // draw rows exist, and those never set collection_id_snapshot), so the
+  // EXISTS check alone silently excludes every booth order regardless of
+  // collection - matched here by falling back to the order's own
+  // collection_id, which startBoothSession does set correctly.
   if (filter.collection_id) {
-    where.push("EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.collection_id_snapshot = ?)")
-    params.push(filter.collection_id)
+    where.push(`(
+      EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.collection_id_snapshot = ?)
+      OR (o.fulfillment_method = 'booth' AND o.collection_id = ?)
+    )`)
+    params.push(filter.collection_id, filter.collection_id)
   }
 
   // Filters on created_at (not confirmed_at/etc.) so idx_orders_status_created
@@ -689,6 +699,47 @@ async function listOrders(filter = {}) {
     has_digital_item: Boolean(r.has_digital_item),
     has_incomplete_gacha_session: Boolean(r.has_incomplete_gacha_session),
   }))
+}
+
+/**
+ * Booth orders, each with its drawn items attached - unlike listOrders,
+ * whose payload is deliberately item-free (kept light for the main Orders
+ * list's every-order-every-poll usage). fulfillment_method is hardcoded
+ * here, never taken from the caller, so this can never be pointed at
+ * anything but booth orders. Same fetch-then-batch-items shape as
+ * shop/shipping/roster.js's route uses for the pickup roster - one query
+ * for the matching orders, one for all their items via `IN (...)`, no
+ * per-order round trip.
+ */
+async function listBoothOrdersWithItems({ collection_id } = {}) {
+  const orders = await listOrders({ fulfillment_method: "booth", collection_id })
+  if (!orders.length) return []
+
+  const [itemRows] = await db.query(
+    `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.unit_price_snapshot,
+            oi.qty, oi.is_gift, oi.gacha_tier_snapshot,
+            oi.image_url_snapshot, pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url,
+            p.images AS product_images
+       FROM order_items oi
+       LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
+       LEFT JOIN products p ON p.id = pv.product_id
+      WHERE oi.order_id IN (${orders.map(() => "?").join(",")})
+      ORDER BY oi.id ASC`,
+    orders.map((o) => o.id)
+  )
+
+  const itemsByOrder = new Map()
+  for (const { image_url_snapshot, variant_thumbnail, variant_image_url, product_images, ...item } of itemRows) {
+    const withImage = {
+      ...item,
+      is_gift: Boolean(item.is_gift),
+      image_url: image_url_snapshot || variant_thumbnail || variant_image_url || firstImage(product_images),
+    }
+    if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, [])
+    itemsByOrder.get(item.order_id).push(withImage)
+  }
+
+  return orders.map((o) => ({ ...o, items: itemsByOrder.get(o.id) || [] }))
 }
 
 /** Return reserved stock. Caller must hold the order row lock. */
@@ -1041,6 +1092,7 @@ module.exports = {
   getOrderByToken,
   getOrderById,
   listOrders,
+  listBoothOrdersWithItems,
   transitionOrder,
   updateBuyerInfo,
   savePaymentProof,
