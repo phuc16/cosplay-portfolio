@@ -10,7 +10,7 @@ const TURN_PRESETS = [5, 10, 20, 50]
 const MAX_TURNS = 200
 
 const MONO = "'Space Mono', monospace"
-const DISPLAY = "'Bungee', cursive"
+const DISPLAY = "'Playfair Display', serif"
 
 const ghostButton = {
   cursor: "pointer",
@@ -167,6 +167,7 @@ export default function GachaKiosk() {
             display: "grid",
             placeItems: "center",
             fontFamily: DISPLAY,
+            fontStyle: "italic",
             fontSize: 18,
             color: "#120A1F",
           }}
@@ -177,6 +178,7 @@ export default function GachaKiosk() {
           <div
             style={{
               fontFamily: DISPLAY,
+              fontStyle: "italic",
               fontSize: "clamp(15px, 2.4vw, 19px)",
               letterSpacing: ".03em",
               lineHeight: 1,
@@ -303,6 +305,7 @@ export default function GachaKiosk() {
               <h1
                 style={{
                   fontFamily: DISPLAY,
+                  fontStyle: "italic",
                   fontSize: 24,
                   marginTop: 8,
                   textTransform: "uppercase",
@@ -389,6 +392,7 @@ export default function GachaKiosk() {
                   }
                   style={{
                     fontFamily: DISPLAY,
+                    fontStyle: "italic",
                     fontSize: "clamp(44px, 9vw, 72px)",
                     width: 160,
                     textAlign: "center",
@@ -516,6 +520,7 @@ export default function GachaKiosk() {
                       : "linear-gradient(135deg, #FF2E88, #21E6FF)",
                   color: starting || loadingPrizes || prizes.length === 0 ? "#6B5A85" : "#0E0818",
                   fontFamily: DISPLAY,
+                  fontStyle: "italic",
                   fontSize: 22,
                   letterSpacing: ".04em",
                   textTransform: "uppercase",
@@ -572,6 +577,7 @@ export default function GachaKiosk() {
               borderRadius: 12,
               cursor: "pointer",
               fontFamily: DISPLAY,
+              fontStyle: "italic",
               fontSize: 18,
               letterSpacing: ".04em",
               textTransform: "uppercase",

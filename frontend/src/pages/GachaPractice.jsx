@@ -99,7 +99,8 @@ export default function GachaPractice() {
         </div>
         <h1
           style={{
-            fontFamily: "'Bungee', cursive",
+            fontFamily: "'Playfair Display', serif",
+            fontStyle: "italic",
             fontSize: "clamp(22px, 5vw, 32px)",
             margin: "8px 0 0",
             textTransform: "uppercase",
