@@ -179,17 +179,13 @@ async function drawForSession(sessionId, { drawKey, ownerOrderId, requireSource 
       throw new GachaSessionNotFoundError()
     }
 
-    // An admin can cancel a booth-cash or online order mid-session
-    // (confirmed -> cancelled is a legal transition) without touching the
-    // session row, so without this the session stays 'active' and further
-    // draws would burn real quantity_remaining onto a dead order. Locked
-    // here, in the same transaction, so a cancel racing a draw resolves one
-    // way or the other rather than both. gacha_sessions -> orders is the
-    // lock order this function already used in its completion branch; taking
-    // it for every draw just widens an edge that was already there.
-    const [[owner]] = await conn.query("SELECT status FROM orders WHERE id = ? FOR UPDATE", [session.order_id])
-    if (owner && owner.status === "cancelled") throw new GachaOrderCancelledError()
-
+    // Checked before the cancelled-order guard below: a retry carrying the
+    // drawKey of an already-committed draw must always replay cleanly,
+    // even if the order was cancelled in the window between the original
+    // commit and the retry arriving (e.g. lost connection at the venue,
+    // exactly the scenario drawKey exists for). This is reading recorded
+    // history, not taking a new turn, so the order's current status is
+    // irrelevant to whether it's allowed.
     if (drawKey && session.last_draw_key === drawKey && session.last_draw_id) {
       const [[replay]] = await conn.query(
         `SELECT p.* FROM gacha_draws d JOIN gacha_prizes p ON p.id = d.gacha_prize_id WHERE d.id = ?`,
@@ -204,6 +200,17 @@ async function drawForSession(sessionId, { drawKey, ownerOrderId, requireSource 
         orderId: session.order_id,
       }
     }
+
+    // An admin can cancel a booth-cash or online order mid-session
+    // (confirmed -> cancelled is a legal transition) without touching the
+    // session row, so without this the session stays 'active' and further
+    // draws would burn real quantity_remaining onto a dead order. Locked
+    // here, in the same transaction, so a cancel racing a draw resolves one
+    // way or the other rather than both. gacha_sessions -> orders is the
+    // lock order this function already used in its completion branch; taking
+    // it for every draw just widens an edge that was already there.
+    const [[owner]] = await conn.query("SELECT status FROM orders WHERE id = ? FOR UPDATE", [session.order_id])
+    if (owner && owner.status === "cancelled") throw new GachaOrderCancelledError()
 
     if (session.status === "completed" || session.turns_used >= session.turns_total) {
       throw new GachaSessionCompleteError()
@@ -277,6 +284,12 @@ async function drawForSession(sessionId, { drawKey, ownerOrderId, requireSource 
  */
 async function practiceDraw(productId) {
   const [prizes] = await db.query("SELECT * FROM gacha_prizes WHERE product_id = ?", [productId])
+  // weightedPick throws a plain Error on an empty pool - checked explicitly
+  // here (same shape as drawForSession's own pre-check) so a fully-drawn
+  // product's free practice demo degrades to a typed, catchable error
+  // instead of an uncaught throw the route can only map to a 500.
+  const poolRemaining = prizes.reduce((sum, p) => sum + p.quantity_remaining, 0)
+  if (poolRemaining <= 0) throw new GachaSoldOutError()
   const winner = gachaDomain.weightedPick(prizes)
   return { prize: winner }
 }

@@ -122,6 +122,58 @@ describe("savePaymentProof - queue number for prepaid pickup", () => {
   })
 })
 
+describe("transitionOrder - queue number fallback on admin confirm without proof", () => {
+  it("assigns a queue number when an admin confirms a pickup order directly, without any proof upload", async () => {
+    const { variantId } = await seedVariant()
+    const res = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+
+    const ok = await repo.transitionOrder(res.id, "confirmed")
+
+    expect(ok).toBe(true)
+    const order = await repo.getOrderById(res.id)
+    expect(order.queue_number).toBe(1)
+  })
+
+  it("does not assign one for a ship order confirmed directly", async () => {
+    const { variantId } = await seedVariant()
+    const res = await repo.createOrder({
+      items: [{ variant_id: variantId, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+
+    await repo.transitionOrder(res.id, "confirmed")
+
+    const order = await repo.getOrderById(res.id)
+    expect(order.queue_number).toBeNull()
+  })
+
+  it("does not reassign or bump the number for an order that already has one from proof upload", async () => {
+    const { variantId } = await seedVariant()
+    const res = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    await repo.savePaymentProof(res.id, "https://x/proof.png")
+
+    await repo.transitionOrder(res.id, "confirmed")
+
+    const order = await repo.getOrderById(res.id)
+    expect(order.queue_number).toBe(1)
+  })
+
+  it("keeps numbering consistent per collection whether assigned via proof upload or the confirm fallback", async () => {
+    const { variantId } = await seedVariant()
+    const viaProof = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    await repo.savePaymentProof(viaProof.id, "https://x/proof.png")
+    await repo.transitionOrder(viaProof.id, "confirmed")
+
+    const viaFallback = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    await repo.transitionOrder(viaFallback.id, "confirmed")
+
+    const first = await repo.getOrderById(viaProof.id)
+    const second = await repo.getOrderById(viaFallback.id)
+    expect(first.queue_number).toBe(1)
+    expect(second.queue_number).toBe(2)
+  })
+})
+
 describe("assignQueueNumberIfNeeded", () => {
   it("is a no-op for a cancelled order that already has a number (numbers are never reused)", async () => {
     const { variantId } = await seedVariant()

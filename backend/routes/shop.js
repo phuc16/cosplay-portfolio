@@ -163,6 +163,9 @@ module.exports = function shopRoutes() {
       const result = await sessionRepo.practiceDraw(Number(req.params.productId))
       res.json({ prize: result.prize })
     } catch (err) {
+      if (err instanceof sessionRepo.GachaSoldOutError) {
+        return res.status(409).json({ error: "gacha_sold_out", message: err.message })
+      }
       console.error("[SHOP] Lỗi quay demo:", err.message)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }

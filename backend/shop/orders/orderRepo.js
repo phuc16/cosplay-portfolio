@@ -891,6 +891,18 @@ async function transitionOrder(id, toStatus, extra = {}) {
       // gacha-session read path heals it silently afterwards.
       console.error(`[ORDERS] Không tạo được phiên gacha cho đơn #${id}:`, err.message)
     }
+
+    // Fallback for a pickup order an admin confirms directly (e.g. verified
+    // payment through some other channel) without the buyer ever uploading
+    // proof through savePaymentProof - that's normally what assigns the
+    // number, so without this the order would reach 'confirmed' still
+    // unnumbered. assignQueueNumberIfNeeded is already a no-op for a
+    // non-pickup order or one that already has a number.
+    try {
+      await assignQueueNumberIfNeeded(id)
+    } catch (err) {
+      console.error(`[ORDERS] Không gán được số thứ tự cho đơn #${id}:`, err.message)
+    }
   }
 
   return ok

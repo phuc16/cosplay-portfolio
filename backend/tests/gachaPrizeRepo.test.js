@@ -103,3 +103,33 @@ describe("listPrizes/replacePrizes against a non-gacha or missing product id", (
     ).rejects.toThrow("Không tìm thấy sản phẩm gacha")
   })
 })
+
+describe("replacePrizes - defensive quantity_total validation (called directly, bypassing the HTTP route's own check)", () => {
+  it("rejects a non-numeric quantity_total instead of silently defeating the delete/shrink guards", async () => {
+    const pid = await seedGachaProduct()
+    await expect(
+      prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: "not-a-number" }])
+    ).rejects.toThrow(prizeRepo.GachaPrizeInputError)
+  })
+
+  it("rejects a negative quantity_total", async () => {
+    const pid = await seedGachaProduct()
+    await expect(
+      prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: -1 }])
+    ).rejects.toThrow(prizeRepo.GachaPrizeInputError)
+  })
+
+  it("rejects a non-integer quantity_total", async () => {
+    const pid = await seedGachaProduct()
+    await expect(
+      prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 1.5 }])
+    ).rejects.toThrow(prizeRepo.GachaPrizeInputError)
+  })
+
+  it("still accepts a valid integer quantity_total", async () => {
+    const pid = await seedGachaProduct()
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 10 }])
+    const rows = await prizeRepo.listPrizes(pid)
+    expect(rows[0].quantity_total).toBe(10)
+  })
+})

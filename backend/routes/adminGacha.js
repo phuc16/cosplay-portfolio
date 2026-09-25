@@ -62,6 +62,13 @@ module.exports = function adminGachaRoutes() {
       if (err instanceof prizeRepo.GachaPrizeQuantityError) {
         return res.status(409).json({ error: "gacha_prize_quantity", message: err.message })
       }
+      // Unreachable through this route in practice (validatePrizes above
+      // already rejects a bad quantity_total) - replacePrizes's own guard
+      // is defense in depth for its other callers, so map it to 400 here
+      // too rather than letting it fall through to a 500.
+      if (err instanceof prizeRepo.GachaPrizeInputError) {
+        return res.status(400).json({ error: "invalid_input", message: err.message })
+      }
       oops(res, err, "Lỗi lưu phần thưởng")
     }
   })
