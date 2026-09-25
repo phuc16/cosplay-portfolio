@@ -29,14 +29,15 @@ services:
     logging: *logging
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: quay.io/minio/aistor/minio:latest
     restart: unless-stopped
-    command: server /data
+    command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MINIO_LICENSE: ${MINIO_LICENSE:?set MINIO_LICENSE in .env - see https://docs.min.io/aistor/operations/licenses/}
     logging: *logging
 
   backend:

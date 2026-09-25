@@ -119,10 +119,12 @@ DB_NAME=cosplay
 # Redis
 REDIS_HOST=redis
 
-# MinIO
+# MinIO (runs the licensed AIStor image - free license at
+# https://docs.min.io/aistor/operations/licenses/)
 MINIO_ROOT_USER=CHANGE_ME
 MINIO_ROOT_PASSWORD=CHANGE_ME_STRONG_PASSWORD
 MINIO_BUCKET=cosplay
+MINIO_LICENSE=YOUR_AISTOR_LICENSE_KEY
 
 # JWT - dùng lệnh tạo random: openssl rand -hex 32
 JWT_SECRET=YOUR_64_CHAR_HEX_SECRET
@@ -181,7 +183,7 @@ Chỉ cần **pull** và **up** – không build trên server.
 
 **Bảo mật của compose prod:**
 - Không service nào publish port ra ngoài, trừ frontend bind `127.0.0.1:5173` (chỉ host Nginx vào được). MySQL/Redis/MinIO/backend chỉ nói chuyện trong mạng nội bộ Docker - không thể bị truy cập hoặc spoof `X-Forwarded-For` từ internet.
-- File `.env` **bắt buộc** phải có `DB_PASS`, `MINIO_ROOT_USER/PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME/PASSWORD` - thiếu là compose từ chối chạy (không còn default `admin/admin`).
+- File `.env` **bắt buộc** phải có `DB_PASS`, `MINIO_ROOT_USER/PASSWORD`, `MINIO_LICENSE`, `JWT_SECRET`, `ADMIN_USERNAME/PASSWORD` - thiếu là compose từ chối chạy (không còn default `admin/admin`).
 - Log tự xoay vòng (json-file, 10MB × 3 file/container) - không lo đầy đĩa.
 - Khi đổi cấu hình compose (ports/logging), phải chạy `up -d --force-recreate` mới có hiệu lực.
 
