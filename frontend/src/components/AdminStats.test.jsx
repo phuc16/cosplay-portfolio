@@ -5,6 +5,7 @@ import { act } from "react"
 vi.mock("./stats/StatsDrop", () => ({ default: () => <div data-testid="stats-drop" /> }))
 vi.mock("./stats/StatsRestock", () => ({ default: () => <div data-testid="stats-restock" /> }))
 vi.mock("./stats/StatsBookkeeping", () => ({ default: () => <div data-testid="stats-bookkeeping" /> }))
+vi.mock("./stats/StatsGacha", () => ({ default: () => <div data-testid="stats-gacha" /> }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -38,5 +39,12 @@ describe("AdminStats", () => {
     const button = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sổ quỹ")
     await act(async () => { button.dispatchEvent(new MouseEvent("click", { bubbles: true })) })
     expect(container.querySelector('[data-testid="stats-bookkeeping"]')).not.toBeNull()
+  })
+
+  it("switches to the gacha stats view on click", async () => {
+    const container = await renderAdminStats()
+    const button = [...container.querySelectorAll("button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { button.dispatchEvent(new MouseEvent("click", { bubbles: true })) })
+    expect(container.querySelector('[data-testid="stats-gacha"]')).not.toBeNull()
   })
 })

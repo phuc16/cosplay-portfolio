@@ -96,6 +96,11 @@ export default function Checkout() {
   // to collect cash at for the digital line).
   const allDigital = cart.length > 0 && cart.every((c) => c.is_digital)
   const anyDigital = cart.some((c) => c.is_digital)
+  // Independent of is_digital, which is deliberately false for gacha (its
+  // prizes ship like any physical order): COD has no doorstep to collect at,
+  // since the turns are consumed online the moment the order is confirmed.
+  // The server rejects this too (NoCodForGachaError); this is the UI half.
+  const anyGacha = cart.some((c) => c.is_gacha)
 
   const [giftSettings, setGiftSettings] = useState(null)
 
@@ -175,8 +180,8 @@ export default function Checkout() {
   // event pickup, which requires prepayment. The server rejects this
   // combination too (routes/orders.js validate()); this is the UI half.
   const offeredPayment = useMemo(
-    () => (methods || []).filter((m) => !(m === "cod" && (fulfillment === "pickup" || anyDigital))),
-    [methods, fulfillment, anyDigital]
+    () => (methods || []).filter((m) => !(m === "cod" && (fulfillment === "pickup" || anyDigital || anyGacha))),
+    [methods, fulfillment, anyDigital, anyGacha]
   )
 
   useEffect(() => {
@@ -368,6 +373,9 @@ export default function Checkout() {
         )}
         {anyDigital && (methods || []).includes("cod") && (
           <p className="text-xs opacity-70 mt-1">{t("checkoutCodUnavailableDigital")}</p>
+        )}
+        {anyGacha && (methods || []).includes("cod") && (
+          <p className="text-xs opacity-70 mt-1">{t("checkoutCodUnavailableGacha")}</p>
         )}
         {/* Stated before the buyer commits - cod never expires, so the
             notice is only shown for the payment methods that actually

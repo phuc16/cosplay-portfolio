@@ -2,11 +2,13 @@ import { useState } from "react"
 import StatsDrop from "./stats/StatsDrop"
 import StatsRestock from "./stats/StatsRestock"
 import StatsBookkeeping from "./stats/StatsBookkeeping"
+import StatsGacha from "./stats/StatsGacha"
 
 const VIEWS = [
   { key: "drop", label: "Theo đợt bán" },
   { key: "restock", label: "Restock" },
   { key: "bookkeeping", label: "Sổ quỹ" },
+  { key: "gacha", label: "Gacha" },
 ]
 
 export default function AdminStats() {
@@ -32,6 +34,7 @@ export default function AdminStats() {
       {view === "drop" && <StatsDrop />}
       {view === "restock" && <StatsRestock />}
       {view === "bookkeeping" && <StatsBookkeeping />}
+      {view === "gacha" && <StatsGacha />}
     </div>
   )
 }

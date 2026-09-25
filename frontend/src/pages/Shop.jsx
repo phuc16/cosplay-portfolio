@@ -27,15 +27,18 @@ function sortCollections(list, sortBy) {
   return sorted
 }
 
-// A collection can mix digital and physical products, but has_digital_item
-// (already computed server-side - see catalogRepo.listPublicCollections)
-// is the same "at least one digital item" signal the card's own badge
-// already uses, so grouping by it here stays consistent with what a buyer
-// sees on each card.
+// A collection can mix digital, gacha, and physical products, but
+// has_digital_item/has_gacha_item (already computed server-side - see
+// catalogRepo.listPublicCollections) are the same "at least one X item"
+// signals the card's own badge already uses, so grouping by them here stays
+// consistent with what a buyer sees on each card. Gacha takes priority over
+// digital for a collection that somehow mixes both, since it's the more
+// distinctive category worth surfacing on its own.
 function groupCollectionsByType(list) {
-  const digital = list.filter((c) => c.has_digital_item)
-  const physical = list.filter((c) => !c.has_digital_item)
-  return { digital, physical }
+  const gacha = list.filter((c) => c.has_gacha_item)
+  const digital = list.filter((c) => !c.has_gacha_item && c.has_digital_item)
+  const physical = list.filter((c) => !c.has_gacha_item && !c.has_digital_item)
+  return { gacha, digital, physical }
 }
 
 function CollectionCard({ c, t }) {
@@ -70,7 +73,12 @@ function CollectionCard({ c, t }) {
       <div className="p-4">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-semibold">{c.title}</h3>
-          {c.has_digital_item && (
+          {c.has_gacha_item && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
+              {t("shopGroupGacha")}
+            </span>
+          )}
+          {!c.has_gacha_item && c.has_digital_item && (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
               {t("shopDigitalBadge")}
             </span>
@@ -118,13 +126,14 @@ export default function Shop() {
     (collections || []).filter((c) => {
       if (search.trim() && !c.title.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (statusFilter && c.status !== statusFilter) return false
-      if (typeFilter === "digital" && !c.has_digital_item) return false
-      if (typeFilter === "physical" && c.has_digital_item) return false
+      if (typeFilter === "gacha" && !c.has_gacha_item) return false
+      if (typeFilter === "digital" && (c.has_gacha_item || !c.has_digital_item)) return false
+      if (typeFilter === "physical" && (c.has_gacha_item || c.has_digital_item)) return false
       return true
     }),
     sortBy
   )
-  const { digital, physical } = groupCollectionsByType(visibleCollections)
+  const { gacha, digital, physical } = groupCollectionsByType(visibleCollections)
 
   return (
     <>
@@ -160,6 +169,7 @@ export default function Shop() {
               onChange={setTypeFilter}
               options={[
                 { code: "", name: t("shopFilterAllTypes") },
+                { code: "gacha", name: t("shopGroupGacha") },
                 { code: "digital", name: t("shopGroupDigital") },
                 { code: "physical", name: t("shopGroupPhysical") },
               ]}
@@ -185,6 +195,7 @@ export default function Shop() {
         <p className="opacity-60 mb-6">{t("shopNoCollectionsMatch")}</p>
       )}
 
+      <CollectionGroup title={t("shopGroupGacha")} list={gacha} t={t} />
       <CollectionGroup title={t("shopGroupDigital")} list={digital} t={t} />
       <CollectionGroup title={t("shopGroupPhysical")} list={physical} t={t} />
       </main>

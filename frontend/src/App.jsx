@@ -9,6 +9,8 @@ import Collection from "./pages/Collection"
 import Cart from "./pages/Cart"
 import Checkout from "./pages/Checkout"
 import Order from "./pages/Order"
+import GachaKiosk from "./pages/GachaKiosk"
+import GachaPractice from "./pages/GachaPractice"
 
 export default function App() {
   return (
@@ -18,8 +20,10 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Portfolio />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/gacha/:productId/kiosk" element={<GachaKiosk />} />
             <Route path="/merchandise" element={<Shop />} />
             <Route path="/merchandise/faq" element={<Faq />} />
+            <Route path="/merchandise/gacha/:productId/try" element={<GachaPractice />} />
             <Route path="/merchandise/:slug" element={<Collection />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />

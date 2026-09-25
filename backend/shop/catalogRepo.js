@@ -89,6 +89,19 @@ async function closeExpiredCollections(rows) {
   return rows.map((r) => (dueIds.has(r.id) ? { ...r, status: "closed" } : r))
 }
 
+/** Every gacha product across every collection, for the admin gacha-stats
+ * product picker - includes booth-only products, unlike the public listing. */
+async function listGachaProducts() {
+  const [rows] = await db.query(
+    `SELECT p.id, p.name, p.collection_id, c.title AS collection_title
+       FROM products p
+       JOIN collections c ON c.id = p.collection_id
+      WHERE p.type = 'gacha'
+      ORDER BY c.sort_order ASC, p.sort_order ASC`
+  )
+  return rows
+}
+
 async function listAllCollections() {
   const [rows] = await db.query(
     "SELECT * FROM collections ORDER BY sort_order ASC, id ASC"
@@ -99,8 +112,11 @@ async function listAllCollections() {
 
 async function listPublicCollections() {
   const [rows] = await db.query(
-    `SELECT c.*, COUNT(p.id) AS product_count,
-            EXISTS (SELECT 1 FROM products dp WHERE dp.collection_id = c.id AND dp.type = 'digital') AS has_digital_item
+    `SELECT c.*, COUNT(CASE WHEN NOT (p.type = 'gacha' AND p.gacha_booth_only) THEN p.id END) AS product_count,
+            EXISTS (SELECT 1 FROM products dp WHERE dp.collection_id = c.id AND dp.type = 'digital') AS has_digital_item,
+            EXISTS (
+              SELECT 1 FROM products gp WHERE gp.collection_id = c.id AND gp.type = 'gacha' AND gp.gacha_booth_only = false
+            ) AS has_gacha_item
        FROM collections c
        LEFT JOIN products p ON p.collection_id = c.id
       WHERE c.status IN (?, ?)
@@ -117,6 +133,7 @@ async function listPublicCollections() {
   const now = new Date()
   return updated.map((r) => ({
     ...mapCollection(r), product_count: Number(r.product_count), has_digital_item: Boolean(r.has_digital_item),
+    has_gacha_item: Boolean(r.has_gacha_item),
     not_started_yet: Boolean(r.start_at) && new Date(r.start_at) > now,
   }))
 }
@@ -148,6 +165,24 @@ async function nestCollectionDetail(collection) {
     byProduct.get(v.product_id).push({ ...v, images: parseImages(v.images) })
   }
 
+  // A gacha product's hidden variant is deliberately unlimited (stock_qty
+  // null), so stock is not its sold-out signal - the prize pool is. Summed
+  // here so the storefront has one number to gate add-to-cart on, same shape
+  // as sessionRepo.getPoolRemaining. Absent from the map = no prize rows at
+  // all, which is "not stocked yet", not "sold out", so it stays null.
+  const gachaIds = products.filter((p) => p.type === "gacha").map((p) => p.id)
+  const poolByProduct = new Map()
+  if (gachaIds.length) {
+    const [poolRows] = await db.query(
+      `SELECT product_id, COALESCE(SUM(quantity_remaining), 0) AS total
+         FROM gacha_prizes
+        WHERE product_id IN (${gachaIds.map(() => "?").join(",")})
+        GROUP BY product_id`,
+      gachaIds
+    )
+    for (const r of poolRows) poolByProduct.set(r.product_id, Number(r.total))
+  }
+
   return {
     ...mapCollection(collection),
     products: products.map((p) => {
@@ -155,7 +190,7 @@ async function nestCollectionDetail(collection) {
       // Digital products have no variant list in any UI - the one hidden
       // variant they do have is flattened onto the product itself here so
       // nothing downstream needs to know it secretly exists.
-      if (p.type === "digital") {
+      if (p.type === "digital" || p.type === "gacha") {
         const hidden = productVariants[0] || null
         return {
           ...p,
@@ -165,12 +200,16 @@ async function nestCollectionDetail(collection) {
           stock_qty: hidden?.stock_qty ?? null,
           delivery_link: hidden?.delivery_link ?? null,
           thumbnail_image: hidden?.thumbnail_image ?? null,
+          gacha_pool_remaining: p.type === "gacha" ? (poolByProduct.get(p.id) ?? null) : null,
+          gacha_booth_only: Boolean(p.gacha_booth_only),
         }
       }
       return {
         ...p,
         images: parseImages(p.images),
         variants: productVariants,
+        gacha_pool_remaining: null,
+        gacha_booth_only: Boolean(p.gacha_booth_only),
       }
     }),
   }
@@ -196,7 +235,14 @@ async function getPublicCollectionBySlug(slug) {
   return {
     ...detail,
     not_started_yet: notStartedYet,
-    products: detail.products.map(({ delivery_link, ...rest }) => rest),
+    // A booth-only gacha product is never meant to exist for an online buyer
+    // at all - filtered out here, not just left unlinked, so it can't be
+    // browsed via a shared/bookmarked collection URL either. The admin path
+    // (getCollectionDetailById) shares nestCollectionDetail but never calls
+    // this function, so it keeps showing every gacha product regardless.
+    products: detail.products
+      .filter((p) => !(p.type === "gacha" && p.gacha_booth_only))
+      .map(({ delivery_link, ...rest }) => rest),
   }
 }
 
@@ -337,6 +383,7 @@ async function copyCollection(id) {
       stock_qty: p.stock_qty,
       delivery_link: p.delivery_link,
       thumbnail_image: p.thumbnail_image,
+      gacha_booth_only: p.gacha_booth_only,
     })
     if (p.type !== "digital" && p.variants.length) {
       await replaceVariants(
@@ -373,6 +420,42 @@ async function blockedVariantsOnConn(conn, variantIds) {
   return rows
 }
 
+/**
+ * Gacha-specific reasons a product can't be deleted, as VariantInUseError
+ * labels. Two distinct reasons, kept distinguishable so an admin UI rendering
+ * `.labels` can explain which one applies:
+ *
+ *  - an active session holds prize reservations that live only in
+ *    gacha_sessions/gacha_draws; cascading them away strands a buyer mid-draw.
+ *  - ANY historical draw pins its gacha_prizes row via
+ *    gacha_draws.gacha_prize_id ON DELETE RESTRICT, so the DELETE would fail
+ *    anyway - as a raw ER_ROW_IS_REFERENCED_2 500 instead of the clean 409
+ *    this guard exists to produce.
+ */
+async function gachaBlockersOnConn(conn, productIds) {
+  if (!productIds.length) return []
+  const placeholders = productIds.map(() => "?").join(",")
+  const labels = []
+
+  const [activeSessions] = await conn.query(
+    `SELECT id FROM gacha_sessions
+      WHERE product_id IN (${placeholders}) AND status = 'active' FOR UPDATE`,
+    productIds
+  )
+  if (activeSessions.length) labels.push("phiên gacha đang hoạt động")
+
+  const [drawn] = await conn.query(
+    `SELECT 1 FROM gacha_draws d
+       JOIN gacha_prizes p ON p.id = d.gacha_prize_id
+      WHERE p.product_id IN (${placeholders})
+      LIMIT 1`,
+    productIds
+  )
+  if (drawn.length) labels.push("lịch sử quay gacha")
+
+  return labels
+}
+
 async function deleteCollection(id) {
   const conn = await db.getConnection()
   try {
@@ -387,6 +470,16 @@ async function deleteCollection(id) {
     const blocked = await blockedVariantsOnConn(conn, variants.map((v) => v.id))
     if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
 
+    // products.collection_id and gacha_sessions.product_id both cascade, so
+    // without this a collection delete would silently destroy an active
+    // session (or hit the gacha_draws RESTRICT as a raw 500).
+    const [products] = await conn.query(
+      "SELECT id FROM products WHERE collection_id = ? ORDER BY id ASC FOR UPDATE",
+      [id]
+    )
+    const gachaBlocked = await gachaBlockersOnConn(conn, products.map((p) => p.id))
+    if (gachaBlocked.length) throw new VariantInUseError(gachaBlocked)
+
     const [res] = await conn.query("DELETE FROM collections WHERE id = ?", [id])
     await conn.commit()
     return res.affectedRows > 0
@@ -400,10 +493,10 @@ async function deleteCollection(id) {
 
 async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
-  const type = data.type === "digital" ? "digital" : "physical"
+  const type = ["digital", "gacha"].includes(data.type) ? data.type : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, gacha_booth_only)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
@@ -412,17 +505,22 @@ async function createProduct(data) {
       JSON.stringify(data.images || []),
       type,
       sortOrder,
+      Boolean(data.gacha_booth_only),
     ]
   )
   const productId = res.insertId
   // Digital products have no admin-managed variant list - this single
   // hidden row (no label) carries stock_qty/delivery_link through the same
   // variant_id-based cart/order_items/stock-decrement pipeline unchanged.
-  if (type === "digital") {
+  if (type === "digital" || type === "gacha") {
     await replaceVariants(productId, [{
       label: "",
-      stock_qty: data.stock_qty,
-      delivery_link: data.delivery_link,
+      // A gacha product's turns are never stock-limited at the variant
+      // level - the prize pool (gacha_prizes.quantity_remaining) is what
+      // actually caps how many turns can be sold (see createOrder's pool
+      // check). Unlimited here is intentional, not an oversight.
+      stock_qty: type === "gacha" ? null : data.stock_qty,
+      delivery_link: type === "gacha" ? null : data.delivery_link,
       thumbnail_image: data.thumbnail_image,
     }])
   }
@@ -433,12 +531,20 @@ async function updateProduct(id, data) {
   const [[existing]] = await db.query("SELECT type FROM products WHERE id = ?", [id])
   if (!existing) return false
 
+  const setClauses = ["name = ?", "description = ?", "price = ?", "images = ?"]
+  const params = [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || [])]
+  if (data.gacha_booth_only !== undefined) {
+    setClauses.push("gacha_booth_only = ?")
+    params.push(Boolean(data.gacha_booth_only))
+  }
+  params.push(id)
+
   const [res] = await db.query(
-    "UPDATE products SET name = ?, description = ?, price = ?, images = ? WHERE id = ?",
-    [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), id]
+    `UPDATE products SET ${setClauses.join(", ")} WHERE id = ?`,
+    params
   )
 
-  if (existing.type === "digital") {
+  if (existing.type === "digital" || existing.type === "gacha") {
     // Reuses the hidden variant's own id - replaceVariants must UPDATE it,
     // never delete-and-recreate: order_items.product_variant_id would SET
     // NULL on every edit, and a live order referencing it would make
@@ -455,8 +561,8 @@ async function updateProduct(id, data) {
     await replaceVariants(id, [{
       id: currentVariant ? currentVariant.id : undefined,
       label: "",
-      stock_qty: data.stock_qty !== undefined ? data.stock_qty : currentVariant?.stock_qty,
-      delivery_link: data.delivery_link !== undefined ? data.delivery_link : currentVariant?.delivery_link,
+      stock_qty: existing.type === "gacha" ? null : (data.stock_qty !== undefined ? data.stock_qty : currentVariant?.stock_qty),
+      delivery_link: existing.type === "gacha" ? null : (data.delivery_link !== undefined ? data.delivery_link : currentVariant?.delivery_link),
       thumbnail_image: data.thumbnail_image !== undefined ? data.thumbnail_image : currentVariant?.thumbnail_image,
     }])
   }
@@ -475,6 +581,11 @@ async function deleteProduct(id) {
     )
     const blocked = await blockedVariantsOnConn(conn, variants.map((v) => v.id))
     if (blocked.length) throw new VariantInUseError(blocked.map((b) => b.label))
+
+    // An active session or any historical draw blocks the delete the same way
+    // a live order blocks a variant's - see gachaBlockersOnConn.
+    const gachaBlocked = await gachaBlockersOnConn(conn, [id])
+    if (gachaBlocked.length) throw new VariantInUseError(gachaBlocked)
 
     const [res] = await conn.query("DELETE FROM products WHERE id = ?", [id])
     await conn.commit()
@@ -598,6 +709,8 @@ async function replaceVariants(productId, variants) {
 }
 
 module.exports = {
+  PUBLIC_STATUSES,
+  listGachaProducts,
   listAllCollections,
   listPublicCollections,
   getPublicCollectionBySlug,

@@ -3,6 +3,8 @@ import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import statsRepo from "../shop/stats/statsRepo.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }
@@ -23,7 +25,10 @@ async function placeOrder(variantId, over = {}) {
 }
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables(
+    "gacha_draws", "gacha_sessions", "gacha_prizes",
+    "order_items", "orders", "product_variants", "products", "collections"
+  )
 })
 
 describe("getDropStats", () => {
@@ -136,7 +141,16 @@ describe("getDropStats", () => {
     await placeOrder(variantId, { fulfillment_method: "pickup" })
 
     const stats = await statsRepo.getDropStats(collectionId)
-    expect(stats.fulfillment_counts).toEqual({ ship: 1, pickup: 1, digital: 0 })
+    expect(stats.fulfillment_counts).toEqual({ ship: 1, pickup: 1, digital: 0, booth: 0 })
+  })
+
+  // A booth-cash gacha order's drawn items carry no collection snapshot today,
+  // so none reaches this query yet - but the bucket has to exist regardless,
+  // or the first one that does turns its count into NaN.
+  it("has a booth bucket, so a booth-cash order can never count as NaN", async () => {
+    const { collectionId } = await seed()
+    const stats = await statsRepo.getDropStats(collectionId)
+    expect(stats.fulfillment_counts.booth).toBe(0)
   })
 
   it("counts a digital order under fulfillment_counts.digital, not NaN", async () => {
@@ -218,5 +232,32 @@ describe("getDropStats", () => {
     expect(statsB.order_counts.completed).toBe(1)
     expect(statsA.units_sold).toBe(1)
     expect(statsB.units_sold).toBe(1)
+  })
+})
+
+describe("getDropStats - booth-cash gacha revenue", () => {
+  it("counts a booth-cash gacha order's real total for its product's collection", async () => {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 999999, quantity_total: 10 }])
+
+    await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal: 2 })
+
+    const stats = await statsRepo.getDropStats(cid)
+    expect(stats.received_total).toBe(40000)
+    expect(stats.received.cash).toBe(40000)
+    expect(stats.order_counts.confirmed).toBe(1)
+  })
+
+  it("does not inflate drop stats once a booth session's turns are actually drawn", async () => {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 999999, quantity_total: 10 }])
+
+    const { sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal: 1 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "k1" })
+
+    const stats = await statsRepo.getDropStats(cid)
+    expect(stats.received_total).toBe(20000)
   })
 })

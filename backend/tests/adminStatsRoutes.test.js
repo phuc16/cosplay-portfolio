@@ -5,6 +5,8 @@ import app from "../server.js"
 import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
@@ -36,7 +38,7 @@ async function seed() {
 }
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables("gacha_draws", "gacha_sessions", "gacha_prizes", "order_items", "orders", "product_variants", "products", "collections")
 })
 
 describe("auth", () => {
@@ -69,6 +71,37 @@ describe("GET /api/admin/stats/drop/:collectionId", () => {
 
   it("404s a non-numeric collectionId", async () => {
     const res = await authed(request(app).get("/api/admin/stats/drop/abc"))
+    expect(res.status).toBe(404)
+  })
+})
+
+describe("GET /api/admin/stats/gacha/:productId", () => {
+  async function seedGacha() {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 10 }])
+    return pid
+  }
+
+  it("returns gacha drop stats combining online and booth draws", async () => {
+    const pid = await seedGacha()
+    await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal: 1 })
+
+    const res = await authed(request(app).get(`/api/admin/stats/gacha/${pid}`))
+    expect(res.status).toBe(200)
+    expect(res.body.product_id).toBe(pid)
+    expect(res.body.revenue.booth).toBe(20000)
+  })
+
+  it("404s a product that exists but isn't a gacha product", async () => {
+    const cid = await catalog.createCollection({ title: "Physical", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Poster", price: 35000, type: "physical" })
+    const res = await authed(request(app).get(`/api/admin/stats/gacha/${pid}`))
+    expect(res.status).toBe(404)
+  })
+
+  it("404s an unknown productId", async () => {
+    const res = await authed(request(app).get("/api/admin/stats/gacha/999999"))
     expect(res.status).toBe(404)
   })
 })

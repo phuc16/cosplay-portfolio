@@ -75,7 +75,7 @@ function receiverInfoHtml(order) {
     <table style="width:100%;border-collapse:collapse">${cells}</table>`
 }
 
-function itemsHtml(items = [], { showDeliveryLink = false } = {}) {
+function itemsHtml(items = [], { showDeliveryLink = false, orderUrl = "" } = {}) {
   const rows = items.map((i) => `
     <tr>
       <td style="padding:8px 8px 8px 0;border-bottom:1px solid #f0f0f0;width:44px">
@@ -88,6 +88,9 @@ function itemsHtml(items = [], { showDeliveryLink = false } = {}) {
         ${i.is_gift ? ` <span style="font-size:11px;font-weight:600;background:#f0f0f0;padding:1px 6px;border-radius:4px">🎁 Quà tặng</span>` : ""}
         ${showDeliveryLink && i.delivery_link_snapshot
           ? `<br/><a href="${escapeHtml(i.delivery_link_snapshot)}" style="color:${BRAND}">Tải về</a>`
+          : ""}
+        ${showDeliveryLink && i.product_type === "gacha"
+          ? `<br/><a href="${escapeHtml(orderUrl)}" style="color:${BRAND}">Mở hộp quà</a>`
           : ""}
       </td>
       <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-size:14px;white-space:nowrap">${i.is_gift ? "Miễn phí" : formatVnd(i.unit_price_snapshot * i.qty)}</td>
@@ -113,14 +116,15 @@ function buildVars(order) {
   const hasDigitalItem = (order.items || []).some((i) => i.delivery_link_snapshot)
   const showDigitalNote = showDeliveryLink && hasDigitalItem
   const digitalNote = "Link tải sản phẩm số đã có trong danh sách bên dưới."
+  const orderUrl = `${SITE_URL}/order/${order.order_token}`
 
   return {
     order_id: escapeHtml(formatOrderCode(order.id, order.created_at)),
     order_token: escapeHtml(order.order_token),
-    order_url: `${SITE_URL}/order/${order.order_token}`,
+    order_url: orderUrl,
     buyer_name: escapeHtml(order.buyer_name),
     total: formatVnd(order.total),
-    items: itemsHtml(order.items, { showDeliveryLink }),   // built from escaped parts above
+    items: itemsHtml(order.items, { showDeliveryLink, orderUrl }),   // built from escaped parts above
     status: escapeHtml(order.status),
     payment_method: escapeHtml(order.payment_method),
     fulfillment_method: escapeHtml(order.fulfillment_method),

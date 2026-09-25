@@ -107,6 +107,56 @@ export const FAQ_ITEMS = [
   },
   {
     question: {
+      vi: "Gacha là gì, mua lượt quay như thế nào?",
+      en: "What is gacha, and how do I buy a turn?",
+    },
+    answer: {
+      vi: "Gacha là sản phẩm mở hộp ngẫu nhiên: bạn mua một hoặc nhiều lượt quay, mỗi lượt trả về đúng một phần thưởng được chọn ngẫu nhiên theo tỉ lệ độ hiếm hiển thị ngay trên trang sản phẩm. Sau khi thanh toán được xác nhận, bạn tự mở từng lượt ngay trên trang đơn hàng của mình - phần thưởng nhận được sẽ được giao (ship) như một đơn hàng bình thường.",
+      en: "Gacha is a mystery-box product: you buy one or more turns, and each turn gives back exactly one prize, picked randomly according to the rarity odds shown right on the product page. Once payment is confirmed, you open each turn yourself on your own order page - whatever you win ships to you like a normal order.",
+    },
+  },
+  {
+    question: {
+      vi: "Tỉ lệ trúng mỗi độ hiếm được tính thế nào? Tôi có thể chọn phần thưởng không?",
+      en: "How are the rarity odds calculated? Can I choose my prize?",
+    },
+    answer: {
+      vi: "Không, bạn không thể chọn hoặc biết trước phần thưởng - mỗi lượt quay được máy chủ chọn ngẫu nhiên hoàn toàn dựa trên số lượng còn lại của từng phần thưởng, không thể can thiệp hay đoán trước. Tỉ lệ % hiển thị trên trang là tỉ lệ thật tại thời điểm bạn xem, và sẽ giảm dần khi kho quà vơi đi.",
+      en: "No - you can't choose or predict your prize. Every turn's outcome is decided entirely server-side, weighted by each prize's real remaining stock, with no way to influence or guess it in advance. The percentages shown on the page are the real, live odds at that moment, and shift as prizes run out.",
+    },
+  },
+  {
+    question: {
+      vi: "Tôi có thể quay thử trước khi mua không?",
+      en: "Can I try before buying?",
+    },
+    answer: {
+      vi: "Có - mỗi sản phẩm gacha đều có trang \"Quay thử\" miễn phí, quay không giới hạn số lần theo đúng tỉ lệ thật, nhưng kết quả ở đây chỉ để xem trước, không phải phần thưởng thật và không tốn tiền.",
+      en: "Yes - every gacha product has a free \"Try it\" page where you can spin as many times as you like, using the real live odds. Results there are just a preview, not a real prize, and cost nothing.",
+    },
+  },
+  {
+    question: {
+      vi: "Gacha có hỗ trợ thanh toán khi nhận hàng (COD) không?",
+      en: "Does gacha support cash on delivery (COD)?",
+    },
+    answer: {
+      vi: "Không - lượt quay được tính là đã dùng ngay khi đơn được xác nhận, nên không còn mốc giao hàng nào để thu tiền mặt. Chỉ thanh toán được qua chuyển khoản ngân hàng hoặc Momo.",
+      en: "No - a gacha turn is considered spent the moment the order is confirmed, so there's no delivery moment left to collect cash at. Pay by bank transfer or Momo instead.",
+    },
+  },
+  {
+    question: {
+      vi: "Vì sao có sản phẩm gacha tôi thấy ở sự kiện nhưng không mua online được?",
+      en: "Why can't I buy a gacha product online even though I saw it at the event?",
+    },
+    answer: {
+      vi: "Một số sản phẩm gacha được người bán đặt là chỉ bán tại quầy sự kiện (thanh toán trực tiếp bằng tiền mặt) - những sản phẩm này sẽ không xuất hiện trên cửa hàng online.",
+      en: "Some gacha products are marked by the seller as booth-only - sold in person at the event, cash only - and won't appear in the online shop at all.",
+    },
+  },
+  {
+    question: {
       vi: "Vì sao tôi không thấy một đợt mở bán, hoặc không đặt được nữa?",
       en: "Why can't I see a drop, or why can't I order from it anymore?",
     },

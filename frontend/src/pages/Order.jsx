@@ -3,17 +3,19 @@
    directly unit-testable, same pattern as OrderTimeline's buildTimelineSteps. */
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo } from "../api/shop"
+import { fetchOrder, fetchPaymentInstructions, uploadPaymentProof, verifyOrderPin, fetchOrderQrBlob, updateOrderBuyerInfo, fetchGachaSession, drawGachaSession } from "../api/shop"
 import { orderAuthHeaders, setOrderSessionToken, refreshAdminSession } from "../utils/orderAuth"
 import { useBlobUrl } from "../hooks/useBlobUrl"
 import { useLanguage } from "../contexts/LanguageContext"
 import { formatVnd } from "../utils/money"
+import { groupOrderItems } from "../utils/groupOrderItems"
 import { formatDeadline, formatVnDateTime } from "../utils/orderDeadline"
 import PaymentInstructions from "../components/shop/PaymentInstructions"
 import AddressFields from "../components/shop/AddressFields"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
 import StatusBadge from "../components/StatusBadge"
+import GachaMachine from "../shop/gacha/GachaMachine"
 import { variantForStatus } from "../constants/statusVariant"
 
 const STATUS_KEY = {
@@ -36,6 +38,11 @@ const STATUS_TIMESTAMP_FIELD = {
 export function statusTimestamp(order) {
   return order[STATUS_TIMESTAMP_FIELD[order.status]] || null
 }
+
+// A gacha session is only created once the seller confirms the order, and it
+// stays openable afterwards - the buyer may not have spent every turn by the
+// time the parcel ships.
+const GACHA_STATUSES = ["confirmed", "shipped", "completed"]
 
 // Well under the backend's 50MB limit - rejects an oversized photo before it burns a retry against the proof rate limiter.
 const MAX_PROOF_BYTES = 8 * 1024 * 1024
@@ -235,6 +242,15 @@ export default function Order() {
   const [editingBuyerInfo, setEditingBuyerInfo] = useState(false)
   const [buyerInfoDraft, setBuyerInfoDraft] = useState(null)
   const [buyerInfoError, setBuyerInfoError] = useState("")
+  const [gachaSession, setGachaSession] = useState(null)
+  // Display pool for the reel's filler cells only - the winning prize always
+  // comes from the draw response, never from this list.
+  const [gachaPrizes, setGachaPrizes] = useState([])
+  // Flips once the buyer dismisses the end-of-session summary, so this whole
+  // section stops rendering right away rather than falling back to the idle
+  // reel's "Hết lượt" state for the rest of this page view - the "Sản phẩm"
+  // list further down already shows the same drawn items permanently.
+  const [gachaFinished, setGachaFinished] = useState(false)
 
   const startEditBuyerInfo = () => {
     // Email is deliberately excluded - it's not editable (backend ignores
@@ -300,6 +316,20 @@ export default function Order() {
   useEffect(() => {
     if (order?.status !== "pending") return
     fetchPaymentInstructions(token, orderAuthHeaders(token)).then(setInstructions).catch(() => setInstructions(null))
+  }, [order?.status, token])
+
+  useEffect(() => {
+    if (!GACHA_STATUSES.includes(order?.status)) return
+    fetchGachaSession(token)
+      .then((data) => {
+        setGachaSession(data.session)
+        setGachaPrizes(data.prizes || [])
+        setGachaFinished(false)
+      })
+      .catch(() => {
+        setGachaSession(null)
+        setGachaPrizes([])
+      })
   }, [order?.status, token])
 
   const qrSrc = useBlobUrl(
@@ -406,7 +436,10 @@ export default function Order() {
       )}
 
       <h2 className="font-semibold mb-2">{t("orderItems")}</h2>
-      {order.items.map((i) => (
+      {groupOrderItems(
+        order.items,
+        (i) => `${i.product_name_snapshot}|${i.variant_label_snapshot}|${i.unit_price_snapshot}|${i.is_gift}|${i.gacha_tier_snapshot || ""}`
+      ).map((i) => (
         <div key={i.id} className="flex justify-between items-center gap-3 py-2 border-b border-[var(--border-brand)]">
           <div className="flex items-center gap-3 min-w-0">
             {i.image_url
@@ -437,6 +470,36 @@ export default function Order() {
 
       {order.fulfillment_method === "ship" && (
         <p className="text-xs opacity-70 mt-1">{t("checkoutShippingNote")}</p>
+      )}
+
+      {/* gachaPrizes gates the render too: the reel fills its non-winning
+          cells from that pool, so there is nothing to animate until it loads. */}
+      {gachaSession?.status === "active" && gachaPrizes.length > 0 && !gachaFinished && (
+        <section className="mt-6 p-4 rounded-xl border border-[var(--border-brand)]">
+          <h2 className="font-semibold mb-2">{t("orderGachaTitle")}</h2>
+          {/* Deliberately no onSessionComplete: flipping status here would
+              unmount the machine in the same commit that reveals the last
+              prize. onDismissSummary instead hides this section the moment
+              the buyer closes that summary screen, not before - and refetches
+              the order at that same moment, so the "Sản phẩm" list below
+              picks up the newly-drawn item(s) instead of showing the
+              page-load snapshot (just the purchase line) until a reload. */}
+          <GachaMachine
+            prizes={gachaPrizes}
+            turnsTotal={gachaSession.turns_total}
+            turnsUsed={gachaSession.turns_used}
+            drawFn={(drawKey) => drawGachaSession(token, drawKey)}
+            onDrawResult={(response) => setGachaSession((s) => (s ? { ...s, turns_used: response.turns_used } : s))}
+            // order.items was only ever fetched once, at page load - before
+            // any draws happened. Hiding the widget without refetching would
+            // leave the "Sản phẩm" list stuck showing just the purchase line
+            // (no drawn prizes) until the buyer manually reloads the page.
+            onDismissSummary={() => {
+              setGachaFinished(true)
+              fetchOrder(token, orderAuthHeaders(token)).then(setOrder).catch(() => {})
+            }}
+          />
+        </section>
       )}
 
       <div className="mt-4 p-4 rounded-xl border border-[var(--border-brand)] text-sm">

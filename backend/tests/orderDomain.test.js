@@ -169,6 +169,11 @@ describe("canTransition", () => {
     expect(d.canTransition("confirmed", "completed", "digital")).toBe(true)
   })
 
+  it("booth fulfillment goes confirmed -> completed directly, like pickup and digital", () => {
+    expect(d.canTransition("confirmed", "completed", "booth")).toBe(true)
+    expect(d.canTransition("confirmed", "shipped", "booth")).toBe(false)
+  })
+
   it("refuses skipping confirmation", () => {
     expect(d.canTransition("pending", "shipped", "ship")).toBe(false)
     expect(d.canTransition("pending", "completed", "ship")).toBe(false)

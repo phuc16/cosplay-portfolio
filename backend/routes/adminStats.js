@@ -18,6 +18,14 @@ module.exports = function adminStatsRoutes() {
     } catch (err) { oops(res, err, "Lỗi thống kê theo đợt bán") }
   })
 
+  router.get("/stats/gacha/:productId", async (req, res) => {
+    try {
+      const stats = await repo.getGachaDropStats(req.params.productId)
+      if (!stats) return res.status(404).json({ error: "not_found", message: "Không tìm thấy sản phẩm gacha" })
+      res.json(stats)
+    } catch (err) { oops(res, err, "Lỗi thống kê gacha") }
+  })
+
   router.get("/stats/restock", async (req, res) => {
     try {
       res.json(await repo.getRestockStats(req.query.collection_id))

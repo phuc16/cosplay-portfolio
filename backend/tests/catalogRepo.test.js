@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest"
 import repo from "../shop/catalogRepo.js"
 import db from "../db.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables, closeDb } from "./helpers/db.js"
 
 beforeEach(async () => {
@@ -8,7 +10,16 @@ beforeEach(async () => {
   // autoincrement, so a leftover order from a previous run/file can reference
   // a variant id that a new test's variant then reuses, false-tripping the
   // live-order delete guard in replaceVariants.
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables(
+    "gacha_draws",
+    "gacha_sessions",
+    "gacha_prizes",
+    "order_items",
+    "orders",
+    "product_variants",
+    "products",
+    "collections"
+  )
 })
 
 afterAll(async () => {
@@ -275,6 +286,143 @@ describe("digital products", () => {
   })
 })
 
+describe("gacha products", () => {
+  it("creates a gacha product with one hidden unlimited-stock variant", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.variant_id).not.toBeNull()
+    expect(product.stock_qty).toBeNull()
+  })
+
+  // A gacha product's variant stock is deliberately null (unlimited), so the
+  // storefront has no per-variant sold-out signal for it - the prize pool is.
+  it("exposes the prize pool total as gacha_pool_remaining on the public read path", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [
+      { name: "SSR", tier: "legendary", display_price: 200000, quantity_total: 2 },
+      { name: "R", tier: "common", display_price: 20000, quantity_total: 8 },
+    ])
+
+    const detail = await repo.getPublicCollectionBySlug("gacha-drop")
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_pool_remaining).toBe(10)
+  })
+
+  it("reports gacha_pool_remaining 0 once every prize has been drawn", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 20000, quantity_total: 2 }])
+
+    const { sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal: 2 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "tap-2" })
+
+    const detail = await repo.getPublicCollectionBySlug("gacha-drop")
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_pool_remaining).toBe(0)
+  })
+
+  it("leaves gacha_pool_remaining null for non-gacha products", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+
+    const detail = await repo.getPublicCollectionBySlug("gacha-drop")
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_pool_remaining).toBeNull()
+  })
+
+  // A gacha product with no prizes configured yet is not "sold out" - it was
+  // never stocked. Reporting 0 would hide it behind a sold-out overlay the
+  // seller never asked for, so it reads as null (no pool signal) instead.
+  it("reports gacha_pool_remaining null for a gacha product with no prizes configured", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+
+    const detail = await repo.getPublicCollectionBySlug("gacha-drop")
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_pool_remaining).toBeNull()
+  })
+
+  it("defaults gacha_booth_only to false for a newly created gacha product", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_booth_only).toBe(false)
+  })
+
+  it("persists gacha_booth_only: true when set at creation", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    const product = detail.products.find((p) => p.id === pid)
+    expect(product.gacha_booth_only).toBe(true)
+  })
+
+  it("toggles gacha_booth_only via updateProduct", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+
+    await repo.updateProduct(pid, {
+      name: "Mystery Case", price: 20000, images: [], gacha_booth_only: true,
+    })
+    let detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(true)
+
+    await repo.updateProduct(pid, {
+      name: "Mystery Case", price: 20000, images: [], gacha_booth_only: false,
+    })
+    detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(false)
+  })
+
+  it("does not clear gacha_booth_only when updateProduct's payload omits the field", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    await repo.updateProduct(pid, { name: "Mystery Case", price: 20000, images: [] })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).gacha_booth_only).toBe(true)
+  })
+
+  it("excludes a booth-only gacha product from the public read path", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const boothOnlyId = await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+    const onlineId = await repo.createProduct({
+      collection_id: cid, name: "Online Case", price: 20000, type: "gacha",
+    })
+
+    const publicDetail = await repo.getPublicCollectionBySlug("gacha-drop")
+    const ids = publicDetail.products.map((p) => p.id)
+    expect(ids).not.toContain(boothOnlyId)
+    expect(ids).toContain(onlineId)
+  })
+
+  it("still shows a booth-only gacha product on the admin read path", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const boothOnlyId = await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const adminDetail = await repo.getCollectionDetailById(cid)
+    expect(adminDetail.products.map((p) => p.id)).toContain(boothOnlyId)
+  })
+})
+
 describe("createCollection", () => {
   it("generates a slug from the Vietnamese title", async () => {
     const id = await repo.createCollection({ title: "Bộ sưu tập Hè", status: "active" })
@@ -331,6 +479,17 @@ describe("listPublicCollections", () => {
     expect(c.product_count).toBe(2)
   })
 
+  it("excludes booth-only gacha products from product_count", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+    await repo.createProduct({ collection_id: cid, name: "Online Case", price: 20000, type: "gacha" })
+
+    const [c] = await repo.listPublicCollections()
+    expect(c.product_count).toBe(1)
+  })
+
   it("flags has_digital_item so the storefront can badge a collection without relying on title/description text", async () => {
     const cidDigital = await repo.createCollection({ title: "Digital Drop", status: "active" })
     await repo.createProduct({
@@ -343,6 +502,30 @@ describe("listPublicCollections", () => {
     const collections = await repo.listPublicCollections()
     expect(collections.find((c) => c.id === cidDigital).has_digital_item).toBe(true)
     expect(collections.find((c) => c.id === cidPhysical).has_digital_item).toBe(false)
+  })
+
+  it("flags has_gacha_item so the storefront can group a gacha collection separately from physical", async () => {
+    const cidGacha = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    await repo.createProduct({ collection_id: cidGacha, name: "Mystery Case", price: 20000, type: "gacha" })
+    const cidPhysical = await repo.createCollection({ title: "Physical Drop", status: "active" })
+    await repo.createProduct({ collection_id: cidPhysical, name: "Card", price: 35000 })
+
+    const collections = await repo.listPublicCollections()
+    expect(collections.find((c) => c.id === cidGacha).has_gacha_item).toBe(true)
+    expect(collections.find((c) => c.id === cidPhysical).has_gacha_item).toBe(false)
+  })
+
+  // A booth-only gacha product is already invisible in the collection's own
+  // product list (getPublicCollectionBySlug) - has_gacha_item must agree,
+  // or the collection would land in the "Gacha" group and then show none.
+  it("does not flag has_gacha_item for a collection whose only gacha product is booth-only", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const collections = await repo.listPublicCollections()
+    expect(collections.find((c) => c.id === cid).has_gacha_item).toBe(false)
   })
 
   it("includes a collection whose start_at hasn't arrived yet, flagged as not_started_yet", async () => {
@@ -714,6 +897,20 @@ describe("copyCollection", () => {
     expect(source.products[0].id).not.toBe(copy.products[0].id)
   })
 
+  it("carries gacha_booth_only over to the copied product", async () => {
+    const cid = await repo.createCollection({ title: "Fes HH2026", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Booth Exclusive", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+
+    expect(copy.products).toHaveLength(1)
+    expect(copy.products[0].type).toBe("gacha")
+    expect(copy.products[0].gacha_booth_only).toBe(true)
+  })
+
   it("second copy of the same source gets a further-deduplicated slug", async () => {
     const cid = await repo.createCollection({ title: "Fes HH2026", status: "active" })
 
@@ -846,5 +1043,75 @@ describe("collection scheduling", () => {
     const copy = await repo.getCollectionDetailById(newId)
     expect(copy.start_at).toBeNull()
     expect(copy.end_at).toBeNull()
+  })
+})
+
+describe("gacha product delete guard", () => {
+  it("refuses to delete a gacha product with an active session", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 5 }])
+    await sessionRepo.startBoothSession({ productId: pid, buyerName: null, turnsTotal: 1 })
+
+    await expect(repo.deleteProduct(pid)).rejects.toThrow(repo.VariantInUseError)
+    await expect(repo.deleteProduct(pid)).rejects.toMatchObject({
+      labels: ["phiên gacha đang hoạt động"],
+    })
+  })
+
+  // A finished session leaves gacha_draws rows behind, and those pin their
+  // gacha_prizes row with ON DELETE RESTRICT. Without an explicit guard the
+  // DELETE surfaces as a raw ER_ROW_IS_REFERENCED_2 500 instead of the 409
+  // this mechanism exists to produce, so draw history gets its own label.
+  it("refuses to delete a gacha product with draw history even when no session is active", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 5 }])
+    const { sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: null, turnsTotal: 1 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+
+    const [[session]] = await db.query("SELECT status FROM gacha_sessions WHERE id = ?", [sessionId])
+    expect(session.status).not.toBe("active")
+
+    await expect(repo.deleteProduct(pid)).rejects.toThrow(repo.VariantInUseError)
+    await expect(repo.deleteProduct(pid)).rejects.toMatchObject({
+      labels: ["lịch sử quay gacha"],
+    })
+  })
+
+  it("refuses to delete a COLLECTION containing a gacha product with an active session", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 5 }])
+    await sessionRepo.startBoothSession({ productId: pid, buyerName: null, turnsTotal: 1 })
+
+    await expect(repo.deleteCollection(cid)).rejects.toThrow(repo.VariantInUseError)
+    await expect(repo.deleteCollection(cid)).rejects.toMatchObject({
+      labels: ["phiên gacha đang hoạt động"],
+    })
+
+    const [collections] = await db.query("SELECT id FROM collections WHERE id = ?", [cid])
+    expect(collections).toHaveLength(1)
+  })
+
+  it("refuses to delete a COLLECTION whose gacha product only has draw history", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 5 }])
+    const { sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: null, turnsTotal: 1 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+
+    await expect(repo.deleteCollection(cid)).rejects.toMatchObject({
+      labels: ["lịch sử quay gacha"],
+    })
+  })
+
+  it("still deletes a gacha product (and its collection) that has never been drawn", async () => {
+    const cid = await repo.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 5 }])
+
+    await expect(repo.deleteProduct(pid)).resolves.toBe(true)
+    await expect(repo.deleteCollection(cid)).resolves.toBe(true)
   })
 })

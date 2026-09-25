@@ -121,18 +121,30 @@ async function getDropStats(collectionId) {
   // first. Money is computed from order_items' own per-line collection
   // snapshot instead - one row per order it touches, scoped to just the
   // revenue this collection's items represent within that order.
+  // Mirrors getBookkeepingStats' same split: a gacha draw's order_items row
+  // is a decorative prize value, not money paid, and a booth order never gets
+  // a real purchase-line item at all - so booth revenue is pulled from the
+  // order's own o.total/collection_id instead (set at startBoothSession
+  // time), in a second branch scoped to this collection.
   const [orderRows] = await db.query(
     `SELECT o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at,
             SUM(oi.unit_price_snapshot * oi.qty) AS collection_total
        FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id AND oi.collection_id_snapshot = ?
-      GROUP BY o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at`,
-    [collectionId]
+       JOIN order_items oi ON oi.order_id = o.id AND oi.collection_id_snapshot = ? AND oi.gacha_draw_id IS NULL
+      GROUP BY o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at
+
+      UNION ALL
+
+      SELECT o.id, o.status, o.payment_method, o.fulfillment_method, o.expires_at, o.cancelled_at,
+             o.total AS collection_total
+        FROM orders o
+       WHERE o.collection_id = ? AND o.fulfillment_method = 'booth'`,
+    [collectionId, collectionId]
   )
 
-  const received = { bank: 0, momo: 0, paypal: 0, cod: 0 }
+  const received = { bank: 0, momo: 0, paypal: 0, cod: 0, cash: 0 }
   const orderCounts = { pending: 0, confirmed: 0, shipped: 0, completed: 0, cancelled: 0 }
-  const fulfillmentCounts = { ship: 0, pickup: 0, digital: 0 }
+  const fulfillmentCounts = { ship: 0, pickup: 0, digital: 0, booth: 0 }
   let awaitingPayment = 0
   let toCollect = 0
   let lost = 0
@@ -190,7 +202,7 @@ async function getDropStats(collectionId) {
     collection_id: collection.id,
     collection_title: collection.title,
     received,
-    received_total: received.bank + received.momo + received.paypal + received.cod,
+    received_total: received.bank + received.momo + received.paypal + received.cod + received.cash,
     awaiting_payment: awaitingPayment,
     to_collect: toCollect,
     lost,
@@ -322,19 +334,38 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     [from, toExclusive]
   )
 
+  // A gacha draw's order_items row carries a prize's decorative display_price,
+  // not money paid, and never snapshots a collection - so it's excluded here
+  // (`gacha_draw_id IS NULL`) rather than summed as if it were revenue. Booth
+  // orders never get a real purchase-line item at all (startBoothSession
+  // writes none - only drawForSession's decorative draw rows), so they'd
+  // otherwise vanish entirely from by_collection; the second branch attributes
+  // a booth order's real o.total to its own collection_id instead. An online
+  // gacha order isn't double-counted: its real purchase-line item already
+  // reconciles in the first branch, and the second branch only fires for
+  // fulfillment_method = 'booth'.
   const [collectionRows] = await db.query(
     `SELECT o.id AS order_id, o.status, o.payment_method,
             oi.collection_id_snapshot AS collection_id, c.title AS collection_title,
             SUM(oi.unit_price_snapshot * oi.qty) AS amount
        FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id
+       JOIN order_items oi ON oi.order_id = o.id AND oi.gacha_draw_id IS NULL
        LEFT JOIN collections c ON c.id = oi.collection_id_snapshot
       WHERE o.created_at >= ? AND o.created_at < ?
-      GROUP BY o.id, o.status, o.payment_method, oi.collection_id_snapshot, c.title`,
-    [from, toExclusive]
+      GROUP BY o.id, o.status, o.payment_method, oi.collection_id_snapshot, c.title
+
+      UNION ALL
+
+      SELECT o.id AS order_id, o.status, o.payment_method,
+             o.collection_id AS collection_id, c.title AS collection_title,
+             o.total AS amount
+        FROM orders o
+        LEFT JOIN collections c ON c.id = o.collection_id
+       WHERE o.created_at >= ? AND o.created_at < ? AND o.fulfillment_method = 'booth'`,
+    [from, toExclusive, from, toExclusive]
   )
 
-  const received = { bank: 0, momo: 0, paypal: 0, cod: 0 }
+  const received = { bank: 0, momo: 0, paypal: 0, cod: 0, cash: 0 }
   let awaitingPayment = 0
   let toCollect = 0
   let lost = 0
@@ -378,7 +409,7 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
     date_from: dateFrom,
     date_to: dateTo,
     received,
-    received_total: received.bank + received.momo + received.paypal + received.cod,
+    received_total: received.bank + received.momo + received.paypal + received.cod + received.cash,
     awaiting_payment: awaitingPayment,
     to_collect: toCollect,
     lost,
@@ -388,7 +419,117 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
   }
 }
 
+const GACHA_TIERS = ["common", "rare", "mythical", "legendary", "ancient"]
+
+/**
+ * A gacha product's draws, tier rollup, and money - both online and booth
+ * combined, and split by channel. gacha_sessions.source ("online" |
+ * "booth_cash") is the channel discriminator; practice draws never persist
+ * a session/draw row at all (see prizeRepo.practiceDraw), so no filtering
+ * for those is needed here. Draw counts are read straight off gacha_draws,
+ * matching the prize editor's own "Đã trúng" figure (quantity_total -
+ * quantity_remaining) - drawn history is immutable even if the order that
+ * paid for it is later cancelled (see replacePrizes' delete-guard comment),
+ * so these are not filtered by order status.
+ */
+async function getGachaDropStats(productId) {
+  const [[product]] = await db.query(
+    `SELECT p.id, p.name, p.price, p.collection_id, c.title AS collection_title
+       FROM products p
+       JOIN collections c ON c.id = p.collection_id
+      WHERE p.id = ? AND p.type = 'gacha'`,
+    [productId]
+  )
+  if (!product) return null
+
+  const [prizeRows] = await db.query(
+    `SELECT id, name, tier, display_price, quantity_total, quantity_remaining
+       FROM gacha_prizes WHERE product_id = ? ORDER BY sort_order ASC, id ASC`,
+    [productId]
+  )
+
+  const [drawRows] = await db.query(
+    `SELECT gd.gacha_prize_id, gs.source, COUNT(*) AS cnt
+       FROM gacha_draws gd
+       JOIN gacha_sessions gs ON gs.id = gd.session_id
+      WHERE gs.product_id = ?
+      GROUP BY gd.gacha_prize_id, gs.source`,
+    [productId]
+  )
+  const drawnByPrize = new Map()
+  for (const row of drawRows) {
+    const entry = drawnByPrize.get(row.gacha_prize_id) || { online: 0, booth: 0 }
+    if (row.source === "online") entry.online = Number(row.cnt)
+    else if (row.source === "booth_cash") entry.booth = Number(row.cnt)
+    drawnByPrize.set(row.gacha_prize_id, entry)
+  }
+
+  const tierRollup = new Map(GACHA_TIERS.map((t) => [t, {
+    tier: t, drawn_online: 0, drawn_booth: 0, value_online: 0, value_booth: 0,
+  }]))
+
+  const prizes = prizeRows.map((p) => {
+    const drawn = drawnByPrize.get(p.id) || { online: 0, booth: 0 }
+    const price = Number(p.display_price)
+    const rollup = tierRollup.get(p.tier)
+    if (rollup) {
+      rollup.drawn_online += drawn.online
+      rollup.drawn_booth += drawn.booth
+      rollup.value_online += drawn.online * price
+      rollup.value_booth += drawn.booth * price
+    }
+    return {
+      id: p.id, name: p.name, tier: p.tier, display_price: price,
+      quantity_total: p.quantity_total, quantity_remaining: p.quantity_remaining,
+      drawn_online: drawn.online, drawn_booth: drawn.booth,
+    }
+  })
+
+  const [[{ variant_id: variantId }]] = await db.query(
+    "SELECT id AS variant_id FROM product_variants WHERE product_id = ? LIMIT 1",
+    [productId]
+  )
+  const [[{ total: onlineRevenue }]] = await db.query(
+    `SELECT COALESCE(SUM(oi.unit_price_snapshot * oi.qty), 0) AS total
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+      WHERE oi.product_variant_id = ? AND oi.gacha_draw_id IS NULL AND o.status != 'cancelled'`,
+    [variantId]
+  )
+  const [[{ total: boothRevenue }]] = await db.query(
+    `SELECT COALESCE(SUM(o.total), 0) AS total
+       FROM gacha_sessions gs
+       JOIN orders o ON o.id = gs.order_id
+      WHERE gs.product_id = ? AND gs.source = 'booth_cash' AND o.status != 'cancelled'`,
+    [productId]
+  )
+
+  const tiers = [...tierRollup.values()]
+  const valueGivenOut = tiers.reduce(
+    (acc, t) => ({ online: acc.online + t.value_online, booth: acc.booth + t.value_booth }),
+    { online: 0, booth: 0 }
+  )
+
+  return {
+    product_id: product.id,
+    product_name: product.name,
+    collection_id: product.collection_id,
+    collection_title: product.collection_title,
+    prizes,
+    tiers,
+    revenue: {
+      online: Number(onlineRevenue), booth: Number(boothRevenue),
+      total: Number(onlineRevenue) + Number(boothRevenue),
+    },
+    value_given_out: {
+      online: valueGivenOut.online, booth: valueGivenOut.booth,
+      total: valueGivenOut.online + valueGivenOut.booth,
+    },
+  }
+}
+
 module.exports = {
   getDropStats, buildVariantSummary, getRestockStats,
   getBookkeepingStats, parseLocalDateRange, InvalidRangeError,
+  getGachaDropStats,
 }

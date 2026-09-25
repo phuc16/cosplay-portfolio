@@ -18,6 +18,8 @@ const updateOrderBuyerInfo = vi.fn()
 const fetchProvinces = vi.fn()
 const fetchWards = vi.fn()
 const searchAddress = vi.fn()
+const fetchGachaSession = vi.fn()
+const drawGachaSession = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchOrder: (...args) => fetchOrder(...args),
@@ -29,6 +31,8 @@ vi.mock("../api/shop", () => ({
   fetchProvinces: (...args) => fetchProvinces(...args),
   fetchWards: (...args) => fetchWards(...args),
   searchAddress: (...args) => searchAddress(...args),
+  fetchGachaSession: (...args) => fetchGachaSession(...args),
+  drawGachaSession: (...args) => drawGachaSession(...args),
 }))
 
 // ShopFooter (rendered on every shop page) fetches /api/settings via `get`
@@ -46,6 +50,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: Order, statusTimestamp } = await import("./Order")
 const { formatVnDateTime } = await import("../utils/orderDeadline")
+const { gachaAudio } = await import("../shop/gacha/gachaAudio")
 
 function baseOrder(over = {}) {
   return {
@@ -90,6 +95,8 @@ beforeEach(() => {
   fetchProvinces.mockReset().mockResolvedValue([])
   fetchWards.mockReset().mockResolvedValue([])
   searchAddress.mockReset().mockResolvedValue({ predictions: [] })
+  fetchGachaSession.mockReset().mockResolvedValue({ session: null, drops: [] })
+  drawGachaSession.mockReset()
   axios.post.mockReset()
   sessionStorage.clear()
   localStorage.clear()
@@ -966,6 +973,151 @@ describe("Order - status timestamp", () => {
     // Just confirms no stray "Invalid Date" text renders - the absence of a
     // specific timestamp string isn't otherwise assertable here.
     expect(container.textContent).not.toContain("Invalid Date")
+  })
+})
+
+describe("Order - gacha section", () => {
+  const activeSession = { id: 7, product_id: 3, turns_total: 3, turns_used: 1, status: "active" }
+  const prizes = [{ id: 1, name: "Sticker", tier: "common", image_url: null, display_price: 5000 }]
+
+  function spinButton(container) {
+    return [...container.querySelectorAll("button")].find((b) => /mở hộp|đang mở|hết lượt/i.test(b.textContent))
+  }
+
+  it("never starts the ambient BGM - that's booth kiosk/practice only, this is an ordinary checkout page", async () => {
+    const startSpy = vi.spyOn(gachaAudio, "startBgm")
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: activeSession, drops: [], prizes })
+
+    await renderOrder()
+
+    expect(startSpy).not.toHaveBeenCalled()
+    startSpy.mockRestore()
+  })
+
+  it("shows the gacha machine when the confirmed order has an active session", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: activeSession, drops: [], prizes })
+
+    const container = await renderOrder()
+
+    expect(fetchGachaSession).toHaveBeenCalledWith("tok123")
+    expect(spinButton(container)).toBeTruthy()
+    expect(container.textContent).toContain("1/3")
+  })
+
+  it("renders no gacha section for a confirmed order with no session", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: null, drops: [] })
+
+    const container = await renderOrder()
+
+    expect(spinButton(container)).toBeUndefined()
+  })
+
+  it("does not look for a session while the order is still pending", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "pending" }))
+    fetchPaymentInstructions.mockResolvedValue({ method: "bank", amount: 35000 })
+
+    const container = await renderOrder()
+
+    expect(fetchGachaSession).not.toHaveBeenCalled()
+    expect(spinButton(container)).toBeUndefined()
+  })
+
+  it("renders no gacha section once the session is completed", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "completed" }))
+    fetchGachaSession.mockResolvedValue({
+      session: { ...activeSession, turns_used: 3, status: "completed" }, drops: [], prizes,
+    })
+
+    const container = await renderOrder()
+
+    expect(spinButton(container)).toBeUndefined()
+  })
+
+  it("hides the whole gacha section once the buyer dismisses the end-of-session summary, without waiting for the next load", async () => {
+    // The real reel runs for 7.5-9.5s of wall clock - drive
+    // requestAnimationFrame off the microtask queue with a coarse clock so a
+    // full spin finishes inside a handful of act() flushes.
+    const originalRaf = globalThis.requestAnimationFrame
+    let now = 0
+    globalThis.requestAnimationFrame = (cb) => {
+      now += 1000
+      const at = now
+      queueMicrotask(() => cb(at))
+      return at
+    }
+
+    try {
+      const oneTurnSession = { id: 7, product_id: 3, turns_total: 1, turns_used: 0, status: "active" }
+      // The initial load only has the purchase line - order.items is never
+      // refetched mid-session, so the drawn prize only shows up once the
+      // dismiss handler re-fetches the order.
+      const staleOrder = baseOrder({ status: "confirmed" })
+      const freshOrder = baseOrder({
+        status: "confirmed",
+        items: [
+          ...staleOrder.items,
+          { id: 99, product_name_snapshot: "Sticker", variant_label_snapshot: "", unit_price_snapshot: 5000, qty: 1 },
+        ],
+      })
+      fetchOrder.mockResolvedValueOnce(staleOrder).mockResolvedValueOnce(freshOrder)
+      fetchGachaSession.mockResolvedValue({ session: oneTurnSession, drops: [], prizes })
+      drawGachaSession.mockResolvedValue({
+        prize: prizes[0], turns_used: 1, turns_total: 1, session_completed: true,
+      })
+
+      const container = await renderOrder()
+      await act(async () => spinButton(container).dispatchEvent(new MouseEvent("click", { bubbles: true })))
+      for (let i = 0; i < 20; i++) await act(async () => {})
+
+      // The reel lands on a reveal modal first ("Kết quả") - only tapping its
+      // own continue button, since this was the last turn, advances to the
+      // end-of-session summary.
+      const reveal = container.querySelector('[aria-label="Kết quả"]')
+      const continueBtn = [...reveal.querySelectorAll("button")].find((b) => /lượt tiếp|xong/i.test(b.textContent))
+      await act(async () => continueBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+      const summary = container.querySelector('[aria-label="Quà của bạn"]')
+      expect(summary).not.toBeNull()
+
+      // Scoped to the "Sản phẩm"/Items list rows specifically - "Sticker" is
+      // also a real prize name inside the still-visible catalog/summary, so
+      // asserting against the whole page would pass regardless of the bug.
+      const itemRows = () =>
+        [...container.querySelectorAll("div")]
+          .filter((el) => el.className.includes("justify-between") && el.className.includes("border-b"))
+          .map((r) => r.textContent).join(" ")
+      expect(itemRows()).not.toContain("Sticker")
+
+      const closeBtn = [...summary.querySelectorAll("button")].find((b) => /đóng/i.test(b.textContent))
+      await act(async () => closeBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+      await act(async () => {})
+
+      expect(container.querySelector('[aria-label="Quà của bạn"]')).toBeNull()
+      expect(spinButton(container)).toBeUndefined()
+      // The refetch after dismiss picks up the real drawn item, not just the
+      // stale purchase-line snapshot from page load.
+      expect(fetchOrder).toHaveBeenCalledTimes(2)
+      expect(itemRows()).toContain("Sticker")
+    } finally {
+      globalThis.requestAnimationFrame = originalRaf
+    }
+  })
+
+  it("draws through the order's own endpoint with a fresh idempotency key", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ status: "confirmed" }))
+    fetchGachaSession.mockResolvedValue({ session: activeSession, drops: [], prizes })
+    drawGachaSession.mockResolvedValue({
+      prize: prizes[0], turns_used: 2, turns_total: 3, session_completed: false,
+    })
+
+    const container = await renderOrder()
+    await act(async () => spinButton(container).dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(drawGachaSession).toHaveBeenCalledWith("tok123", expect.any(String))
+    expect(drawGachaSession.mock.calls[0][1].length).toBeGreaterThan(0)
   })
 })
 

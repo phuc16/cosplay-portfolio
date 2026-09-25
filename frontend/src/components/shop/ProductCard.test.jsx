@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
+import { MemoryRouter } from "react-router-dom"
 import { LanguageProvider } from "../../contexts/LanguageContext"
 import { readCart } from "../../shop/cart"
 
@@ -27,9 +28,11 @@ async function renderCard(props = {}) {
   const product = props.product || baseProduct()
   await act(async () => {
     root.render(
-      <LanguageProvider>
-        <ProductCard product={product} collectionSlug="drop" orderable={true} onAdded={onAdded} {...props} />
-      </LanguageProvider>
+      <MemoryRouter>
+        <LanguageProvider>
+          <ProductCard product={product} collectionSlug="drop" orderable={true} onAdded={onAdded} {...props} />
+        </LanguageProvider>
+      </MemoryRouter>
     )
   })
   return { container, onAdded }
@@ -391,6 +394,137 @@ describe("digital products", () => {
 
     const cart = readCart()
     expect(cart[0].image_url).toBe("https://x/thumb.jpg")
+  })
+})
+
+describe("gacha products", () => {
+  const gachaProduct = (overrides = {}) => ({
+    id: 3, name: "Mystery Case", price: 20000, type: "gacha",
+    images: ["https://x/cover.jpg"], variant_id: 77, stock_qty: null,
+    variants: [], gacha_pool_remaining: 10,
+    ...overrides,
+  })
+
+  it("has no variant picker - opens straight to add-to-cart, like a digital product", async () => {
+    const { container } = await renderCard({ product: gachaProduct() })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    expect(container.querySelector('[role="dialog"]')).toBeTruthy()
+    expect(container.textContent).toContain("Mystery Case")
+  })
+
+  it("links to the practice page for the product, on both the teaser card and the detail view", async () => {
+    const { container } = await renderCard({ product: gachaProduct() })
+
+    const teaserLink = container.querySelector('a[href="/merchandise/gacha/3/try"]')
+    expect(teaserLink).not.toBeNull()
+    expect(teaserLink.textContent).toMatch(/try it for free/i)
+
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const detailLinks = [...container.querySelectorAll('a[href="/merchandise/gacha/3/try"]')]
+    expect(detailLinks.length).toBe(2)
+  })
+
+  it("never shows the practice link for a non-gacha product", async () => {
+    const { container } = await renderCard({ product: baseProduct() })
+    expect(container.querySelector('a[href*="/try"]')).toBeNull()
+  })
+
+  it("adds turns to cart using the flattened variant_id", async () => {
+    const { container } = await renderCard({ product: gachaProduct() })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const addButton = [...container.querySelectorAll("button")].find((b) => /add to cart/i.test(b.textContent))
+    await act(async () => { addButton.click() })
+
+    const cart = readCart()
+    expect(cart[0].variant_id).toBe(77)
+    expect(cart[0].is_digital).toBe(false)
+  })
+
+  // A gacha turn is never stock-limited at the variant level - the prize pool is.
+  it("isProductSoldOut reads gacha_pool_remaining, not the (always null) stock_qty", () => {
+    expect(isProductSoldOut(gachaProduct({ gacha_pool_remaining: 0 }))).toBe(true)
+    expect(isProductSoldOut(gachaProduct({ gacha_pool_remaining: 3 }))).toBe(false)
+    expect(isProductSoldOut(gachaProduct({ gacha_pool_remaining: null }))).toBe(false)
+  })
+
+  it("shows the sold-out overlay when the prize pool is empty", async () => {
+    const { container } = await renderCard({ product: gachaProduct({ gacha_pool_remaining: 0 }) })
+    expect(container.textContent).toContain("Sold out")
+  })
+
+  // The hidden turn variant's stock_qty is null (unlimited) - only the pool caps it.
+  it("caps the turn stepper at gacha_pool_remaining instead of treating it as unlimited", async () => {
+    const { container } = await renderCard({ product: gachaProduct({ gacha_pool_remaining: 3 }) })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const plus = container.querySelector('button[aria-label="Increase quantity"]')
+    const input = container.querySelector('input[type="number"]')
+    for (let i = 0; i < 5; i++) await act(async () => { plus.click() })
+
+    expect(Number(input.value)).toBe(3)
+    expect(plus.disabled).toBe(true)
+
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(input, "50")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    expect(Number(input.value)).toBe(3)
+  })
+
+  it("leaves a genuinely unlimited (no prizes configured) gacha stepper unclamped", async () => {
+    const { container } = await renderCard({ product: gachaProduct({ gacha_pool_remaining: null }) })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const plus = container.querySelector('button[aria-label="Increase quantity"]')
+    for (let i = 0; i < 5; i++) await act(async () => { plus.click() })
+    expect(Number(container.querySelector('input[type="number"]').value)).toBe(6)
+  })
+
+  it("blocks adding turns when the cart already holds another product, with an inline reason", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([
+      { variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000 },
+    ]))
+    const { container } = await renderCard({ product: gachaProduct() })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const addButton = [...container.querySelectorAll("button")].find((b) => /add to cart/i.test(b.textContent))
+    await act(async () => { addButton.click() })
+
+    expect(readCart()).toHaveLength(1)
+    expect(container.querySelector('[role="alert"]').textContent).toMatch(/on their own/i)
+  })
+
+  it("blocks adding an ordinary product while gacha turns are in the cart", async () => {
+    localStorage.setItem("shop_cart", JSON.stringify([
+      { variant_id: 77, qty: 1, product_name: "Mystery Case", variant_label: "", price: 20000, is_gacha: true },
+    ]))
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const addButton = [...container.querySelectorAll("button")].find((b) => /add to cart/i.test(b.textContent))
+    await act(async () => { addButton.click() })
+
+    expect(readCart()).toHaveLength(1)
+    expect(container.querySelector('[role="alert"]').textContent).toMatch(/gacha/i)
+  })
+
+  it("disables add-to-cart when the prize pool is empty", async () => {
+    const { container } = await renderCard({ product: gachaProduct({ gacha_pool_remaining: 0 }) })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const addButton = [...container.querySelectorAll("button")].find((b) => /add to cart/i.test(b.textContent))
+    expect(addButton.disabled).toBe(true)
   })
 })
 

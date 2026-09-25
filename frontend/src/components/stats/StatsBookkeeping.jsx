@@ -167,7 +167,7 @@ export default function StatsBookkeeping() {
             <p className="mb-2 text-sm">
               Đã nhận theo phương thức: Ngân hàng {formatVnd(stats.received.bank)} · Momo{" "}
               {formatVnd(stats.received.momo)} · PayPal {formatVnd(stats.received.paypal)} · COD{" "}
-              {formatVnd(stats.received.cod)}
+              {formatVnd(stats.received.cod)} · Tiền mặt {formatVnd(stats.received.cash)}
             </p>
             <p className="mb-4 text-sm opacity-70">
               Chi phí ship đã ghi nhận (chi phí, không phải doanh thu): {formatVnd(stats.shipping_cost)}

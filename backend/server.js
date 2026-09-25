@@ -181,6 +181,64 @@ const proofLimiter = rateLimit({
   },
 })
 
+// Gacha draw: 60/min per IP. A real festival session taps this fast (one
+// per spin), but a scripted rapid-fire probe for the row-lock race window
+// still needs a ceiling independent of the general admin/public limiters.
+const gachaDrawLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // The admin draw mount sits ahead of `auth`, and at a festival the booth
+  // tablet shares one NAT IP with every attendee's phone on the venue wifi -
+  // so without this, anyone on that wifi could spend the booth's whole draw
+  // budget on 401s and freeze the kiosk for the rest of the window. Only
+  // requests that got a real answer count; the 600/min globalLimiter still
+  // caps the rejected ones.
+  skipFailedRequests: true,
+  keyGenerator: keyGen,
+  store: makeStore("rl:gacha-draw:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Gacha draw IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều lượt quay. Thử lại sau." })
+  },
+})
+
+// Booth session start: 30/min per IP. Each call writes a real confirmed
+// order with real revenue attached, so it needs a tighter ceiling than the
+// 600/min global one - while still leaving far more headroom than a human at
+// a till can use. Same skipFailedRequests reasoning as gachaDrawLimiter: the
+// mount is ahead of `auth` on a shared venue IP.
+const gachaBoothSessionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+  keyGenerator: keyGen,
+  store: makeStore("rl:gacha-booth:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Gacha booth session IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều phiên quầy được tạo. Thử lại sau." })
+  },
+})
+
+// Gacha practice draw: 30/min per IP. Free, unauthenticated and write-free,
+// so abuse costs no stock - but it still runs a DB read per call, and a
+// human tapping a demo spin never needs more than this.
+const gachaPracticeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyGen,
+  store: makeStore("rl:gacha-practice:"),
+  handler: (req, res) => {
+    console.warn(`[RATE LIMIT] Gacha practice IP ${keyGen(req)} bị chặn`)
+    res.status(429).json({ error: "too_many_requests", message: "Quá nhiều lượt quay thử. Thử lại sau." })
+  },
+})
+
 // Global: 600 req/phút hard ceiling per IP
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -232,6 +290,13 @@ app.use((req, res, next) => {
 })
 
 const API_PREFIX = "/api"
+
+// Express's default non-strict routing serves "/x/draw/" from the "/x/draw"
+// route, but an anchored regex tested against the raw req.path does not
+// match it - which would let a trailing slash slip a request past the
+// per-path limiters below and into the handler. Normalise the input rather
+// than loosening every regex.
+const stripTrailingSlash = (p) => p.replace(/\/+$/, "") || "/"
 
 
 // LOGIN ADMIN - check env (RAM), no DB + brute force protection
@@ -356,6 +421,14 @@ app.post(`${API_PREFIX}/refresh`, async (req, res) => {
 // address-search gets its own stricter limiter ahead of the router's
 // general publicLimiter (both apply; addressLimiter's 20/min binds first).
 app.use(`${API_PREFIX}/shop/address-search`, addressLimiter)
+// Same layering for the free practice spin: its own 30/min limiter binds
+// ahead of publicLimiter, for that one POST path only.
+const GACHA_PRACTICE_DRAW_PATH = /^\/gacha\/\d+\/practice-draw$/
+app.use(`${API_PREFIX}/shop`, (req, res, next) => {
+  const path = stripTrailingSlash(req.path)
+  if (req.method === "POST" && GACHA_PRACTICE_DRAW_PATH.test(path)) return gachaPracticeLimiter(req, res, next)
+  return next()
+})
 app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
 
 // ── ORDERS: public order creation + lookup. Creation gets its own stricter
@@ -364,12 +437,31 @@ app.use(`${API_PREFIX}/shop`, publicLimiter, require("./routes/shop")())
 // budget, or vice versa); reading an order status page uses the general
 // public limiter so a buyer refreshing it isn't locked out. ──
 const PROOF_PATH = /^\/[^/]+\/proof$/
+// The buyer-online half of the same action the admin booth mount rate-limits
+// below, so it shares that limiter instance rather than defining a second
+// one. Separate const name only because both live in this module scope.
+const GACHA_ORDER_DRAW_PATH = /^\/[^/]+\/gacha-session\/draw$/
 app.use(`${API_PREFIX}/orders`, (req, res, next) => {
-  if (req.method === "POST" && PROOF_PATH.test(req.path)) return proofLimiter(req, res, next)
+  const path = stripTrailingSlash(req.path)
+  if (req.method === "POST" && PROOF_PATH.test(path)) return proofLimiter(req, res, next)
+  if (req.method === "POST" && GACHA_ORDER_DRAW_PATH.test(path)) return gachaDrawLimiter(req, res, next)
   if (req.method === "POST") return orderLimiter(req, res, next)
   return publicLimiter(req, res, next)
 },
   require("./routes/orders")())
+
+// Rate limiting by IP is still meaningful ahead of admin auth: it protects
+// the draw's row-lock regardless of who is calling. Mirrors the PROOF_PATH
+// pattern on the public orders mount above.
+const GACHA_DRAW_PATH = /^\/gacha-sessions\/\d+\/draw$/
+const GACHA_BOOTH_SESSION_PATH = /^\/gacha-products\/\d+\/booth-sessions$/
+app.use(`${API_PREFIX}/admin`, (req, res, next) => {
+  const path = stripTrailingSlash(req.path)
+  if (req.method === "POST" && GACHA_DRAW_PATH.test(path)) return gachaDrawLimiter(req, res, next)
+  if (req.method === "POST" && GACHA_BOOTH_SESSION_PATH.test(path)) return gachaBoothSessionLimiter(req, res, next)
+  return next()
+})
+app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminGacha")())
 
 app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminCatalog")())
 app.use(`${API_PREFIX}/admin`, auth, require("./routes/adminOrders")())

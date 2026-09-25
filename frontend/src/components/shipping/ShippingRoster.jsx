@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react"
 import { adminListCollections, adminGetPickupRoster, adminSetOrderPrepared } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
+import { groupOrderItems } from "../../utils/groupOrderItems"
 import SearchableSelect from "../SearchableSelect"
 
 // Hides a non-matching row on screen (className "hidden") but forces it back
@@ -209,7 +210,10 @@ export default function ShippingRoster() {
                             <td></td>
                             <td colSpan={8} className="pb-2">
                               <ul className="pl-0">
-                                {r.items.map((i, idx) => (
+                                {groupOrderItems(
+                                  r.items,
+                                  (i) => `${i.product_name}|${i.variant_label}|${i.is_gift}|${i.image_url || ""}`
+                                ).map((i, idx) => (
                                   <li key={idx} className="flex items-center gap-1.5 py-0.5">
                                     {i.image_url
                                       ? <img src={i.image_url} alt="" className="w-6 h-6 object-cover rounded print:hidden" />

@@ -5,6 +5,8 @@ const { buildInstructions } = require("../shop/payments/instructions")
 const { processShopImage, storeShopImage, InvalidImageError } = require("../shop/images")
 const { uploadSingleImage } = require("../shop/upload")
 const emailQueue = require("../shop/email/queue")
+const sessionRepo = require("../shop/gacha/sessionRepo")
+const prizeRepo = require("../shop/gacha/prizeRepo")
 const qr = require("../shop/orders/qr")
 const { orderAccess, verifyPin, issueOrderSessionToken } = require("../shop/orders/orderAccess")
 const { formatOrderCode } = require("../shop/orders/domain")
@@ -14,6 +16,10 @@ const FULFILLMENT = ["ship", "pickup"]
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const bad = (res, message) => res.status(400).json({ error: "invalid_input", message })
+
+/** Statuses a paid gacha order should already own a session in - see the
+ *  self-healing read in GET /:token/gacha-session. */
+const SESSION_BEARING_STATUSES = ["confirmed", "shipped", "completed"]
 
 // The DB row (and repo.getOrderByToken) carries internal fields the buyer has
 // no use for and no business seeing - request_key (the idempotency key) and
@@ -177,6 +183,14 @@ module.exports = function orderRoutes() {
       if (err instanceof repo.EmptyCartError) return bad(res, err.message)
       if (err instanceof repo.FulfillmentNotOfferedError) return bad(res, err.message)
       if (err instanceof repo.NoCodForDigitalError) return bad(res, err.message)
+      if (err instanceof repo.NoCodForGachaError) return bad(res, err.message)
+      if (err instanceof repo.MixedGachaCartError) return bad(res, err.message)
+      // The prize pool, not a variant's stock_qty, ran out between the buyer
+      // loading the product and checking out - same "retry won't help
+      // unchanged" class as OutOfStockError, hence 409 rather than 400.
+      if (err instanceof repo.GachaPoolSoldOutError) {
+        return res.status(409).json({ error: "gacha_sold_out", message: err.message })
+      }
       if (err instanceof repo.FulfillmentRequiredError) return bad(res, err.message)
       // A cart line's variant_id matches no row at all (deleted, or a stale
       // cart carrying an id that never existed) - distinct from a real
@@ -274,6 +288,87 @@ module.exports = function orderRoutes() {
       res.json(toPublicOrder(order))
     } catch (err) {
       console.error("[ORDERS] Lỗi lấy đơn:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.get("/:token/gacha-session", orderAccess, async (req, res) => {
+    try {
+      res.set("X-Robots-Tag", "noindex, nofollow")
+
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      // An order only grows a session once it reaches 'confirmed', and a
+      // non-gacha order never grows one at all - both are ordinary states
+      // for this route, not errors.
+      let session = await sessionRepo.getSessionByOrderId(order.id)
+
+      // Self-healing: transitionOrder creates the session best-effort after
+      // the commit, so a hiccup there leaves a paid, confirmed gacha order
+      // with no session and nothing to retry it. This is the buyer's own
+      // read path for exactly that session, so it is the natural retry point.
+      // startOnlineSessionIfNeeded is idempotent (unique index on order_id)
+      // and a no-op for an order with no gacha item, so calling it here is
+      // safe even when the miss has an ordinary cause.
+      if (!session && SESSION_BEARING_STATUSES.includes(order.status)) {
+        await sessionRepo.startOnlineSessionIfNeeded(order.id)
+        session = await sessionRepo.getSessionByOrderId(order.id)
+      }
+      if (!session) return res.json({ session: null, drops: [] })
+
+      // The reel needs the product's full prize list to render at all. It
+      // used to come from the public practice endpoint, which is gated on the
+      // collection being published - a buyer who already paid must keep their
+      // turns even after the drop is archived, so it is served here instead,
+      // behind the buyer's own order-token gate.
+      res.json({
+        session,
+        drops: await sessionRepo.getDropsForSession(session.id),
+        prizes: await prizeRepo.listPrizes(session.product_id),
+      })
+    } catch (err) {
+      console.error("[ORDERS] Lỗi đọc phiên gacha:", err.message)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  router.post("/:token/gacha-session/draw", orderAccess, async (req, res) => {
+    try {
+      const order = await repo.getOrderByToken(req.params.token)
+      if (!order) return res.status(404).json({ error: "not_found", message: "Không tìm thấy đơn hàng" })
+
+      const session = await sessionRepo.getSessionByOrderId(order.id)
+      if (!session) return res.status(404).json({ error: "not_found", message: "Không tìm thấy phiên quay" })
+
+      const drawKey = req.body?.draw_key
+      if (!drawKey || typeof drawKey !== "string") return bad(res, "Cần draw_key")
+
+      // ownerOrderId re-asserts inside the draw transaction that this session
+      // really belongs to the order whose token the caller proved - the
+      // session id is resolved server-side here, so a mismatch means the
+      // mapping itself moved under us, and the draw must not land.
+      const result = await sessionRepo.drawForSession(session.id, { drawKey, ownerOrderId: order.id })
+      res.json({
+        prize: result.prize,
+        turns_used: result.turnsUsed,
+        turns_total: result.turnsTotal,
+        session_completed: result.sessionCompleted,
+      })
+    } catch (err) {
+      if (err instanceof sessionRepo.GachaSessionNotFoundError) {
+        return res.status(404).json({ error: "not_found", message: err.message })
+      }
+      if (err instanceof sessionRepo.GachaSessionCompleteError) {
+        return res.status(409).json({ error: "session_complete", message: err.message })
+      }
+      if (err instanceof sessionRepo.GachaOrderCancelledError) {
+        return res.status(409).json({ error: "order_cancelled", message: err.message })
+      }
+      if (err instanceof sessionRepo.GachaSoldOutError) {
+        return res.status(409).json({ error: "gacha_sold_out", message: err.message })
+      }
+      console.error("[ORDERS] Lỗi quay gacha:", err.message)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

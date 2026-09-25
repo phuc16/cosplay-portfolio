@@ -1,8 +1,9 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
-import { addToCart } from "../../shop/cart"
+import { addToCart, gachaCartConflict } from "../../shop/cart"
 import { buildShareUrl, buildShareText, copyToClipboard } from "../../shop/share"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
@@ -14,9 +15,20 @@ function stockLabel(variant, t) {
 
 export const isSoldOut = (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
 
+/** Digital and gacha products both arrive from the API with an empty variants
+ *  array and their one hidden variant flattened onto the product itself
+ *  (catalogRepo's nestCollectionDetail) - anything that reads a variant list
+ *  or matches a cart line by variant id has to branch on both, not just digital. */
+export const hasFlattenedVariant = (type) => type === "digital" || type === "gacha"
+
 /** A product with no variants isn't a purchasable stock item, so it's never "sold out".
- *  A digital product has no variant list - its stock lives on the flattened product.stock_qty instead. */
+ *  A digital product has no variant list - its stock lives on the flattened product.stock_qty instead.
+ *  A gacha product's turns are never stock-limited (stock_qty is deliberately
+ *  null/unlimited) - its prize pool running dry is what sells it out. A gacha
+ *  product with no pool figure at all has no prizes configured yet, which is
+ *  "not stocked", not "sold out". */
 export const isProductSoldOut = (p) => {
+  if (p.type === "gacha") return p.gacha_pool_remaining !== null && p.gacha_pool_remaining !== undefined && p.gacha_pool_remaining <= 0
   if (p.type === "digital") return p.stock_qty !== null && p.stock_qty !== undefined && p.stock_qty <= 0
   return p.variants?.length > 0 && p.variants.every(isSoldOut)
 }
@@ -32,11 +44,20 @@ function variantCover(v) {
   return v.thumbnail_image || variantImages(v)[0]
 }
 
-/** null/undefined stock_qty means unlimited - clamp only when a real ceiling exists. */
-const clampQty = (n, v) => {
-  const max = v.stock_qty === null || v.stock_qty === undefined ? Infinity : v.stock_qty
-  return Math.min(Math.max(1, n), max)
+/** null/undefined stock_qty means unlimited - clamp only when a real ceiling exists.
+ *  A gacha turn's stock_qty is deliberately null, but its prize pool is a real
+ *  ceiling: the backend rejects an order for more turns than the pool holds, so
+ *  the stepper has to stop there rather than let the buyer discover it at checkout. */
+const maxQtyFor = (product, v) => {
+  if (product?.type === "gacha") {
+    return product.gacha_pool_remaining === null || product.gacha_pool_remaining === undefined
+      ? Infinity
+      : product.gacha_pool_remaining
+  }
+  return v.stock_qty === null || v.stock_qty === undefined ? Infinity : v.stock_qty
 }
+
+const clampQty = (n, max) => Math.min(Math.max(1, n), max)
 
 /**
  * Column count scales with how many variants there are to show - a 2-code
@@ -58,14 +79,16 @@ function galleryGridClasses(count) {
 export default function ProductCard({ product, collectionSlug, orderable, unavailableLabel, onAdded, deepLinkVariantId }) {
   const { t } = useLanguage()
   const isDigital = product.type === "digital"
-  // A digital product is treated exactly like a product with one variant -
-  // the same single-variant code path below (no picker, straight to detail)
-  // already does the right thing; this just supplies that one "variant".
-  // A digital product should always have a variant_id (createProduct always
+  const isGacha = product.type === "gacha"
+  const flattened = hasFlattenedVariant(product.type)
+  // A digital or gacha product is treated exactly like a product with one
+  // variant - the same single-variant code path below (no picker, straight to
+  // detail) already does the right thing; this just supplies that one
+  // "variant". Either should always have a variant_id (createProduct always
   // creates the hidden variant) - but if one somehow doesn't, treat it as
   // having no variants at all, same as a physical product with zero
   // variants, rather than letting it submit variant_id: null to the cart.
-  const variants = isDigital
+  const variants = flattened
     ? (product.variant_id != null
       ? [{ id: product.variant_id, label: "", stock_qty: product.stock_qty, images: product.images, thumbnail_image: product.thumbnail_image }]
       : [])
@@ -92,14 +115,20 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   })
   const [qty, setQty] = useState(1)
   const [activeImage, setActiveImage] = useState(0)
+  const [addError, setAddError] = useState("")
   const [shareCopied, setShareCopied] = useState(false)
   const detail = view && typeof view === "object" ? view : null
   const detailImages = detail ? variantImages(detail) : []
+  // A gacha turn's own stock_qty is always null, so only the product-level
+  // check (its prize pool) can close the buy button on it.
+  const detailSoldOut = detail ? isSoldOut(detail) || isProductSoldOut(product) : false
+  const detailMaxQty = detail ? maxQtyFor(product, detail) : Infinity
 
   // Every path to a variant's detail goes through this, so qty/photo never carry over stale from a prior variant.
   const openDetail = (v) => {
     setQty(1)
     setActiveImage(0)
+    setAddError("")
     setShareCopied(false)
     setView(v)
   }
@@ -131,7 +160,7 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   }
 
   const commitAdd = (v) => {
-    addToCart({
+    const line = {
       variant_id: v.id,
       qty,
       product_name: product.name,
@@ -140,7 +169,15 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
       image_url: variantCover(v) || product.images?.[0] || null,
       collection_slug: collectionSlug,
       is_digital: isDigital,
-    })
+      is_gacha: isGacha,
+    }
+    const conflict = gachaCartConflict(line)
+    if (conflict) {
+      setAddError(conflict === "gacha_needs_own_order" ? t("cartGachaOwnOrder") : t("cartGachaBlocksOthers"))
+      return
+    }
+    setAddError("")
+    addToCart(line)
     onAdded?.(v.label)
     // A multi-variant product's buyer is often picking up several codes in
     // one visit - dropping them back into the picker grid lets them add the
@@ -193,6 +230,15 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
             )}
           </div>
           <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
+          {isGacha && (
+            <Link
+              to={`/merchandise/gacha/${product.id}/try`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm text-[var(--text-link)] underline w-fit"
+            >
+              {t("gachaTryLink")}
+            </Link>
+          )}
 
           {product.description && (
             <div
@@ -327,7 +373,16 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
               </div>
               {shareCopied && <p className="text-xs opacity-70">{t("shopShareLinkCopied")}</p>}
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
-              <p className="text-sm opacity-70">{orderable ? stockLabel(detail, t) : (unavailableLabel || t("shopClosed"))}</p>
+              <p className="text-sm opacity-70">{orderable ? (detailSoldOut ? t("shopSoldOut") : stockLabel(detail, t)) : (unavailableLabel || t("shopClosed"))}</p>
+              {isGacha && (
+                <Link
+                  to={`/merchandise/gacha/${product.id}/try`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm text-[var(--text-link)] underline w-fit"
+                >
+                  {t("gachaTryLink")}
+                </Link>
+              )}
 
               {detail.description && (
                 <div
@@ -336,11 +391,11 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 />
               )}
 
-              {!isSoldOut(detail) && orderable && (
+              {!detailSoldOut && orderable && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setQty((q) => clampQty(q - 1, detail))}
+                    onClick={() => setQty((q) => clampQty(q - 1, detailMaxQty))}
                     disabled={qty <= 1}
                     aria-label={t("shopQtyDecrease")}
                     className="w-8 h-8 rounded-lg border border-[var(--border-brand)] disabled:opacity-40 disabled:cursor-not-allowed"
@@ -351,19 +406,19 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                     type="number"
                     inputMode="numeric"
                     min={1}
-                    max={detail.stock_qty ?? undefined}
+                    max={Number.isFinite(detailMaxQty) ? detailMaxQty : undefined}
                     value={qty}
                     onChange={(e) => {
                       const n = Number(e.target.value)
-                      if (Number.isInteger(n)) setQty(clampQty(n, detail))
+                      if (Number.isInteger(n)) setQty(clampQty(n, detailMaxQty))
                     }}
                     aria-label={t("cartQty")}
                     className="w-14 text-center px-1 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
                   />
                   <button
                     type="button"
-                    onClick={() => setQty((q) => clampQty(q + 1, detail))}
-                    disabled={detail.stock_qty !== null && detail.stock_qty !== undefined && qty >= detail.stock_qty}
+                    onClick={() => setQty((q) => clampQty(q + 1, detailMaxQty))}
+                    disabled={qty >= detailMaxQty}
                     aria-label={t("shopQtyIncrease")}
                     className="w-8 h-8 rounded-lg border border-[var(--border-brand)] disabled:opacity-40 disabled:cursor-not-allowed"
                   >
@@ -372,10 +427,12 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 </div>
               )}
 
+              {addError && <p role="alert" className="text-sm text-[var(--text-error)]">{addError}</p>}
+
               <div className="flex gap-2 mt-2">
                 <button
                   type="button"
-                  disabled={isSoldOut(detail) || !orderable}
+                  disabled={detailSoldOut || !orderable}
                   onClick={() => commitAdd(detail)}
                   className="flex-1 px-3 py-2 rounded-xl bg-[var(--brand)] text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >

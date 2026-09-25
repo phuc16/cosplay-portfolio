@@ -181,6 +181,40 @@ describe("digital delivery link", () => {
   })
 })
 
+describe("gacha open-the-case link", () => {
+  const gachaOrder = (overrides = {}) => ({
+    id: 1, order_token: "tok", buyer_name: "A", total: 50000, status: "confirmed",
+    fulfillment_method: "ship", created_at: new Date(),
+    items: [{ product_name_snapshot: "Mystery Case", variant_label_snapshot: "", qty: 1, unit_price_snapshot: 50000, product_type: "gacha" }],
+    ...overrides,
+  })
+
+  it("links the gacha purchase line to the order page once confirmed", () => {
+    const vars = t.buildVars(gachaOrder())
+    expect(vars.items).toContain("Mở hộp quà")
+    expect(vars.items).toContain(`${process.env.SITE_URL || ""}/order/tok`)
+  })
+
+  it("never renders the link while pending", () => {
+    const vars = t.buildVars(gachaOrder({ status: "pending" }))
+    expect(vars.items).not.toContain("Mở hộp quà")
+  })
+
+  it("never renders the link for an already-drawn prize row (no product_type, since the join misses a null product_variant_id)", () => {
+    const vars = t.buildVars(gachaOrder({
+      items: [{ product_name_snapshot: "Sticker", variant_label_snapshot: "", qty: 1, unit_price_snapshot: 5000, product_type: null, gacha_tier_snapshot: "common" }],
+    }))
+    expect(vars.items).not.toContain("Mở hộp quà")
+  })
+
+  it("never renders the link for an ordinary physical item", () => {
+    const vars = t.buildVars(gachaOrder({
+      items: [{ product_name_snapshot: "Card", variant_label_snapshot: "A1", qty: 1, unit_price_snapshot: 35000, product_type: "physical" }],
+    }))
+    expect(vars.items).not.toContain("Mở hộp quà")
+  })
+})
+
 describe("payment_proof_uploaded (admin template)", () => {
   const orderWithProof = (overrides = {}) => ({
     ...order,

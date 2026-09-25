@@ -3,6 +3,8 @@ import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import statsRepo from "../shop/stats/statsRepo.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const buyer = { buyer_name: "A", phone: "0900000000", email: "a@example.com", address_raw: "x" }
@@ -36,8 +38,23 @@ async function placeOrderAt(variantId, createdAt, over = {}) {
   return o
 }
 
+/** A booth-cash gacha order, exactly as the Staff Panel creates one: born
+ *  `confirmed`, payment_method `cash`, fulfillment_method `booth`. */
+async function startBoothCashOrderAt(createdAt, { turnsTotal = 1, price = 20000 } = {}) {
+  const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+  const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price, type: "gacha" })
+  await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: price, quantity_total: 10 }])
+
+  const { orderId, sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: "Khách", turnsTotal })
+  await db.query("UPDATE orders SET created_at = ? WHERE id = ?", [createdAt, orderId])
+  return { collectionId: cid, productId: pid, orderId, sessionId }
+}
+
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables(
+    "gacha_draws", "gacha_sessions", "gacha_prizes",
+    "order_items", "orders", "product_variants", "products", "collections"
+  )
 })
 
 describe("parseLocalDateRange / statsRepo.InvalidRangeError", () => {
@@ -210,6 +227,94 @@ describe("getBookkeepingStats - money and buckets", () => {
     expect(stats.to_collect).toBe(70000)
     expect(stats.received.cod).toBe(0)
     expect(stats.received_total).toBe(0)
+  })
+
+  // Booth cash is in the till the moment the order exists - unlike a transfer
+  // an admin still has to verify, and unlike COD, which is collected on a
+  // future delivery. Counting it as to_collect reported money the seller
+  // already holds as still owed.
+  it("counts a still-being-drawn (confirmed) booth-cash order as received.cash, never to_collect", async () => {
+    const today = new Date()
+    await startBoothCashOrderAt(today, { turnsTotal: 2, price: 20000 })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    expect(stats.received.cash).toBe(40000)
+    expect(stats.received_total).toBe(40000)
+    expect(stats.to_collect).toBe(0)
+  })
+
+  it("counts a completed booth-cash order in received_total, not as a NaN that silently drops it", async () => {
+    const today = new Date()
+    const { orderId, sessionId } = await startBoothCashOrderAt(today, { turnsTotal: 1, price: 20000 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+    const [[order]] = await db.query("SELECT status FROM orders WHERE id = ?", [orderId])
+    expect(order.status).toBe("completed")
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    expect(stats.received.cash).toBe(20000)
+    expect(stats.received_total).toBe(20000)
+    expect(Number.isNaN(stats.received_total)).toBe(false)
+    expect(stats.to_collect).toBe(0)
+  })
+})
+
+describe("getBookkeepingStats - gacha by_collection attribution", () => {
+  it("attributes a booth-cash order's real total to its product's collection, not 'Không thuộc bộ sưu tập'", async () => {
+    const today = new Date()
+    const { collectionId } = await startBoothCashOrderAt(today, { turnsTotal: 2, price: 20000 })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+
+    const bucket = stats.by_collection.find((c) => c.collection_id === collectionId)
+    expect(bucket).toBeDefined()
+    expect(bucket.received_total).toBe(40000)
+
+    const noneBucket = stats.by_collection.find((c) => c.collection_id === null)
+    expect(noneBucket).toBeUndefined()
+  })
+
+  it("does not inflate by_collection when a booth session's turns are actually drawn", async () => {
+    const today = new Date()
+    const { collectionId, sessionId } = await startBoothCashOrderAt(today, { turnsTotal: 2, price: 20000 })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "k1" })
+    await sessionRepo.drawForSession(sessionId, { drawKey: "k2" })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+
+    const bucket = stats.by_collection.find((c) => c.collection_id === collectionId)
+    expect(bucket.received_total).toBe(40000)
+    expect(stats.received_total).toBe(40000)
+
+    const sumReceived = stats.by_collection.reduce((s, c) => s + c.received_total, 0)
+    expect(sumReceived).toBe(stats.received_total)
+  })
+
+  it("does not double-count an online gacha order's purchase-line item against its own draw rows", async () => {
+    const cid = await catalog.createCollection({ title: "Online Gacha", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "R", tier: "common", display_price: 999999, quantity_total: 10 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 2 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+    const today = new Date()
+    await db.query("UPDATE orders SET created_at = ? WHERE id = ?", [today, o.id])
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const session = await sessionRepo.getSessionByOrderId(o.id)
+    await sessionRepo.drawForSession(session.id, { drawKey: "k1", ownerOrderId: o.id })
+    await sessionRepo.drawForSession(session.id, { drawKey: "k2", ownerOrderId: o.id })
+
+    const dateStr = vnDateStr(today)
+    const stats = await statsRepo.getBookkeepingStats({ date_from: dateStr, date_to: dateStr })
+    const bucket = stats.by_collection.find((c) => c.collection_id === cid)
+    expect(bucket.received_total).toBe(40000)
   })
 })
 

@@ -4,13 +4,20 @@ import {
   adminReorderProducts,
 } from "../api/shop"
 import AdminVariants from "./AdminVariants"
+import AdminGachaPrizeEditor from "./AdminGachaPrizeEditor"
 import SearchableSelect from "./SearchableSelect"
 import { formatVnd } from "../utils/money"
 
 const blank = {
   name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "",
-  thumbnail_image: "",
+  thumbnail_image: "", gacha_booth_only: false,
 }
+
+const PRODUCT_TYPE_OPTIONS = [
+  { code: "physical", name: "Vật lý" },
+  { code: "digital", name: "Số (digital)" },
+  { code: "gacha", name: "Gacha" },
+]
 
 const SORTS = [
   { value: "default", label: "Thứ tự kéo thả" },
@@ -27,6 +34,14 @@ const isProductSoldOut = (p) => {
   return p.variants?.length > 0 && p.variants.every(
     (v) => v.stock_qty !== null && v.stock_qty !== undefined && v.stock_qty <= 0
   )
+}
+
+// Physical products are broken into variants; a gacha product has no variant
+// concept (its single turn-variant is hidden and server-managed) - its
+// expandable panel is the prize pool instead. Digital products have neither.
+const subEditorLabel = (type) => {
+  if (type === "digital") return null
+  return type === "gacha" ? "Phần thưởng" : "Phân loại"
 }
 
 function sortProducts(list, sortBy) {
@@ -112,7 +127,7 @@ export default function AdminProducts({ collection }) {
     setDraft({
       name: p.name, description: p.description || "", price: p.price, images: p.images || [],
       type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
-      thumbnail_image: p.thumbnail_image || "",
+      thumbnail_image: p.thumbnail_image || "", gacha_booth_only: Boolean(p.gacha_booth_only),
     })
   }
 
@@ -189,11 +204,9 @@ export default function AdminProducts({ collection }) {
       {!editingId && (
         <SearchableSelect padding="px-2 py-1" height="h-[38px]"
           value={draft.type}
-          onChange={(type) => setDraft({ ...draft, type })}
-          options={[
-            { code: "physical", name: "Vật lý" },
-            { code: "digital", name: "Số (digital)" },
-          ]}
+          onChange={(type) => setDraft({ ...draft, type, gacha_booth_only: false })}
+          options={PRODUCT_TYPE_OPTIONS}
+          label={PRODUCT_TYPE_OPTIONS.find((o) => o.code === draft.type)?.name}
           placeholder="Vật lý"
         />
       )}
@@ -218,6 +231,16 @@ export default function AdminProducts({ collection }) {
         rows={3}
         className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
       />
+      {draft.type === "gacha" && (
+        <label className="flex items-center gap-2 mb-2 text-sm">
+          <input
+            type="checkbox"
+            checked={Boolean(draft.gacha_booth_only)}
+            onChange={(e) => setDraft({ ...draft, gacha_booth_only: e.target.checked })}
+          />
+          Chỉ bán tại quầy (ẩn khỏi shop online)
+        </label>
+      )}
       {draft.type === "digital" && (
         <>
           <input
@@ -382,20 +405,24 @@ export default function AdminProducts({ collection }) {
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
-              {p.type !== "digital" && (
+              {subEditorLabel(p.type) && (
                 <button
                   type="button"
                   onClick={() => setExpandedProductId(expandedProductId === p.id ? null : p.id)}
                   className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]"
                 >
-                  {expandedProductId === p.id ? "Thu gọn" : "Phân loại"}
+                  {expandedProductId === p.id ? "Thu gọn" : subEditorLabel(p.type)}
                 </button>
               )}
               <button type="button" onClick={() => edit(p)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Sửa</button>
               <button type="button" onClick={() => remove(p.id)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">Xóa</button>
             </div>
           </div>
-          {p.type !== "digital" && expandedProductId === p.id && <AdminVariants product={p} onSaved={reload} />}
+          {subEditorLabel(p.type) && expandedProductId === p.id && (
+            p.type === "gacha"
+              ? <AdminGachaPrizeEditor productId={p.id} />
+              : <AdminVariants product={p} onSaved={reload} />
+          )}
           {editingId === p.id && <div className="mt-3">{form}</div>}
         </div>
       ))}

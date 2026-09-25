@@ -9,6 +9,8 @@ const adminDeleteProduct = vi.fn()
 const adminUploadImage = vi.fn()
 const adminReorderProducts = vi.fn()
 const adminSaveVariants = vi.fn()
+const adminFetchPrizes = vi.fn()
+const adminSavePrizes = vi.fn()
 
 vi.mock("../api/shop", () => ({
   adminGetCollection: (...args) => adminGetCollection(...args),
@@ -18,6 +20,8 @@ vi.mock("../api/shop", () => ({
   adminUploadImage: (...args) => adminUploadImage(...args),
   adminReorderProducts: (...args) => adminReorderProducts(...args),
   adminSaveVariants: (...args) => adminSaveVariants(...args),
+  adminFetchPrizes: (...args) => adminFetchPrizes(...args),
+  adminSavePrizes: (...args) => adminSavePrizes(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -69,6 +73,8 @@ beforeEach(() => {
   adminUploadImage.mockReset()
   adminReorderProducts.mockReset()
   adminSaveVariants.mockReset()
+  adminFetchPrizes.mockReset()
+  adminSavePrizes.mockReset()
 })
 
 describe("AdminProducts - reordering via drag and drop", () => {
@@ -212,6 +218,162 @@ describe("AdminProducts - digital products", () => {
 
     expect(container.textContent).toContain("Digital Sold Out")
     expect(container.textContent).not.toContain("Digital In Stock")
+  })
+})
+
+describe("AdminProducts - gacha products", () => {
+  it("offers Gacha as a product type alongside the existing two", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    const container = await renderProducts()
+    await flush()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+
+    const options = [...container.querySelectorAll("li button")].map((b) => b.textContent)
+    expect(options).toEqual(["Vật lý", "Số (digital)", "Gacha"])
+  })
+
+  it("shows a prize toggle instead of the variant one, and expands into the prize editor", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Gachapon", price: 20000, type: "gacha", images: [], variants: [] }],
+    })
+    adminFetchPrizes.mockResolvedValue([
+      { id: 5, name: "Sticker", tier: "common", display_price: 5000, quantity_total: 10, quantity_remaining: 10 },
+    ])
+
+    const container = await renderProducts()
+    await flush()
+
+    const buttons = [...container.querySelectorAll("button")].map((b) => b.textContent)
+    expect(buttons).toContain("Phần thưởng")
+    expect(buttons).not.toContain("Phân loại")
+
+    const toggle = [...container.querySelectorAll("button")].find((b) => b.textContent === "Phần thưởng")
+    await act(async () => { toggle.click() })
+    await flush()
+
+    expect(adminFetchPrizes).toHaveBeenCalledWith(1)
+    expect(container.querySelector('input[placeholder="Tên phần thưởng"]')?.value).toBe("Sticker")
+    expect(container.querySelector('input[placeholder="Mã (A1) hoặc size (M)"]')).toBeNull()
+  })
+
+  it("shows the booth-only checkbox only for a gacha product being created", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    const container = await renderProducts()
+    await flush()
+
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const gachaOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { gachaOption.click() })
+
+    expect(container.querySelector('input[type="checkbox"]')).not.toBeNull()
+    expect(container.textContent).toContain("Chỉ bán tại quầy")
+  })
+
+  it("saves gacha_booth_only: true when the checkbox is checked", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+    const container = await renderProducts()
+    await flush()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const gachaOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { gachaOption.click() })
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Booth Case")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const checkbox = container.querySelector('input[type="checkbox"]')
+    await act(async () => { checkbox.click() })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Booth Case", type: "gacha", gacha_booth_only: true })
+    )
+  })
+
+  it("pre-checks the checkbox when editing an existing booth-only product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Booth Case", price: 20000, type: "gacha", images: [], variants: [], gacha_booth_only: true }],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const checkbox = container.querySelector('input[type="checkbox"]')
+    expect(checkbox.checked).toBe(true)
+  })
+
+  it("never shows the checkbox for a physical product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Card", price: 35000, type: "physical", images: [], variants: [] }],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull()
+  })
+
+  it("resets gacha_booth_only to false when switching type away from gacha", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+    const container = await renderProducts()
+    await flush()
+
+    // Switch to gacha
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const gachaOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { gachaOption.click() })
+    await flush()
+
+    // Check the booth-only checkbox
+    const checkbox = container.querySelector('input[type="checkbox"]')
+    await act(async () => { checkbox.click() })
+    await flush()
+
+    // Switch back to physical
+    const gachaTypeTrigger = container.querySelector('[aria-label="Gacha"]')
+    await act(async () => { gachaTypeTrigger.click() })
+    await flush()
+    const physicalOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Vật lý")
+    await act(async () => { physicalOption.click() })
+    await flush()
+
+    // Fill in product name
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Physical Product")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    // Save
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    // Assert gacha_booth_only is false
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Physical Product", type: "physical", gacha_booth_only: false })
+    )
   })
 })
 

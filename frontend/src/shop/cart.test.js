@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { readCart, addToCart, updateQty, removeFromCart, clearCart, cartCount, cartTotal } from "./cart"
+import { readCart, addToCart, updateQty, removeFromCart, clearCart, cartCount, cartTotal, gachaCartConflict } from "./cart"
 
 const item = (over = {}) => ({
   variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1",
@@ -112,5 +112,38 @@ describe("cart", () => {
     expect(result).toEqual([{ variant_id: 1, qty: 1, product_name: "Card", variant_label: "A1", price: 35000, image_url: null, collection_slug: "drop" }])
 
     mock.mockRestore()
+  })
+})
+
+describe("gachaCartConflict", () => {
+  const gachaLine = (over = {}) => item({ variant_id: 77, is_gacha: true, product_name: "Mystery Case", ...over })
+
+  it("allows a gacha turn into an empty cart", () => {
+    expect(gachaCartConflict(gachaLine(), [])).toBeNull()
+  })
+
+  it("allows more turns of the gacha product already in the cart", () => {
+    expect(gachaCartConflict(gachaLine(), [gachaLine()])).toBeNull()
+  })
+
+  it("blocks a gacha turn when the cart already holds another product", () => {
+    expect(gachaCartConflict(gachaLine(), [item()])).toBe("gacha_needs_own_order")
+  })
+
+  it("blocks a gacha turn when the cart already holds a different gacha product", () => {
+    expect(gachaCartConflict(gachaLine({ variant_id: 88 }), [gachaLine()])).toBe("gacha_needs_own_order")
+  })
+
+  it("blocks an ordinary product when the cart already holds gacha turns", () => {
+    expect(gachaCartConflict(item(), [gachaLine()])).toBe("cart_has_gacha")
+  })
+
+  it("leaves two ordinary products alone", () => {
+    expect(gachaCartConflict(item({ variant_id: 2 }), [item()])).toBeNull()
+  })
+
+  it("reads the live cart when no cart is passed", () => {
+    addToCart(gachaLine())
+    expect(gachaCartConflict(item())).toBe("cart_has_gacha")
   })
 })

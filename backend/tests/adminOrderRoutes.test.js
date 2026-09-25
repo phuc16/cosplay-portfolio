@@ -6,6 +6,8 @@ import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
 import settings from "../shop/payments/settingsRepo.js"
+import prizeRepo from "../shop/gacha/prizeRepo.js"
+import sessionRepo from "../shop/gacha/sessionRepo.js"
 import { resetTables } from "./helpers/db.js"
 
 const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
@@ -27,8 +29,19 @@ async function seedOrder(over = {}) {
 }
 
 beforeEach(async () => {
-  await resetTables("order_items", "orders", "product_variants", "products", "collections")
+  await resetTables(
+    "gacha_draws", "gacha_sessions", "gacha_prizes",
+    "order_items", "orders", "product_variants", "products", "collections"
+  )
 })
+
+async function seedBoothOrder({ buyerName = "Khách", turnsTotal = 1 } = {}) {
+  const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+  const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+  await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 10 }])
+  const { orderId, sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName, turnsTotal })
+  return { cid, pid, orderId, sessionId }
+}
 
 describe("auth", () => {
   it("requires a token", async () => {
@@ -77,6 +90,18 @@ describe("GET /api/admin/orders", () => {
     const res = await authed(request(app).get("/api/admin/orders?date_from=garbage"))
     expect(res.status).toBe(200)
     expect(res.body.map((row) => row.id)).toContain(o.id)
+  })
+
+  // A booth-cash order never gets a purchase-line order_items row (only
+  // draw rows, which never set collection_id_snapshot), so the collection
+  // filter's usual EXISTS-on-item-snapshot check alone would silently
+  // exclude every booth order - the exact bug that surfaced writing the
+  // booth-orders endpoint's own collection filter test.
+  it("filtering by collection_id still finds a booth-cash order for that collection", async () => {
+    const { cid, orderId } = await seedBoothOrder()
+
+    const res = await authed(request(app).get(`/api/admin/orders?collection_id=${cid}`))
+    expect(res.body.map((row) => row.id)).toEqual([orderId])
   })
 
   describe("search", () => {
@@ -536,5 +561,50 @@ describe("PUT /api/admin/orders/:id/buyer-info", () => {
       buyer_name: "A", phone: "09",
     })
     expect(res.status).toBe(404)
+  })
+})
+
+describe("GET /api/admin/booth-orders", () => {
+  it("only ever returns booth orders, ignoring any fulfillment_method the caller might pass", async () => {
+    await seedOrder()
+    const { orderId } = await seedBoothOrder()
+
+    const res = await authed(request(app).get("/api/admin/booth-orders?fulfillment_method=ship"))
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].id).toBe(orderId)
+    expect(res.body[0].fulfillment_method).toBe("booth")
+  })
+
+  it("attaches each order's drawn items, without a separate detail fetch", async () => {
+    const { orderId, sessionId } = await seedBoothOrder()
+    await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+
+    const res = await authed(request(app).get("/api/admin/booth-orders"))
+    const order = res.body.find((o) => o.id === orderId)
+    expect(order.items).toHaveLength(1)
+    expect(order.items[0].product_name_snapshot).toBe("Sticker")
+    expect(order.items[0].gacha_tier_snapshot).toBe("common")
+  })
+
+  it("returns an empty items array for a booth order with no draws yet", async () => {
+    const { orderId } = await seedBoothOrder()
+
+    const res = await authed(request(app).get("/api/admin/booth-orders"))
+    const order = res.body.find((o) => o.id === orderId)
+    expect(order.items).toEqual([])
+  })
+
+  it("filters by collection_id", async () => {
+    const { cid, orderId } = await seedBoothOrder()
+    const other = await seedBoothOrder()
+    void other
+
+    const res = await authed(request(app).get(`/api/admin/booth-orders?collection_id=${cid}`))
+    expect(res.body.map((o) => o.id)).toEqual([orderId])
+  })
+
+  it("requires a token", async () => {
+    expect((await request(app).get("/api/admin/booth-orders")).status).toBe(401)
   })
 })
