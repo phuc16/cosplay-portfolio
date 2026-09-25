@@ -22,11 +22,11 @@ const { default: StatsDrop } = await import("./StatsDrop")
 function dropStats(over = {}) {
   return {
     collection_id: 1, collection_title: "Drop",
-    received: { bank: 35000, momo: 0, paypal: 0, cod: 0 }, received_total: 35000,
+    received: { bank: 35000, momo: 0, paypal: 0, cod: 0, cash: 0 }, received_total: 35000,
     awaiting_payment: 0, to_collect: 0, lost: 0, pending_cod: 0,
     order_counts: { pending: 0, confirmed: 1, shipped: 0, completed: 0, cancelled: 0 },
     units_sold: 1, expiry_rate: null, prepaid_order_count: 0, expired_order_count: 0,
-    fulfillment_counts: { ship: 1, pickup: 0 },
+    fulfillment_counts: { ship: 1, pickup: 0, digital: 0, booth: 0 },
     variants: [
       { variant_id: 5, product_name: "Card", variant_label: "A1", sold: 1, deleted: false, unlimited: false, remaining: 4, sell_through: 0.2, time_to_sellout_days: null },
     ],
@@ -90,6 +90,22 @@ describe("StatsDrop", () => {
     expect(container.textContent).toContain("Đơn COD chưa xác nhận")
     expect(container.textContent).toContain("12.000₫")
     expect(container.textContent).not.toContain("47.000₫") // never folded into received_total
+  })
+
+  it("shows the booth/digital fulfillment counts and the cash (booth) money breakdown", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats({
+      received: { bank: 35000, momo: 0, paypal: 0, cod: 0, cash: 50000 },
+      received_total: 85000,
+      fulfillment_counts: { ship: 1, pickup: 0, digital: 2, booth: 3 },
+    }))
+    const container = await renderStatsDrop()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    expect(container.textContent).toContain("Sản phẩm số: 2")
+    expect(container.textContent).toContain("Tại quầy: 3")
+    expect(container.textContent).toContain("Tiền mặt (tại quầy) 50.000₫")
   })
 
   it("shows 'không giới hạn' for an unlimited variant, never a stock number", async () => {
@@ -181,7 +197,10 @@ describe("StatsDrop", () => {
     await selectCollectionOption(container, "Second Drop")
     await flush()
 
-    await act(async () => { resolveSecond(dropStats({ collection_id: 2, collection_title: "Second Drop", received_total: 99000 })) })
+    await act(async () => { resolveSecond(dropStats({
+      collection_id: 2, collection_title: "Second Drop", received_total: 99000,
+      received: { bank: 99000, momo: 0, paypal: 0, cod: 0, cash: 0 },
+    })) })
     await act(async () => { resolveFirst(dropStats({ collection_id: 1, collection_title: "Drop", received_total: 35000 })) })
 
     expect(container.textContent).toContain("99.000₫")

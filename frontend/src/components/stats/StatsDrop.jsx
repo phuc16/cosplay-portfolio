@@ -119,7 +119,13 @@ export default function StatsDrop() {
             </p>
             <p className="mb-2 text-sm">Tổng số lượng đã bán: {stats.units_sold}</p>
             <p className="mb-2 text-sm">
-              Giao hàng: {stats.fulfillment_counts.ship} · Nhận tại chỗ: {stats.fulfillment_counts.pickup}
+              Giao hàng: {stats.fulfillment_counts.ship} · Nhận tại chỗ: {stats.fulfillment_counts.pickup} · Sản
+              phẩm số: {stats.fulfillment_counts.digital} · Tại quầy: {stats.fulfillment_counts.booth}
+            </p>
+            <p className="mb-2 text-sm">
+              Đã nhận theo phương thức: Ngân hàng {formatVnd(stats.received.bank)} · Momo{" "}
+              {formatVnd(stats.received.momo)} · PayPal {formatVnd(stats.received.paypal)} · COD{" "}
+              {formatVnd(stats.received.cod)} · Tiền mặt (tại quầy) {formatVnd(stats.received.cash)}
             </p>
             <p className="mb-4 text-sm">
               Tỷ lệ hết hạn:{" "}
