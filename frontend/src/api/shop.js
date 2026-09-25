@@ -204,6 +204,12 @@ export const drawGachaSession = (token, drawKey) =>
     { headers: orderAuthHeaders(token) },
   ).then((r) => r.data)
 
+export const adminListGachaProducts = () =>
+  api.get("/api/admin/gacha-products").then((r) => r.data)
+
+export const adminGetGachaDropStats = (productId) =>
+  api.get(`/api/admin/stats/gacha/${productId}`).then((r) => r.data)
+
 export const adminFetchPrizes = (productId) =>
   api.get(`/api/admin/gacha-products/${productId}/prizes`).then((r) => r.data)
 

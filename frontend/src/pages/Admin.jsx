@@ -5,7 +5,6 @@ import AdminAlbums from "../components/AdminAlbums"
 import AdminSettings from "../components/AdminSettings"
 import AdminCollections from "../components/AdminCollections"
 import AdminOrders from "../components/AdminOrders"
-import AdminBoothOrders from "../components/AdminBoothOrders"
 import AdminPaymentSettings from "../components/AdminPaymentSettings"
 import AdminGiftSettings from "../components/AdminGiftSettings"
 import AdminEmailTemplates from "../components/AdminEmailTemplates"
@@ -142,12 +141,6 @@ export default function Admin() {
               Đơn hàng
             </button>
             <button
-              onClick={() => setTab("booth")}
-              className={`text-sm ${tab === "booth" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Tại quầy
-            </button>
-            <button
               onClick={() => setTab("payments")}
               className={`text-sm ${tab === "payments" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
             >
@@ -198,7 +191,6 @@ export default function Admin() {
         {tab === "settings" && <AdminSettings />}
         {tab === "shop" && <AdminCollections />}
         {tab === "orders" && <AdminOrders />}
-        {tab === "booth" && <AdminBoothOrders />}
         {tab === "payments" && (
           <>
             <AdminPaymentSettings />
