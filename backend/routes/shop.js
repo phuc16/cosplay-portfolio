@@ -2,6 +2,7 @@ const express = require("express")
 const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const giftSettings = require("../shop/giftSettings")
+const shopDisplaySettings = require("../shop/shopDisplaySettings")
 const vnAddress = require("../shop/vnAddress")
 const prizeRepo = require("../shop/gacha/prizeRepo")
 const sessionRepo = require("../shop/gacha/sessionRepo")
@@ -57,6 +58,18 @@ module.exports = function shopRoutes() {
       res.json(giftSettings.publicSettings(await giftSettings.getSettings()))
     } catch (err) {
       console.error("[SHOP] Lỗi lấy cấu hình quà tặng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Admin-configurable render order for the storefront's Gacha/Digital/Physical
+  // groups (see Shop.jsx's groupCollectionsByType). Defaults to
+  // gacha/digital/physical when never set.
+  router.get("/group-order", async (req, res) => {
+    try {
+      res.json({ group_order: await shopDisplaySettings.getGroupOrder() })
+    } catch (err) {
+      console.error("[SHOP] Lỗi lấy thứ tự nhóm:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
