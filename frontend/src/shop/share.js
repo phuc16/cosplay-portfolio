@@ -30,3 +30,36 @@ export function buildShareText(t, productName, variantLabel, price) {
     text: t("shopShareText", { product, price: formatVnd(price), shop: t("shopTitle") }),
   }
 }
+
+/**
+ * navigator.clipboard is only exposed in a secure context (https or
+ * localhost) - on a plain-IP/http deployment it's undefined and the share
+ * button silently did nothing. Falls back to the legacy execCommand("copy")
+ * path (via an offscreen textarea), which works regardless of context.
+ */
+export async function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // fall through to the legacy path below
+    }
+  }
+  if (typeof document === "undefined") return false
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.style.position = "fixed"
+  textarea.style.opacity = "0"
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+  let ok = false
+  try {
+    ok = document.execCommand("copy")
+  } catch {
+    ok = false
+  }
+  document.body.removeChild(textarea)
+  return ok
+}

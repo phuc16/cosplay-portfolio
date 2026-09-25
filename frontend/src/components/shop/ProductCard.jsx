@@ -3,7 +3,7 @@ import { useLanguage } from "../../contexts/LanguageContext"
 import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
 import { addToCart } from "../../shop/cart"
-import { buildShareUrl, buildShareText } from "../../shop/share"
+import { buildShareUrl, buildShareText, copyToClipboard } from "../../shop/share"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
 function stockLabel(variant, t) {
@@ -120,11 +120,14 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
       }
       return
     }
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(shareUrl)
+    if (await copyToClipboard(shareUrl)) {
       setShareCopied(true)
       setTimeout(() => setShareCopied(false), 2000)
+      return
     }
+    // Neither the Clipboard API nor execCommand("copy") worked (very old
+    // or locked-down browser) - last resort so the click isn't a no-op.
+    window.prompt(t("shopSharePromptFallback"), shareUrl)
   }
 
   const commitAdd = (v) => {

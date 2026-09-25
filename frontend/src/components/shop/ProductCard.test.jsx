@@ -570,6 +570,25 @@ describe("ProductCard - share", () => {
     expect(container.querySelector('[role="dialog"]').textContent).toContain("Link copied!")
   })
 
+  it("falls back to window.prompt when neither the Clipboard API nor execCommand works", async () => {
+    delete navigator.share
+    delete navigator.clipboard
+    const execCommand = vi.fn().mockReturnValue(false)
+    document.execCommand = execCommand
+    const prompt = vi.spyOn(window, "prompt").mockImplementation(() => {})
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const shareBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Share")
+    await act(async () => { shareBtn.click() })
+
+    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(prompt.mock.calls[0][1]).toContain("product=1")
+
+    prompt.mockRestore()
+    execCommand.mockRestore?.()
+  })
+
   it("omits the variant query param for a single-variant product", async () => {
     delete navigator.share
     const writeText = vi.fn().mockResolvedValue(undefined)

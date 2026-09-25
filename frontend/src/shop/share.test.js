@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest"
-import { buildShareUrl, buildShareText } from "./share"
+import { describe, it, expect, afterEach, vi } from "vitest"
+import { buildShareUrl, buildShareText, copyToClipboard } from "./share"
 
 describe("buildShareUrl", () => {
   it("includes product but omits variant when variantId is null", () => {
@@ -48,5 +48,54 @@ describe("buildShareText", () => {
     expect(title).toBe("Digital Album")
     expect(text).toContain("Digital Album -")
     expect(text).not.toContain("·")
+  })
+})
+
+describe("copyToClipboard", () => {
+  const originalClipboard = navigator.clipboard
+
+  afterEach(() => {
+    if (originalClipboard === undefined) delete navigator.clipboard
+    else navigator.clipboard = originalClipboard
+    document.execCommand?.mockRestore?.()
+  })
+
+  it("uses navigator.clipboard.writeText when it succeeds", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    navigator.clipboard = { writeText }
+
+    const ok = await copyToClipboard("https://example.com/x")
+
+    expect(writeText).toHaveBeenCalledWith("https://example.com/x")
+    expect(ok).toBe(true)
+  })
+
+  it("falls back to execCommand('copy') when navigator.clipboard is unavailable (insecure context)", async () => {
+    delete navigator.clipboard
+    document.execCommand = vi.fn().mockReturnValue(true)
+
+    const ok = await copyToClipboard("https://example.com/x")
+
+    expect(document.execCommand).toHaveBeenCalledWith("copy")
+    expect(ok).toBe(true)
+  })
+
+  it("falls back to execCommand('copy') when navigator.clipboard.writeText rejects", async () => {
+    navigator.clipboard = { writeText: vi.fn().mockRejectedValue(new Error("denied")) }
+    document.execCommand = vi.fn().mockReturnValue(true)
+
+    const ok = await copyToClipboard("https://example.com/x")
+
+    expect(document.execCommand).toHaveBeenCalledWith("copy")
+    expect(ok).toBe(true)
+  })
+
+  it("returns false when neither the Clipboard API nor execCommand works", async () => {
+    delete navigator.clipboard
+    document.execCommand = vi.fn().mockReturnValue(false)
+
+    const ok = await copyToClipboard("https://example.com/x")
+
+    expect(ok).toBe(false)
   })
 })
