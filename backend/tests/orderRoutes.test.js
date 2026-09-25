@@ -572,6 +572,25 @@ describe("GET /api/orders/:token", () => {
     const res = await authed(request(app).get(`/api/orders/${pickup.body.order_token}`))
     expect(res.body.pickup_code).toMatch(/^\d{6}$/)
   })
+
+  it("includes queue_number on the buyer-facing order response for a confirmed pickup order", async () => {
+    const v = await seed(5, { allow_ship: true, allow_pickup: true })
+    const pickup = await request(app).post("/api/orders")
+      .send(body(v, { fulfillment_method: "pickup", buyer: { buyer_name: "A", phone: "0900000000", email: "a@example.com" } }))
+
+    const [[pRow]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [pickup.body.order_token])
+    await orders.transitionOrder(pRow.id, "confirmed")
+
+    const res = await authed(request(app).get(`/api/orders/${pickup.body.order_token}`))
+    expect(res.body.queue_number).toBe(1)
+  })
+
+  it("has queue_number null on the buyer-facing response for a ship order", async () => {
+    const v = await seed(5)
+    const ship = await request(app).post("/api/orders").send(body(v))
+    const res = await authed(request(app).get(`/api/orders/${ship.body.order_token}`))
+    expect(res.body.queue_number).toBeNull()
+  })
 })
 
 describe("PUT /api/orders/:token/buyer-info", () => {

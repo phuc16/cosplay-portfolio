@@ -49,6 +49,10 @@ function toPublicOrder(order) {
     // read aloud/show staff, verifiable against the printed roster without
     // network. Always null for a ship order.
     pickup_code,
+    // Per-collection queue number for a pickup order, so the buyer can queue
+    // at the event by number - see orderRepo.assignQueueNumberIfNeeded.
+    // Always null for a ship order, and null until it's been assigned.
+    queue_number,
     // The proof screenshot itself, so the buyer sees what they uploaded on
     // every visit, not just the one where they uploaded it - same trust
     // boundary as the rest of this response, which already requires the
@@ -91,6 +95,7 @@ function toPublicOrder(order) {
     id, order_token, status, total, fulfillment_method, tracking_code, created_at, items: publicItems,
     confirmed_at, shipped_at, completed_at, cancelled_at,
     pickup_locations: pickup_locations || [], expires_at, pickup_code: paidPickupCode,
+    queue_number: queue_number ?? null,
     has_payment_proof: Boolean(payment_proof_url),
     payment_proof_url: payment_proof_url || null,
     buyer_name, phone, note: note || null, address_raw: address_raw || null,
