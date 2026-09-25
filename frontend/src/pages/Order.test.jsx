@@ -329,6 +329,27 @@ describe("Order - pickup code (Event Pickup Verification plan)", () => {
   })
 })
 
+describe("Order - queue number", () => {
+  it("shows the queue number for a pickup order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", queue_number: 7 }))
+    const container = await renderOrder()
+    expect(container.textContent).toContain("Queue number")
+    expect(container.textContent).toContain("7")
+  })
+
+  it("renders no queue number section when the order has none yet (unpaid pending)", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "pickup", queue_number: null }))
+    const container = await renderOrder()
+    expect(container.textContent).not.toContain("Queue number")
+  })
+
+  it("does not render a queue number section for a ship order", async () => {
+    fetchOrder.mockResolvedValue(baseOrder({ fulfillment_method: "ship", queue_number: 7 }))
+    const container = await renderOrder()
+    expect(container.textContent).not.toContain("Queue number")
+  })
+})
+
 describe("Order - payment deadline (Phase 6)", () => {
   it("renders the deadline block for a pending, prepaid order with a future expires_at", async () => {
     fetchOrder.mockResolvedValue(baseOrder({ status: "pending", expires_at: futureIso(3) }))

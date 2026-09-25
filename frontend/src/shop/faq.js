@@ -67,6 +67,16 @@ export const FAQ_ITEMS = [
   },
   {
     question: {
+      vi: "Số thứ tự trên đơn nhận tại sự kiện dùng để làm gì?",
+      en: "What's the queue number on my event-pickup order for?",
+    },
+    answer: {
+      vi: "Đây là số thứ tự riêng cho bộ sưu tập bạn đã đặt, dùng để xếp hàng tại sự kiện - nhân viên sẽ gọi số theo thứ tự. Với đơn chuyển khoản/Momo/PayPal, số chỉ được cấp sau khi bạn tải ảnh chuyển khoản lên; đơn thanh toán khi nhận hàng (COD) được cấp số ngay khi đặt. Số hiện trên trang đơn hàng của bạn và trong email xác nhận.",
+      en: "This is a number scoped to the collection you ordered from, used to queue in person at the event - staff call numbers in order. For bank transfer/Momo/PayPal orders, it's assigned once you upload your payment proof; cash-on-delivery (COD) orders get one immediately at checkout. It shows on your order page and in the confirmation email.",
+    },
+  },
+  {
+    question: {
       vi: "Cách nhập địa chỉ giao hàng thế nào?",
       en: "How do I fill in the shipping address?",
     },
