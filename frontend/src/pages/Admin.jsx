@@ -4,6 +4,7 @@ import { api } from "../api/api"
 import AdminAlbums from "../components/AdminAlbums"
 import AdminSettings from "../components/AdminSettings"
 import AdminCollections from "../components/AdminCollections"
+import AdminShopGroupOrder from "../components/AdminShopGroupOrder"
 import AdminOrders from "../components/AdminOrders"
 import AdminBoothOrders from "../components/AdminBoothOrders"
 import AdminPaymentSettings from "../components/AdminPaymentSettings"
@@ -196,7 +197,12 @@ export default function Admin() {
         </header>
         {tab === "albums" && <AdminAlbums />}
         {tab === "settings" && <AdminSettings />}
-        {tab === "shop" && <AdminCollections />}
+        {tab === "shop" && (
+          <>
+            <AdminShopGroupOrder />
+            <AdminCollections />
+          </>
+        )}
         {tab === "orders" && <AdminOrders />}
         {tab === "booth" && <AdminBoothOrders />}
         {tab === "payments" && (

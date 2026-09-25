@@ -7,9 +7,11 @@ import { LanguageProvider } from "../contexts/LanguageContext"
 import { ThemeProvider } from "../contexts/ThemeContext"
 
 const fetchCollections = vi.fn()
+const fetchGroupOrder = vi.fn()
 
 vi.mock("../api/shop", () => ({
   fetchCollections: (...args) => fetchCollections(...args),
+  fetchGroupOrder: (...args) => fetchGroupOrder(...args),
 }))
 
 vi.mock("axios", async (importOriginal) => {
@@ -45,6 +47,7 @@ async function flush() { await act(async () => {}) }
 
 beforeEach(() => {
   fetchCollections.mockReset()
+  fetchGroupOrder.mockReset().mockResolvedValue(["gacha", "digital", "physical"])
   axios.get.mockReset()
 })
 
@@ -151,6 +154,37 @@ describe("Shop - grouped by type", () => {
 
     const gachaGroup = groups[0].closest("div")
     expect([...gachaGroup.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Gacha One"])
+  })
+
+  it("renders the groups in the admin-configured order instead of the gacha/digital/physical default", async () => {
+    fetchGroupOrder.mockResolvedValue(["physical", "digital", "gacha"])
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Gacha One", status: "active", product_count: 1, has_gacha_item: true, has_digital_item: false },
+      { id: 2, slug: "b", title: "Digital One", status: "active", product_count: 1, has_gacha_item: false, has_digital_item: true },
+      { id: 3, slug: "c", title: "Physical One", status: "active", product_count: 1, has_gacha_item: false, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Physical", "Digital", "Gacha"])
+  })
+
+  it("falls back to the default group order if fetching it fails", async () => {
+    fetchGroupOrder.mockRejectedValue(new Error("network down"))
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "a", title: "Gacha One", status: "active", product_count: 1, has_gacha_item: true, has_digital_item: false },
+      { id: 2, slug: "b", title: "Physical One", status: "active", product_count: 1, has_gacha_item: false, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const groups = [...container.querySelectorAll('[data-testid="collection-group-title"]')]
+    expect(groups.map((g) => g.textContent)).toEqual(["Gacha", "Physical"])
   })
 
   it("hides a collection with product_count 0, instead of mislabelling it into the Physical group", async () => {

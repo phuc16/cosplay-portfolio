@@ -104,6 +104,9 @@ export const fetchPaymentMethods = () =>
 export const fetchGiftSettings = () =>
   api.get("/api/shop/gift-settings").then((r) => r.data)
 
+export const fetchGroupOrder = () =>
+  api.get("/api/shop/group-order").then((r) => r.data.group_order)
+
 export const fetchPaymentInstructions = (token, headers = {}) =>
   api.get(`/api/orders/${token}/payment`, { headers }).then((r) => r.data)
 
@@ -130,6 +133,12 @@ export const adminGetGiftSettings = () =>
 
 export const adminSaveGiftSettings = (data) =>
   api.put("/api/admin/gift-settings", data).then((r) => r.data)
+
+export const adminGetShopDisplaySettings = () =>
+  api.get("/api/admin/shop-display-settings").then((r) => r.data)
+
+export const adminSaveShopDisplaySettings = (groupOrder) =>
+  api.put("/api/admin/shop-display-settings", { group_order: groupOrder }).then((r) => r.data)
 
 // ── Email templates ──
 export const adminListEmailTemplates = () =>
