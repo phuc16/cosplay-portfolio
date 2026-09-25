@@ -165,6 +165,27 @@ describe("drawForSession", () => {
     const session = await sessionRepo.getSessionById(sessionId)
     expect(session.turns_used).toBe(1)
   })
+
+  // The retry scenario drawKey exists for: a draw commits, the response is
+  // lost (e.g. flaky venue wifi), and in that window the order is cancelled
+  // for an unrelated reason - the buyer's client retries with the exact
+  // same drawKey. That retry must still replay the original prize rather
+  // than throwing GachaOrderCancelledError, since it's reading already-
+  // committed history, not taking a new turn.
+  it("still replays an already-committed draw via drawKey even if the order was cancelled afterward", async () => {
+    const pid = await seedGachaProduct([{ name: "Common", tier: "common", display_price: 1000, quantity_total: 10 }])
+    const { orderId, sessionId } = await sessionRepo.startBoothSession({ productId: pid, buyerName: null, turnsTotal: 3 })
+
+    const first = await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+    await orderRepo.transitionOrder(orderId, "cancelled")
+
+    const replay = await sessionRepo.drawForSession(sessionId, { drawKey: "tap-1" })
+
+    expect(replay.prize.id).toBe(first.prize.id)
+    expect(replay.turnsUsed).toBe(1)
+    const [[{ drawCount }]] = await db.query("SELECT COUNT(*) AS drawCount FROM gacha_draws WHERE session_id = ?", [sessionId])
+    expect(drawCount).toBe(1) // no second draw actually happened
+  })
 })
 
 describe("concurrent draws for the last unit of a prize", () => {
@@ -262,6 +283,13 @@ describe("practiceDraw", () => {
       [pid]
     )
     expect(drawCount).toBe(0)
+  })
+
+  it("throws a typed GachaSoldOutError instead of an untyped Error when the pool is empty", async () => {
+    const pid = await seedGachaProduct([{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 1 }])
+    await db.query("UPDATE gacha_prizes SET quantity_remaining = 0 WHERE product_id = ?", [pid])
+
+    await expect(sessionRepo.practiceDraw(pid)).rejects.toThrow(sessionRepo.GachaSoldOutError)
   })
 })
 

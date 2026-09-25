@@ -10,6 +10,21 @@ class GachaPrizeQuantityError extends Error {
 }
 
 /**
+ * Defense in depth: adminGacha.js's validatePrizes already rejects a
+ * non-integer/negative quantity_total before this ever runs, but this
+ * function is exported and called directly by 8+ test files (and any
+ * future caller) - without its own check, a NaN quantity_total would
+ * silently defeat the delete/shrink guards below (NaN < drawn is always
+ * false in JS) instead of being rejected.
+ */
+class GachaPrizeInputError extends Error {
+  constructor(name) {
+    super(`"${name}": số lượng phải là số nguyên không âm`)
+    this.name = "GachaPrizeInputError"
+  }
+}
+
+/**
  * Neither listPrizes nor replacePrizes used to check this, so calling them
  * with a wrong/non-gacha product id silently returned [] (GET) or wrote
  * orphaned gacha_prizes rows onto e.g. a physical product (PUT) instead of
@@ -88,6 +103,9 @@ async function replacePrizes(productId, prizes) {
     let sortOrder = 0
     for (const p of prizes) {
       const quantityTotal = Number(p.quantity_total)
+      if (!Number.isInteger(quantityTotal) || quantityTotal < 0) {
+        throw new GachaPrizeInputError(p.name || "?")
+      }
       const existing = p.id ? existingById.get(Number(p.id)) : null
       if (existing) {
         const drawn = existing.quantity_total - existing.quantity_remaining
@@ -122,4 +140,4 @@ async function replacePrizes(productId, prizes) {
   }
 }
 
-module.exports = { listPrizes, listPublicPrizes, replacePrizes, GachaPrizeQuantityError }
+module.exports = { listPrizes, listPublicPrizes, replacePrizes, GachaPrizeQuantityError, GachaPrizeInputError }

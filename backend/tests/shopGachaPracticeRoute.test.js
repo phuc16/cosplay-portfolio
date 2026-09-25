@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest"
 import request from "supertest"
 import express from "express"
+import db from "../db.js"
 import catalog from "../shop/catalogRepo.js"
 import prizeRepo from "../shop/gacha/prizeRepo.js"
 import shopRoutes from "../routes/shop.js"
@@ -77,5 +78,16 @@ describe("POST /gacha/:productId/practice-draw", () => {
     const res = await request(makeApp()).post(`/api/shop/gacha/${pid}/practice-draw`)
     expect(res.status).toBe(404)
     expect(JSON.stringify(res.body)).not.toContain("Secret Figure")
+  })
+
+  it("returns 409 gacha_sold_out instead of a 500 once the product's pool is fully drawn out", async () => {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha" })
+    await prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 1 }])
+    await db.query("UPDATE gacha_prizes SET quantity_remaining = 0 WHERE product_id = ?", [pid])
+
+    const res = await request(makeApp()).post(`/api/shop/gacha/${pid}/practice-draw`)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe("gacha_sold_out")
   })
 })
