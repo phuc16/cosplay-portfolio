@@ -33,6 +33,9 @@ module.exports = function adminGachaRoutes() {
     try {
       res.json(await prizeRepo.listPrizes(Number(req.params.productId)))
     } catch (err) {
+      if (err instanceof sessionRepo.GachaProductNotFoundError) {
+        return res.status(404).json({ error: "not_found", message: err.message })
+      }
       oops(res, err, "Lỗi đọc danh sách phần thưởng")
     }
   })
@@ -44,6 +47,9 @@ module.exports = function adminGachaRoutes() {
       await prizeRepo.replacePrizes(Number(req.params.productId), req.body.prizes)
       res.json({ ok: true })
     } catch (err) {
+      if (err instanceof sessionRepo.GachaProductNotFoundError) {
+        return res.status(404).json({ error: "not_found", message: err.message })
+      }
       if (err instanceof prizeRepo.GachaPrizeQuantityError) {
         return res.status(409).json({ error: "gacha_prize_quantity", message: err.message })
       }

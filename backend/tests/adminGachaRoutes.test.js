@@ -82,6 +82,48 @@ describe("PUT /gacha-products/:id/prizes", () => {
     expect(res.status).toBe(409)
     expect(res.body.error).toBe("gacha_prize_quantity")
   })
+
+  it("returns 404 for a product that exists but isn't a gacha product", async () => {
+    const cid = await catalog.createCollection({ title: "Physical Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Poster", price: 35000, type: "physical" })
+    const app = makeApp()
+
+    const res = await savePrizes(app, pid, ONE_PRIZE)
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 for an unknown product id", async () => {
+    const app = makeApp()
+    const res = await savePrizes(app, 999999, ONE_PRIZE)
+    expect(res.status).toBe(404)
+  })
+})
+
+describe("GET /gacha-products/:id/prizes", () => {
+  it("returns the saved prize list", async () => {
+    const pid = await seedGachaProduct()
+    const app = makeApp()
+    await savePrizes(app, pid, ONE_PRIZE)
+
+    const res = await request(app).get(`/api/admin/gacha-products/${pid}/prizes`).set("Authorization", `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+  })
+
+  it("returns 404 for a product that exists but isn't a gacha product, instead of an empty list", async () => {
+    const cid = await catalog.createCollection({ title: "Physical Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Poster", price: 35000, type: "physical" })
+    const app = makeApp()
+
+    const res = await request(app).get(`/api/admin/gacha-products/${pid}/prizes`).set("Authorization", `Bearer ${adminToken()}`)
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 for an unknown product id, instead of an empty list", async () => {
+    const app = makeApp()
+    const res = await request(app).get("/api/admin/gacha-products/999999/prizes").set("Authorization", `Bearer ${adminToken()}`)
+    expect(res.status).toBe(404)
+  })
 })
 
 describe("POST /gacha-products/:id/booth-sessions", () => {

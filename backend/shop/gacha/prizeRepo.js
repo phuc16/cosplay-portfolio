@@ -1,5 +1,6 @@
 const db = require("./../../db")
 const { PUBLIC_STATUSES } = require("./../catalogRepo")
+const { GachaProductNotFoundError } = require("./sessionRepo")
 
 class GachaPrizeQuantityError extends Error {
   constructor(name) {
@@ -8,7 +9,20 @@ class GachaPrizeQuantityError extends Error {
   }
 }
 
+/**
+ * Neither listPrizes nor replacePrizes used to check this, so calling them
+ * with a wrong/non-gacha product id silently returned [] (GET) or wrote
+ * orphaned gacha_prizes rows onto e.g. a physical product (PUT) instead of
+ * erroring - caught when an admin hit the prizes endpoint for product id 1,
+ * a non-gacha product, and got [] back with no indication anything was wrong.
+ */
+async function assertGachaProduct(productId, conn = db) {
+  const [[product]] = await conn.query("SELECT id FROM products WHERE id = ? AND type = 'gacha'", [productId])
+  if (!product) throw new GachaProductNotFoundError()
+}
+
 async function listPrizes(productId) {
+  await assertGachaProduct(productId)
   const [rows] = await db.query(
     "SELECT * FROM gacha_prizes WHERE product_id = ? ORDER BY sort_order ASC, id ASC",
     [productId]
@@ -53,6 +67,8 @@ async function replacePrizes(productId, prizes) {
   const conn = await db.getConnection()
   try {
     await conn.beginTransaction()
+
+    await assertGachaProduct(productId, conn)
 
     const [existingRows] = await conn.query(
       "SELECT id, name, quantity_total, quantity_remaining FROM gacha_prizes WHERE product_id = ? ORDER BY id ASC FOR UPDATE",

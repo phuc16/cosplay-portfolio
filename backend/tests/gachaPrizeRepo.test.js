@@ -72,3 +72,34 @@ describe("replacePrizes", () => {
     ).rejects.toThrow(prizeRepo.GachaPrizeQuantityError)
   })
 })
+
+describe("listPrizes/replacePrizes against a non-gacha or missing product id", () => {
+  it("listPrizes rejects a product id that exists but isn't type gacha", async () => {
+    const cid = await catalog.createCollection({ title: "Physical Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Poster", price: 35000, type: "physical" })
+
+    await expect(prizeRepo.listPrizes(pid)).rejects.toThrow("Không tìm thấy sản phẩm gacha")
+  })
+
+  it("listPrizes rejects a product id that doesn't exist at all", async () => {
+    await expect(prizeRepo.listPrizes(999999)).rejects.toThrow("Không tìm thấy sản phẩm gacha")
+  })
+
+  it("replacePrizes rejects a product id that exists but isn't type gacha, without writing any rows", async () => {
+    const cid = await catalog.createCollection({ title: "Physical Drop", status: "active" })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Poster", price: 35000, type: "physical" })
+
+    await expect(
+      prizeRepo.replacePrizes(pid, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 10 }])
+    ).rejects.toThrow("Không tìm thấy sản phẩm gacha")
+
+    const [rows] = await db.query("SELECT * FROM gacha_prizes WHERE product_id = ?", [pid])
+    expect(rows).toHaveLength(0)
+  })
+
+  it("replacePrizes rejects a product id that doesn't exist at all", async () => {
+    await expect(
+      prizeRepo.replacePrizes(999999, [{ name: "Sticker", tier: "common", display_price: 5000, quantity_total: 10 }])
+    ).rejects.toThrow("Không tìm thấy sản phẩm gacha")
+  })
+})
