@@ -124,6 +124,11 @@ export default function Shop() {
 
   const visibleCollections = sortCollections(
     (collections || []).filter((c) => {
+      // product_count already excludes booth-only gacha products (nothing an
+      // online buyer could ever purchase there) - a collection left at 0
+      // has nothing to sell online and would otherwise fall into the
+      // "Physical" group by default, mislabeled, linking to an empty page.
+      if (!c.product_count) return false
       if (search.trim() && !c.title.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (statusFilter && c.status !== statusFilter) return false
       if (typeFilter === "gacha" && !c.has_gacha_item) return false

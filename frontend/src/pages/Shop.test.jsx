@@ -51,9 +51,9 @@ beforeEach(() => {
 describe("Shop - collection ordering", () => {
   it("sinks closed (ended) collections after active ones, without reordering within each group", async () => {
     fetchCollections.mockResolvedValue([
-      { id: 1, slug: "ended-a", title: "Ended A", status: "closed", product_count: 0 },
+      { id: 1, slug: "ended-a", title: "Ended A", status: "closed", product_count: 1 },
       { id: 2, slug: "active-a", title: "Active A", status: "active", product_count: 1 },
-      { id: 3, slug: "ended-b", title: "Ended B", status: "closed", product_count: 0 },
+      { id: 3, slug: "ended-b", title: "Ended B", status: "closed", product_count: 1 },
       { id: 4, slug: "active-b", title: "Active B", status: "active", product_count: 2 },
     ])
     axios.get.mockResolvedValue({ data: {} })
@@ -153,6 +153,24 @@ describe("Shop - grouped by type", () => {
     expect([...gachaGroup.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Gacha One"])
   })
 
+  it("hides a collection with product_count 0, instead of mislabelling it into the Physical group", async () => {
+    // A collection whose only product is a booth-only gacha item has
+    // has_gacha_item: false (booth-only is deliberately excluded from that
+    // flag) and product_count: 0 (same exclusion) - nothing here for an
+    // online buyer to see or buy.
+    fetchCollections.mockResolvedValue([
+      { id: 1, slug: "booth-only-copy", title: "Booth Only Copy", status: "active", product_count: 0, has_gacha_item: false, has_digital_item: false },
+      { id: 2, slug: "b", title: "Real Physical", status: "active", product_count: 1, has_gacha_item: false, has_digital_item: false },
+    ])
+    axios.get.mockResolvedValue({ data: {} })
+
+    const container = await renderShop()
+    await flush()
+
+    const titles = [...container.querySelectorAll("h3")].map((h) => h.textContent)
+    expect(titles).toEqual(["Real Physical"])
+  })
+
   it("puts a collection mixing gacha and digital items into the Gacha group, not Digital", async () => {
     fetchCollections.mockResolvedValue([
       { id: 1, slug: "a", title: "Mixed", status: "active", product_count: 2, has_gacha_item: true, has_digital_item: true },
@@ -209,7 +227,7 @@ describe("Shop - not-started preview", () => {
 
   it("sorts not-started collections between live and closed ones", async () => {
     fetchCollections.mockResolvedValue([
-      { id: 1, slug: "ended", title: "Ended", status: "closed", product_count: 0, not_started_yet: false },
+      { id: 1, slug: "ended", title: "Ended", status: "closed", product_count: 1, not_started_yet: false },
       { id: 2, slug: "live", title: "Live", status: "active", product_count: 1, not_started_yet: false },
       { id: 3, slug: "upcoming", title: "Upcoming", status: "active", product_count: 1, not_started_yet: true, start_at: "2026-12-25T13:00:00.000Z" },
     ])
@@ -376,7 +394,7 @@ describe("Shop - search, filter, sort", () => {
 describe("Shop - closed drop overlay", () => {
   it("shows a 'this drop has ended' overlay on the thumbnail for a closed collection", async () => {
     fetchCollections.mockResolvedValue([
-      { id: 1, slug: "ended", title: "Ended", status: "closed", product_count: 0, cover_image: "https://x/cover.jpg" },
+      { id: 1, slug: "ended", title: "Ended", status: "closed", product_count: 1, cover_image: "https://x/cover.jpg" },
     ])
     axios.get.mockResolvedValue({ data: {} })
 
