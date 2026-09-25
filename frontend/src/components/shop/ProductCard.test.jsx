@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 import { MemoryRouter } from "react-router-dom"
@@ -650,6 +650,92 @@ describe("ProductCard - full variant gallery", () => {
     const grid = container.querySelector('[role="dialog"] [class*="grid-cols-3"]')
     expect(grid).toBeTruthy()
     expect(grid.className).toContain("lg:grid-cols-8")
+  })
+})
+
+describe("ProductCard - share", () => {
+  const originalShare = navigator.share
+  const originalClipboard = navigator.clipboard
+
+  afterEach(() => {
+    if (originalShare === undefined) delete navigator.share
+    else navigator.share = originalShare
+    if (originalClipboard === undefined) delete navigator.clipboard
+    else navigator.clipboard = originalClipboard
+  })
+
+  it("calls navigator.share with title/text/url when available", async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    navigator.share = share
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const shareBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Share")
+    await act(async () => { shareBtn.click() })
+
+    expect(share).toHaveBeenCalledTimes(1)
+    const arg = share.mock.calls[0][0]
+    expect(arg.title).toBe("Poster · A1")
+    expect(arg.url).toContain("product=1")
+    expect(arg.url).toContain("variant=1")
+  })
+
+  it("does not throw when the user cancels the native share sheet", async () => {
+    navigator.share = vi.fn().mockRejectedValue(new DOMException("cancelled", "AbortError"))
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const shareBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Share")
+    await expect(act(async () => { shareBtn.click() })).resolves.not.toThrow()
+  })
+
+  it("falls back to clipboard + shows a copied confirmation when navigator.share is unavailable", async () => {
+    delete navigator.share
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    navigator.clipboard = { writeText }
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const shareBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Share")
+    await act(async () => { shareBtn.click() })
+
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(writeText.mock.calls[0][0]).toContain("product=1")
+    expect(container.querySelector('[role="dialog"]').textContent).toContain("Link copied!")
+  })
+
+  it("falls back to window.prompt when neither the Clipboard API nor execCommand works", async () => {
+    delete navigator.share
+    delete navigator.clipboard
+    const execCommand = vi.fn().mockReturnValue(false)
+    document.execCommand = execCommand
+    const prompt = vi.spyOn(window, "prompt").mockImplementation(() => {})
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1")
+
+    const shareBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Share")
+    await act(async () => { shareBtn.click() })
+
+    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(prompt.mock.calls[0][1]).toContain("product=1")
+
+    prompt.mockRestore()
+    execCommand.mockRestore?.()
+  })
+
+  it("omits the variant query param for a single-variant product", async () => {
+    delete navigator.share
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    navigator.clipboard = { writeText }
+    const single = baseProduct({ variants: [{ id: 9, label: "Std", stock_qty: null, image_url: null }] })
+    const { container } = await renderCard({ product: single })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const shareBtn = [...container.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Share")
+    await act(async () => { shareBtn.click() })
+
+    expect(writeText.mock.calls[0][0]).not.toContain("variant=")
   })
 })
 

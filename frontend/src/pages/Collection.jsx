@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useParams, useSearchParams } from "react-router-dom"
 import { fetchCollection } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import { renderMarkdown } from "../utils/markdown"
@@ -26,6 +26,12 @@ function sortProducts(list, sortBy) {
 export default function Collection() {
   const { slug } = useParams()
   const { t } = useLanguage()
+  const [searchParams] = useSearchParams()
+  // A shared product link (see ProductCard.jsx's Share button / shop/share.js) -
+  // read once here and matched against the fetched collection below so the
+  // recipient lands straight on the same detail view a click would have opened.
+  const deepLinkProductId = searchParams.get("product")
+  const deepLinkVariantParam = searchParams.get("variant")
   const [result, setResult] = useState({ slug: null, collection: undefined })
   const [addedMsg, setAddedMsg] = useState(null)
   const [search, setSearch] = useState("")
@@ -203,6 +209,11 @@ export default function Collection() {
                   orderable={!closed && !notStartedYet}
                   unavailableLabel={unavailableLabel}
                   onAdded={handleAdded}
+                  deepLinkVariantId={
+                    deepLinkProductId && String(p.id) === deepLinkProductId
+                      ? (deepLinkVariantParam && Number.isFinite(Number(deepLinkVariantParam)) ? Number(deepLinkVariantParam) : null)
+                      : undefined
+                  }
                 />
               ))}
             </div>
