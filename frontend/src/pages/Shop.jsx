@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { fetchCollections } from "../api/shop"
+import { fetchCollections, fetchGroupOrder } from "../api/shop"
 import { useLanguage } from "../contexts/LanguageContext"
 import ShopHeader from "../components/shop/ShopHeader"
 import ShopFooter from "../components/shop/ShopFooter"
@@ -108,9 +108,12 @@ function CollectionGroup({ title, list, t }) {
   )
 }
 
+const DEFAULT_GROUP_ORDER = ["gacha", "digital", "physical"]
+
 export default function Shop() {
   const { t } = useLanguage()
   const [collections, setCollections] = useState(null)
+  const [groupOrder, setGroupOrder] = useState(DEFAULT_GROUP_ORDER)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [typeFilter, setTypeFilter] = useState("")
@@ -120,10 +123,20 @@ export default function Shop() {
     fetchCollections()
       .then(setCollections)
       .catch(() => setCollections([]))
+    // Admin-configurable (AdminShopGroupOrder) - falls back to the default
+    // order on any failure, same as every other best-effort storefront read.
+    fetchGroupOrder()
+      .then(setGroupOrder)
+      .catch(() => setGroupOrder(DEFAULT_GROUP_ORDER))
   }, [])
 
   const visibleCollections = sortCollections(
     (collections || []).filter((c) => {
+      // product_count already excludes booth-only gacha products (nothing an
+      // online buyer could ever purchase there) - a collection left at 0
+      // has nothing to sell online and would otherwise fall into the
+      // "Physical" group by default, mislabeled, linking to an empty page.
+      if (!c.product_count) return false
       if (search.trim() && !c.title.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (statusFilter && c.status !== statusFilter) return false
       if (typeFilter === "gacha" && !c.has_gacha_item) return false
@@ -133,7 +146,12 @@ export default function Shop() {
     }),
     sortBy
   )
-  const { gacha, digital, physical } = groupCollectionsByType(visibleCollections)
+  const groups = groupCollectionsByType(visibleCollections)
+  const groupTitles = {
+    gacha: t("shopGroupGacha"),
+    digital: t("shopGroupDigital"),
+    physical: t("shopGroupPhysical"),
+  }
 
   return (
     <>
@@ -195,9 +213,9 @@ export default function Shop() {
         <p className="opacity-60 mb-6">{t("shopNoCollectionsMatch")}</p>
       )}
 
-      <CollectionGroup title={t("shopGroupGacha")} list={gacha} t={t} />
-      <CollectionGroup title={t("shopGroupDigital")} list={digital} t={t} />
-      <CollectionGroup title={t("shopGroupPhysical")} list={physical} t={t} />
+      {groupOrder.map((key) => (
+        <CollectionGroup key={key} title={groupTitles[key]} list={groups[key]} t={t} />
+      ))}
       </main>
 
       <ShopFooter />

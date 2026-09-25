@@ -129,6 +129,18 @@ describe("buildRoster - pickup_code", () => {
   })
 })
 
+describe("buildRoster - queue_number", () => {
+  it("includes the queue number on every row", () => {
+    const { rows } = buildRoster([order({ queue_number: 7 })])
+    expect(rows[0].queue_number).toBe(7)
+  })
+
+  it("is null for an order that hasn't been assigned one yet", () => {
+    const { rows } = buildRoster([order({ queue_number: null })])
+    expect(rows[0].queue_number).toBeNull()
+  })
+})
+
 describe("buildRoster - prepared", () => {
   it("includes prepared, coerced to a boolean, on every row", () => {
     const { rows } = buildRoster([order({ id: 1, prepared: 1 }), order({ id: 2, prepared: 0 })])

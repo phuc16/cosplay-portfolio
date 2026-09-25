@@ -582,6 +582,14 @@ export default function Order() {
         </div>
       )}
 
+      {order.fulfillment_method === "pickup" && order.queue_number && (
+        <div className="mt-4 p-4 rounded-xl border border-[var(--border-warning)] bg-[var(--surface-warning)] text-center">
+          <p className="text-xs opacity-70">{t("orderQueueNumber")}</p>
+          <p className="text-2xl font-bold tracking-widest">{order.queue_number}</p>
+          <p className="text-xs opacity-60 mt-1">{t("orderQueueNumberHint")}</p>
+        </div>
+      )}
+
       {order.fulfillment_method === "pickup" && order.pickup_code && (
         <div className="mt-4 p-4 rounded-xl border border-[var(--border-warning)] bg-[var(--surface-warning)] text-center">
           <p className="text-xs opacity-70">{t("orderPickupCode")}</p>

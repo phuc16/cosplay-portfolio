@@ -553,6 +553,30 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.textContent).not.toContain("Chưa quay hết")
   })
 
+  it("shows a queue number badge for a pickup order that has one", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "pickup", queue_number: 7 })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).toContain("STT 7")
+  })
+
+  it("shows no queue number badge for a pickup order that doesn't have one yet", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "pickup", queue_number: null })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).not.toContain("STT")
+  })
+
+  it("shows no queue number badge for a ship order", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship", queue_number: 7 })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).not.toContain("STT")
+  })
+
   it("fetches payment instructions by id under admin auth when opening the detail panel, not the buyer's public token route", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1 })])
     adminGetOrder.mockResolvedValue(order({ id: 1, email: "a@b.com", items: [] }))

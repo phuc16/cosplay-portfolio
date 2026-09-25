@@ -404,6 +404,11 @@ export default function AdminOrders() {
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <StatusBadge label={labelFor(STATUS_LABELS, o.status)} variant={variantForStatus(o.status)} />
                   <span className="text-sm opacity-70">{labelFor(FULFILLMENT_METHOD_LABELS, o.fulfillment_method)}</span>
+                  {o.fulfillment_method === "pickup" && o.queue_number && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--surface-warning)] text-[var(--text-warning)]">
+                      STT {o.queue_number}
+                    </span>
+                  )}
                   {o.has_digital_item && o.fulfillment_method !== "digital" && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--brand-soft)]">
                       + Sản phẩm số

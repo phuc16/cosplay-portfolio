@@ -389,7 +389,7 @@ module.exports = function adminShippingRoutes() {
       // would miss an order for every collection but that one. EXISTS against
       // order_items' per-line snapshot catches every collection it touches.
       const [orderRows] = await db.query(
-        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code, created_at, prepared, note
+        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code, queue_number, created_at, prepared, note
            FROM orders o
           WHERE status = 'confirmed' AND fulfillment_method = 'pickup'
             AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.collection_id_snapshot = ?)`,
