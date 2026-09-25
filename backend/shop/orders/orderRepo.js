@@ -510,6 +510,21 @@ async function createOrder(input) {
     }
 
     await conn.commit()
+
+    // COD has no proof-upload step to hang the assignment off - the order is
+    // real (cash changes hands at pickup, nothing to abandon) the moment
+    // it's placed, unlike a prepaid order where an unconfirmed checkout may
+    // never actually pay. Best-effort: a queue number is a courtesy for
+    // physically queuing at the event, not something a placed order should
+    // fail over.
+    if (fulfillmentMethod === "pickup" && input.payment_method === "cod") {
+      try {
+        await assignQueueNumberIfNeeded(res.insertId)
+      } catch (err) {
+        console.error("[ORDERS] Không gán được số thứ tự:", err.message)
+      }
+    }
+
     return { id: res.insertId, order_token: token, access_pin: accessPin, total, reused: false }
   } catch (err) {
     await conn.rollback()
@@ -909,24 +924,75 @@ async function transitionOrder(id, toStatus, extra = {}) {
  */
 async function savePaymentProof(orderId, url) {
   const conn = await db.getConnection()
+  let fulfillmentMethod
   try {
     await conn.beginTransaction()
-    const [[order]] = await conn.query("SELECT status FROM orders WHERE id = ? FOR UPDATE", [orderId])
+    const [[order]] = await conn.query("SELECT status, fulfillment_method FROM orders WHERE id = ? FOR UPDATE", [orderId])
     if (!order || order.status !== "pending") {
       await conn.rollback()
       return false
     }
+    fulfillmentMethod = order.fulfillment_method
     await conn.query(
       "UPDATE orders SET payment_proof_url = ?, payment_proof_uploaded_at = NOW() WHERE id = ?",
       [url, orderId]
     )
     await conn.commit()
-    return true
   } catch (err) {
     await conn.rollback()
     throw err
   } finally {
     conn.release()
+  }
+
+  // The buyer has now done everything on their end (an unconfirmed pending
+  // order with no proof yet stays unnumbered) - a queue number is a
+  // courtesy for physically queuing at the event, not something the
+  // already-successful upload above should fail over.
+  if (fulfillmentMethod === "pickup") {
+    try {
+      await assignQueueNumberIfNeeded(orderId)
+    } catch (err) {
+      console.error("[ORDERS] Không gán được số thứ tự:", err.message)
+    }
+  }
+  return true
+}
+
+/**
+ * Assigns the next per-collection queue number to a pickup order, so the
+ * buyer can queue at the event by number - a no-op if the order isn't
+ * pickup or already has one. Numbers are never reused/backfilled: a
+ * cancelled order keeps its number, matching how a physical ticket stays
+ * "called" rather than being handed to someone else.
+ *
+ * Concurrent callers computing the same next number is a real race (no
+ * lock is held across the read and the write); the unique index on
+ * (collection_id, queue_number) is what actually prevents a collision -
+ * the loser retries with a freshly re-read next number, same TOCTOU-retry
+ * shape as createCollection's slug uniqueness.
+ */
+async function assignQueueNumberIfNeeded(orderId, attempt = 0) {
+  const [[order]] = await db.query(
+    "SELECT collection_id, fulfillment_method, queue_number FROM orders WHERE id = ?",
+    [orderId]
+  )
+  if (!order || order.fulfillment_method !== "pickup" || order.queue_number !== null) return
+
+  const [[{ next }]] = await db.query(
+    "SELECT COALESCE(MAX(queue_number), 0) + 1 AS next FROM orders WHERE collection_id <=> ?",
+    [order.collection_id]
+  )
+  try {
+    await db.query(
+      "UPDATE orders SET queue_number = ? WHERE id = ? AND queue_number IS NULL",
+      [next, orderId]
+    )
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY" && attempt < 5) {
+      return assignQueueNumberIfNeeded(orderId, attempt + 1)
+    }
+    throw err
   }
 }
 
@@ -1096,6 +1162,7 @@ module.exports = {
   transitionOrder,
   updateBuyerInfo,
   savePaymentProof,
+  assignQueueNumberIfNeeded,
   releaseExpiredOrders,
   OutOfStockError,
   VariantNotFoundError,

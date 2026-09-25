@@ -22,6 +22,25 @@ describe("renderTemplate", () => {
     expect(out.html).toContain("Nguyễn Văn A")
   })
 
+  it("includes the queue number in receiver_info for a pickup order that has one", () => {
+    const pickupOrder = { ...order, fulfillment_method: "pickup", queue_number: 7, pickup_locations: [] }
+    const out = t.renderTemplate({ subject: "x", body_html: "{{receiver_info}}" }, t.buildVars(pickupOrder))
+    expect(out.html).toContain("Số thứ tự")
+    expect(out.html).toContain("7")
+  })
+
+  it("omits the queue number row for a pickup order that doesn't have one yet", () => {
+    const pickupOrder = { ...order, fulfillment_method: "pickup", queue_number: null, pickup_locations: [] }
+    const out = t.renderTemplate({ subject: "x", body_html: "{{receiver_info}}" }, t.buildVars(pickupOrder))
+    expect(out.html).not.toContain("Số thứ tự")
+  })
+
+  it("never shows a queue number for a ship order, even if the field is somehow set", () => {
+    const shipOrder = { ...order, fulfillment_method: "ship", queue_number: 7 }
+    const out = t.renderTemplate({ subject: "x", body_html: "{{receiver_info}}" }, t.buildVars(shipOrder))
+    expect(out.html).not.toContain("Số thứ tự")
+  })
+
   it("formats the total as VND", () => {
     const out = t.renderTemplate({ subject: "x", body_html: "{{total}}" }, t.buildVars(order))
     expect(out.html).toContain("105.000")

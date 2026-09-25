@@ -64,6 +64,9 @@ function receiverInfoHtml(order) {
       if (loc.pickup_location) rows.push([`Địa điểm nhận${suffix}`, loc.pickup_location])
       if (loc.pickup_note) rows.push([`Ghi chú nhận hàng${suffix}`, loc.pickup_note])
     }
+    // Assigned once the buyer's done their part (proof uploaded, or
+    // immediately for COD) - absent until then, see orderRepo.assignQueueNumberIfNeeded.
+    if (order.queue_number) rows.push(["Số thứ tự", String(order.queue_number)])
   }
   const cells = rows.map(([label, value]) => `
     <tr>
