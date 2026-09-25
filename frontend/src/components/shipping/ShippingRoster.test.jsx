@@ -383,6 +383,47 @@ describe("ShippingRoster", () => {
     expect(row.textContent).toContain("PICKUP-7X2K")
   })
 
+  it("renders the queue number (STT) for a row that has one", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+          queue_number: 7,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    expect(container.textContent).toContain("STT")
+    const row = container.querySelector("tbody tr")
+    expect(row.textContent).toContain("7")
+  })
+
+  it("shows a dash for a row with no queue number yet", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [
+        {
+          order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+          items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+          queue_number: null,
+        },
+      ],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    const row = container.querySelector("tbody tr")
+    expect(row.textContent).toContain("-")
+  })
+
   it("has a print button", async () => {
     adminGetPickupRoster.mockResolvedValue({ rows: [], excluded: [] })
     const container = await renderComponent()

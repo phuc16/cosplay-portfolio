@@ -13,7 +13,7 @@ function matchesSearch(r, term) {
   if (!term) return true
   const needle = term.trim().toLowerCase()
   if (!needle) return true
-  return [r.order_code, r.buyer_name, r.phone, r.pickup_code].some((f) => String(f || "").toLowerCase().includes(needle))
+  return [r.order_code, r.buyer_name, r.phone, r.pickup_code, r.queue_number].some((f) => String(f || "").toLowerCase().includes(needle))
 }
 
 export default function ShippingRoster() {
@@ -136,6 +136,7 @@ export default function ShippingRoster() {
                   <thead>
                     <tr className="text-left opacity-70">
                       <th className="pr-2">✓</th>
+                      <th className="pr-2">STT</th>
                       <th className="pr-2">Mã đơn</th>
                       <th className="pr-2">Mã nhận hàng</th>
                       <th className="pr-2">Người nhận</th>
@@ -157,6 +158,7 @@ export default function ShippingRoster() {
                             className={`border-t border-[var(--border-brand)] ${rowVisible ? "" : "hidden print:table-row"}`}
                           >
                             <td className="pr-2 py-1">☐</td>
+                            <td className="pr-2 py-1 font-semibold">{r.queue_number ?? "-"}</td>
                             <td className="pr-2 py-1">
                               {r.order_code}
                               {r.has_digital_item && (

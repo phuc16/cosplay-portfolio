@@ -41,6 +41,7 @@ function buildRoster(orders) {
       buyer_name: order.buyer_name,
       phone: order.phone,
       pickup_code: order.pickup_code,
+      queue_number: order.queue_number ?? null,
       // The buyer's own checkout note - for staff handing the order over,
       // never sent to a courier (this is a pickup order, there is no
       // courier involved at all).

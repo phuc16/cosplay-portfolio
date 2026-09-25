@@ -299,6 +299,20 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(row.pickup_code).toMatch(/^\d{6}$/)
   })
 
+  it("includes the queue number once assigned (COD pickup order gets one immediately)", async () => {
+    const { collectionId, orderId } = await seedPickupOrder({ payment_method: "cod" })
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
+    const row = res.body.rows.find((r) => r.order_id === orderId)
+    expect(row.queue_number).toBe(1)
+  })
+
+  it("is null for a prepaid pickup order that hasn't uploaded proof yet", async () => {
+    const { collectionId, orderId } = await seedPickupOrder({ payment_method: "bank" })
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
+    const row = res.body.rows.find((r) => r.order_id === orderId)
+    expect(row.queue_number).toBeNull()
+  })
+
   // --- order_token must never leak into this printed/carried document ---
   it("never includes order_token in the response, even as a canary value", async () => {
     const { collectionId, orderId } = await seedPickupOrder()
