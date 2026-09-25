@@ -317,11 +317,16 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(row.queue_number).toBe(1)
   })
 
-  it("is null for a prepaid pickup order that hasn't uploaded proof yet", async () => {
+  // A pickup order reaching the roster is always 'confirmed', and
+  // transitionOrder's fallback now guarantees a confirmed pickup order
+  // always has a queue number by then (via proof upload or the fallback
+  // itself) - there's no longer a "confirmed but unnumbered" case to test
+  // here.
+  it("assigns a queue number even when an admin confirms directly, without any proof upload", async () => {
     const { collectionId, orderId } = await seedPickupOrder({ payment_method: "bank" })
     const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
     const row = res.body.rows.find((r) => r.order_id === orderId)
-    expect(row.queue_number).toBeNull()
+    expect(row.queue_number).toBe(1)
   })
 
   // --- order_token must never leak into this printed/carried document ---

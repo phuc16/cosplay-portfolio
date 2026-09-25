@@ -64,9 +64,6 @@ function receiverInfoHtml(order) {
       if (loc.pickup_location) rows.push([`Địa điểm nhận${suffix}`, loc.pickup_location])
       if (loc.pickup_note) rows.push([`Ghi chú nhận hàng${suffix}`, loc.pickup_note])
     }
-    // Assigned once the buyer's done their part (proof uploaded, or
-    // immediately for COD) - absent until then, see orderRepo.assignQueueNumberIfNeeded.
-    if (order.queue_number) rows.push(["Số thứ tự", String(order.queue_number)])
   }
   const cells = rows.map(([label, value]) => `
     <tr>
@@ -75,7 +72,28 @@ function receiverInfoHtml(order) {
     </tr>`).join("")
   return `
     <p style="font-weight:700;font-size:14px;margin:16px 0 6px">Thông tin nhận hàng</p>
-    <table style="width:100%;border-collapse:collapse">${cells}</table>`
+    <table style="width:100%;border-collapse:collapse">${cells}</table>
+    ${queueNumberHtml(order)}`
+}
+
+/**
+ * A standalone, hard-to-miss block for the pickup queue number - buried as
+ * just another row in the info table above was too easy to skim past for
+ * something a buyer needs to physically read out at the event. Mirrors the
+ * order page's own pickup-code callout (large, centered, its own box).
+ * Assigned once the buyer's done their part (payment proof uploaded) -
+ * absent until then, see orderRepo.assignQueueNumberIfNeeded.
+ */
+function queueNumberHtml(order) {
+  if (order.fulfillment_method !== "pickup" || !order.queue_number) return ""
+  return `
+    <table style="width:100%;border-collapse:collapse;margin-top:12px">
+      <tr><td style="padding:14px;text-align:center;background:#fff8e6;border:1px solid #f5deb3;border-radius:8px">
+        <div style="font-size:12px;color:#8a6d1f">Số thứ tự</div>
+        <div style="font-size:28px;font-weight:800;letter-spacing:2px;color:#8a6d1f">${escapeHtml(order.queue_number)}</div>
+        <div style="font-size:12px;color:#8a6d1f;margin-top:2px">Dùng số này để xếp hàng tại sự kiện</div>
+      </td></tr>
+    </table>`
 }
 
 function itemsHtml(items = [], { showDeliveryLink = false, orderUrl = "" } = {}) {
