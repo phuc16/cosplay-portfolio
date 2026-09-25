@@ -3,13 +3,11 @@ import StatsDrop from "./stats/StatsDrop"
 import StatsRestock from "./stats/StatsRestock"
 import StatsBookkeeping from "./stats/StatsBookkeeping"
 import StatsGacha from "./stats/StatsGacha"
-import AdminBoothOrders from "./AdminBoothOrders"
 
 const VIEWS = [
   { key: "drop", label: "Theo đợt bán" },
   { key: "restock", label: "Restock" },
   { key: "bookkeeping", label: "Sổ quỹ" },
-  { key: "booth", label: "Tại quầy" },
   { key: "gacha", label: "Gacha" },
 ]
 
@@ -36,7 +34,6 @@ export default function AdminStats() {
       {view === "drop" && <StatsDrop />}
       {view === "restock" && <StatsRestock />}
       {view === "bookkeeping" && <StatsBookkeeping />}
-      {view === "booth" && <AdminBoothOrders />}
       {view === "gacha" && <StatsGacha />}
     </div>
   )
