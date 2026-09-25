@@ -36,6 +36,31 @@ beforeEach(async () => {
 
 afterAll(closeDb)
 
+describe("GET /gacha-products", () => {
+  it("lists gacha products across collections, including collection_title, booth-only ones too", async () => {
+    const pid = await seedGachaProduct()
+    const cid2 = await catalog.createCollection({ title: "Booth Only Drop", status: "active" })
+    const pid2 = await catalog.createProduct({
+      collection_id: cid2, name: "Booth Case", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+
+    const res = await request(makeApp()).get("/api/admin/gacha-products").set("Authorization", `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    const ids = res.body.map((p) => p.id)
+    expect(ids).toContain(pid)
+    expect(ids).toContain(pid2)
+    expect(res.body.find((p) => p.id === pid).collection_title).toBe("Gacha Drop")
+  })
+
+  it("excludes non-gacha products", async () => {
+    const cid = await catalog.createCollection({ title: "Physical Drop", status: "active" })
+    await catalog.createProduct({ collection_id: cid, name: "Poster", price: 35000, type: "physical" })
+
+    const res = await request(makeApp()).get("/api/admin/gacha-products").set("Authorization", `Bearer ${adminToken()}`)
+    expect(res.body).toEqual([])
+  })
+})
+
 describe("PUT /gacha-products/:id/prizes", () => {
   it("saves the prize list", async () => {
     const pid = await seedGachaProduct()

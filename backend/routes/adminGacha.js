@@ -1,6 +1,7 @@
 const express = require("express")
 const prizeRepo = require("../shop/gacha/prizeRepo")
 const sessionRepo = require("../shop/gacha/sessionRepo")
+const catalogRepo = require("../shop/catalogRepo")
 
 const bad = (res, message) => res.status(400).json({ error: "invalid_input", message })
 const oops = (res, err, where) => {
@@ -28,6 +29,14 @@ function validatePrizes(prizes) {
 
 module.exports = function adminGachaRoutes() {
   const router = express.Router()
+
+  router.get("/gacha-products", async (req, res) => {
+    try {
+      res.json(await catalogRepo.listGachaProducts())
+    } catch (err) {
+      oops(res, err, "Lỗi liệt kê sản phẩm gacha")
+    }
+  })
 
   router.get("/gacha-products/:productId/prizes", async (req, res) => {
     try {

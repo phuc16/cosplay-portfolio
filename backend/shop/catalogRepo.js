@@ -89,6 +89,19 @@ async function closeExpiredCollections(rows) {
   return rows.map((r) => (dueIds.has(r.id) ? { ...r, status: "closed" } : r))
 }
 
+/** Every gacha product across every collection, for the admin gacha-stats
+ * product picker - includes booth-only products, unlike the public listing. */
+async function listGachaProducts() {
+  const [rows] = await db.query(
+    `SELECT p.id, p.name, p.collection_id, c.title AS collection_title
+       FROM products p
+       JOIN collections c ON c.id = p.collection_id
+      WHERE p.type = 'gacha'
+      ORDER BY c.sort_order ASC, p.sort_order ASC`
+  )
+  return rows
+}
+
 async function listAllCollections() {
   const [rows] = await db.query(
     "SELECT * FROM collections ORDER BY sort_order ASC, id ASC"
@@ -697,6 +710,7 @@ async function replaceVariants(productId, variants) {
 
 module.exports = {
   PUBLIC_STATUSES,
+  listGachaProducts,
   listAllCollections,
   listPublicCollections,
   getPublicCollectionBySlug,

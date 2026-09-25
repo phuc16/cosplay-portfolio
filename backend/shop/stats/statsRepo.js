@@ -419,7 +419,117 @@ async function getBookkeepingStats({ date_from: dateFrom, date_to: dateTo }) {
   }
 }
 
+const GACHA_TIERS = ["common", "rare", "mythical", "legendary", "ancient"]
+
+/**
+ * A gacha product's draws, tier rollup, and money - both online and booth
+ * combined, and split by channel. gacha_sessions.source ("online" |
+ * "booth_cash") is the channel discriminator; practice draws never persist
+ * a session/draw row at all (see prizeRepo.practiceDraw), so no filtering
+ * for those is needed here. Draw counts are read straight off gacha_draws,
+ * matching the prize editor's own "Đã trúng" figure (quantity_total -
+ * quantity_remaining) - drawn history is immutable even if the order that
+ * paid for it is later cancelled (see replacePrizes' delete-guard comment),
+ * so these are not filtered by order status.
+ */
+async function getGachaDropStats(productId) {
+  const [[product]] = await db.query(
+    `SELECT p.id, p.name, p.price, p.collection_id, c.title AS collection_title
+       FROM products p
+       JOIN collections c ON c.id = p.collection_id
+      WHERE p.id = ? AND p.type = 'gacha'`,
+    [productId]
+  )
+  if (!product) return null
+
+  const [prizeRows] = await db.query(
+    `SELECT id, name, tier, display_price, quantity_total, quantity_remaining
+       FROM gacha_prizes WHERE product_id = ? ORDER BY sort_order ASC, id ASC`,
+    [productId]
+  )
+
+  const [drawRows] = await db.query(
+    `SELECT gd.gacha_prize_id, gs.source, COUNT(*) AS cnt
+       FROM gacha_draws gd
+       JOIN gacha_sessions gs ON gs.id = gd.session_id
+      WHERE gs.product_id = ?
+      GROUP BY gd.gacha_prize_id, gs.source`,
+    [productId]
+  )
+  const drawnByPrize = new Map()
+  for (const row of drawRows) {
+    const entry = drawnByPrize.get(row.gacha_prize_id) || { online: 0, booth: 0 }
+    if (row.source === "online") entry.online = Number(row.cnt)
+    else if (row.source === "booth_cash") entry.booth = Number(row.cnt)
+    drawnByPrize.set(row.gacha_prize_id, entry)
+  }
+
+  const tierRollup = new Map(GACHA_TIERS.map((t) => [t, {
+    tier: t, drawn_online: 0, drawn_booth: 0, value_online: 0, value_booth: 0,
+  }]))
+
+  const prizes = prizeRows.map((p) => {
+    const drawn = drawnByPrize.get(p.id) || { online: 0, booth: 0 }
+    const price = Number(p.display_price)
+    const rollup = tierRollup.get(p.tier)
+    if (rollup) {
+      rollup.drawn_online += drawn.online
+      rollup.drawn_booth += drawn.booth
+      rollup.value_online += drawn.online * price
+      rollup.value_booth += drawn.booth * price
+    }
+    return {
+      id: p.id, name: p.name, tier: p.tier, display_price: price,
+      quantity_total: p.quantity_total, quantity_remaining: p.quantity_remaining,
+      drawn_online: drawn.online, drawn_booth: drawn.booth,
+    }
+  })
+
+  const [[{ variant_id: variantId }]] = await db.query(
+    "SELECT id AS variant_id FROM product_variants WHERE product_id = ? LIMIT 1",
+    [productId]
+  )
+  const [[{ total: onlineRevenue }]] = await db.query(
+    `SELECT COALESCE(SUM(oi.unit_price_snapshot * oi.qty), 0) AS total
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+      WHERE oi.product_variant_id = ? AND oi.gacha_draw_id IS NULL AND o.status != 'cancelled'`,
+    [variantId]
+  )
+  const [[{ total: boothRevenue }]] = await db.query(
+    `SELECT COALESCE(SUM(o.total), 0) AS total
+       FROM gacha_sessions gs
+       JOIN orders o ON o.id = gs.order_id
+      WHERE gs.product_id = ? AND gs.source = 'booth_cash' AND o.status != 'cancelled'`,
+    [productId]
+  )
+
+  const tiers = [...tierRollup.values()]
+  const valueGivenOut = tiers.reduce(
+    (acc, t) => ({ online: acc.online + t.value_online, booth: acc.booth + t.value_booth }),
+    { online: 0, booth: 0 }
+  )
+
+  return {
+    product_id: product.id,
+    product_name: product.name,
+    collection_id: product.collection_id,
+    collection_title: product.collection_title,
+    prizes,
+    tiers,
+    revenue: {
+      online: Number(onlineRevenue), booth: Number(boothRevenue),
+      total: Number(onlineRevenue) + Number(boothRevenue),
+    },
+    value_given_out: {
+      online: valueGivenOut.online, booth: valueGivenOut.booth,
+      total: valueGivenOut.online + valueGivenOut.booth,
+    },
+  }
+}
+
 module.exports = {
   getDropStats, buildVariantSummary, getRestockStats,
   getBookkeepingStats, parseLocalDateRange, InvalidRangeError,
+  getGachaDropStats,
 }
