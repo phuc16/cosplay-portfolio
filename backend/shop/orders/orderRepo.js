@@ -511,20 +511,6 @@ async function createOrder(input) {
 
     await conn.commit()
 
-    // COD has no proof-upload step to hang the assignment off - the order is
-    // real (cash changes hands at pickup, nothing to abandon) the moment
-    // it's placed, unlike a prepaid order where an unconfirmed checkout may
-    // never actually pay. Best-effort: a queue number is a courtesy for
-    // physically queuing at the event, not something a placed order should
-    // fail over.
-    if (fulfillmentMethod === "pickup" && input.payment_method === "cod") {
-      try {
-        await assignQueueNumberIfNeeded(res.insertId)
-      } catch (err) {
-        console.error("[ORDERS] Không gán được số thứ tự:", err.message)
-      }
-    }
-
     return { id: res.insertId, order_token: token, access_pin: accessPin, total, reused: false }
   } catch (err) {
     await conn.rollback()
@@ -971,6 +957,14 @@ async function savePaymentProof(orderId, url) {
  * (collection_id, queue_number) is what actually prevents a collision -
  * the loser retries with a freshly re-read next number, same TOCTOU-retry
  * shape as createCollection's slug uniqueness.
+ *
+ * CAVEAT: that index only guards this if collection_id is non-NULL - MySQL
+ * treats every NULL as distinct in a unique index, so two orders whose
+ * collection has been deleted (collection_id ON DELETE SET NULL) would not
+ * collide against each other at all. Not reachable today only because
+ * deleteCollection refuses to delete a collection with any live order still
+ * referencing it - a future caller of this function must not assume the
+ * index alone is sufficient without that same guarantee.
  */
 async function assignQueueNumberIfNeeded(orderId, attempt = 0) {
   const [[order]] = await db.query(

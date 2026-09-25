@@ -31,15 +31,11 @@ beforeEach(async () => {
 
 afterAll(closeDb)
 
-describe("createOrder - queue number for COD pickup", () => {
-  it("assigns a queue number immediately for a COD pickup order", async () => {
-    const { variantId } = await seedVariant()
-    const res = await repo.createOrder(pickupOrder(variantId, { payment_method: "cod" }))
-
-    const order = await repo.getOrderById(res.id)
-    expect(order.queue_number).toBe(1)
-  })
-
+describe("createOrder - queue number is never assigned at creation time", () => {
+  // payment_method: "cod" + fulfillment_method: "pickup" is rejected by
+  // routes/orders.js's own request validation before createOrder is ever
+  // called - a pickup order is always prepaid in practice, so createOrder
+  // itself has no COD-at-creation path to test.
   it("does not assign a queue number for a prepaid pickup order at creation time", async () => {
     const { variantId } = await seedVariant()
     const res = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
@@ -48,39 +44,15 @@ describe("createOrder - queue number for COD pickup", () => {
     expect(order.queue_number).toBeNull()
   })
 
-  it("does not assign a queue number for a ship order, even COD", async () => {
+  it("does not assign a queue number for a ship order", async () => {
     const { variantId } = await seedVariant()
     const res = await repo.createOrder({
       items: [{ variant_id: variantId, qty: 1 }],
-      buyer, fulfillment_method: "ship", payment_method: "cod",
+      buyer, fulfillment_method: "ship", payment_method: "bank",
     })
 
     const order = await repo.getOrderById(res.id)
     expect(order.queue_number).toBeNull()
-  })
-
-  it("increments per collection - a second COD pickup order in the same collection gets the next number", async () => {
-    const { variantId } = await seedVariant()
-    const first = await repo.createOrder(pickupOrder(variantId, { payment_method: "cod" }))
-    const second = await repo.createOrder(pickupOrder(variantId, { payment_method: "cod" }))
-
-    const orderA = await repo.getOrderById(first.id)
-    const orderB = await repo.getOrderById(second.id)
-    expect(orderA.queue_number).toBe(1)
-    expect(orderB.queue_number).toBe(2)
-  })
-
-  it("numbers a different collection independently, starting back at 1", async () => {
-    const a = await seedVariant({ title: "Drop A" })
-    const b = await seedVariant({ title: "Drop B" })
-    await repo.createOrder(pickupOrder(a.variantId, { payment_method: "cod" }))
-    const first = await repo.createOrder(pickupOrder(a.variantId, { payment_method: "cod" }))
-    const otherCollection = await repo.createOrder(pickupOrder(b.variantId, { payment_method: "cod" }))
-
-    const orderA2 = await repo.getOrderById(first.id)
-    const orderB1 = await repo.getOrderById(otherCollection.id)
-    expect(orderA2.queue_number).toBe(2)
-    expect(orderB1.queue_number).toBe(1)
   })
 })
 
@@ -93,6 +65,33 @@ describe("savePaymentProof - queue number for prepaid pickup", () => {
 
     const order = await repo.getOrderById(res.id)
     expect(order.queue_number).toBe(1)
+  })
+
+  it("increments per collection - a second order in the same collection gets the next number", async () => {
+    const { variantId } = await seedVariant()
+    const first = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    const second = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    await repo.savePaymentProof(first.id, "https://x/proof1.png")
+    await repo.savePaymentProof(second.id, "https://x/proof2.png")
+
+    const orderA = await repo.getOrderById(first.id)
+    const orderB = await repo.getOrderById(second.id)
+    expect(orderA.queue_number).toBe(1)
+    expect(orderB.queue_number).toBe(2)
+  })
+
+  it("numbers a different collection independently, starting back at 1", async () => {
+    const a = await seedVariant({ title: "Drop A" })
+    const b = await seedVariant({ title: "Drop B" })
+    const first = await repo.createOrder(pickupOrder(a.variantId, { payment_method: "bank" }))
+    const otherCollection = await repo.createOrder(pickupOrder(b.variantId, { payment_method: "bank" }))
+    await repo.savePaymentProof(first.id, "https://x/proof1.png")
+    await repo.savePaymentProof(otherCollection.id, "https://x/proof2.png")
+
+    const orderA = await repo.getOrderById(first.id)
+    const orderB1 = await repo.getOrderById(otherCollection.id)
+    expect(orderA.queue_number).toBe(1)
+    expect(orderB1.queue_number).toBe(1)
   })
 
   it("does not assign one for a ship order's proof upload", async () => {
@@ -126,10 +125,12 @@ describe("savePaymentProof - queue number for prepaid pickup", () => {
 describe("assignQueueNumberIfNeeded", () => {
   it("is a no-op for a cancelled order that already has a number (numbers are never reused)", async () => {
     const { variantId } = await seedVariant()
-    const res = await repo.createOrder(pickupOrder(variantId, { payment_method: "cod" }))
+    const res = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    await repo.savePaymentProof(res.id, "https://x/proof.png")
     await repo.transitionOrder(res.id, "cancelled")
 
-    const second = await repo.createOrder(pickupOrder(variantId, { payment_method: "cod" }))
+    const second = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    await repo.savePaymentProof(second.id, "https://x/proof2.png")
 
     const cancelled = await repo.getOrderById(res.id)
     const active = await repo.getOrderById(second.id)

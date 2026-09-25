@@ -299,10 +299,21 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(row.pickup_code).toMatch(/^\d{6}$/)
   })
 
-  it("includes the queue number once assigned (COD pickup order gets one immediately)", async () => {
-    const { collectionId, orderId } = await seedPickupOrder({ payment_method: "cod" })
-    const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}`))
-    const row = res.body.rows.find((r) => r.order_id === orderId)
+  it("includes the queue number once the buyer has uploaded payment proof", async () => {
+    // seedPickupOrder confirms immediately - proof must be uploaded while
+    // still pending, so this builds the order manually instead.
+    const cid = await catalog.createCollection({ title: "Drop", status: "active", allow_pickup: true })
+    const pid = await catalog.createProduct({ collection_id: cid, name: "Card", price: 40000 })
+    await catalog.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+    const o = await orders.createOrder({
+      items: [{ variant_id: v.id, qty: 1 }], buyer, fulfillment_method: "pickup", payment_method: "bank",
+    })
+    await orders.savePaymentProof(o.id, "https://x/proof.png")
+    await orders.transitionOrder(o.id, "confirmed")
+
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${cid}`))
+    const row = res.body.rows.find((r) => r.order_id === o.id)
     expect(row.queue_number).toBe(1)
   })
 
