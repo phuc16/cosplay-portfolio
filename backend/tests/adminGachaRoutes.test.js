@@ -124,6 +124,32 @@ describe("GET /gacha-products/:id/prizes", () => {
     const res = await request(app).get("/api/admin/gacha-products/999999/prizes").set("Authorization", `Bearer ${adminToken()}`)
     expect(res.status).toBe(404)
   })
+
+  it("still returns 200 for a gacha product that is buyable online (gacha_booth_only: false) - the check is type-only, not booth-only-gated", async () => {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({
+      collection_id: cid, name: "Mystery Case", price: 20000, type: "gacha", gacha_booth_only: false,
+    })
+    const app = makeApp()
+    await savePrizes(app, pid, ONE_PRIZE)
+
+    const res = await request(app).get(`/api/admin/gacha-products/${pid}/prizes`).set("Authorization", `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+  })
+
+  it("also returns 200 for a booth-only gacha product (gacha_booth_only: true)", async () => {
+    const cid = await catalog.createCollection({ title: "Gacha Drop", status: "active" })
+    const pid = await catalog.createProduct({
+      collection_id: cid, name: "Booth Only Case", price: 20000, type: "gacha", gacha_booth_only: true,
+    })
+    const app = makeApp()
+    await savePrizes(app, pid, ONE_PRIZE)
+
+    const res = await request(app).get(`/api/admin/gacha-products/${pid}/prizes`).set("Authorization", `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+  })
 })
 
 describe("POST /gacha-products/:id/booth-sessions", () => {
