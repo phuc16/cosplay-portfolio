@@ -343,6 +343,33 @@ describe("products and variants", () => {
     expect(res.body.error).toBe("invalid_input")
   })
 
+  it("accepts a character_tag at exactly the 255-char limit", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const tag = "a".repeat(255)
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Card", price: 1000, character_tag: tag })
+    expect(res.status).toBe(201)
+  })
+
+  it("rejects a character_tag one character over the 255-char limit with 400, not 500", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const tag = "a".repeat(256)
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Card", price: 1000, character_tag: tag })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("invalid_input")
+  })
+
+  it("creates a product with no character_tag at all, stored as null", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const res = await authed(request(app).post(`/api/admin/collections/${cid}/products`))
+      .send({ name: "Card", price: 1000 })
+    expect(res.status).toBe(201)
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === res.body.id).character_tag).toBeNull()
+  })
+
   it("bulk replaces variants, preserving null stock as unlimited", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
     const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })

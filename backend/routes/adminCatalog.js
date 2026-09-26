@@ -53,6 +53,9 @@ function validateCollection(body) {
 function validateProduct(body) {
   if (!body.name || !String(body.name).trim()) return "Cần tên sản phẩm"
   if (String(body.name).length > NAME_MAX_LEN) return `Tên sản phẩm không được quá ${NAME_MAX_LEN} ký tự`
+  if (body.character_tag && String(body.character_tag).length > NAME_MAX_LEN) {
+    return `Nhân vật/series không được quá ${NAME_MAX_LEN} ký tự`
+  }
   const price = Number(body.price)
   if (!Number.isInteger(price) || price < 0) return "Giá phải là số nguyên không âm (VND)"
   if (body.type !== undefined && !["physical", "digital", "gacha"].includes(body.type)) return "Loại sản phẩm không hợp lệ"
