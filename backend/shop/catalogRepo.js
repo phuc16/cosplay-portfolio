@@ -384,6 +384,7 @@ async function copyCollection(id) {
       delivery_link: p.delivery_link,
       thumbnail_image: p.thumbnail_image,
       gacha_booth_only: p.gacha_booth_only,
+      character_tag: p.character_tag,
     })
     if (p.type !== "digital" && p.variants.length) {
       await replaceVariants(
@@ -491,12 +492,17 @@ async function deleteCollection(id) {
   }
 }
 
+/** Trims a free-text tag and coerces blank/omitted to NULL - never stores an empty string. */
+function normalizeTag(value) {
+  return value && String(value).trim() ? String(value).trim() : null
+}
+
 async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
   const type = ["digital", "gacha"].includes(data.type) ? data.type : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, gacha_booth_only)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, gacha_booth_only, character_tag)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
@@ -506,6 +512,7 @@ async function createProduct(data) {
       type,
       sortOrder,
       Boolean(data.gacha_booth_only),
+      normalizeTag(data.character_tag),
     ]
   )
   const productId = res.insertId
@@ -531,8 +538,11 @@ async function updateProduct(id, data) {
   const [[existing]] = await db.query("SELECT type FROM products WHERE id = ?", [id])
   if (!existing) return false
 
-  const setClauses = ["name = ?", "description = ?", "price = ?", "images = ?"]
-  const params = [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || [])]
+  const setClauses = ["name = ?", "description = ?", "price = ?", "images = ?", "character_tag = ?"]
+  const params = [
+    data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []),
+    normalizeTag(data.character_tag),
+  ]
   if (data.gacha_booth_only !== undefined) {
     setClauses.push("gacha_booth_only = ?")
     params.push(Boolean(data.gacha_booth_only))

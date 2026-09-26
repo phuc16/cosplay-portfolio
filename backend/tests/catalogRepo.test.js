@@ -107,6 +107,65 @@ describe("variant description", () => {
   })
 })
 
+describe("character_tag", () => {
+  it("stores character_tag on create and returns it in collection detail", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Card", price: 35000, character_tag: "Raiden Shogun",
+    })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).character_tag).toBe("Raiden Shogun")
+  })
+
+  it("defaults to null when character_tag is omitted or blank", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid1 = await repo.createProduct({ collection_id: cid, name: "Card A", price: 1000 })
+    const pid2 = await repo.createProduct({ collection_id: cid, name: "Card B", price: 1000, character_tag: "   " })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid1).character_tag).toBeNull()
+    expect(detail.products.find((p) => p.id === pid2).character_tag).toBeNull()
+  })
+
+  it("updates character_tag on an existing product", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 1000, character_tag: "A" })
+
+    await repo.updateProduct(pid, { name: "Card", price: 1000, character_tag: "B" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).character_tag).toBe("B")
+  })
+
+  it("clears character_tag back to null on update when sent blank", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 1000, character_tag: "A" })
+
+    await repo.updateProduct(pid, { name: "Card", price: 1000, character_tag: "" })
+
+    const detail = await repo.getCollectionDetailById(cid)
+    expect(detail.products.find((p) => p.id === pid).character_tag).toBeNull()
+  })
+
+  it("exposes character_tag on the public collection read path too", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 1000, character_tag: "Raiden Shogun" })
+
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].character_tag).toBe("Raiden Shogun")
+  })
+
+  it("carries character_tag over into a copied collection's products", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 1000, character_tag: "Raiden Shogun" })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].character_tag).toBe("Raiden Shogun")
+  })
+})
+
 describe("digital products", () => {
   it("creates a digital product with a hidden variant carrying stock_qty and delivery_link", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
