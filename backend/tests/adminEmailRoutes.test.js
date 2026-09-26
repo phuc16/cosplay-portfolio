@@ -6,6 +6,7 @@ import db from "../db.js"
 import templates from "../shop/email/templates.js"
 import catalog from "../shop/catalogRepo.js"
 import orders from "../shop/orders/orderRepo.js"
+import stockAlertQueue from "../shop/stockAlerts/queue.js"
 import { resetTables } from "./helpers/db.js"
 
 const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET)
@@ -107,6 +108,36 @@ describe("GET /api/admin/email-queue/failed", () => {
 
   it("returns an empty list when nothing has failed", async () => {
     const res = await authed(request(app).get("/api/admin/email-queue/failed"))
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+})
+
+describe("GET /api/admin/stock-alert-queue/failed", () => {
+  beforeEach(async () => {
+    await resetTables("stock_alert_queue")
+  })
+
+  it("requires auth", async () => {
+    expect((await request(app).get("/api/admin/stock-alert-queue/failed")).status).toBe(401)
+  })
+
+  it("returns failed rows in the shape stockAlerts/queue.js writes them", async () => {
+    await stockAlertQueue.enqueueMany(db, [{
+      product_variant_id: 1, email: "a@example.com",
+      product_name_snapshot: "Card", variant_label_snapshot: "A1", collection_slug_snapshot: "drop",
+    }])
+    const [[row]] = await db.query("SELECT id FROM stock_alert_queue LIMIT 1")
+    for (let i = 0; i < stockAlertQueue.MAX_ATTEMPTS; i += 1) await stockAlertQueue.markFailed(row.id, "boom")
+
+    const res = await authed(request(app).get("/api/admin/stock-alert-queue/failed"))
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0]).toMatchObject({ email: "a@example.com", status: "failed", last_error: "boom" })
+  })
+
+  it("returns an empty list when nothing has failed", async () => {
+    const res = await authed(request(app).get("/api/admin/stock-alert-queue/failed"))
     expect(res.status).toBe(200)
     expect(res.body).toEqual([])
   })

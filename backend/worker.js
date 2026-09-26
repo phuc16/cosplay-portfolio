@@ -5,6 +5,7 @@ const redis = require("./redis")
 const storage = require("./storage")
 const orderRepo = require("./shop/orders/orderRepo")
 const emailSender = require("./shop/email/sender")
+const stockAlertSender = require("./shop/stockAlerts/sender")
 const { createLease, TICK_INTERVAL_MS } = require("./workerLease")
 
 const THUMB_WIDTH = 400
@@ -86,6 +87,25 @@ async function dispatchEmails() {
   }
 }
 
+/**
+ * Independent from dispatchEmails/email_queue above - back-in-stock alerts
+ * live in their own stock_alert_queue table with no relationship to orders
+ * (see the 2026-09-26 design doc), so a failure here can never affect the
+ * order-email pipeline or vice versa.
+ */
+async function dispatchStockAlertEmails() {
+  try {
+    const { sent, failed } = await stockAlertSender.sendQueuedStockAlerts(10)
+    if (sent || failed) {
+      console.log(`[WORKER] Thông báo còn hàng: gửi ${sent}, lỗi ${failed}`)
+    }
+    return sent
+  } catch (err) {
+    console.error("[WORKER] Lỗi gửi thông báo còn hàng:", err.message)
+    return 0
+  }
+}
+
 let running = false
 
 /**
@@ -122,6 +142,7 @@ async function run() {
 
     await sweepExpiredOrders()
     await dispatchEmails()
+    await dispatchStockAlertEmails()
   } finally {
     running = false
   }
@@ -195,4 +216,7 @@ if (require.main === module) {
   setInterval(tick, TICK_INTERVAL_MS)
 }
 
-module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured, tick, lease }
+module.exports = {
+  run, sweepExpiredOrders, dispatchEmails, dispatchStockAlertEmails,
+  warnIfMailStuckUnconfigured, tick, lease,
+}

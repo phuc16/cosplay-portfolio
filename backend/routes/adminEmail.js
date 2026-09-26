@@ -1,6 +1,7 @@
 const express = require("express")
 const templates = require("../shop/email/templates")
 const sender = require("../shop/email/sender")
+const stockAlertQueue = require("../shop/stockAlerts/queue")
 
 const TYPES = Object.keys(templates.DEFAULT_TEMPLATES)
 
@@ -56,6 +57,19 @@ module.exports = function adminEmailRoutes() {
       res.json(rows)
     } catch (err) {
       console.error("[ADMIN/EMAIL] Lỗi đọc email lỗi:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // Same minimal surfacing as /email-queue/failed above, for the
+  // independent stock-alert queue - a row that exhausted its retries
+  // otherwise sits invisibly in stock_alert_queue.
+  router.get("/stock-alert-queue/failed", async (req, res) => {
+    try {
+      const rows = await stockAlertQueue.listFailed()
+      res.json(rows)
+    } catch (err) {
+      console.error("[ADMIN/EMAIL] Lỗi đọc thông báo còn hàng lỗi:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })

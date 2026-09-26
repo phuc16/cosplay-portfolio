@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { adminListEmailTemplates, adminSaveEmailTemplate, adminListFailedEmails } from "../api/shop"
+import { adminListEmailTemplates, adminSaveEmailTemplate, adminListFailedEmails, adminListFailedStockAlerts } from "../api/shop"
 
 const LABELS = {
   order_placed: "Đã nhận đơn hàng",
@@ -112,6 +112,35 @@ function FailedEmails() {
   )
 }
 
+// Same minimal surfacing as FailedEmails above, for the independent
+// back-in-stock alert queue (see backend/shop/stockAlerts/queue.js) - a row
+// that exhausted its retries otherwise sits invisibly in stock_alert_queue.
+function FailedStockAlerts() {
+  const [failed, setFailed] = useState(null)
+
+  useEffect(() => {
+    adminListFailedStockAlerts().then(setFailed).catch(() => setFailed([]))
+  }, [])
+
+  if (!failed || failed.length === 0) return null
+
+  return (
+    <div className="mb-6 p-3 rounded-xl border border-red-400">
+      <h4 className="font-semibold mb-2 text-red-600">
+        Thông báo còn hàng gửi thất bại ({failed.length})
+      </h4>
+      <ul className="text-sm space-y-1">
+        {failed.map((row) => (
+          <li key={row.id} className="opacity-80">
+            {row.product_name_snapshot} · {row.variant_label_snapshot} · {row.email}
+            {row.last_error && <span className="opacity-60"> - {row.last_error}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export default function AdminEmailTemplates() {
   const [templates, setTemplates] = useState(null)
 
@@ -125,6 +154,7 @@ export default function AdminEmailTemplates() {
     <div className="max-w-2xl">
       <h3 className="text-xl font-semibold mb-4">Mẫu email</h3>
       <FailedEmails />
+      <FailedStockAlerts />
       {templates.map((tpl) => (
         <Editor
           key={tpl.type}

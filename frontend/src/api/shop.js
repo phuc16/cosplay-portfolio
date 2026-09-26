@@ -150,6 +150,13 @@ export const adminSaveEmailTemplate = (type, data) =>
 export const adminListFailedEmails = () =>
   api.get("/api/admin/email-queue/failed").then((r) => r.data)
 
+// "Notify me when back in stock" signup for one sold-out variant.
+export const subscribeStockAlert = (data) =>
+  api.post("/api/shop/stock-alerts", data).then((r) => r.data)
+
+export const adminListFailedStockAlerts = () =>
+  api.get("/api/admin/stock-alert-queue/failed").then((r) => r.data)
+
 // ── Stats ──
 export const adminGetDropStats = (collectionId) =>
   api.get(`/api/admin/stats/drop/${collectionId}`).then((r) => r.data)
