@@ -10,7 +10,7 @@ import { formatVnd } from "../utils/money"
 
 const blank = {
   name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "",
-  thumbnail_image: "", gacha_booth_only: false,
+  thumbnail_image: "", gacha_booth_only: false, character_tag: "",
 }
 
 const PRODUCT_TYPE_OPTIONS = [
@@ -128,6 +128,7 @@ export default function AdminProducts({ collection }) {
       name: p.name, description: p.description || "", price: p.price, images: p.images || [],
       type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
       thumbnail_image: p.thumbnail_image || "", gacha_booth_only: Boolean(p.gacha_booth_only),
+      character_tag: p.character_tag || "",
     })
   }
 
@@ -215,6 +216,12 @@ export default function AdminProducts({ collection }) {
         value={draft.name}
         onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         placeholder="Tên sản phẩm"
+        className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+      />
+      <input
+        value={draft.character_tag}
+        onChange={(e) => setDraft({ ...draft, character_tag: e.target.value })}
+        placeholder="Nhân vật / Series (tùy chọn)"
         className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
       />
       <input
@@ -401,7 +408,14 @@ export default function AdminProducts({ collection }) {
               <span className="shrink-0 opacity-50 select-none leading-6" aria-hidden="true">⋮⋮</span>
               <div>
                 <p className="font-medium">{p.name}</p>
-                <p className="text-sm opacity-70">{formatVnd(p.price)}</p>
+                <p className="text-sm opacity-70">
+                  {formatVnd(p.price)}
+                  {p.character_tag && (
+                    <span className="ml-2 px-1.5 py-0.5 text-xs rounded-md border border-[var(--border-brand)] opacity-80">
+                      {p.character_tag}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
             <div className="flex gap-2 shrink-0">

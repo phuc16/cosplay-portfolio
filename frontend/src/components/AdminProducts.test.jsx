@@ -377,6 +377,90 @@ describe("AdminProducts - gacha products", () => {
   })
 })
 
+describe("AdminProducts - character_tag", () => {
+  it("saves character_tag when filled in on create", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+    const container = await renderProducts()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    const tagInput = container.querySelector('input[placeholder="Nhân vật / Series (tùy chọn)"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Card")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+      setter.call(tagInput, "Raiden Shogun")
+      tagInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Card", character_tag: "Raiden Shogun" })
+    )
+  })
+
+  it("creates a product with no character_tag at all", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+    const container = await renderProducts()
+    await flush()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(nameInput, "Card")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Card", character_tag: "" })
+    )
+  })
+
+  it("pre-fills the tag field when editing an existing tagged product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Card", character_tag: "Raiden Shogun" })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const tagInput = container.querySelector('input[placeholder="Nhân vật / Series (tùy chọn)"]')
+    expect(tagInput.value).toBe("Raiden Shogun")
+  })
+
+  it("shows the tag as a pill on the compact product row when set", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Card", character_tag: "Raiden Shogun" })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    expect(container.textContent).toContain("Raiden Shogun")
+  })
+
+  it("shows no pill on the compact product row when the tag is unset", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [product({ id: 1, name: "Card" })],
+    })
+    const container = await renderProducts()
+    await flush()
+
+    const row = container.querySelector("[data-product-row]")
+    expect(row.querySelectorAll("span.rounded-md")).toHaveLength(0)
+  })
+})
+
 describe("AdminProducts - search, filter, sort", () => {
   it("filters the list by name, case-insensitively", async () => {
     adminGetCollection.mockResolvedValue({
