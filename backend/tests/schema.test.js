@@ -71,6 +71,12 @@ describe("catalog schema", () => {
     expect(Object.keys(c)).toEqual(expect.arrayContaining(["delivery_link"]))
     expect(c.delivery_link.IS_NULLABLE).toBe("YES")
   })
+
+  it("creates products with a nullable character_tag column", async () => {
+    const c = await columns("products")
+    expect(Object.keys(c)).toEqual(expect.arrayContaining(["character_tag"]))
+    expect(c.character_tag.IS_NULLABLE).toBe("YES")
+  })
 })
 
 describe("digital order schema", () => {
