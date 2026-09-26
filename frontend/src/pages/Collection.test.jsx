@@ -185,6 +185,81 @@ describe("Collection - search, filter, sort", () => {
   })
 })
 
+describe("Collection - character/series tag filter", () => {
+  function taggedProducts(tags) {
+    return baseCollection({
+      products: tags.map((tag, i) => ({
+        id: i + 1, name: `Product ${i + 1}`, price: 1000 * (i + 1), description: null, images: [],
+        variants: [{ id: i + 1, label: "A1", stock_qty: 5 }],
+        character_tag: tag,
+      })),
+    })
+  }
+
+  it("renders no tag filter when every product shares the same single tag", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts(["A", "A"]))
+    const container = await renderCollection()
+
+    expect(container.querySelector('button[aria-label="All characters"]')).toBeNull()
+  })
+
+  it("renders no tag filter when no product is tagged at all", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts([null, null]))
+    const container = await renderCollection()
+
+    expect(container.querySelector('button[aria-label="All characters"]')).toBeNull()
+  })
+
+  it("offers exactly the distinct real tags (no separate untagged option) when 2+ distinct tags exist", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts(["A", "A", null, "B"]))
+    const container = await renderCollection()
+
+    const trigger = container.querySelector('button[aria-label="All characters"]')
+    expect(trigger).toBeTruthy()
+    await act(async () => { trigger.click() })
+
+    const options = [...container.querySelectorAll("li button")].map((b) => b.textContent)
+    expect(options).toEqual(["All characters", "A", "B"])
+  })
+
+  it("filters to only the matching tag, leaving untagged products hidden", async () => {
+    fetchCollection.mockResolvedValue(taggedProducts(["A", "B", null]))
+    const container = await renderCollection()
+
+    const trigger = container.querySelector('button[aria-label="All characters"]')
+    await act(async () => { trigger.click() })
+    const optionA = [...container.querySelectorAll("li button")].find((b) => b.textContent === "A")
+    await act(async () => { optionA.click() })
+
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent)
+    expect(names).toEqual(["Product 1"])
+  })
+
+  it("combines with the existing stock filter", async () => {
+    fetchCollection.mockResolvedValue(baseCollection({
+      products: [
+        { id: 1, name: "A In Stock", price: 1000, description: null, images: [], character_tag: "A", variants: [{ id: 1, label: "A1", stock_qty: 5 }] },
+        { id: 2, name: "A Sold Out", price: 1000, description: null, images: [], character_tag: "A", variants: [{ id: 2, label: "A1", stock_qty: 0 }] },
+        { id: 3, name: "B In Stock", price: 1000, description: null, images: [], character_tag: "B", variants: [{ id: 3, label: "A1", stock_qty: 5 }] },
+      ],
+    }))
+    const container = await renderCollection()
+
+    const tagTrigger = container.querySelector('button[aria-label="All characters"]')
+    await act(async () => { tagTrigger.click() })
+    const tagA = [...container.querySelectorAll("li button")].find((b) => b.textContent === "A")
+    await act(async () => { tagA.click() })
+
+    const stockTrigger = container.querySelector('button[aria-label="All"]')
+    await act(async () => { stockTrigger.click() })
+    const inStockOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "In stock")
+    await act(async () => { inStockOption.click() })
+
+    const names = [...container.querySelectorAll("h3")].map((h) => h.textContent)
+    expect(names).toEqual(["A In Stock"])
+  })
+})
+
 describe("Collection - add-to-cart toast", () => {
   it("shows a toast linking to /cart after adding an item", async () => {
     fetchCollection.mockResolvedValue(baseCollection())

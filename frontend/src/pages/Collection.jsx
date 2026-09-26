@@ -37,6 +37,7 @@ export default function Collection() {
   const [search, setSearch] = useState("")
   const [stockFilter, setStockFilter] = useState("")
   const [sortBy, setSortBy] = useState("default")
+  const [tagFilter, setTagFilter] = useState("")
 
   // Brief inline confirmation, matching this codebase's no-toast-library style -
   // cleared automatically a couple seconds after each add.
@@ -89,11 +90,20 @@ export default function Collection() {
   const closed = collection.status === "closed"
   const notStartedYet = !closed && collection.not_started_yet
   const unavailableLabel = closed ? t("shopClosed") : notStartedYet ? t("shopNotStarted") : null
+  // Only real, non-empty tags count - an untagged product (character_tag
+  // null/"") never becomes a distinct filterable value. If 0 or 1 distinct
+  // tags exist among this collection's products, there's nothing to filter,
+  // so no control is rendered at all.
+  const distinctTags = [...new Set(collection.products.map((p) => p.character_tag).filter(Boolean))]
+  const showTagFilter = distinctTags.length >= 2
   const visibleProducts = sortProducts(
     collection.products.filter((p) => {
       if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
       if (stockFilter === "in_stock" && isProductSoldOut(p)) return false
       if (stockFilter === "sold_out" && !isProductSoldOut(p)) return false
+      // An untagged product only ever shows under the implicit "All" bucket
+      // (tagFilter === "") - there is no separate "Untagged" option.
+      if (tagFilter && p.character_tag !== tagFilter) return false
       return true
     }),
     sortBy
@@ -170,7 +180,7 @@ export default function Collection() {
                 placeholder={t("shopSearchProducts")}
                 className="w-full sm:flex-1 min-w-0 h-[38px] px-2 py-1.5 rounded-lg border border-[var(--border-brand)] bg-transparent"
               />
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+              <div className={`grid ${showTagFilter ? "grid-cols-3" : "grid-cols-2"} gap-2 sm:flex sm:flex-wrap sm:shrink-0`}>
                 <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
                   value={stockFilter}
                   onChange={setStockFilter}
@@ -181,6 +191,17 @@ export default function Collection() {
                   ]}
                   placeholder={t("shopFilterAllStock")}
                 />
+                {showTagFilter && (
+                  <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
+                    value={tagFilter}
+                    onChange={setTagFilter}
+                    options={[
+                      { code: "", name: t("shopFilterAllTags") },
+                      ...distinctTags.map((tag) => ({ code: tag, name: tag })),
+                    ]}
+                    placeholder={t("shopFilterAllTags")}
+                  />
+                )}
                 <SearchableSelect padding="px-2 py-1.5" height="h-[38px]"
                   value={sortBy}
                   onChange={setSortBy}
