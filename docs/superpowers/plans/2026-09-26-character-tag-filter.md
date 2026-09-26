@@ -37,14 +37,14 @@ Vitest.
 ### Task 1: Migration for `products.character_tag`
 
 **Files:**
-- Create: `backend/migrations/049_add_product_character_tag.js`
+- Create: `backend/migrations/051_add_product_character_tag.js`
 - Modify: `backend/tests/schema.test.js`
 
 **Interfaces:**
 - Produces: `products.character_tag` (`VARCHAR(255) NULL`). All later
   tasks read/write this exact column name.
 
-- [ ] **Step 1: Write `049_add_product_character_tag.js`**
+- [ ] **Step 1: Write `051_add_product_character_tag.js`**
 
 ```js
 exports.up = function (knex) {
@@ -87,7 +87,7 @@ Run: `cd backend && DB_HOST=127.0.0.1 DB_PORT=3307 DB_USER=root DB_PASS=root DB_
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/migrations/049_add_product_character_tag.js backend/tests/schema.test.js
+git add backend/migrations/051_add_product_character_tag.js backend/tests/schema.test.js
 git commit -m "feat(shop): add products.character_tag column"
 ```
 
