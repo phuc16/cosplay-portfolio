@@ -5,6 +5,11 @@ import { MemoryRouter } from "react-router-dom"
 import { LanguageProvider } from "../../contexts/LanguageContext"
 import { readCart } from "../../shop/cart"
 
+const subscribeStockAlert = vi.fn()
+vi.mock("../../api/shop", () => ({
+  subscribeStockAlert: (...args) => subscribeStockAlert(...args),
+}))
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: ProductCard, isProductSoldOut, isSoldOut } = await import("./ProductCard")
@@ -753,5 +758,99 @@ describe("unavailableLabel", () => {
     await act(async () => { card?.click() })
 
     expect(container.textContent).toContain("Chưa mở bán")
+  })
+})
+
+describe("ProductCard - back-in-stock signup", () => {
+  beforeEach(() => { subscribeStockAlert.mockReset() })
+
+  it("shows the notify-me form for a strictly sold-out (finite, zero) variant", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2") // baseProduct's B2 has stock_qty: 0
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="email"]')).toBeTruthy()
+  })
+
+  it("does not show the form for an unlimited (stock_qty null) variant", async () => {
+    const product = baseProduct({ variants: [{ id: 1, label: "A1", stock_qty: null, image_url: null }] })
+    const { container } = await renderCard({ product })
+    await openVariantDetail(container, "A1")
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="email"]')).toBeNull()
+  })
+
+  it("does not show the form for an in-stock variant", async () => {
+    const { container } = await renderCard()
+    await openVariantDetail(container, "A1") // stock_qty: 5
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.querySelector('input[type="email"]')).toBeNull()
+  })
+
+  it("submits variant_id and email, and shows a success message", async () => {
+    subscribeStockAlert.mockResolvedValue({ ok: true })
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2")
+    const dialog = container.querySelector('[role="dialog"]')
+
+    const emailInput = dialog.querySelector('input[type="email"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(emailInput, "a@example.com")
+      emailInput.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+
+    const submitBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Notify me")
+    await act(async () => { submitBtn.click() })
+    await act(async () => {})
+
+    expect(subscribeStockAlert).toHaveBeenCalledWith({ variant_id: 2, email: "a@example.com" })
+    expect(dialog.textContent).toContain("You're signed up")
+  })
+
+  it("resets the form when a new variant's detail is opened", async () => {
+    subscribeStockAlert.mockResolvedValue({ ok: true })
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2")
+    let dialog = container.querySelector('[role="dialog"]')
+
+    const emailInput = dialog.querySelector('input[type="email"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(emailInput, "a@example.com")
+      emailInput.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    const submitBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Notify me")
+    await act(async () => { submitBtn.click() })
+    await act(async () => {})
+    expect(dialog.textContent).toContain("You're signed up")
+
+    // Close and reopen the same sold-out variant - the form must not still
+    // show the previous submission's success state.
+    const closeBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Close")
+    await act(async () => { closeBtn.click() })
+    await openVariantDetail(container, "B2")
+    dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).not.toContain("You're signed up")
+    expect(dialog.querySelector('input[type="email"]')).toBeTruthy()
+  })
+
+  it("shows the server's error message on failure", async () => {
+    subscribeStockAlert.mockRejectedValue({ response: { data: { message: "Email không hợp lệ" } } })
+    const { container } = await renderCard()
+    await openVariantDetail(container, "B2")
+    const dialog = container.querySelector('[role="dialog"]')
+
+    const emailInput = dialog.querySelector('input[type="email"]')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+    await act(async () => {
+      setter.call(emailInput, "a@example.com")
+      emailInput.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+
+    const submitBtn = [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Notify me")
+    await act(async () => { submitBtn.click() })
+    await act(async () => {})
+
+    expect(dialog.textContent).toContain("Email không hợp lệ")
   })
 })

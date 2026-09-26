@@ -5,6 +5,7 @@ import { renderMarkdown } from "../../utils/markdown"
 import { formatVnd } from "../../utils/money"
 import { addToCart, gachaCartConflict } from "../../shop/cart"
 import { buildShareUrl, buildShareText, copyToClipboard } from "../../shop/share"
+import { subscribeStockAlert } from "../../api/shop"
 
 /** stock_qty null = unlimited, 0 = sold out, n = n remaining. */
 function stockLabel(variant, t) {
@@ -117,6 +118,9 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
   const [activeImage, setActiveImage] = useState(0)
   const [addError, setAddError] = useState("")
   const [shareCopied, setShareCopied] = useState(false)
+  const [alertEmail, setAlertEmail] = useState("")
+  const [alertStatus, setAlertStatus] = useState("idle") // idle | submitting | done | error
+  const [alertMessage, setAlertMessage] = useState("")
   const detail = view && typeof view === "object" ? view : null
   const detailImages = detail ? variantImages(detail) : []
   // A gacha turn's own stock_qty is always null, so only the product-level
@@ -130,6 +134,9 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
     setActiveImage(0)
     setAddError("")
     setShareCopied(false)
+    setAlertEmail("")
+    setAlertStatus("idle")
+    setAlertMessage("")
     setView(v)
   }
 
@@ -184,6 +191,22 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
     // next one immediately, instead of re-opening the whole product from
     // the collection page for every single code.
     setView(variants.length > 1 ? "grid" : null)
+  }
+
+  // Only ever reachable for a strictly sold-out (finite, stock_qty === 0)
+  // variant - see isSoldOut, gated in the JSX below. A gacha's empty prize
+  // pool or an unlimited (stock_qty null) variant never renders this form.
+  const submitStockAlert = async () => {
+    setAlertStatus("submitting")
+    setAlertMessage("")
+    try {
+      await subscribeStockAlert({ variant_id: detail.id, email: alertEmail })
+      setAlertStatus("done")
+      setAlertMessage(t("shopNotifyMeSuccess"))
+    } catch (e) {
+      setAlertStatus("error")
+      setAlertMessage(e.response?.data?.message || t("shopNotifyMeError"))
+    }
   }
 
   const openPicker = () => {
@@ -374,6 +397,38 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
               {shareCopied && <p className="text-xs opacity-70">{t("shopShareLinkCopied")}</p>}
               <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
               <p className="text-sm opacity-70">{orderable ? (detailSoldOut ? t("shopSoldOut") : stockLabel(detail, t)) : (unavailableLabel || t("shopClosed"))}</p>
+
+              {/* Only a strictly sold-out (finite, stock_qty === 0) variant is
+                  eligible - never a gacha's empty prize pool or an unlimited
+                  (stock_qty null) variant, which can never be "sold out". */}
+              {isSoldOut(detail) && (
+                <div className="mt-2 p-3 rounded-xl border border-[var(--border-brand)]">
+                  <p className="text-sm font-medium mb-2">{t("shopNotifyMeLabel")}</p>
+                  {alertStatus === "done" ? (
+                    <p className="text-sm text-[var(--brand)]">{alertMessage}</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={alertEmail}
+                        onChange={(e) => setAlertEmail(e.target.value)}
+                        placeholder={t("shopNotifyMeEmailPlaceholder")}
+                        className="flex-1 px-3 py-2 rounded-lg border border-[var(--border-brand)] bg-transparent text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={alertStatus === "submitting" || !alertEmail}
+                        onClick={submitStockAlert}
+                        className="px-3 py-2 rounded-lg bg-[var(--brand)] text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {t("shopNotifyMeSubmit")}
+                      </button>
+                    </div>
+                  )}
+                  {alertStatus === "error" && <p role="alert" className="text-sm text-[var(--text-error)] mt-1">{alertMessage}</p>}
+                </div>
+              )}
+
               {isGacha && (
                 <Link
                   to={`/merchandise/gacha/${product.id}/try`}
