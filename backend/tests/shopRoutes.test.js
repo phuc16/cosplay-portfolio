@@ -70,6 +70,15 @@ describe("GET /api/shop/collections/:slug", () => {
     expect(res.body.products[0].variants[0].label).toBe("A1")
   })
 
+  it("exposes character_tag on a public product", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Card", price: 1000, character_tag: "Raiden Shogun" })
+
+    const res = await request(app).get("/api/shop/collections/drop")
+    expect(res.status).toBe(200)
+    expect(res.body.products[0].character_tag).toBe("Raiden Shogun")
+  })
+
   it("never exposes delivery_link for a digital product", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })
     await repo.createProduct({
