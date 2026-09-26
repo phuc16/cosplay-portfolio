@@ -25,3 +25,14 @@ starting design/implementation work.
   `?product=&variant=` query param on the existing collection page, which
   `Collection.jsx` auto-opens on mount - no per-product route, no backend
   changes.
+
+## 2026-09-26 - Character/series tag filter (`character-tag-filter`)
+
+- Branch: `feature/auto-character-tag-filter`
+- PR: https://github.com/phuc16/cosplay-portfolio/pull/28
+- Trend angle: `Cosplay-community`
+- Description: Adds an optional `character_tag` free-text field to
+  products (single plain-text column, not a many-to-many tags table -
+  YAGNI at this shop's scale) with an admin form field and a client-side
+  `SearchableSelect` filter on the collection page, shown only when a
+  collection has 2+ distinct tagged values among its products.
