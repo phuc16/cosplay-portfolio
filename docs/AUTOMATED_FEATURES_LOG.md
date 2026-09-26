@@ -25,3 +25,15 @@ starting design/implementation work.
   `?product=&variant=` query param on the existing collection page, which
   `Collection.jsx` auto-opens on mount - no per-product route, no backend
   changes.
+
+## 2026-09-26 - Back-in-stock email alerts (`back-in-stock-alerts`)
+
+- Branch: `feature/auto-back-in-stock-alerts`
+- PR: https://github.com/phuc16/cosplay-portfolio/pull/29
+- Trend angle: `Shopping/e-commerce`
+- Description: Buyers can leave an email on a sold-out product variant
+  and get notified once an admin's stock edit brings it back from 0 to
+  a positive number - queued and sent by the background worker,
+  structurally independent of the order-email pipeline (new
+  `stock_alerts`/`stock_alert_queue` tables, no FK to `orders`/
+  `email_queue`).
