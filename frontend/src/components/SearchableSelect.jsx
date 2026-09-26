@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { useLanguage } from "../contexts/LanguageContext"
 
 // A short list (sort order, a yes/no filter, ~5 status values) doesn't need
@@ -20,19 +20,30 @@ export default function SearchableSelect({
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const rootRef = useRef(null)
+  const buttonRef = useRef(null)
+  const listboxId = useId()
   const showSearch = options.length > SEARCH_THRESHOLD
+
+  // Shared by the click-outside handler below and by Escape (keyboard) -
+  // wrapped in useCallback (empty deps: it only calls stable setState
+  // setters) so both call sites can list it as a dependency without it
+  // triggering a re-subscribe on every render.
+  const closeAndClear = useCallback(() => {
+    setOpen(false)
+    setQuery("")
+  }, [])
 
   useEffect(() => {
     const onClickOutside = (e) => {
       if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false)
-        setQuery("")
+        closeAndClear()
       }
     }
     document.addEventListener("mousedown", onClickOutside)
     return () => document.removeEventListener("mousedown", onClickOutside)
-  }, [])
+  }, [closeAndClear])
 
   // `box-sizing: border-box` only means a declared height already accounts
   // for padding/border - it doesn't let them net negative. `h-0` on the
@@ -47,15 +58,73 @@ export default function SearchableSelect({
   // only the vertical padding is dropped here.
   const sizerPadding = padding.split(" ").filter((cls) => !cls.startsWith("py-")).join(" ")
 
+  const filterOptions = (q) => {
+    const trimmed = q.trim()
+    return trimmed ? options.filter((o) => o.name.toLowerCase().includes(trimmed.toLowerCase())) : options
+  }
+
   const selected = options.find((o) => o.code === value)
-  const filtered = query.trim()
-    ? options.filter((o) => o.name.toLowerCase().includes(query.trim().toLowerCase()))
-    : options
+  const filtered = filterOptions(query)
 
   const pick = (code) => {
     onChange(code)
     setOpen(false)
     setQuery("")
+  }
+
+  // Attached to the outermost wrapping div (see the JSX below), not just the
+  // trigger button - that div is the one ancestor common to both the trigger
+  // button and, when open and showSearch is true, the search <input> inside
+  // the popup, so a single handler here reliably captures the keystroke
+  // regardless of which of those two elements currently has focus.
+  const handleKeyDown = (e) => {
+    if (disabled) return
+
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+        // Stops a real <button>'s native "Enter/Space activates a click"
+        // from also firing (which would otherwise toggle straight back
+        // closed right after this opens it).
+        e.preventDefault()
+        setOpen(true)
+        setHighlightedIndex(options.length ? 0 : -1)
+      }
+      return
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault()
+        setHighlightedIndex((i) => (filtered.length === 0 ? -1 : Math.min(filtered.length - 1, i + 1)))
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        setHighlightedIndex((i) => (filtered.length === 0 ? -1 : Math.max(0, i - 1)))
+        break
+      case "Home":
+        e.preventDefault()
+        if (filtered.length) setHighlightedIndex(0)
+        break
+      case "End":
+        e.preventDefault()
+        if (filtered.length) setHighlightedIndex(filtered.length - 1)
+        break
+      case "Enter":
+        e.preventDefault()
+        if (filtered.length && highlightedIndex >= 0 && highlightedIndex < filtered.length) {
+          pick(filtered[highlightedIndex].code)
+        }
+        break
+      case "Escape":
+        e.preventDefault()
+        closeAndClear()
+        buttonRef.current?.focus()
+        break
+      default:
+        // Notably Tab: no preventDefault, no state change - let it move
+        // focus natively. Also lets ordinary typing reach the search input.
+        break
+    }
   }
 
   return (
@@ -70,20 +139,34 @@ export default function SearchableSelect({
     // it out of the visible layout while still counting toward its width -
     // see the `sizerPadding` comment above for why its vertical padding is
     // deliberately dropped instead of reusing `padding` as-is.
-    <div className="relative" ref={rootRef}>
+    <div className="relative" ref={rootRef} onKeyDown={handleKeyDown}>
       <div className={`invisible pointer-events-none h-0 overflow-hidden ${sizerPadding} whitespace-nowrap`} aria-hidden="true">
         {options.map((o) => <div key={o.code}>{o.name}</div>)}
         {!options.some((o) => o.name === placeholder) && <div>{placeholder}</div>}
       </div>
       <button
+        ref={buttonRef}
         type="button"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={
+          open && highlightedIndex >= 0 && filtered[highlightedIndex]
+            ? `${listboxId}-option-${highlightedIndex}`
+            : undefined
+        }
         onClick={() => {
           if (disabled) return
           // Re-clicking the trigger to close must also drop any typed
           // filter - otherwise the next open silently starts pre-filtered
           // by whatever was typed last time, with no visible search box
           // (if showSearch) to explain why options are missing.
-          setOpen((o) => !o)
+          setOpen((o) => {
+            const next = !o
+            if (next) setHighlightedIndex(options.length ? 0 : -1)
+            return next
+          })
           setQuery("")
         }}
         disabled={disabled}
@@ -117,19 +200,27 @@ export default function SearchableSelect({
               autoFocus
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value
+                setQuery(next)
+                const nextFiltered = filterOptions(next)
+                setHighlightedIndex(nextFiltered.length ? 0 : -1)
+              }}
               placeholder={t("selectSearchOption")}
               className={`w-full ${padding} border-b border-[var(--border-brand)] bg-transparent text-sm outline-none`}
             />
           )}
-          <ul className="max-h-56 overflow-y-auto">
+          <ul role="listbox" id={listboxId} className="max-h-56 overflow-y-auto">
             {filtered.length === 0 && <li className={`${padding} text-sm opacity-60`}>{t("selectNoResults")}</li>}
-            {filtered.map((o) => (
-              <li key={o.code}>
+            {filtered.map((o, index) => (
+              <li key={o.code} role="presentation">
                 <button
                   type="button"
+                  role="option"
+                  id={`${listboxId}-option-${index}`}
+                  aria-selected={o.code === value}
                   onClick={() => pick(o.code)}
-                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${o.code === value ? "bg-[var(--brand-soft)] font-medium" : ""}`}
+                  className={`w-full text-left ${padding} text-sm whitespace-nowrap hover:bg-[var(--brand-soft)] ${o.code === value ? "bg-[var(--brand-soft)] font-medium" : ""} ${index === highlightedIndex ? "bg-[var(--brand-soft)]" : ""}`}
                 >
                   {o.name}
                 </button>
