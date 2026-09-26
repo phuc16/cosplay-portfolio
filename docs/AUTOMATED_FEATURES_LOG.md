@@ -25,3 +25,16 @@ starting design/implementation work.
   `?product=&variant=` query param on the existing collection page, which
   `Collection.jsx` auto-opens on mount - no per-product route, no backend
   changes.
+
+## 2026-09-26 - SearchableSelect keyboard nav + ARIA combobox semantics (`select-a11y`)
+
+- Branch: `feature/auto-select-a11y`
+- PR: https://github.com/phuc16/cosplay-portfolio/pull/27
+- Trend angle: `Tech trend (accessibility)`
+- Description: Closes the keyboard-nav/ARIA gap in `SearchableSelect`
+  explicitly flagged and deferred in `docs/DECISIONS.md`'s 2026-09-11 entry -
+  adds arrow-key/Home/End option navigation (no wraparound), Enter-to-select,
+  Escape-to-close (returns focus to the trigger), and
+  `role="combobox"`/`"listbox"`/`"option"` +
+  `aria-expanded`/`aria-controls`/`aria-activedescendant`/`aria-selected`
+  semantics, with no change to the component's prop contract. Frontend-only.
