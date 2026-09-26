@@ -1,5 +1,7 @@
 const db = require("./../db")
 const { slugify, uniqueSlug } = require("./slug")
+const stockAlertsRepo = require("./stockAlerts/repo")
+const stockAlertQueue = require("./stockAlerts/queue")
 
 const PUBLIC_STATUSES = ["active", "closed"]
 
@@ -634,9 +636,13 @@ async function replaceVariants(productId, variants) {
     // locking the same variant rows (also ascending) can never grab them in
     // the opposite order and deadlock against this save.
     const [current] = await conn.query(
-      "SELECT id FROM product_variants WHERE product_id = ? ORDER BY id ASC FOR UPDATE",
+      "SELECT id, stock_qty FROM product_variants WHERE product_id = ? ORDER BY id ASC FOR UPDATE",
       [productId]
     )
+    // Pre-update stock, so a restock event (see the update loop below) can be
+    // detected by comparing against the value about to be written - this
+    // table only ever selected `id` before the back-in-stock alerts feature.
+    const prevStockById = new Map(current.map((r) => [r.id, r.stock_qty]))
     const keeping = new Set(keepIds)
     const removing = current.map((r) => r.id).filter((id) => !keeping.has(id))
 
@@ -670,10 +676,26 @@ async function replaceVariants(productId, variants) {
       await conn.query("DELETE FROM product_variants WHERE product_id = ?", [productId])
     }
 
+    // Populated below, inside the update loop, with { id, label } for every
+    // variant whose stock just crossed 0 -> a positive number - see the
+    // notification step after the loop.
+    const restockedVariants = []
+
     for (const [index, v] of list.entries()) {
       const stock = v.stock_qty === null || v.stock_qty === undefined || v.stock_qty === ""
         ? null
         : Number(v.stock_qty)
+
+      // A restock event is exactly previousStock === 0 (a variant this
+      // system considered sold out) crossing up to a real positive number.
+      // 0 -> null (unlimited) is deliberately NOT a restock event here - only
+      // a variant with a real previous row and a real new ceiling counts,
+      // per the back-in-stock-alerts design doc. A brand new variant (no
+      // `v.id`) can never restock - it has no previous row to have been zero.
+      const previousStock = v.id ? prevStockById.get(v.id) : undefined
+      if (previousStock === 0 && stock !== null && stock > 0) {
+        restockedVariants.push({ id: v.id, label: v.label })
+      }
 
       // `images` is the additive gallery; `image_url` stays its first entry
       // so any code still reading the single-photo column keeps working.
@@ -696,6 +718,31 @@ async function replaceVariants(productId, variants) {
           "INSERT INTO product_variants (product_id, label, image_url, images, thumbnail_image, description, stock_qty, delivery_link, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
           [productId, v.label, imageUrl, JSON.stringify(images), v.thumbnail_image || null, v.description || null, stock, v.delivery_link || null, index]
         )
+      }
+    }
+
+    // Restock notifications, still inside this same transaction: a failure
+    // anywhere in this block rolls back together with the stock update
+    // itself (via the catch below), so there's no window where subscribers
+    // are marked notified but nothing was actually queued, or vice versa.
+    if (restockedVariants.length) {
+      const [[productRow]] = await conn.query(
+        `SELECT p.name AS product_name, c.slug AS collection_slug
+           FROM products p JOIN collections c ON c.id = p.collection_id
+          WHERE p.id = ?`,
+        [productId]
+      )
+      for (const { id: variantId, label } of restockedVariants) {
+        const subscribers = await stockAlertsRepo.listUnnotified(conn, variantId)
+        if (!subscribers.length) continue
+        await stockAlertQueue.enqueueMany(conn, subscribers.map((s) => ({
+          product_variant_id: variantId,
+          email: s.email,
+          product_name_snapshot: productRow?.product_name || "",
+          variant_label_snapshot: label || "",
+          collection_slug_snapshot: productRow?.collection_slug || null,
+        })))
+        await stockAlertsRepo.markNotified(conn, subscribers.map((s) => s.id))
       }
     }
 

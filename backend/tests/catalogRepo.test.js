@@ -3,6 +3,7 @@ import repo from "../shop/catalogRepo.js"
 import db from "../db.js"
 import prizeRepo from "../shop/gacha/prizeRepo.js"
 import sessionRepo from "../shop/gacha/sessionRepo.js"
+import stockAlertsRepo from "../shop/stockAlerts/repo.js"
 import { resetTables, closeDb } from "./helpers/db.js"
 
 beforeEach(async () => {
@@ -14,6 +15,8 @@ beforeEach(async () => {
     "gacha_draws",
     "gacha_sessions",
     "gacha_prizes",
+    "stock_alert_queue",
+    "stock_alerts",
     "order_items",
     "orders",
     "product_variants",
@@ -705,6 +708,100 @@ describe("replaceVariants", () => {
       [variantB.id]
     )
     expect(variantBAfter).toEqual(variantB)
+  })
+})
+
+describe("stock alert restock trigger", () => {
+  async function seedSoldOutVariant() {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 0 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+    return { pid, variantId: v.id }
+  }
+
+  it("queues and marks-notified every subscriber on a 0 -> positive restock", async () => {
+    const { pid, variantId } = await seedSoldOutVariant()
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "a@example.com" })
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "b@example.com" })
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", stock_qty: 5 }])
+
+    const [queued] = await db.query("SELECT * FROM stock_alert_queue ORDER BY email")
+    expect(queued).toHaveLength(2)
+    expect(queued[0].email).toBe("a@example.com")
+    expect(queued[0].product_name_snapshot).toBe("Card")
+    expect(queued[0].variant_label_snapshot).toBe("A1")
+    expect(queued[0].collection_slug_snapshot).toBe("drop")
+    expect(queued[0].status).toBe("pending")
+
+    const [alerts] = await db.query("SELECT notified_at FROM stock_alerts WHERE product_variant_id = ?", [variantId])
+    expect(alerts.every((a) => a.notified_at !== null)).toBe(true)
+  })
+
+  it("does not fire for a positive -> different positive edit (5 -> 8)", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 35000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 5 }])
+    const [[v]] = await db.query("SELECT id FROM product_variants LIMIT 1")
+
+    await repo.replaceVariants(pid, [{ id: v.id, label: "A1", stock_qty: 8 }])
+
+    const [queued] = await db.query("SELECT * FROM stock_alert_queue")
+    expect(queued).toHaveLength(0)
+  })
+
+  it("queues nothing and does not error when a restocked variant has zero subscribers", async () => {
+    const { pid, variantId } = await seedSoldOutVariant()
+    await expect(repo.replaceVariants(pid, [{ id: variantId, label: "A1", stock_qty: 5 }])).resolves.not.toThrow()
+    const [queued] = await db.query("SELECT * FROM stock_alert_queue")
+    expect(queued).toHaveLength(0)
+  })
+
+  it("does not fire when a sold-out variant goes to unlimited (0 -> null)", async () => {
+    const { pid, variantId } = await seedSoldOutVariant()
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "a@example.com" })
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", stock_qty: null }])
+
+    const [queued] = await db.query("SELECT * FROM stock_alert_queue")
+    expect(queued).toHaveLength(0)
+  })
+
+  it("does not crash when a variant is deleted instead of updated", async () => {
+    const { pid, variantId } = await seedSoldOutVariant()
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "a@example.com" })
+
+    // Replacing with a brand new variant (no id) drops the old one entirely.
+    await expect(repo.replaceVariants(pid, [{ label: "B1", stock_qty: 5 }])).resolves.not.toThrow()
+    const [queued] = await db.query("SELECT * FROM stock_alert_queue")
+    expect(queued).toHaveLength(0)
+  })
+
+  it("only queues once across repeated saves while stock stays positive", async () => {
+    const { pid, variantId } = await seedSoldOutVariant()
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "a@example.com" })
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", stock_qty: 5 }])
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", stock_qty: 6 }])
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", stock_qty: 7 }])
+
+    const [queued] = await db.query("SELECT * FROM stock_alert_queue")
+    expect(queued).toHaveLength(1)
+  })
+
+  it("multiple subscribers on one variant all get queued exactly once, all get notified_at set", async () => {
+    const { pid, variantId } = await seedSoldOutVariant()
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "a@example.com" })
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "b@example.com" })
+    await stockAlertsRepo.signUp({ variant_id: variantId, email: "c@example.com" })
+
+    await repo.replaceVariants(pid, [{ id: variantId, label: "A1", stock_qty: 3 }])
+
+    const [queued] = await db.query("SELECT email FROM stock_alert_queue")
+    expect(queued.map((r) => r.email).sort()).toEqual(["a@example.com", "b@example.com", "c@example.com"])
+    const [alerts] = await db.query("SELECT notified_at FROM stock_alerts WHERE product_variant_id = ?", [variantId])
+    expect(alerts.every((a) => a.notified_at !== null)).toBe(true)
   })
 })
 
