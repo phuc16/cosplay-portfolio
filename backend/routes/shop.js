@@ -2,6 +2,7 @@ const express = require("express")
 const catalogRepo = require("../shop/catalogRepo")
 const paymentSettings = require("../shop/payments/settingsRepo")
 const giftSettings = require("../shop/giftSettings")
+const stockAlerts = require("../shop/stockAlerts/repo")
 const shopDisplaySettings = require("../shop/shopDisplaySettings")
 const vnAddress = require("../shop/vnAddress")
 const prizeRepo = require("../shop/gacha/prizeRepo")
@@ -58,6 +59,28 @@ module.exports = function shopRoutes() {
       res.json(giftSettings.publicSettings(await giftSettings.getSettings()))
     } catch (err) {
       console.error("[SHOP] Lỗi lấy cấu hình quà tặng:", err)
+      res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
+    }
+  })
+
+  // "Notify me when back in stock" signup for one sold-out variant. Upsert
+  // semantics: a repeat signup by the same email resets notified_at rather
+  // than erroring or duplicating (see stockAlerts/repo.js::signUp).
+  router.post("/stock-alerts", async (req, res) => {
+    try {
+      await stockAlerts.signUp(req.body || {})
+      res.json({ ok: true })
+    } catch (err) {
+      if (err instanceof stockAlerts.InvalidEmailError) {
+        return res.status(400).json({ error: "invalid_email", message: err.message })
+      }
+      if (err instanceof stockAlerts.VariantNotFoundError) {
+        return res.status(404).json({ error: "variant_not_found", message: err.message })
+      }
+      if (err instanceof stockAlerts.VariantNotSoldOutError) {
+        return res.status(400).json({ error: "variant_not_sold_out", message: err.message })
+      }
+      console.error("[SHOP] Lỗi đăng ký thông báo còn hàng:", err)
       res.status(500).json({ error: "server_error", message: "Lỗi server. Thử lại sau." })
     }
   })
