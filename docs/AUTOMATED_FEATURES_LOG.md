@@ -70,7 +70,7 @@ file for details if this entry hasn't been reconciled yet.
 ## 2026-09-27 - Size chart / fit notes for wearable products (`size-chart-note`)
 
 - Branch: `feature/auto-size-chart-note`
-- PR: TBD - see repo open PRs
+- PR: https://github.com/phuc16/cosplay-portfolio/pull/32
 - Trend angle: `cosplay-community`
 - Description: An optional free-text `products.size_chart_note` field
   (markdown, same convention as the existing `description` column) a
