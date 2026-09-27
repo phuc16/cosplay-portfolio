@@ -65,7 +65,7 @@ Today's 3 picks below were chosen specifically to avoid every topic above.
 ## 2026-09-27 - Recent sales badge / social proof (`recent-sales-badge`)
 
 - Branch: `feature/auto-recent-sales-badge`
-- PR: TBD - see repo open PRs
+- PR: https://github.com/phuc16/cosplay-portfolio/pull/30
 - Trend angle: `e-commerce`
 - Description: A "🔥 N sold in the last 24h" badge on a product card once a
   product clears a threshold of committed (confirmed/shipped/completed)
