@@ -69,7 +69,7 @@ this entry hasn't been reconciled yet.
 ## 2026-09-27 - Before/after transformation gallery (`before-after-gallery`)
 
 - Branch: `feature/auto-before-after-gallery`
-- PR: TBD - see repo open PRs
+- PR: https://github.com/phuc16/cosplay-portfolio/pull/31
 - Trend angle: `portfolio/website-decor`
 - Description: Admin can link two existing photos in the same portfolio
   album as a before/after pair (`PUT /api/images/:id/pair`, two nullable
