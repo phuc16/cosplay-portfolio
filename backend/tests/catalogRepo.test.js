@@ -722,6 +722,74 @@ async function insertOrderForVariant(variantId, status, token) {
   )
 }
 
+/** Inserts an order + single order_item referencing variantId, with an explicit
+ * qty/status/created_at - for exercising attachRecentSalesCounts' window/status
+ * filtering, which insertOrderForVariant above has no knobs for. */
+async function insertOrderWithQtyAt(variantId, { qty, status, hoursAgo, token }) {
+  await db.query(
+    `INSERT INTO orders (order_token, buyer_name, phone, email, fulfillment_method, status, payment_method, total, expires_at, access_pin_hash, created_at)
+     VALUES (?, 'A', '0900000000', 'a@example.com', 'ship', ?, 'bank', 99000, UTC_TIMESTAMP(), 'x', UTC_TIMESTAMP() - INTERVAL ? HOUR)`,
+    [token, status, hoursAgo]
+  )
+  const [[o]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [token])
+  await db.query(
+    "INSERT INTO order_items (order_id, product_variant_id, product_name_snapshot, variant_label_snapshot, unit_price_snapshot, qty) VALUES (?, ?, 'Card', 'A1', 99000, ?)",
+    [o.id, variantId, qty]
+  )
+}
+
+describe("recent sales count (social proof badge)", () => {
+  it("counts units from confirmed/shipped/completed orders within the last 24h", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 99000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 100 }])
+    const [[variant]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+
+    await insertOrderWithQtyAt(variant.id, { qty: 2, status: "confirmed", hoursAgo: 1, token: "t1" })
+    await insertOrderWithQtyAt(variant.id, { qty: 2, status: "shipped", hoursAgo: 2, token: "t2" })
+
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].recent_sales_count).toBe(4)
+  })
+
+  it("reports 0 (not the real count) below the badge threshold, so a single sale never looks like a trend", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 99000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 100 }])
+    const [[variant]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+
+    await insertOrderWithQtyAt(variant.id, { qty: 2, status: "confirmed", hoursAgo: 1, token: "t1" })
+
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].recent_sales_count).toBe(0)
+  })
+
+  it("excludes pending orders - only a committed purchase counts as sold", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 99000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 100 }])
+    const [[variant]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+
+    await insertOrderWithQtyAt(variant.id, { qty: 5, status: "pending", hoursAgo: 1, token: "t1" })
+    await insertOrderWithQtyAt(variant.id, { qty: 5, status: "cancelled", hoursAgo: 1, token: "t2" })
+
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].recent_sales_count).toBe(0)
+  })
+
+  it("excludes sales older than the 24h window", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({ collection_id: cid, name: "Card", price: 99000 })
+    await repo.replaceVariants(pid, [{ label: "A1", stock_qty: 100 }])
+    const [[variant]] = await db.query("SELECT id FROM product_variants WHERE product_id = ?", [pid])
+
+    await insertOrderWithQtyAt(variant.id, { qty: 10, status: "completed", hoursAgo: 25, token: "t1" })
+
+    const detail = await repo.getPublicCollectionBySlug("drop")
+    expect(detail.products[0].recent_sales_count).toBe(0)
+  })
+})
+
 describe("deleteProduct", () => {
   it("rejects with VariantInUseError when a variant is referenced by a pending/confirmed/shipped order", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })

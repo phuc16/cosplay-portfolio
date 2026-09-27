@@ -228,6 +228,11 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 {t("shopDigitalBadge")}
               </span>
             )}
+            {!isProductSoldOut(product) && product.recent_sales_count > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-500/15 text-orange-500">
+                {t("shopRecentSales", { n: product.recent_sales_count })}
+              </span>
+            )}
           </div>
           <p className="text-[var(--brand)] font-bold">{formatVnd(product.price)}</p>
           {isGacha && (

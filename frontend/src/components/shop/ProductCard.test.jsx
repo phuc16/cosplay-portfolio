@@ -109,6 +109,37 @@ describe("ProductCard - sold-out overlay", () => {
   })
 })
 
+describe("ProductCard - recent sales badge", () => {
+  it("shows a recent-sales badge when recent_sales_count is above the backend's threshold", async () => {
+    const product = baseProduct({ recent_sales_count: 5 })
+    const { container } = await renderCard({ product })
+    expect(container.textContent).toContain("5 sold in the last 24h")
+  })
+
+  it("shows no badge when recent_sales_count is 0 (backend's own way of saying 'not worth mentioning')", async () => {
+    const product = baseProduct({ recent_sales_count: 0 })
+    const { container } = await renderCard({ product })
+    expect(container.textContent).not.toContain("sold in the last 24h")
+  })
+
+  it("shows no badge when recent_sales_count is absent (older API response / other read paths)", async () => {
+    const { container } = await renderCard()
+    expect(container.textContent).not.toContain("sold in the last 24h")
+  })
+
+  it("hides the badge on an otherwise-popular product once it's sold out - nothing left to buy", async () => {
+    const product = baseProduct({
+      recent_sales_count: 5,
+      variants: [
+        { id: 1, label: "A1", stock_qty: 0, image_url: "https://x/a1.jpg" },
+        { id: 2, label: "B2", stock_qty: 0, image_url: null },
+      ],
+    })
+    const { container } = await renderCard({ product })
+    expect(container.textContent).not.toContain("sold in the last 24h")
+  })
+})
+
 describe("ProductCard - variant thumbnail_image", () => {
   it("uses a variant's own thumbnail_image as its gallery-grid cover, not its own photo", async () => {
     const product = baseProduct({

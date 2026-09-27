@@ -13,6 +13,14 @@ class VariantInUseError extends Error {
 
 const LIVE_ORDER_STATUSES = ["pending", "confirmed", "shipped"]
 
+// A "recently sold" social-proof badge only means something once a handful of
+// units have actually moved - a single sale looks like noise, not momentum.
+// Below this, attachRecentSalesCounts reports 0 rather than the real (low)
+// number, so the frontend can render purely on truthiness with no threshold
+// of its own to keep in sync with this one.
+const RECENT_SALES_WINDOW_HOURS = 24
+const RECENT_SALES_BADGE_THRESHOLD = 3
+
 /** Variant ids referenced by an order that is not yet finished or cancelled. */
 async function variantsWithLiveOrders(variantIds) {
   if (!variantIds.length) return []
@@ -215,6 +223,36 @@ async function nestCollectionDetail(collection) {
   }
 }
 
+/** Units sold per product in the last RECENT_SALES_WINDOW_HOURS, counting
+ * only orders that actually committed to buying (confirmed/shipped/completed
+ * - a pending order can still expire/get cancelled, so it isn't "sold" yet).
+ * Windowed on order creation time via UTC_TIMESTAMP(), never NOW()/a naive
+ * Date, matching every other date comparison in this file. A variant deleted
+ * within the window drops its own past sales from the count (order_items.
+ * product_variant_id goes SET NULL on delete) - an accepted, rare
+ * undercount rather than a reason to snapshot product_id onto order_items
+ * for a purely informational, non-order-critical number. */
+async function attachRecentSalesCounts(products) {
+  const ids = products.map((p) => p.id)
+  if (!ids.length) return products
+  const [rows] = await db.query(
+    `SELECT pv.product_id AS product_id, SUM(oi.qty) AS units
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       JOIN product_variants pv ON pv.id = oi.product_variant_id
+      WHERE o.status IN ('confirmed', 'shipped', 'completed')
+        AND o.created_at >= (UTC_TIMESTAMP() - INTERVAL ? HOUR)
+        AND pv.product_id IN (${ids.map(() => "?").join(",")})
+      GROUP BY pv.product_id`,
+    [RECENT_SALES_WINDOW_HOURS, ...ids]
+  )
+  const byProduct = new Map(rows.map((r) => [r.product_id, Number(r.units)]))
+  return products.map((p) => {
+    const units = byProduct.get(p.id) || 0
+    return { ...p, recent_sales_count: units >= RECENT_SALES_BADGE_THRESHOLD ? units : 0 }
+  })
+}
+
 async function getPublicCollectionBySlug(slug) {
   const [[collection]] = await db.query(
     "SELECT * FROM collections WHERE slug = ? AND status IN (?, ?) LIMIT 1",
@@ -232,17 +270,18 @@ async function getPublicCollectionBySlug(slug) {
   // with the admin-only getCollectionDetailById, which legitimately needs the link,
   // so it is stripped here, on the public path only. stock_qty stays: buyers
   // legitimately need to see stock/sold-out state before ever placing an order.
-  return {
-    ...detail,
-    not_started_yet: notStartedYet,
+  const products = detail.products
     // A booth-only gacha product is never meant to exist for an online buyer
     // at all - filtered out here, not just left unlinked, so it can't be
     // browsed via a shared/bookmarked collection URL either. The admin path
     // (getCollectionDetailById) shares nestCollectionDetail but never calls
     // this function, so it keeps showing every gacha product regardless.
-    products: detail.products
-      .filter((p) => !(p.type === "gacha" && p.gacha_booth_only))
-      .map(({ delivery_link, ...rest }) => rest),
+    .filter((p) => !(p.type === "gacha" && p.gacha_booth_only))
+    .map(({ delivery_link, ...rest }) => rest)
+  return {
+    ...detail,
+    not_started_yet: notStartedYet,
+    products: await attachRecentSalesCounts(products),
   }
 }
 
