@@ -77,6 +77,44 @@ describe("ProductCard - variant description", () => {
   })
 })
 
+describe("ProductCard - size chart / fit note (product-level)", () => {
+  it("renders the size chart block in the detail modal when the product has one", async () => {
+    const product = baseProduct({
+      size_chart_note: "Ngực 88cm, Eo 70cm",
+      variants: [{ id: 1, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg" }],
+    })
+    const { container } = await renderCard({ product })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).toContain("Size chart")
+    expect(dialog.textContent).toContain("Ngực 88cm, Eo 70cm")
+  })
+
+  it("shows nothing extra when the product has no size_chart_note", async () => {
+    const product = baseProduct({ variants: [{ id: 1, label: "A1", stock_qty: 5, image_url: "https://x/a1.jpg" }] })
+    const { container } = await renderCard({ product })
+    const cover = container.querySelector('img[src="https://x/cover.jpg"]')
+    await act(async () => { cover.click() })
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog.textContent).not.toContain("Size chart")
+  })
+
+  it("shows the same size chart note regardless of which variant's detail is open (product-level, not per-variant)", async () => {
+    const product = baseProduct({ size_chart_note: "Ngực 88cm" })
+
+    const first = await renderCard({ product })
+    await openVariantDetail(first.container, "A1")
+    expect(first.container.querySelector('[role="dialog"]').textContent).toContain("Ngực 88cm")
+
+    const second = await renderCard({ product })
+    await openVariantDetail(second.container, "B2")
+    expect(second.container.querySelector('[role="dialog"]').textContent).toContain("Ngực 88cm")
+  })
+})
+
 describe("isSoldOut (per-variant)", () => {
   it("is exported and reports true only for a variant whose stock_qty is a non-null number <= 0", () => {
     expect(isSoldOut({ stock_qty: 0 })).toBe(true)

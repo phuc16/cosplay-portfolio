@@ -384,6 +384,7 @@ async function copyCollection(id) {
       delivery_link: p.delivery_link,
       thumbnail_image: p.thumbnail_image,
       gacha_booth_only: p.gacha_booth_only,
+      size_chart_note: p.size_chart_note,
     })
     if (p.type !== "digital" && p.variants.length) {
       await replaceVariants(
@@ -495,8 +496,8 @@ async function createProduct(data) {
   const sortOrder = await nextSortOrder("products", "WHERE collection_id = ?", [data.collection_id])
   const type = ["digital", "gacha"].includes(data.type) ? data.type : "physical"
   const [res] = await db.query(
-    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, gacha_booth_only)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (collection_id, name, description, price, images, type, sort_order, gacha_booth_only, size_chart_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.collection_id,
       data.name,
@@ -506,6 +507,7 @@ async function createProduct(data) {
       type,
       sortOrder,
       Boolean(data.gacha_booth_only),
+      data.size_chart_note || null,
     ]
   )
   const productId = res.insertId
@@ -531,8 +533,8 @@ async function updateProduct(id, data) {
   const [[existing]] = await db.query("SELECT type FROM products WHERE id = ?", [id])
   if (!existing) return false
 
-  const setClauses = ["name = ?", "description = ?", "price = ?", "images = ?"]
-  const params = [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || [])]
+  const setClauses = ["name = ?", "description = ?", "price = ?", "images = ?", "size_chart_note = ?"]
+  const params = [data.name, data.description || null, Number(data.price) || 0, JSON.stringify(data.images || []), data.size_chart_note || null]
   if (data.gacha_booth_only !== undefined) {
     setClauses.push("gacha_booth_only = ?")
     params.push(Boolean(data.gacha_booth_only))

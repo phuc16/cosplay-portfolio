@@ -10,7 +10,7 @@ import { formatVnd } from "../utils/money"
 
 const blank = {
   name: "", description: "", price: "", images: [], type: "physical", stock_qty: "", delivery_link: "",
-  thumbnail_image: "", gacha_booth_only: false,
+  thumbnail_image: "", gacha_booth_only: false, size_chart_note: "",
 }
 
 const PRODUCT_TYPE_OPTIONS = [
@@ -128,6 +128,7 @@ export default function AdminProducts({ collection }) {
       name: p.name, description: p.description || "", price: p.price, images: p.images || [],
       type: p.type || "physical", stock_qty: p.stock_qty ?? "", delivery_link: p.delivery_link || "",
       thumbnail_image: p.thumbnail_image || "", gacha_booth_only: Boolean(p.gacha_booth_only),
+      size_chart_note: p.size_chart_note || "",
     })
   }
 
@@ -231,6 +232,18 @@ export default function AdminProducts({ collection }) {
         rows={3}
         className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
       />
+      {/* Only meaningful for a physical/wearable item - a digital download
+          or a gacha turn has no size/fit to describe. Optional either way:
+          left blank, the product detail simply shows nothing extra. */}
+      {draft.type === "physical" && (
+        <textarea
+          value={draft.size_chart_note}
+          onChange={(e) => setDraft({ ...draft, size_chart_note: e.target.value })}
+          placeholder="Bảng size / ghi chú độ vừa (tùy chọn, markdown, ví dụ: Ngực 88cm, Eo 70cm. Nên chọn size lớn hơn 1 cỡ.)"
+          rows={3}
+          className="w-full mb-2 px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+        />
+      )}
       {draft.type === "gacha" && (
         <label className="flex items-center gap-2 mb-2 text-sm">
           <input

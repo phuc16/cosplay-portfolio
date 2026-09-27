@@ -391,6 +391,21 @@ export default function ProductCard({ product, collectionSlug, orderable, unavai
                 />
               )}
 
+              {/* Product-level, not per-variant (unlike detail.description
+                  above) - a wearable's fit doesn't change per photocard
+                  code/color, so it's shown once here regardless of which
+                  variant is open. Digital/gacha products never have one -
+                  the admin form hides the input for those types. */}
+              {product.size_chart_note && (
+                <div>
+                  <p className="text-xs font-semibold uppercase opacity-60">{t("shopSizeChartLabel")}</p>
+                  <div
+                    className="prose prose-sm max-w-none opacity-80"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(product.size_chart_note) }}
+                  />
+                </div>
+              )}
+
               {!detailSoldOut && orderable && (
                 <div className="flex items-center gap-2">
                   <button

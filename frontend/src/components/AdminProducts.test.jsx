@@ -221,6 +221,82 @@ describe("AdminProducts - digital products", () => {
   })
 })
 
+describe("AdminProducts - size chart / fit note", () => {
+  it("shows the size chart textarea for a physical product (the default type) and saves it", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+    adminCreateProduct.mockResolvedValue({ id: 1 })
+
+    const container = await renderProducts()
+    await flush()
+
+    const noteField = container.querySelector('textarea[placeholder*="Bảng size"]')
+    expect(noteField).toBeTruthy()
+
+    const nameInput = container.querySelector('input[placeholder="Tên sản phẩm"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+      setter.call(nameInput, "Costume")
+      nameInput.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set
+      setter.call(noteField, "Ngực 88cm, Eo 70cm")
+      noteField.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
+    const saveButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Thêm")
+    await act(async () => { saveButton.click() })
+
+    expect(adminCreateProduct).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ name: "Costume", size_chart_note: "Ngực 88cm, Eo 70cm" })
+    )
+  })
+
+  it("hides the size chart textarea for a digital product - nothing to size", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+
+    const container = await renderProducts()
+    await flush()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const digitalOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Số (digital)")
+    await act(async () => { digitalOption.click() })
+
+    expect(container.querySelector('textarea[placeholder*="Bảng size"]')).toBeNull()
+  })
+
+  it("hides the size chart textarea for a gacha product", async () => {
+    adminGetCollection.mockResolvedValue({ products: [] })
+
+    const container = await renderProducts()
+    await flush()
+
+    const typeTrigger = container.querySelector('[aria-label="Vật lý"]')
+    await act(async () => { typeTrigger.click() })
+    const gachaOption = [...container.querySelectorAll("li button")].find((b) => b.textContent === "Gacha")
+    await act(async () => { gachaOption.click() })
+
+    expect(container.querySelector('textarea[placeholder*="Bảng size"]')).toBeNull()
+  })
+
+  it("pre-fills the size chart textarea when editing an existing physical product", async () => {
+    adminGetCollection.mockResolvedValue({
+      products: [{ id: 1, name: "Costume", price: 350000, type: "physical", images: [], variants: [], size_chart_note: "Ngực 88cm" }],
+    })
+
+    const container = await renderProducts()
+    await flush()
+
+    const editButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Sửa")
+    await act(async () => { editButton.click() })
+
+    const noteField = container.querySelector('textarea[placeholder*="Bảng size"]')
+    expect(noteField.value).toBe("Ngực 88cm")
+  })
+})
+
 describe("AdminProducts - gacha products", () => {
   it("offers Gacha as a product type alongside the existing two", async () => {
     adminGetCollection.mockResolvedValue({ products: [] })

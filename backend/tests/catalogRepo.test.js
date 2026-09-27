@@ -107,6 +107,54 @@ describe("variant description", () => {
   })
 })
 
+describe("size_chart_note", () => {
+  it("defaults to null when not submitted", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({ collection_id: cid, name: "Costume", price: 350000 })
+
+    const product = (await repo.getCollectionDetailById(cid)).products[0]
+    expect(product.size_chart_note).toBeNull()
+  })
+
+  it("is stored at creation and returned on both the admin and public read paths", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Costume", price: 350000,
+      size_chart_note: "Ngực: 88cm, Eo: 70cm. Nên chọn size lớn hơn 1 cỡ.",
+    })
+
+    const adminDetail = await repo.getCollectionDetailById(cid)
+    expect(adminDetail.products[0].size_chart_note).toBe("Ngực: 88cm, Eo: 70cm. Nên chọn size lớn hơn 1 cỡ.")
+
+    const publicDetail = await repo.getPublicCollectionBySlug("drop")
+    expect(publicDetail.products[0].size_chart_note).toBe("Ngực: 88cm, Eo: 70cm. Nên chọn size lớn hơn 1 cỡ.")
+  })
+
+  it("updateProduct overwrites size_chart_note when provided, and clears it when explicitly submitted as empty", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    const pid = await repo.createProduct({
+      collection_id: cid, name: "Costume", price: 350000, size_chart_note: "v1",
+    })
+
+    await repo.updateProduct(pid, { name: "Costume", price: 350000, size_chart_note: "v2" })
+    expect((await repo.getCollectionDetailById(cid)).products[0].size_chart_note).toBe("v2")
+
+    await repo.updateProduct(pid, { name: "Costume", price: 350000, size_chart_note: "" })
+    expect((await repo.getCollectionDetailById(cid)).products[0].size_chart_note).toBeNull()
+  })
+
+  it("carries through copyCollection, like every other product field", async () => {
+    const cid = await repo.createCollection({ title: "Drop", status: "active" })
+    await repo.createProduct({
+      collection_id: cid, name: "Costume", price: 350000, size_chart_note: "Ngực: 88cm",
+    })
+
+    const newId = await repo.copyCollection(cid)
+    const copy = await repo.getCollectionDetailById(newId)
+    expect(copy.products[0].size_chart_note).toBe("Ngực: 88cm")
+  })
+})
+
 describe("digital products", () => {
   it("creates a digital product with a hidden variant carrying stock_qty and delivery_link", async () => {
     const cid = await repo.createCollection({ title: "Drop", status: "active" })

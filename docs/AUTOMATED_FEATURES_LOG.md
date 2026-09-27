@@ -17,7 +17,7 @@ starting design/implementation work.
 ## 2026-09-22 - Shareable product cards (`shareable-product-cards`)
 
 - Branch: `feature/auto-shareable-product-cards`
-- PR: TBD - see repo open PRs
+- PR: #24 (merged)
 - Trend angle: `cosplay-community`
 - Description: Adds a "Share" button to the product/variant detail modal
   (native share sheet on mobile, copy-to-clipboard + inline confirmation on
@@ -25,3 +25,56 @@ starting design/implementation work.
   `?product=&variant=` query param on the existing collection page, which
   `Collection.jsx` auto-opens on mount - no per-product route, no backend
   changes.
+
+## 2026-09-27 - Housekeeping: catalog of pre-existing open PRs from earlier runs
+
+Before picking today's features, found 18 open PRs already sitting unmerged
+on GitHub from prior daily runs (dated 2026-09-18 through 2026-09-26),
+several literal duplicates of each other created on different days. This
+log never covered them: each PR's own log-append commit lives on its own
+unmerged branch and never reached `main`, so every subsequent day's run
+re-read an under-populated `main` copy of this file and picked
+already-attempted ideas again without knowing it. Cataloging all of them
+here now (regardless of merge order) so future runs stop rediscovering/
+duplicating this work - check this list, not just the entries above it,
+before picking:
+
+- #7 `feature/auto-payment-reminder-email` - payment reminder email for pending orders (e-commerce)
+- #8 `feature/auto-coupon-codes` - coupon/discount codes at checkout (e-commerce)
+- #9 `feature/auto-product-reviews` - product reviews/ratings after order completion (e-commerce)
+- #10 `feature/auto-accessible-select` - keyboard nav/ARIA for SearchableSelect (tech/a11y)
+- #11 `feature/auto-back-in-stock` - back-in-stock email notifications (e-commerce)
+- #12 `feature/auto-character-tags` - character/series tagging + filtering for products (cosplay-community)
+- #15 `feature/auto-shop-seo-metadata` - SEO meta tags + JSON-LD for Shop/Collection pages (tech)
+- #16 `feature/auto-order-again` - one-click "order again" from a completed order (e-commerce)
+- #17 `feature/auto-artist-credit` - artist/photographer credit line on products (cosplay-community)
+- #19 `feature/auto-searchable-select-a11y` - duplicate of #10
+- #20 `feature/auto-order-reorder` - duplicate of #16
+- #21 `feature/auto-product-character-tag` - duplicate of #12
+- #22 `feature/auto-pwa-installable` - web app manifest + installable service worker (tech)
+- #23 `feature/auto-wishlist` - wishlist/save-for-later list (e-commerce)
+- #27 `feature/auto-select-a11y` - duplicate of #10/#19
+- #28 `feature/auto-character-tag-filter` - duplicate of #12/#21
+- #29 `feature/auto-back-in-stock-alerts` - duplicate of #11
+
+Closed-without-merge (rejected - don't retry): #13 (SearchableSelect a11y,
+duplicate of the above), #14 (coupon/discount codes, duplicate of #8).
+
+Today's 3 picks below were chosen specifically to avoid every topic above.
+Also opened today (each on its own branch, not shown here since this
+file's copy on `main` won't see them until one of those branches merges):
+`recent-sales-badge` (e-commerce trend) and `before-after-gallery`
+(portfolio/website-decor trend) - see those branches' own copies of this
+file for details if this entry hasn't been reconciled yet.
+
+## 2026-09-27 - Size chart / fit notes for wearable products (`size-chart-note`)
+
+- Branch: `feature/auto-size-chart-note`
+- PR: TBD - see repo open PRs
+- Trend angle: `cosplay-community`
+- Description: An optional free-text `products.size_chart_note` field
+  (markdown, same convention as the existing `description` column) a
+  seller can fill in for a physical/wearable product - shown in the
+  variant detail modal, product-level (not per-variant), hidden from the
+  admin form for digital/gacha products since neither has anything to
+  fit. See `docs/superpowers/specs/2026-09-27-size-chart-note-design.md`.
