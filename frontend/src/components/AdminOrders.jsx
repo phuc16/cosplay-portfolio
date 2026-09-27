@@ -273,17 +273,24 @@ export default function AdminOrders() {
 
   return (
     <div>
-      <div className="flex items-end gap-3 mb-4 flex-wrap">
-        <h3 className="text-xl font-semibold">Đơn hàng</h3>
+      <h3 className="text-xl font-semibold mb-3">Đơn hàng</h3>
 
-        <label className="flex flex-col text-xs gap-1">
+      {/* A grid, not the old flex-wrap row: 6 same-height fields plus 2
+          buttons wrapped ad hoc into ragged, hard-to-scan lines on a phone
+          (see the filter panel in the mobile screenshot this was reported
+          against). Each column stretches to fill its slot instead of
+          sitting at a fixed width, so 1-up on a phone, 2-up on a small
+          tablet, and the original dense single row reappears once there's
+          room for it on desktop. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-4 items-end">
+        <label className="flex flex-col text-xs gap-1 xl:col-span-2">
           Tìm kiếm
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Mã đơn, tên, SĐT, email..."
-            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent w-48"
+            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent w-full"
           />
         </label>
 
@@ -323,24 +330,26 @@ export default function AdminOrders() {
         <label className="flex flex-col text-xs gap-1">
           Từ ngày
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent w-full" />
         </label>
 
         <label className="flex flex-col text-xs gap-1">
           Đến ngày
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent" />
+            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent w-full" />
         </label>
 
-        <button type="button" onClick={() => { setScanError(""); setScannerOpen(true) }}
-          className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">
-          Quét QR
-        </button>
+        <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+          <button type="button" onClick={() => { setScanError(""); setScannerOpen(true) }}
+            className="h-[38px] px-2 flex-1 text-sm border rounded-lg border-[var(--border-brand)]">
+            Quét QR
+          </button>
 
-        <button type="button" onClick={refresh} disabled={refreshing}
-          className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)] disabled:opacity-50">
-          {refreshing ? "Đang tải..." : "Làm mới"}
-        </button>
+          <button type="button" onClick={refresh} disabled={refreshing}
+            className="h-[38px] px-2 flex-1 text-sm border rounded-lg border-[var(--border-brand)] disabled:opacity-50">
+            {refreshing ? "Đang tải..." : "Làm mới"}
+          </button>
+        </div>
       </div>
 
       {orders.length > 0 && (
@@ -427,14 +436,18 @@ export default function AdminOrders() {
                 </div>
               </div>
             </div>
+            {/* px-3 py-2, not the site-wide px-2 py-1: these are the buttons a
+                booth staffer taps right after a QR scan to confirm/complete
+                an order, live, one after another - a bigger tap target
+                matters more here than on a desk-bound admin screen. */}
             <div className="flex gap-2 flex-wrap">
               <button type="button" onClick={() => (detail?.id === o.id ? closeDetail() : openDetail(o.id))}
-                className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.neutral}`}>
+                className={`px-3 py-2 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES.neutral}`}>
                 {detail?.id === o.id ? "Ẩn" : "Chi tiết"}
               </button>
               {nextStatuses(o).map((to) => (
                 <button key={to} type="button" onClick={() => move(o, to)}
-                  className={`px-2 py-1 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES[variantForAction(to)]}`}>
+                  className={`px-3 py-2 text-sm border rounded-lg ${ACTION_BUTTON_CLASSES[variantForAction(to)]}`}>
                   {labelFor(ACTION_LABELS, to)}
                 </button>
               ))}

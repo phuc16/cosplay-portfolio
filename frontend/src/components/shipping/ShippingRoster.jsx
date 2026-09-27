@@ -190,7 +190,7 @@ export default function ShippingRoster() {
                                 type="button"
                                 data-testid={`prepared-${r.order_id}`}
                                 onClick={() => togglePrepared(r)}
-                                className={`px-2.5 py-1 text-xs rounded-full border font-medium whitespace-nowrap ${
+                                className={`px-3 py-2 text-sm rounded-full border font-medium whitespace-nowrap ${
                                   r.prepared
                                     ? "bg-[var(--surface-success)] border-[var(--border-success)] text-[var(--text-success)]"
                                     : "bg-[var(--surface-warning)] border-[var(--border-warning)] text-[var(--text-warning)]"

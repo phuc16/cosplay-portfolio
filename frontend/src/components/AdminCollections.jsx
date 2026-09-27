@@ -184,12 +184,12 @@ export default function AdminCollections() {
 
       {visibleCollections.map((c) => (
         <div key={c.id} className="mb-4 p-4 rounded-2xl border border-[var(--border-brand)]">
-          <div className="flex justify-between items-start gap-3">
+          <div className="flex justify-between items-start gap-3 flex-wrap">
             <div>
               <p className="font-semibold">{c.title}</p>
               <p className="text-sm opacity-70">/{c.slug} · {STATUSES.find((s) => s.value === c.status)?.label}</p>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 flex-wrap">
               <button type="button" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)} className="px-2 py-1 text-sm border rounded-lg border-[var(--border-brand)]">
                 {expandedId === c.id ? "Ẩn" : "Sản phẩm"}
               </button>

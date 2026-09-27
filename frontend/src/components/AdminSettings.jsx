@@ -548,7 +548,7 @@ export default function AdminSettings() {
   const btnDangerCls = "text-sm bg-transparent border-none text-red-400 hover:text-red-300 cursor-pointer"
 
   return (
-    <form onSubmit={save} className="max-w-2xl space-y-4 sm:space-y-5 p-3 sm:p-4 md:p-8">
+    <form onSubmit={save} className="max-w-2xl space-y-4 sm:space-y-5">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">Cài đặt trang</h2>
         <button type="submit" disabled={saving}
@@ -592,7 +592,7 @@ export default function AdminSettings() {
         <h3 className="font-semibold text-gray-800 dark:text-slate-200 text-base">Thông tin chính (vi / en)</h3>
         <div>
           <label className={labelCls}>Tên hiển thị</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input type="text" value={config.artistName?.vi ?? ""} onChange={(e) => updateLocalized("artistName", "vi", e.target.value)} className={inputCls} placeholder="Kamidayhehe (VI)" />
             <input type="text" value={config.artistName?.en ?? ""} onChange={(e) => updateLocalized("artistName", "en", e.target.value)} className={inputCls} placeholder="Kamidayhehe (EN)" />
           </div>
@@ -627,14 +627,14 @@ export default function AdminSettings() {
         </div>
         <div>
           <label className={labelCls}>Tagline</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <textarea value={config.tagline?.vi ?? ""} onChange={(e) => updateLocalized("tagline", "vi", e.target.value)} className={inputCls} rows={2} placeholder="Cosplayer • Prop Maker (VI)" />
             <textarea value={config.tagline?.en ?? ""} onChange={(e) => updateLocalized("tagline", "en", e.target.value)} className={inputCls} rows={2} placeholder="Cosplayer • Prop Maker (EN)" />
           </div>
         </div>
         <div>
           <label className={labelCls}>About (giới thiệu)</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <textarea value={config.about?.vi ?? ""} onChange={(e) => updateLocalized("about", "vi", e.target.value)} className={inputCls} rows={4} placeholder="Giới thiệu (VI)" />
             <textarea value={config.about?.en ?? ""} onChange={(e) => updateLocalized("about", "en", e.target.value)} className={inputCls} rows={4} placeholder="About (EN)" />
           </div>
@@ -788,11 +788,11 @@ export default function AdminSettings() {
         {(config.achievements || []).map((a, i) => (
           <div key={i} className="flex gap-2 items-start border border-gray-200 dark:border-cosplay-border rounded-md p-2">
             <div className="flex-1 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input type="text" value={a.title?.vi ?? ""} onChange={(e) => updateItem("achievements", i, "title", { ...toLocalizedObj(a.title), vi: e.target.value })} className={inputCls} placeholder="Tiêu đề (VI) - 100+ Cosplay" />
                 <input type="text" value={a.title?.en ?? ""} onChange={(e) => updateItem("achievements", i, "title", { ...toLocalizedObj(a.title), en: e.target.value })} className={inputCls} placeholder="Title (EN) - 100+ Cosplays" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input type="text" value={a.description?.vi ?? ""} onChange={(e) => updateItem("achievements", i, "description", { ...toLocalizedObj(a.description), vi: e.target.value })} className={inputCls} placeholder="Mô tả (VI)" />
                 <input type="text" value={a.description?.en ?? ""} onChange={(e) => updateItem("achievements", i, "description", { ...toLocalizedObj(a.description), en: e.target.value })} className={inputCls} placeholder="Description (EN)" />
               </div>
@@ -863,11 +863,11 @@ export default function AdminSettings() {
                 Hiển thị popup khi mở trang
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input type="text" value={ev.title?.vi ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "title", { ...toLocalizedObj(ev.title), vi: e.target.value })} className={inputCls} placeholder="Tên sự kiện (VI)" />
               <input type="text" value={ev.title?.en ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "title", { ...toLocalizedObj(ev.title), en: e.target.value })} className={inputCls} placeholder="Event title (EN)" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input type="text" value={ev.date?.vi ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "date", { ...toLocalizedObj(ev.date), vi: e.target.value })} className={inputCls} placeholder="Ngày (VI) - 15 Th8, 2026" />
               <input type="text" value={ev.date?.en ?? ""} onChange={(e) => updateItem("upcomingEvents", i, "date", { ...toLocalizedObj(ev.date), en: e.target.value })} className={inputCls} placeholder="Date (EN) - Aug 15, 2026" />
             </div>
