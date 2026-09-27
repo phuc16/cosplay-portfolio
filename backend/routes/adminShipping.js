@@ -85,6 +85,8 @@ module.exports = function adminShippingRoutes() {
         payment_method: o.payment_method,
         shipping_payer: o.shipping_payer,
         prepared: Boolean(o.prepared),
+        // Staff-only packing sequence - see orderRepo.assignQueueNumberIfNeeded.
+        queue_number: o.queue_number,
         // A mixed cart (physical item shipped here + a digital one) still
         // needs its digital delivery link sent - nothing else about this
         // export queue would tell staff that, since it only ever handles
