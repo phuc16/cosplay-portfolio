@@ -248,6 +248,7 @@ export default function ShippingExport() {
                         aria-label="Chọn tất cả"
                       />
                     </th>
+                    <th className="pr-2">STT</th>
                     <th className="pr-2">Mã đơn</th>
                     <th className="pr-2">Người nhận</th>
                     <th className="pr-2">SĐT</th>
@@ -270,6 +271,7 @@ export default function ShippingExport() {
                             aria-label={`Chọn đơn ${o.order_code}`}
                           />
                         </td>
+                        <td className="pr-2 py-1">{o.queue_number ?? "-"}</td>
                         <td className="pr-2 py-1">
                           {o.order_code}
                           {o.has_digital_item && (
@@ -317,7 +319,7 @@ export default function ShippingExport() {
                       {expandedId === o.id && (
                         <tr className="border-t border-[var(--border-brand)]">
                           <td></td>
-                          <td colSpan={7} className="py-2 text-sm">
+                          <td colSpan={8} className="py-2 text-sm">
                             {itemsByOrderId[o.id] === undefined && <p className="opacity-60">Đang tải...</p>}
                             {itemsByOrderId[o.id] === null && <p className="text-red-500">Không tải được sản phẩm.</p>}
                             {Array.isArray(itemsByOrderId[o.id]) && (

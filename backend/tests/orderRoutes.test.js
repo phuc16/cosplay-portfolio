@@ -585,9 +585,18 @@ describe("GET /api/orders/:token", () => {
     expect(res.body.queue_number).toBe(1)
   })
 
-  it("has queue_number null on the buyer-facing response for a ship order", async () => {
+  it("keeps queue_number hidden on the buyer-facing response for a ship order, even once one is assigned", async () => {
     const v = await seed(5)
     const ship = await request(app).post("/api/orders").send(body(v))
+
+    const [[sRow]] = await db.query("SELECT id FROM orders WHERE order_token = ?", [ship.body.order_token])
+    await orders.transitionOrder(sRow.id, "confirmed")
+    // A ship order does get a queue_number assigned server-side (staff
+    // packing sequence - see orderRepo.assignQueueNumberIfNeeded), but it is
+    // never meant for the buyer, only for staff via the shipping export.
+    const [[assigned]] = await db.query("SELECT queue_number FROM orders WHERE id = ?", [sRow.id])
+    expect(assigned.queue_number).toBe(1)
+
     const res = await authed(request(app).get(`/api/orders/${ship.body.order_token}`))
     expect(res.body.queue_number).toBeNull()
   })

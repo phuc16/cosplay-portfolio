@@ -182,6 +182,12 @@ describe("GET /api/admin/shipping/export/orders", () => {
     expect(allIds).toContain(idB)
   })
 
+  it("includes the staff packing queue_number, assigned when the order was confirmed", async () => {
+    const id = await seed()
+    const res = await authed(request(app).get("/api/admin/shipping/export/orders"))
+    expect(res.body.find((o) => o.id === id).queue_number).toBe(1)
+  })
+
   it("never includes order_token in the listing response", async () => {
     const id = await seed()
     const [[row]] = await db.query("SELECT order_token FROM orders WHERE id = ?", [id])
