@@ -699,6 +699,8 @@ app.get(`${API_PREFIX}/gallery`, publicLimiter, async (req, res) => {
         fullSrc: img.url,
         width: img.width,
         height: img.height,
+        pairRole: img.pair_role,
+        pairImageId: img.pair_image_id,
       }))
     }))
 
@@ -1014,6 +1016,71 @@ app.put(`${API_PREFIX}/albums/:id/images/reorder`, auth, async (req, res) => {
   } catch (err) {
     console.error("[ALBUMS] Lỗi reorder:", err)
     res.status(500).json({ error: "server_error", message: "Không đổi thứ tự được." })
+  }
+})
+
+// Pairs (or unpairs) two images in the same album as a "before/after"
+// transformation slide, shown as a single side-by-side comparison in the
+// public lightbox instead of two separate photos. Symmetric by design: the
+// "before" row always carries pair_role='before' pointing at the "after"
+// row, which carries the reverse - callers only ever pick the pairing from
+// one side (the admin UI drives it from the "before" image), but both rows
+// must agree or the lightbox can't resolve the partner from either end.
+app.put(`${API_PREFIX}/images/:id/pair`, auth, async (req, res) => {
+  try {
+    const imageId = parseInt(req.params.id, 10)
+    const { pairedImageId } = req.body
+    if (isNaN(imageId)) {
+      return res.status(400).json({ error: "invalid_input", message: "id không hợp lệ." })
+    }
+
+    const [[image]] = await db.query("SELECT id, album_id, pair_image_id FROM images WHERE id=?", [imageId])
+    if (!image) {
+      return res.status(404).json({ error: "not_found", message: "Không tìm thấy ảnh." })
+    }
+
+    // Unlinking: clear this image's own pairing, and its former partner's
+    // (if any) - a one-sided pairing left over would show a lone "after"
+    // half with no "before" half to render it alongside.
+    if (pairedImageId === null || pairedImageId === undefined) {
+      if (image.pair_image_id) {
+        await db.query("UPDATE images SET pair_role=NULL, pair_image_id=NULL WHERE id=?", [image.pair_image_id])
+      }
+      await db.query("UPDATE images SET pair_role=NULL, pair_image_id=NULL WHERE id=?", [imageId])
+      invalidateGallery()
+      return res.json({ ok: true })
+    }
+
+    const partnerId = parseInt(pairedImageId, 10)
+    if (isNaN(partnerId) || partnerId === imageId) {
+      return res.status(400).json({ error: "invalid_input", message: "pairedImageId không hợp lệ." })
+    }
+    const [[partner]] = await db.query("SELECT id, album_id, pair_image_id FROM images WHERE id=?", [partnerId])
+    if (!partner) {
+      return res.status(404).json({ error: "not_found", message: "Không tìm thấy ảnh còn lại." })
+    }
+    if (partner.album_id !== image.album_id) {
+      return res.status(400).json({ error: "invalid_input", message: "Hai ảnh phải thuộc cùng một album." })
+    }
+
+    // Clear any stale pairing on either side first (re-pairing an
+    // already-paired image must not leave its old partner dangling).
+    const stalePartnerIds = [image.pair_image_id, partner.pair_image_id]
+      .filter((id) => id && id !== imageId && id !== partnerId)
+    if (stalePartnerIds.length) {
+      await db.query(
+        `UPDATE images SET pair_role=NULL, pair_image_id=NULL WHERE id IN (${stalePartnerIds.map(() => "?").join(",")})`,
+        stalePartnerIds
+      )
+    }
+    await db.query("UPDATE images SET pair_role='before', pair_image_id=? WHERE id=?", [partnerId, imageId])
+    await db.query("UPDATE images SET pair_role='after', pair_image_id=? WHERE id=?", [imageId, partnerId])
+    invalidateGallery()
+    console.log(`[IMAGES] Paired before=${imageId} after=${partnerId}`)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error("[IMAGES] Lỗi pair:", err)
+    res.status(500).json({ error: "server_error", message: "Không ghép được ảnh." })
   }
 })
 

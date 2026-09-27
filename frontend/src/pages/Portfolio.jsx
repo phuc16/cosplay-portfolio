@@ -5,6 +5,7 @@ import { SITE_CONFIG, applyColorScheme } from "../config"
 import { useTheme } from "../contexts/ThemeContext"
 import { useLanguage } from "../contexts/LanguageContext"
 import { getLocalized } from "../utils/localize"
+import { buildAlbumSlides, slideSrc, slidePairedSrc } from "../utils/albumSlides"
 
 /* ── SVG ICONS ───────────────────────────────────────────────────────────── */
 const icons = {
@@ -558,10 +559,12 @@ function EventPopup({ event, lang, onClose }) {
 }
 
 /* ── LIGHTBOX ────────────────────────────────────────────────────────────── */
-function Lightbox({ photos, startIdx, onClose }) {
+function Lightbox({ photos, startIdx, onClose, vi }) {
   const [idx, setIdx] = useState(startIdx || 0)
   const [imgLoaded, setImgLoaded] = useState(false)
   const total = photos.length
+  const current = photos[idx]
+  const pairedSrc = slidePairedSrc(current)
   const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total])
   const next = useCallback(() => setIdx((i) => (i + 1) % total), [total])
 
@@ -569,12 +572,15 @@ function Lightbox({ photos, startIdx, onClose }) {
   useEffect(() => { setImgLoaded(false) }, [idx])
 
   // Circular preload: warm the browser cache for the neighbours of the current
-  // photo (wrapping around), so prev/next swaps are instant.
+  // photo (wrapping around), so prev/next swaps are instant. A before/after
+  // slide preloads both halves.
   useEffect(() => {
     if (total < 2) return
     for (const n of [(idx + 1) % total, (idx - 1 + total) % total]) {
       const im = new Image()
-      im.src = photos[n]
+      im.src = slideSrc(photos[n])
+      const paired = slidePairedSrc(photos[n])
+      if (paired) { const im2 = new Image(); im2.src = paired }
     }
   }, [idx, photos, total])
   useEffect(() => {
@@ -589,11 +595,24 @@ function Lightbox({ photos, startIdx, onClose }) {
   const navBtn = (onClick, d, right) => (
     <button onClick={(e) => { e.stopPropagation(); onClick() }} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", [right ? "right" : "left"]: 16, width: 44, height: 44, borderRadius: "var(--radius-full)", background: "rgba(0,0,0,.6)", border: "1px solid rgba(255,255,255,.2)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 55, backdropFilter: "blur(4px)" }}>{d}</button>
   )
+  const photoStyle = { maxHeight: "88vh", maxWidth: pairedSrc ? "44vw" : "88vw", objectFit: "contain", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pink-glow)", animation: "hero-fade-in .25s ease", visibility: imgLoaded ? "visible" : "hidden" }
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       {!imgLoaded && <div className="lightbox-spinner" onClick={(e) => e.stopPropagation()} />}
-      <img key={idx} src={photos[idx]} alt="" onClick={(e) => e.stopPropagation()} onLoad={() => setImgLoaded(true)}
-        style={{ maxHeight: "88vh", maxWidth: "88vw", objectFit: "contain", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pink-glow)", animation: "hero-fade-in .25s ease", visibility: imgLoaded ? "visible" : "hidden" }} />
+      {pairedSrc ? (
+        <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ position: "relative" }}>
+            <img key={`${idx}-before`} src={slideSrc(current)} alt="" onLoad={() => setImgLoaded(true)} style={photoStyle} />
+            <span style={{ position: "absolute", top: 8, left: 8, padding: "2px 10px", borderRadius: "var(--radius-full)", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: 12, fontWeight: 600 }}>{vi ? "Trước" : "Before"}</span>
+          </div>
+          <div style={{ position: "relative" }}>
+            <img key={`${idx}-after`} src={pairedSrc} alt="" style={photoStyle} />
+            <span style={{ position: "absolute", top: 8, left: 8, padding: "2px 10px", borderRadius: "var(--radius-full)", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: 12, fontWeight: 600 }}>{vi ? "Sau" : "After"}</span>
+          </div>
+        </div>
+      ) : (
+        <img key={idx} src={slideSrc(current)} alt="" onClick={(e) => e.stopPropagation()} onLoad={() => setImgLoaded(true)} style={photoStyle} />
+      )}
       {total > 1 && navBtn(prev, icons.chevL, false)}
       {total > 1 && navBtn(next, icons.chevR, true)}
       {total > 1 && <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }}>{photos.map((_, i) => <div key={i} onClick={(e) => { e.stopPropagation(); setIdx(i) }} style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? "var(--brand)" : "rgba(255,255,255,.35)", cursor: "pointer", transition: "all .2s" }} />)}</div>}
@@ -612,7 +631,7 @@ function buildData(cfg, gallery, lang) {
     title: g.group,
     count: g.items?.length || 0,
     cover: g.items?.[0]?.src || "",
-    items: (g.items || []).map((it) => it.fullSrc || it.src),
+    items: buildAlbumSlides(g.items),
   }))
   const galleryPhotos = (gallery || []).flatMap((g) => g.items || []).map((it) => it.src)
   // Latest photos: admin-uploaded (config.latestPhotos) → gallery items → hero images
@@ -757,7 +776,7 @@ export default function Portfolio() {
         )}
       </div>
 
-      {lightbox && <Lightbox photos={lightbox.photos} startIdx={lightbox.idx} onClose={() => setLightbox(null)} />}
+      {lightbox && <Lightbox photos={lightbox.photos} startIdx={lightbox.idx} onClose={() => setLightbox(null)} vi={lang === "vi"} />}
       {eventPopup && <EventPopup event={popupEvent} lang={lang} onClose={closeEventPopup} />}
     </div>
   )

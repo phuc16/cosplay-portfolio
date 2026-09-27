@@ -11,6 +11,8 @@ export default function AdminAlbumImages({ album, onClose }) {
   const [error, setError] = useState("")
   const [draggedId, setDraggedId] = useState(null)
   const [reorderPending, setReorderPending] = useState(false)
+  const [pairError, setPairError] = useState("")
+  const [pairingId, setPairingId] = useState(null)
 
   const fetchGallery = () => {
     api.get("/api/gallery").then((r) => {
@@ -89,6 +91,20 @@ export default function AdminAlbumImages({ album, onClose }) {
       })
   }
 
+  // pairedImageId null clears this image's (and its old partner's) pairing;
+  // a number sets this image as "before" and that one as "after" - see
+  // PUT /api/images/:id/pair (server.js) for the symmetric write + the
+  // stale-old-partner cleanup this relies on.
+  const setPair = (imageId, pairedImageId) => {
+    setPairError("")
+    setPairingId(imageId)
+    api
+      .put(`/api/images/${imageId}/pair`, { pairedImageId })
+      .then(fetchGallery)
+      .catch((err) => setPairError(err.response?.data?.message || "Không ghép được ảnh"))
+      .finally(() => setPairingId(null))
+  }
+
   const handleDragEnter = (e, img) => {
     if (draggedId && img.id !== draggedId) e.currentTarget.classList.add("ring-2", "ring-pink-400")
   }
@@ -119,6 +135,9 @@ export default function AdminAlbumImages({ album, onClose }) {
       {error && (
         <p className="mb-4 text-sm text-red-400">{error}</p>
       )}
+      {pairError && (
+        <p className="mb-4 text-sm text-red-400">{pairError}</p>
+      )}
 
       {loading ? (
         <p className="text-gray-500 dark:text-slate-500">Loading...</p>
@@ -146,12 +165,36 @@ export default function AdminAlbumImages({ album, onClose }) {
                   alt=""
                   className="w-full h-24 sm:h-28 md:h-32 object-cover rounded-lg pointer-events-none"
                 />
+                {img.pairRole && (
+                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/65 text-white text-[10px] font-semibold">
+                    {img.pairRole === "before" ? "Trước" : "Sau"}
+                  </span>
+                )}
                 <button
                   onClick={() => deleteImage(img.id)}
                   className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600 z-10"
                 >
                   ×
                 </button>
+                {/* Pairing is only ever driven from the "before" side - an
+                    "after" image's partner is already set from its own row,
+                    so showing a second picker here would let the two rows
+                    disagree about who's paired with whom. */}
+                {img.pairRole !== "after" && (
+                  <select
+                    value={img.pairImageId || ""}
+                    disabled={pairingId === img.id}
+                    onChange={(e) => setPair(img.id, e.target.value ? Number(e.target.value) : null)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    draggable={false}
+                    className="mt-1 w-full text-xs rounded border border-gray-300 dark:border-cosplay-border bg-white dark:bg-cosplay-card text-gray-700 dark:text-slate-300 px-1 py-0.5"
+                  >
+                    <option value="">Ghép ảnh trước/sau...</option>
+                    {gallery.filter((o) => o.id !== img.id && (o.id === img.pairImageId || o.pairRole !== "after")).map((o) => (
+                      <option key={o.id} value={o.id}>Ghép với ảnh #{o.id}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             ))}
           </div>
