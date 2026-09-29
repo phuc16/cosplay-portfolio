@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from "react"
-import { adminListCollections, adminGetPickupRoster, adminSetOrderPrepared } from "../../api/shop"
+import { adminListCollections, adminGetPickupRoster, adminSetOrderPrepared, adminPrintPickupRoster } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 import { groupOrderItems } from "../../utils/groupOrderItems"
+import { openBase64Pdf } from "../../utils/openBase64Pdf"
 import SearchableSelect from "../SearchableSelect"
 
 // Hides a non-matching row on screen (className "hidden") but forces it back
@@ -23,7 +24,29 @@ export default function ShippingRoster() {
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [expandedIds, setExpandedIds] = useState(() => new Set())
+  const [printingPdf, setPrintingPdf] = useState(false)
+  const [printPdfError, setPrintPdfError] = useState("")
   const requestIdRef = useRef(0)
+
+  // Opens a generated PDF (product photos included) in a new tab, rather
+  // than calling window.print() on the on-screen table - whose print
+  // stylesheet hides every image (see the item list's print:hidden
+  // <img>/placeholder spans below; that CSS is now unreachable from any
+  // button in this component, but still guards a manual Ctrl+P). The
+  // browser's own PDF viewer is what actually prints it, if the buyer wants
+  // a paper copy at all.
+  const printRosterPdf = async () => {
+    setPrintPdfError("")
+    setPrintingPdf(true)
+    try {
+      const { file_base64: fileBase64 } = await adminPrintPickupRoster(collectionId)
+      openBase64Pdf(fileBase64)
+    } catch {
+      setPrintPdfError("Không tạo được PDF")
+    } finally {
+      setPrintingPdf(false)
+    }
+  }
 
   const toggleExpanded = (orderId) => {
     setExpandedIds((prev) => {
@@ -103,14 +126,15 @@ export default function ShippingRoster() {
           </label>
         )}
         {roster && (
-          <button type="button" onClick={() => window.print()}
-            className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-brand)]">
-            In
+          <button type="button" onClick={printRosterPdf} disabled={printingPdf}
+            className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-brand)] disabled:opacity-50">
+            {printingPdf ? "Đang tạo PDF..." : "In"}
           </button>
         )}
       </div>
 
       {error && <p className="text-red-500 mb-3">{error}</p>}
+      {printPdfError && <p className="text-red-500 mb-3">{printPdfError}</p>}
       {!collectionId && <p className="opacity-60">Chọn một bộ sưu tập để xem danh sách nhận hàng.</p>}
 
       {roster && (
@@ -155,7 +179,7 @@ export default function ShippingRoster() {
                         <Fragment key={r.order_id}>
                           <tr
                             data-testid={`order-row-${r.order_id}`}
-                            className={`border-t border-[var(--border-brand)] ${rowVisible ? "" : "hidden print:table-row"}`}
+                            className={`border-t border-[var(--border-brand)] hover:bg-[var(--brand-soft)] ${rowVisible ? "" : "hidden print:table-row"}`}
                           >
                             <td className="pr-2 py-1">☐</td>
                             <td className="pr-2 py-1 font-semibold">{r.queue_number ?? "-"}</td>

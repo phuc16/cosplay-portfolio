@@ -7,6 +7,7 @@ const { LOAI_HANG_HOA_VALUES, orderCode } = require("../shop/shipping/vtpMapping
 const { buildExportWorkbook } = require("../shop/shipping/vtpWorkbook")
 const trackingImport = require("../shop/shipping/trackingImport")
 const { buildRoster } = require("../shop/shipping/roster")
+const { buildRosterPdf } = require("../shop/shipping/rosterPdf")
 
 // The admin-recognisable code everywhere else in the app (AdminOrders, the
 // buyer's own order page/emails) is domain.formatOrderCode - never the "DH"
@@ -371,14 +372,58 @@ module.exports = function adminShippingRoutes() {
     } catch (err) { oops(res, err, "Lỗi xác nhận nhập mã vận đơn") }
   })
 
+  // Shared by the JSON roster route and its xlsx export sibling below - both
+  // need the exact same confirmed-pickup-orders-for-this-collection fetch,
+  // shaped the same way, before handing off to buildRoster(). A cart (and so
+  // an order) can span multiple collections - matching on the order's own
+  // collection_id (only the first cart line's collection) would miss an
+  // order for every collection but that one. EXISTS against order_items' own
+  // per-line snapshot catches every collection it touches. order_token is
+  // deliberately never selected: this data gets printed/exported and carried
+  // around a public event.
+  async function fetchRoster(collectionId) {
+    const [orderRows] = await db.query(
+      `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code, queue_number, created_at, prepared, note
+         FROM orders o
+        WHERE status = 'confirmed' AND fulfillment_method = 'pickup'
+          AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.collection_id_snapshot = ?)`,
+      [collectionId]
+    )
+
+    let itemRows = []
+    if (orderRows.length > 0) {
+      // Same variant-thumbnail-with-fallback join as orderRepo.attachItems
+      // - staff packing at the roster need to see the item, not just its name.
+      [itemRows] = await db.query(
+        `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty, oi.image_url_snapshot,
+                oi.delivery_link_snapshot, oi.is_gift,
+                pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
+           FROM order_items oi
+           LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
+           LEFT JOIN products p ON p.id = pv.product_id
+          WHERE oi.order_id IN (?)`,
+        [orderRows.map((o) => o.id)]
+      )
+    }
+
+    const itemsByOrder = new Map()
+    for (const { image_url_snapshot, variant_thumbnail, variant_image_url, product_images, ...item } of itemRows) {
+      const withImage = { ...item, image_url: image_url_snapshot || variant_thumbnail || variant_image_url || firstImage(product_images) }
+      if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, [])
+      itemsByOrder.get(item.order_id).push(withImage)
+    }
+    const withItems = orderRows.map((o) => ({ ...o, items: itemsByOrder.get(o.id) || [] }))
+
+    return buildRoster(withItems)
+  }
+
   // Pickup roster: confirmed pickup orders for one collection, shaped by
   // buildRoster() into the paid-vs-collect-at-handover printable list. The
-  // WHERE clause below is the primary filter, but `status` is still selected
-  // and passed through to buildRoster() - its internal completed-order guard
-  // is defense in depth and silently no-ops without a real status value, so
-  // this query must never drop that column (see roster.js for why).
-  // order_token is deliberately never selected: this document gets printed
-  // and carried around a public event.
+  // WHERE clause in fetchRoster() is the primary filter, but `status` is
+  // still selected and passed through to buildRoster() - its internal
+  // completed-order guard is defense in depth and silently no-ops without a
+  // real status value, so that query must never drop that column (see
+  // roster.js for why).
   router.get("/shipping/roster/:collectionId", async (req, res) => {
     try {
       const collectionId = Number(req.params.collectionId)
@@ -386,44 +431,28 @@ module.exports = function adminShippingRoutes() {
         return res.status(400).json({ error: "invalid_input", message: "collectionId không hợp lệ" })
       }
 
-      // A cart (and so an order) can span multiple collections - matching on
-      // the order's own collection_id (only the first cart line's collection)
-      // would miss an order for every collection but that one. EXISTS against
-      // order_items' per-line snapshot catches every collection it touches.
-      const [orderRows] = await db.query(
-        `SELECT id, buyer_name, phone, status, payment_method, cod_amount, pickup_code, queue_number, created_at, prepared, note
-           FROM orders o
-          WHERE status = 'confirmed' AND fulfillment_method = 'pickup'
-            AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.collection_id_snapshot = ?)`,
-        [collectionId]
-      )
-
-      let itemRows = []
-      if (orderRows.length > 0) {
-        // Same variant-thumbnail-with-fallback join as orderRepo.attachItems
-        // - staff packing at the roster need to see the item, not just its name.
-        [itemRows] = await db.query(
-          `SELECT oi.order_id, oi.product_name_snapshot, oi.variant_label_snapshot, oi.qty, oi.image_url_snapshot,
-                  oi.delivery_link_snapshot, oi.is_gift,
-                  pv.thumbnail_image AS variant_thumbnail, pv.image_url AS variant_image_url, p.images AS product_images
-             FROM order_items oi
-             LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
-             LEFT JOIN products p ON p.id = pv.product_id
-            WHERE oi.order_id IN (?)`,
-          [orderRows.map((o) => o.id)]
-        )
-      }
-
-      const itemsByOrder = new Map()
-      for (const { image_url_snapshot, variant_thumbnail, variant_image_url, product_images, ...item } of itemRows) {
-        const withImage = { ...item, image_url: image_url_snapshot || variant_thumbnail || variant_image_url || firstImage(product_images) }
-        if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, [])
-        itemsByOrder.get(item.order_id).push(withImage)
-      }
-      const withItems = orderRows.map((o) => ({ ...o, items: itemsByOrder.get(o.id) || [] }))
-
-      res.json(buildRoster(withItems))
+      res.json(await fetchRoster(collectionId))
     } catch (err) { oops(res, err, "Lỗi tạo danh sách nhận hàng") }
+  })
+
+  // A print-ready PDF of the same roster, each item shown with its actual
+  // product photo - meant to be opened straight into a PDF viewer and
+  // printed from there, unlike window.print() on the on-screen HTML table
+  // (whose print stylesheet hides every image entirely).
+  router.get("/shipping/roster/:collectionId/print", async (req, res) => {
+    try {
+      const collectionId = Number(req.params.collectionId)
+      if (!Number.isInteger(collectionId) || collectionId <= 0) {
+        return res.status(400).json({ error: "invalid_input", message: "collectionId không hợp lệ" })
+      }
+
+      const { rows } = await fetchRoster(collectionId)
+      const buffer = await buildRosterPdf(rows)
+      res.json({
+        file_base64: buffer.toString("base64"),
+        filename: `danh-sach-nhan-hang-${new Date().toISOString().slice(0, 10)}.pdf`,
+      })
+    } catch (err) { oops(res, err, "Lỗi tạo PDF danh sách nhận hàng") }
   })
 
   return router

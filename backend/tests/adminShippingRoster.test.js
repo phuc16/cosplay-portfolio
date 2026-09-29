@@ -339,3 +339,33 @@ describe("GET /api/admin/shipping/roster/:collectionId", () => {
     expect(body).not.toContain("order_token")
   })
 })
+
+describe("GET /api/admin/shipping/roster/:collectionId/print", () => {
+  it("requires a token", async () => {
+    expect((await request(app).get("/api/admin/shipping/roster/1/print")).status).toBe(401)
+  })
+
+  it("400s on a non-numeric collectionId", async () => {
+    const res = await authed(request(app).get("/api/admin/shipping/roster/not-a-number/print"))
+    expect(res.status).toBe(400)
+  })
+
+  it("returns a base64 PDF with a filename", async () => {
+    const { collectionId } = await seedPickupOrder()
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}/print`))
+    expect(res.status).toBe(200)
+    expect(typeof res.body.file_base64).toBe("string")
+    expect(res.body.filename).toMatch(/^danh-sach-nhan-hang-\d{4}-\d{2}-\d{2}\.pdf$/)
+
+    const buffer = Buffer.from(res.body.file_base64, "base64")
+    expect(buffer.subarray(0, 5).toString()).toBe("%PDF-")
+  })
+
+  it("never leaks order_token into the generated PDF", async () => {
+    const { collectionId, orderId } = await seedPickupOrder()
+    await db.query("UPDATE orders SET order_token = ? WHERE id = ?", ["CANARY-TOKEN-DO-NOT-LEAK", orderId])
+    const res = await authed(request(app).get(`/api/admin/shipping/roster/${collectionId}/print`))
+    const buffer = Buffer.from(res.body.file_base64, "base64")
+    expect(buffer.toString("latin1")).not.toContain("CANARY-TOKEN-DO-NOT-LEAK")
+  })
+})

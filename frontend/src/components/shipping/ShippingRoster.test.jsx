@@ -6,14 +6,19 @@ import { LanguageProvider } from "../../contexts/LanguageContext"
 const adminListCollections = vi.fn()
 const adminGetPickupRoster = vi.fn()
 const adminSetOrderPrepared = vi.fn()
+const adminPrintPickupRoster = vi.fn()
 
 vi.mock("../../api/shop", () => ({
   adminListCollections: (...args) => adminListCollections(...args),
   adminGetPickupRoster: (...args) => adminGetPickupRoster(...args),
   adminSetOrderPrepared: (...args) => adminSetOrderPrepared(...args),
+  adminPrintPickupRoster: (...args) => adminPrintPickupRoster(...args),
 }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+globalThis.URL.createObjectURL = vi.fn(() => "blob:mock")
+globalThis.URL.revokeObjectURL = vi.fn()
+const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => {})
 
 const { default: ShippingRoster } = await import("./ShippingRoster")
 
@@ -45,7 +50,9 @@ beforeEach(() => {
   adminListCollections.mockReset()
   adminGetPickupRoster.mockReset()
   adminSetOrderPrepared.mockReset()
+  adminPrintPickupRoster.mockReset()
   adminListCollections.mockResolvedValue([{ id: 1, title: "Drop" }, { id: 2, title: "Drop 2" }])
+  windowOpenSpy.mockClear()
 })
 
 describe("ShippingRoster", () => {
@@ -424,15 +431,54 @@ describe("ShippingRoster", () => {
     expect(row.textContent).toContain("-")
   })
 
-  it("has a print button", async () => {
+  it("highlights a row on hover to separate each line", async () => {
+    adminGetPickupRoster.mockResolvedValue({
+      rows: [{
+        order_id: 1, order_code: "DH1", buyer_name: "Ánh Dương", phone: "0900000001",
+        items: [{ product_name: "Photocard", variant_label: "A1", qty: 2 }], paid: true, amount_due: 0,
+      }],
+      excluded: [],
+    })
+    const container = await renderComponent()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    const row = container.querySelector('[data-testid="order-row-1"]')
+    expect(row.className).toContain("hover:bg-[var(--brand-soft)]")
+  })
+
+  it("opens a print-ready PDF (with product photos) in a new tab via the single In button, not window.print()", async () => {
     adminGetPickupRoster.mockResolvedValue({ rows: [], excluded: [] })
+    adminPrintPickupRoster.mockResolvedValue({ file_base64: "AAAA", filename: "danh-sach-nhan-hang-2026-09-29.pdf" })
+    const container = await renderComponent()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    const buttons = [...container.querySelectorAll("button")].filter((b) => b.textContent.startsWith("In"))
+    expect(buttons).toHaveLength(1)
+    const printButton = buttons[0]
+    expect(printButton.textContent).toBe("In")
+
+    await act(async () => printButton.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(adminPrintPickupRoster).toHaveBeenCalledWith("1")
+    expect(windowOpenSpy).toHaveBeenCalledWith("blob:mock", "_blank")
+  })
+
+  it("shows an error instead of crashing when PDF generation fails", async () => {
+    adminGetPickupRoster.mockResolvedValue({ rows: [], excluded: [] })
+    adminPrintPickupRoster.mockRejectedValue(new Error("network down"))
     const container = await renderComponent()
     await flush()
     await selectCollectionOption(container, "Drop")
     await flush()
 
     const printButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "In")
-    expect(printButton).toBeDefined()
+    await act(async () => printButton.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(container.textContent).toContain("Không tạo được PDF")
   })
 
   it("shows an error message instead of crashing or hanging when the roster fetch fails", async () => {
