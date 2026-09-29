@@ -74,11 +74,16 @@ export default function AdminQrScanner({ onToken, onClose }) {
   }, [onToken])
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50 p-4">
+    // overflow-y-auto + the video's own max-h-[70vh]: without a height cap,
+    // a tablet in landscape (or just an unusual camera aspect ratio) can
+    // render a video taller than the viewport - with no scroll affordance,
+    // that pushes the close button off-screen with no way to reach it,
+    // stranding whoever's scanning until the camera stream itself errors out.
+    <div className="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50 p-4 overflow-y-auto">
       {error
         ? <p className="text-white mb-4">{error}</p>
-        : <video ref={videoRef} playsInline muted className="max-w-full rounded-xl" />}
-      <button type="button" onClick={onClose} className="mt-4 px-4 py-2 rounded-lg bg-white text-black">
+        : <video ref={videoRef} playsInline muted className="max-w-full max-h-[70vh] rounded-xl" />}
+      <button type="button" onClick={onClose} className="mt-4 px-5 py-2.5 rounded-lg bg-white text-black shrink-0">
         Đóng
       </button>
     </div>

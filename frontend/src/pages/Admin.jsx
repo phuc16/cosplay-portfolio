@@ -115,105 +115,95 @@ export default function Admin() {
   if (token) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-cosplay-dark">
-        <header className="bg-white dark:bg-cosplay-card border-b border-gray-200 dark:border-cosplay-border px-3 sm:px-4 py-3 flex flex-wrap justify-between items-center gap-2">
-          <h1 className="font-bold text-base sm:text-lg text-gray-900 dark:text-slate-100 truncate min-w-0">Admin - Cosplay Portfolio</h1>
-          <div className="flex flex-wrap gap-2 sm:gap-4 items-center shrink-0">
-            <button
-              onClick={() => setTab("albums")}
-              className={`text-sm ${tab === "albums" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Albums
-            </button>
-            <button
-              onClick={() => setTab("settings")}
-              className={`text-sm ${tab === "settings" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Cài đặt trang
-            </button>
-            <button
-              onClick={() => setTab("shop")}
-              className={`text-sm ${tab === "shop" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Shop
-            </button>
-            <button
-              onClick={() => setTab("orders")}
-              className={`text-sm ${tab === "orders" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Đơn hàng
-            </button>
-            <button
-              onClick={() => setTab("booth")}
-              className={`text-sm ${tab === "booth" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Tại quầy
-            </button>
-            <button
-              onClick={() => setTab("payments")}
-              className={`text-sm ${tab === "payments" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Thanh toán
-            </button>
-            <button
-              onClick={() => setTab("email")}
-              className={`text-sm ${tab === "email" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Email
-            </button>
-            <button
-              onClick={() => setTab("stats")}
-              className={`text-sm ${tab === "stats" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Thống kê
-            </button>
-            <button
-              onClick={() => setTab("shipping")}
-              className={`text-sm ${tab === "shipping" ? "text-pink-500 dark:text-pink-400" : "text-gray-600 dark:text-slate-500 hover:text-gray-900 dark:hover:text-slate-300"}`}
-            >
-              Vận chuyển
-            </button>
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-md text-gray-600 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-cosplay-card"
-              title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
-            >
-              {theme === "dark" ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
-            <button
-              onClick={logout}
-              className="text-sm text-gray-600 dark:text-slate-500 hover:text-pink-500 dark:hover:text-pink-400"
-            >
-              Đăng xuất
-            </button>
+        <header className="bg-white dark:bg-cosplay-card border-b border-gray-200 dark:border-cosplay-border sticky top-0 z-40">
+          <div className="px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center gap-2">
+            <h1 className="font-bold text-sm sm:text-lg text-gray-900 dark:text-slate-100 truncate min-w-0">Admin - Cosplay Portfolio</h1>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-md text-gray-600 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-cosplay-card"
+                title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
+              >
+                {theme === "dark" ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={logout}
+                className="text-xs sm:text-sm px-2 py-1 text-gray-600 dark:text-slate-500 hover:text-pink-500 dark:hover:text-pink-400 whitespace-nowrap"
+              >
+                Đăng xuất
+              </button>
+            </div>
           </div>
+          {/* A horizontally scrolling pill strip, not flex-wrap: on a phone,
+              9 tabs wrapped onto 3-4 cramped lines and pushed all page
+              content down below the fold before it could even render.
+              Scrolling keeps the header a fixed, predictable height at every
+              width, and each tab stays a comfortable tap target instead of
+              shrinking to fit. -mx-3/px-3 (sm: -mx-4/px-4) lets the scroll
+              area bleed to the screen edge while the row above it stays
+              aligned to the same padding as the rest of the header. */}
+          <nav className="overflow-x-auto -mx-3 px-3 sm:-mx-4 sm:px-4 pb-2 sm:pb-2.5">
+            <div className="flex gap-1.5 w-max">
+              {[
+                ["albums", "Albums"],
+                ["settings", "Cài đặt trang"],
+                ["shop", "Shop"],
+                ["orders", "Đơn hàng"],
+                ["booth", "Tại quầy"],
+                ["payments", "Thanh toán"],
+                ["email", "Email"],
+                ["stats", "Thống kê"],
+                ["shipping", "Vận chuyển"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setTab(id)}
+                  className={`text-sm px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                    tab === id
+                      ? "bg-pink-500 text-white"
+                      : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-cosplay-dark"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </nav>
         </header>
-        {tab === "albums" && <AdminAlbums />}
-        {tab === "settings" && <AdminSettings />}
-        {tab === "shop" && (
-          <>
-            <AdminShopGroupOrder />
-            <AdminCollections />
-          </>
-        )}
-        {tab === "orders" && <AdminOrders />}
-        {tab === "booth" && <AdminBoothOrders />}
-        {tab === "payments" && (
-          <>
-            <AdminPaymentSettings />
-            <AdminGiftSettings />
-          </>
-        )}
-        {tab === "email" && <AdminEmailTemplates />}
-        {tab === "stats" && <AdminStats />}
-        {tab === "shipping" && <AdminShipping />}
+        {/* Every tab page below renders its own content with no padding of
+            its own (see e.g. AdminOrders.jsx's bare `<div>` root) - on
+            mobile that put every page's content flush against the screen
+            edge with zero margin. One shared padded wrapper here fixes it
+            everywhere at once, instead of touching every page component. */}
+        <main className="p-3 sm:p-4 md:p-6">
+          {tab === "albums" && <AdminAlbums />}
+          {tab === "settings" && <AdminSettings />}
+          {tab === "shop" && (
+            <>
+              <AdminShopGroupOrder />
+              <AdminCollections />
+            </>
+          )}
+          {tab === "orders" && <AdminOrders />}
+          {tab === "booth" && <AdminBoothOrders />}
+          {tab === "payments" && (
+            <>
+              <AdminPaymentSettings />
+              <AdminGiftSettings />
+            </>
+          )}
+          {tab === "email" && <AdminEmailTemplates />}
+          {tab === "stats" && <AdminStats />}
+          {tab === "shipping" && <AdminShipping />}
+        </main>
       </div>
     )
   }

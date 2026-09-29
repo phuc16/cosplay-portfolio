@@ -196,6 +196,9 @@ export const adminConfirmTrackingImport = (rows) =>
 export const adminGetPickupRoster = (collectionId) =>
   api.get(`/api/admin/shipping/roster/${collectionId}`).then((r) => r.data)
 
+export const adminPrintPickupRoster = (collectionId) =>
+  api.get(`/api/admin/shipping/roster/${collectionId}/print`).then((r) => r.data)
+
 // ── Gacha ──
 export const fetchPracticePrizes = (productId) =>
   api.get(`/api/shop/gacha/${productId}/practice`).then((r) => r.data)

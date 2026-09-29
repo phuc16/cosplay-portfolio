@@ -5,6 +5,7 @@ import {
 } from "../../api/shop"
 import { formatVnd } from "../../utils/money"
 import { groupOrderItems } from "../../utils/groupOrderItems"
+import { downloadBase64 } from "../../utils/downloadBase64"
 import SearchableSelect from "../SearchableSelect"
 
 const LOAI_HANG_HOA_OPTIONS = ["Bưu kiện", "Tài liệu"]
@@ -41,19 +42,6 @@ const EXCLUDED_REASON_LABELS = {
 
 function excludedReasonText(x) {
   return x.message || EXCLUDED_REASON_LABELS[x.reason] || "Không rõ lý do"
-}
-
-function downloadBase64(base64, filename) {
-  const bytes = atob(base64)
-  const arr = new Uint8Array(bytes.length)
-  for (let i = 0; i < bytes.length; i += 1) arr[i] = bytes.charCodeAt(i)
-  const blob = new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 // Client-side, not a backend param: within one collection's worth of orders
@@ -108,7 +96,18 @@ export default function ShippingExport() {
     setCollectionId(value)
   }
 
-  const visibleOrders = orders.filter((o) => matchesSearch(o, search))
+  // By STT (queue_number, the staff packing sequence - see
+  // orderRepo.assignQueueNumberIfNeeded), not the server's created_at-based
+  // order - a row with no number yet (shouldn't happen for a confirmed
+  // order, but not guaranteed) sorts after every numbered row.
+  const visibleOrders = orders
+    .filter((o) => matchesSearch(o, search))
+    .sort((a, b) => {
+      if (a.queue_number == null && b.queue_number == null) return 0
+      if (a.queue_number == null) return 1
+      if (b.queue_number == null) return -1
+      return a.queue_number - b.queue_number
+    })
 
   const toggleSelected = (id) => {
     setSelected((prev) => {
@@ -248,6 +247,7 @@ export default function ShippingExport() {
                         aria-label="Chọn tất cả"
                       />
                     </th>
+                    <th className="pr-2">STT</th>
                     <th className="pr-2">Mã đơn</th>
                     <th className="pr-2">Người nhận</th>
                     <th className="pr-2">SĐT</th>
@@ -261,7 +261,7 @@ export default function ShippingExport() {
                 <tbody>
                   {visibleOrders.map((o) => (
                     <Fragment key={o.id}>
-                      <tr className="border-t border-[var(--border-brand)]">
+                      <tr className="border-t border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
                         <td>
                           <input
                             type="checkbox"
@@ -270,6 +270,7 @@ export default function ShippingExport() {
                             aria-label={`Chọn đơn ${o.order_code}`}
                           />
                         </td>
+                        <td className="pr-2 py-1">{o.queue_number ?? "-"}</td>
                         <td className="pr-2 py-1">
                           {o.order_code}
                           {o.has_digital_item && (
@@ -317,7 +318,7 @@ export default function ShippingExport() {
                       {expandedId === o.id && (
                         <tr className="border-t border-[var(--border-brand)]">
                           <td></td>
-                          <td colSpan={7} className="py-2 text-sm">
+                          <td colSpan={8} className="py-2 text-sm">
                             {itemsByOrderId[o.id] === undefined && <p className="opacity-60">Đang tải...</p>}
                             {itemsByOrderId[o.id] === null && <p className="text-red-500">Không tải được sản phẩm.</p>}
                             {Array.isArray(itemsByOrderId[o.id]) && (

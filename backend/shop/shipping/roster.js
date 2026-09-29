@@ -68,7 +68,20 @@ function buildRoster(orders) {
     })
   }
 
-  rows.sort((a, b) => a.buyer_name.localeCompare(b.buyer_name, "vi"))
+  // By queue number (STT), the order staff actually call buyers in - not
+  // alphabetical, which has no relationship to who's been waiting longest.
+  // A row with no number yet (shouldn't happen for a confirmed order, but
+  // not guaranteed - see assignQueueNumberIfNeeded's own caveats) sorts
+  // after every numbered row rather than disappearing to the top under a
+  // NULL-sorts-first default; buyer_name is only a tiebreaker among those.
+  rows.sort((a, b) => {
+    if (a.queue_number === null && b.queue_number === null) {
+      return a.buyer_name.localeCompare(b.buyer_name, "vi")
+    }
+    if (a.queue_number === null) return 1
+    if (b.queue_number === null) return -1
+    return a.queue_number - b.queue_number
+  })
   return { rows, excluded }
 }
 

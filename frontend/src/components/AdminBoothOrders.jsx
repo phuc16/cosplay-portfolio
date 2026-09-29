@@ -17,8 +17,16 @@ export default function AdminBoothOrders() {
   const [orders, setOrders] = useState([])
   const [collections, setCollections] = useState([])
   const [collectionId, setCollectionId] = useState("")
+  const [search, setSearch] = useState("")
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState("")
+
+  // Client-side, like ShippingRoster's own search: the list is already fully
+  // fetched (and polled) for this screen, and booth-scale order counts never
+  // justify a server round trip just to filter by name.
+  const visibleOrders = orders.filter((o) =>
+    !search.trim() || o.buyer_name.toLowerCase().includes(search.trim().toLowerCase())
+  )
 
   const reload = () =>
     adminListBoothOrders(collectionId ? { collection_id: collectionId } : {}).then(setOrders)
@@ -79,6 +87,16 @@ export default function AdminBoothOrders() {
             placeholder="Tất cả"
           />
         </label>
+        <label className="flex flex-col text-xs gap-1">
+          Tìm kiếm
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tên người mua..."
+            className="h-[38px] px-2 py-1 rounded-lg border border-[var(--border-brand)] bg-transparent"
+          />
+        </label>
         <button
           type="button"
           onClick={refresh}
@@ -92,8 +110,11 @@ export default function AdminBoothOrders() {
       {error && <p className="text-red-500 mb-3">{error}</p>}
 
       {orders.length === 0 && <p className="opacity-60">Chưa có đơn tại quầy nào.</p>}
+      {orders.length > 0 && visibleOrders.length === 0 && (
+        <p className="opacity-60">Không tìm thấy đơn nào khớp.</p>
+      )}
 
-      {orders.map((o) => (
+      {visibleOrders.map((o) => (
         <div key={o.id} className="mb-4 p-3 rounded-xl border border-[var(--border-brand)]">
           <div className="flex justify-between items-start gap-2 flex-wrap">
             <div>
@@ -108,7 +129,7 @@ export default function AdminBoothOrders() {
                 type="button"
                 data-testid={`prepared-${o.id}`}
                 onClick={() => togglePrepared(o)}
-                className={`px-2.5 py-1 text-xs rounded-full border font-medium whitespace-nowrap ${
+                className={`px-3.5 py-2 text-sm rounded-full border font-medium whitespace-nowrap ${
                   o.prepared
                     ? "bg-[var(--surface-success)] border-[var(--border-success)] text-[var(--text-success)]"
                     : "bg-[var(--surface-warning)] border-[var(--border-warning)] text-[var(--text-warning)]"

@@ -23,18 +23,6 @@ const TAIL_CELLS = 4
 // the count is hidden from buyer-facing copy rather than printed raw.
 export const UNLIMITED_TURNS_SENTINEL = 1_000_000
 
-// Ambiguous glyphs (0/O, 1/I, B/8, S/5, 2/Z, G/6, Q) are left out so staff can
-// read a code off the buyer's screen without mistyping it.
-const CLAIM_CODE_ALPHABET = "ACDEFHJKLMNPRTUVWXY3479"
-
-function generateClaimCode() {
-  let code = ""
-  for (let i = 0; i < 6; i++) {
-    code += CLAIM_CODE_ALPHABET[Math.floor(Math.random() * CLAIM_CODE_ALPHABET.length)]
-  }
-  return `${code.slice(0, 3)}-${code.slice(3)}`
-}
-
 function randomPrize(prizes) {
   return prizes[Math.floor(Math.random() * prizes.length)]
 }
@@ -100,7 +88,6 @@ export default function GachaMachine({
   // draws it actually witnessed.
   const [drops, setDrops] = useState([])
   const [showSummary, setShowSummary] = useState(false)
-  const [claimCode] = useState(generateClaimCode)
   const [error, setError] = useState(null)
   const [flash, setFlash] = useState(false)
   const [peek, setPeek] = useState(null)
@@ -1081,9 +1068,6 @@ export default function GachaMachine({
                 <div>
                   {drops.length} món · Tổng giá trị {formatVnd(dropsTotal)}
                 </div>
-                {isBoothContext && (
-                  <div style={{ color: "#FF2E88", marginTop: 6 }}>Mã nhận quà {claimCode}</div>
-                )}
               </div>
             </div>
 

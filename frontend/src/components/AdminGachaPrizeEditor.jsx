@@ -229,7 +229,7 @@ export default function AdminGachaPrizeEditor({ productId }) {
 
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button type="button" onClick={addRow} className="px-3 py-1 rounded-lg border border-[var(--border-brand)]">
           + Thêm phần thưởng
         </button>

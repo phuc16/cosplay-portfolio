@@ -112,11 +112,29 @@ describe("buildRoster - items", () => {
 })
 
 describe("buildRoster - sorting", () => {
-  it("sorts rows by buyer_name ascending, Vietnamese-locale aware", () => {
+  it("sorts rows by queue_number (STT) ascending, not by buyer_name", () => {
     const { rows } = buildRoster([
-      order({ id: 1, buyer_name: "Trần Văn B" }),
-      order({ id: 2, buyer_name: "Ánh Dương" }),
-      order({ id: 3, buyer_name: "Bùi Thị C" }),
+      order({ id: 1, buyer_name: "Trần Văn B", queue_number: 3 }),
+      order({ id: 2, buyer_name: "Ánh Dương", queue_number: 1 }),
+      order({ id: 3, buyer_name: "Bùi Thị C", queue_number: 2 }),
+    ])
+    expect(rows.map((r) => r.order_id)).toEqual([2, 3, 1])
+  })
+
+  it("sorts a row with no queue_number yet after every numbered row", () => {
+    const { rows } = buildRoster([
+      order({ id: 1, buyer_name: "Trần Văn B", queue_number: null }),
+      order({ id: 2, buyer_name: "Ánh Dương", queue_number: 2 }),
+      order({ id: 3, buyer_name: "Bùi Thị C", queue_number: 1 }),
+    ])
+    expect(rows.map((r) => r.order_id)).toEqual([3, 2, 1])
+  })
+
+  it("falls back to buyer_name, Vietnamese-locale aware, when queue_number is null on both sides", () => {
+    const { rows } = buildRoster([
+      order({ id: 1, buyer_name: "Trần Văn B", queue_number: null }),
+      order({ id: 2, buyer_name: "Ánh Dương", queue_number: null }),
+      order({ id: 3, buyer_name: "Bùi Thị C", queue_number: null }),
     ])
     expect(rows.map((r) => r.buyer_name)).toEqual(["Ánh Dương", "Bùi Thị C", "Trần Văn B"])
   })
