@@ -403,7 +403,7 @@ export default function AdminProducts({ collection }) {
           onDragLeave={isDefaultView ? handleDragLeave : undefined}
           className="mb-4 p-3 rounded-xl border border-[var(--border-brand)]"
         >
-          <div className="flex justify-between items-start gap-2">
+          <div className="flex justify-between items-start gap-2 flex-wrap">
             <div
               draggable={isDefaultView}
               onDragStart={isDefaultView ? (e) => handleDragStart(e, p) : undefined}
@@ -417,7 +417,7 @@ export default function AdminProducts({ collection }) {
                 <p className="text-sm opacity-70">{formatVnd(p.price)}</p>
               </div>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 flex-wrap">
               {subEditorLabel(p.type) && (
                 <button
                   type="button"

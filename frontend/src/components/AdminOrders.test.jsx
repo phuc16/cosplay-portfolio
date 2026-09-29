@@ -569,8 +569,16 @@ describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
     expect(container.textContent).not.toContain("STT")
   })
 
-  it("shows no queue number badge for a ship order", async () => {
+  it("shows a queue number badge for a ship order too (staff packing sequence)", async () => {
     adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship", queue_number: 7 })])
+    const { container } = await renderAdminOrders()
+    await flush()
+
+    expect(container.textContent).toContain("STT 7")
+  })
+
+  it("shows no queue number badge for a ship order that doesn't have one yet", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1, fulfillment_method: "ship", queue_number: null })])
     const { container } = await renderAdminOrders()
     await flush()
 

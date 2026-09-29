@@ -892,12 +892,13 @@ async function transitionOrder(id, toStatus, extra = {}) {
       console.error(`[ORDERS] Không tạo được phiên gacha cho đơn #${id}:`, err.message)
     }
 
-    // Fallback for a pickup order an admin confirms directly (e.g. verified
-    // payment through some other channel) without the buyer ever uploading
-    // proof through savePaymentProof - that's normally what assigns the
-    // number, so without this the order would reach 'confirmed' still
-    // unnumbered. assignQueueNumberIfNeeded is already a no-op for a
-    // non-pickup order or one that already has a number.
+    // Fallback for a pickup/ship order an admin confirms directly (e.g.
+    // verified payment through some other channel) without the buyer ever
+    // uploading proof through savePaymentProof - that's normally what
+    // assigns the number, so without this the order would reach 'confirmed'
+    // still unnumbered. assignQueueNumberIfNeeded is already a no-op for an
+    // order whose method doesn't use queue numbers, or one that already has
+    // a number.
     try {
       await assignQueueNumberIfNeeded(id)
     } catch (err) {
@@ -945,9 +946,10 @@ async function savePaymentProof(orderId, url) {
 
   // The buyer has now done everything on their end (an unconfirmed pending
   // order with no proof yet stays unnumbered) - a queue number is a
-  // courtesy for physically queuing at the event, not something the
-  // already-successful upload above should fail over.
-  if (fulfillmentMethod === "pickup") {
+  // courtesy for physically queuing at the event / a packing sequence for
+  // staff, not something the already-successful upload above should fail
+  // over.
+  if (QUEUE_NUMBER_METHODS.has(fulfillmentMethod)) {
     try {
       await assignQueueNumberIfNeeded(orderId)
     } catch (err) {
@@ -958,17 +960,31 @@ async function savePaymentProof(orderId, url) {
 }
 
 /**
- * Assigns the next per-collection queue number to a pickup order, so the
- * buyer can queue at the event by number - a no-op if the order isn't
- * pickup or already has one. Numbers are never reused/backfilled: a
- * cancelled order keeps its number, matching how a physical ticket stays
- * "called" rather than being handed to someone else.
+ * Fulfillment methods that get a per-collection sequential number.
+ * - pickup: shown to the buyer, used to queue at the event.
+ * - ship: staff-only packing/processing sequence (never shown to the buyer -
+ *   see toPublicOrder in routes/orders.js), so warehouse staff can work a
+ *   confirmed collection's ship orders in a fixed, predictable order.
+ * Each method gets its own independent sequence per collection (see
+ * migration 049) - a collection running both pickup and ship at once must
+ * not have a ship order "skip ahead" in the pickup line or vice versa.
+ */
+const QUEUE_NUMBER_METHODS = new Set(["pickup", "ship"])
+
+/**
+ * Assigns the next per-collection-per-fulfillment-method queue number to an
+ * order, so a pickup buyer can queue at the event by number and staff can
+ * work ship orders in a fixed packing sequence - a no-op if the order's
+ * method isn't one of QUEUE_NUMBER_METHODS or it already has a number.
+ * Numbers are never reused/backfilled: a cancelled order keeps its number,
+ * matching how a physical ticket stays "called" rather than being handed to
+ * someone else.
  *
  * Concurrent callers computing the same next number is a real race (no
  * lock is held across the read and the write); the unique index on
- * (collection_id, queue_number) is what actually prevents a collision -
- * the loser retries with a freshly re-read next number, same TOCTOU-retry
- * shape as createCollection's slug uniqueness.
+ * (collection_id, fulfillment_method, queue_number) is what actually
+ * prevents a collision - the loser retries with a freshly re-read next
+ * number, same TOCTOU-retry shape as createCollection's slug uniqueness.
  *
  * CAVEAT: that index only guards this if collection_id is non-NULL - MySQL
  * treats every NULL as distinct in a unique index, so two orders whose
@@ -983,11 +999,11 @@ async function assignQueueNumberIfNeeded(orderId, attempt = 0) {
     "SELECT collection_id, fulfillment_method, queue_number FROM orders WHERE id = ?",
     [orderId]
   )
-  if (!order || order.fulfillment_method !== "pickup" || order.queue_number !== null) return
+  if (!order || !QUEUE_NUMBER_METHODS.has(order.fulfillment_method) || order.queue_number !== null) return
 
   const [[{ next }]] = await db.query(
-    "SELECT COALESCE(MAX(queue_number), 0) + 1 AS next FROM orders WHERE collection_id <=> ?",
-    [order.collection_id]
+    "SELECT COALESCE(MAX(queue_number), 0) + 1 AS next FROM orders WHERE collection_id <=> ? AND fulfillment_method = ?",
+    [order.collection_id, order.fulfillment_method]
   )
   try {
     await db.query(

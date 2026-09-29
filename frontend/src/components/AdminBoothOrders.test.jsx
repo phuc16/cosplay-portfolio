@@ -35,6 +35,17 @@ async function renderComponent() {
 }
 async function flush() { await act(async () => {}) }
 
+// React installs a value tracker on <input> DOM nodes it controls, so a
+// plain `el.value = x` followed by dispatching "input" is a no-op (the
+// tracker already sees the "new" value as current). Going through the
+// native setter bypasses that tracker, same as React Testing Library's
+// fireEvent.change does internally.
+function setInputValue(el, value) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set
+  setter.call(el, value)
+  el.dispatchEvent(new Event("input", { bubbles: true }))
+}
+
 beforeEach(() => {
   adminListBoothOrders.mockReset().mockResolvedValue([])
   adminListCollections.mockReset().mockResolvedValue([])
@@ -112,6 +123,45 @@ describe("AdminBoothOrders", () => {
 
     expect(adminSetOrderPrepared).toHaveBeenCalledWith(5, true)
     expect(container.querySelector('[data-testid="prepared-5"]').textContent).toBe("Đã trao quà")
+  })
+
+  it("filters by buyer name, client-side, case-insensitively", async () => {
+    adminListBoothOrders.mockResolvedValue([
+      order({ id: 1, buyer_name: "Trần Xuân Nhật" }),
+      order({ id: 2, buyer_name: "Phạm Thế Anh" }),
+    ])
+    const container = await renderComponent()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Tên người mua..."]')
+    await act(async () => setInputValue(searchInput, "nhật"))
+
+    expect(container.textContent).toContain("Trần Xuân Nhật")
+    expect(container.textContent).not.toContain("Phạm Thế Anh")
+  })
+
+  it("shows a no-match message instead of the empty-list message when search matches nothing", async () => {
+    adminListBoothOrders.mockResolvedValue([order({ buyer_name: "Trần Xuân Nhật" })])
+    const container = await renderComponent()
+    await flush()
+
+    const searchInput = container.querySelector('input[placeholder="Tên người mua..."]')
+    await act(async () => setInputValue(searchInput, "không tồn tại"))
+
+    expect(container.textContent).toContain("Không tìm thấy đơn nào khớp.")
+    expect(container.textContent).not.toContain("Chưa có đơn tại quầy nào.")
+  })
+
+  it("does not re-fetch from the server when the search box changes", async () => {
+    adminListBoothOrders.mockResolvedValue([order({ buyer_name: "Trần Xuân Nhật" })])
+    const container = await renderComponent()
+    await flush()
+    adminListBoothOrders.mockClear()
+
+    const searchInput = container.querySelector('input[placeholder="Tên người mua..."]')
+    await act(async () => setInputValue(searchInput, "Nhật"))
+
+    expect(adminListBoothOrders).not.toHaveBeenCalled()
   })
 
   it("re-fetches on the refresh button", async () => {

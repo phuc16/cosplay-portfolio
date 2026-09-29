@@ -44,7 +44,7 @@ describe("createOrder - queue number is never assigned at creation time", () => 
     expect(order.queue_number).toBeNull()
   })
 
-  it("does not assign a queue number for a ship order", async () => {
+  it("does not assign a queue number for a ship order either, at creation time", async () => {
     const { variantId } = await seedVariant()
     const res = await repo.createOrder({
       items: [{ variant_id: variantId, qty: 1 }],
@@ -94,7 +94,7 @@ describe("savePaymentProof - queue number for prepaid pickup", () => {
     expect(orderB1.queue_number).toBe(1)
   })
 
-  it("does not assign one for a ship order's proof upload", async () => {
+  it("also assigns a queue number to a ship order once the buyer uploads proof (staff packing sequence)", async () => {
     const { variantId } = await seedVariant()
     const res = await repo.createOrder({
       items: [{ variant_id: variantId, qty: 1 }],
@@ -104,7 +104,26 @@ describe("savePaymentProof - queue number for prepaid pickup", () => {
     await repo.savePaymentProof(res.id, "https://x/proof.png")
 
     const order = await repo.getOrderById(res.id)
-    expect(order.queue_number).toBeNull()
+    expect(order.queue_number).toBe(1)
+  })
+
+  it("keeps pickup and ship sequences independent within the same collection", async () => {
+    const { variantId } = await seedVariant({ allow_ship: true })
+    const pickup = await repo.createOrder(pickupOrder(variantId, { payment_method: "bank" }))
+    const ship = await repo.createOrder({
+      items: [{ variant_id: variantId, qty: 1 }],
+      buyer, fulfillment_method: "ship", payment_method: "bank",
+    })
+
+    await repo.savePaymentProof(pickup.id, "https://x/proof1.png")
+    await repo.savePaymentProof(ship.id, "https://x/proof2.png")
+
+    const pickupOrderRow = await repo.getOrderById(pickup.id)
+    const shipOrderRow = await repo.getOrderById(ship.id)
+    // Both start their own sequence at 1 - a ship order confirmed alongside
+    // pickup orders must never "use up" a pickup number or vice versa.
+    expect(pickupOrderRow.queue_number).toBe(1)
+    expect(shipOrderRow.queue_number).toBe(1)
   })
 
   it("never double-assigns on a second proof upload", async () => {
@@ -134,7 +153,7 @@ describe("transitionOrder - queue number fallback on admin confirm without proof
     expect(order.queue_number).toBe(1)
   })
 
-  it("does not assign one for a ship order confirmed directly", async () => {
+  it("also assigns one for a ship order confirmed directly, without any proof upload", async () => {
     const { variantId } = await seedVariant()
     const res = await repo.createOrder({
       items: [{ variant_id: variantId, qty: 1 }],
@@ -144,7 +163,7 @@ describe("transitionOrder - queue number fallback on admin confirm without proof
     await repo.transitionOrder(res.id, "confirmed")
 
     const order = await repo.getOrderById(res.id)
-    expect(order.queue_number).toBeNull()
+    expect(order.queue_number).toBe(1)
   })
 
   it("does not reassign or bump the number for an order that already has one from proof upload", async () => {

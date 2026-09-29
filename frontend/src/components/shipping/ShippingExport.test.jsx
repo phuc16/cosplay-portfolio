@@ -164,6 +164,42 @@ describe("ShippingExport", () => {
     expect(container.querySelector('input[aria-label="Chọn đơn DH1"]').checked).toBe(false)
   })
 
+  it("shows the staff packing queue number, or a dash when not yet assigned", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, order_code: "DH1", queue_number: 3 }),
+      order({ id: 2, order_code: "DH2", queue_number: null }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+
+    const rows = [...container.querySelectorAll("tbody tr")].filter((tr) => !tr.querySelector("td[colspan]"))
+    expect(rows[0].textContent).toContain("3")
+    expect(rows[1].querySelector("td:nth-child(2)").textContent).toBe("-")
+  })
+
+  it("sorts rows by STT (queue_number) ascending, not server order, with unnumbered rows last", async () => {
+    adminListShippingExportOrders.mockResolvedValue([
+      order({ id: 1, order_code: "DH1", buyer_name: "Trần Văn B", queue_number: 3 }),
+      order({ id: 2, order_code: "DH2", buyer_name: "Ánh Dương", queue_number: null }),
+      order({ id: 3, order_code: "DH3", buyer_name: "Bùi Thị C", queue_number: 1 }),
+    ])
+    const container = await renderShippingExport()
+    await flush()
+
+    const rows = [...container.querySelectorAll("tbody tr")].filter((tr) => !tr.querySelector("td[colspan]"))
+    expect(rows.map((r) => r.textContent.includes("Bùi Thị C") ? "C" : r.textContent.includes("Trần Văn B") ? "B" : "A"))
+      .toEqual(["C", "B", "A"])
+  })
+
+  it("highlights a row on hover to separate each line", async () => {
+    adminListShippingExportOrders.mockResolvedValue([order()])
+    const container = await renderShippingExport()
+    await flush()
+
+    const row = container.querySelector("tbody tr")
+    expect(row.className).toContain("hover:bg-[var(--brand-soft)]")
+  })
+
   it("lists eligible orders with a checkbox each", async () => {
     adminListShippingExportOrders.mockResolvedValue([order(), order({ id: 2, order_code: "DH2" })])
     const container = await renderShippingExport()

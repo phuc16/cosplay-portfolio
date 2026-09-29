@@ -71,7 +71,7 @@ function Editor({ tpl, onSaved }) {
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
       {saved && <p className="text-sm text-green-600 mb-2">Đã lưu.</p>}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button type="button" onClick={save} className="px-3 py-1.5 text-sm rounded-lg bg-[var(--brand)] text-white">
           Lưu
         </button>

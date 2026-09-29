@@ -587,7 +587,7 @@ describe("GachaMachine - session summary", () => {
     expect(summaryDialog(container).textContent).toContain("CHƯA ĐẶT — PHIÊN #001 HOÀN TẤT")
   })
 
-  it("shows the staff-handover footer and the claim code at the booth kiosk", async () => {
+  it("shows the staff-handover footer at the booth kiosk", async () => {
     const drawFn = twoDrawFn()
     const container = await renderMachine({
       prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn, onFinish: vi.fn(),
@@ -596,11 +596,10 @@ describe("GachaMachine - session summary", () => {
     await playSession(container, drawFn, 2)
 
     const summary = summaryDialog(container)
-    expect(summary.textContent).toMatch(/Mã nhận quà [ACDEFHJKLMNPRTUVWXY3479]{3}-[ACDEFHJKLMNPRTUVWXY3479]{3}/)
     expect(summary.textContent).toContain("Đưa màn hình này cho nhân viên để nhận quà")
   })
 
-  it("hides the staff-handover footer and the claim code off the booth kiosk", async () => {
+  it("hides the staff-handover footer off the booth kiosk", async () => {
     const drawFn = twoDrawFn()
     const container = await renderMachine({
       prizes: catalogPrizes, turnsTotal: 2, turnsUsed: 0, drawFn,
@@ -609,7 +608,6 @@ describe("GachaMachine - session summary", () => {
     await playSession(container, drawFn, 2)
 
     const summary = summaryDialog(container)
-    expect(summary.textContent).not.toContain("Mã nhận quà")
     expect(summary.textContent).not.toContain("nhân viên")
     expect(summary.textContent).toContain("Sticker")
     expect(summary.textContent).toContain("Poster")
