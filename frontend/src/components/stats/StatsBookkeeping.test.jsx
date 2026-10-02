@@ -92,6 +92,16 @@ describe("StatsBookkeeping", () => {
     expect(container.textContent).toContain("Drop hè")
   })
 
+  it("highlights a collection row on hover to separate each line", async () => {
+    adminGetBookkeepingStats.mockResolvedValue(bookkeepingStats())
+    const container = await renderStatsBookkeeping()
+    await flush()
+    await click(findButton(container, "Xem"))
+
+    const row = container.querySelector("tbody tr")
+    expect(row.className).toContain("hover:bg-[var(--brand-soft)]")
+  })
+
   it("shows an explicit empty state for a range with no orders", async () => {
     adminGetBookkeepingStats.mockResolvedValue(bookkeepingStats({ by_collection: [], received_total: 0 }))
     const container = await renderStatsBookkeeping()

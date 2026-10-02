@@ -26,6 +26,16 @@ const PHOTO_SIZE = 24
 const ROW_GAP = 4
 const BLOCK_PADDING = 8
 const BOTTOM_LIMIT = 760 // A4 page height (~842pt) minus a bottom margin
+// Empty squares to pen-tick, same idea as the "☐" column the on-screen
+// roster table already renders for the same physical handover process - one
+// per order (the whole buyer handed off) and one per item (each product
+// actually handed over), since a buyer's cart can be handed over in pieces.
+const CHECKBOX_SIZE = 10
+const CHECKBOX_GAP = 6
+
+function drawCheckbox(doc, x, y) {
+  doc.rect(x, y, CHECKBOX_SIZE, CHECKBOX_SIZE).strokeColor("#333333").stroke()
+}
 
 /**
  * Every shop image is stored/served as a webp proxied through
@@ -112,13 +122,20 @@ async function buildRosterPdf(rows) {
 
     let blockTop = doc.y
     const contentX = MARGIN + BLOCK_PADDING
-    doc.x = contentX
+    // Every header line indents past the order-level checkbox, so the
+    // checkbox sits cleanly to the left of the whole text block rather than
+    // just the first line.
+    const textX = contentX + CHECKBOX_SIZE + CHECKBOX_GAP
+    const textWidth = contentWidth - BLOCK_PADDING * 2 - CHECKBOX_SIZE - CHECKBOX_GAP
+    doc.x = textX
     doc.y = blockTop + BLOCK_PADDING
+
+    drawCheckbox(doc, contentX, doc.y + 2)
 
     const stt = row.queue_number ?? "-"
     doc.font("body-bold").fontSize(13).fillColor("#000000")
-      .text(`STT ${stt} · ${row.order_code} · ${row.buyer_name} · ${row.phone}`, contentX, doc.y, {
-        width: contentWidth - BLOCK_PADDING * 2,
+      .text(`STT ${stt} · ${row.order_code} · ${row.buyer_name} · ${row.phone}`, textX, doc.y, {
+        width: textWidth,
       })
     // Its own highlighted badge, not just another item in a gray "·"-joined
     // line - this is the one thing staff actually read out loud against the
@@ -130,19 +147,19 @@ async function buildRosterPdf(rows) {
       doc.font("body-bold").fontSize(11)
       const badgeWidth = doc.widthOfString(badgeText) + 12
       const badgeTop = doc.y
-      doc.rect(contentX, badgeTop, badgeWidth, 18).fill("#fef3c7")
-      doc.fillColor("#92400e").text(badgeText, contentX + 6, badgeTop + 4)
+      doc.rect(textX, badgeTop, badgeWidth, 18).fill("#fef3c7")
+      doc.fillColor("#92400e").text(badgeText, textX + 6, badgeTop + 4)
       doc.fillColor("#000000")
       doc.y = badgeTop + 18
-      doc.x = contentX
+      doc.x = textX
       doc.moveDown(0.2)
     }
 
     doc.font("body").fontSize(10).fillColor("#555555")
-    doc.text(row.paid ? "Đã thanh toán" : `Thu khi giao: ${formatVnd(row.amount_due)}`, contentX, doc.y, {
-      width: contentWidth - BLOCK_PADDING * 2,
+    doc.text(row.paid ? "Đã thanh toán" : `Thu khi giao: ${formatVnd(row.amount_due)}`, textX, doc.y, {
+      width: textWidth,
     })
-    if (row.note) doc.text(`Ghi chú: ${row.note}`, contentX, doc.y, { width: contentWidth - BLOCK_PADDING * 2 })
+    if (row.note) doc.text(`Ghi chú: ${row.note}`, textX, doc.y, { width: textWidth })
     doc.fillColor("#000000")
     doc.moveDown(0.3)
 
@@ -167,18 +184,21 @@ async function buildRosterPdf(rows) {
       }
 
       const rowY = doc.y
+      drawCheckbox(doc, contentX, rowY + PHOTO_SIZE / 2 - CHECKBOX_SIZE / 2)
+
+      const photoX = contentX + CHECKBOX_SIZE + CHECKBOX_GAP
       const buffer = images.get(item.image_url)
       if (buffer) {
-        doc.image(buffer, contentX, rowY, { width: PHOTO_SIZE, height: PHOTO_SIZE })
+        doc.image(buffer, photoX, rowY, { width: PHOTO_SIZE, height: PHOTO_SIZE })
       } else {
-        drawPlaceholder(doc, contentX, rowY)
+        drawPlaceholder(doc, photoX, rowY)
       }
 
       const label = item.variant_label ? `${item.product_name} · ${item.variant_label}` : item.product_name
       const suffix = item.is_gift ? " (Quà tặng)" : item.delivery_link ? " (Sản phẩm số)" : ""
       doc.font("body").fontSize(11).fillColor("#000000")
-        .text(`${label} × ${item.qty}${suffix}`, contentX + PHOTO_SIZE + 10, rowY + PHOTO_SIZE / 2 - 6, {
-          width: contentWidth - BLOCK_PADDING * 2 - PHOTO_SIZE - 10,
+        .text(`${label} × ${item.qty}${suffix}`, photoX + PHOTO_SIZE + 10, rowY + PHOTO_SIZE / 2 - 6, {
+          width: contentWidth - BLOCK_PADDING * 2 - CHECKBOX_SIZE - CHECKBOX_GAP - PHOTO_SIZE - 10,
         })
 
       doc.y = rowY + PHOTO_SIZE + ROW_GAP

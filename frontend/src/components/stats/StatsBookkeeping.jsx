@@ -187,7 +187,7 @@ export default function StatsBookkeeping() {
                 </thead>
                 <tbody>
                   {stats.by_collection.map((c) => (
-                    <tr key={c.collection_id ?? "none"} className="border-t border-[var(--border-brand)]">
+                    <tr key={c.collection_id ?? "none"} className="border-t border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
                       <td className="pr-2 py-1">{c.collection_title}</td>
                       <td className="pr-2 py-1">{formatVnd(c.received_total)}</td>
                       <td className="pr-2 py-1">{formatVnd(c.awaiting_payment)}</td>

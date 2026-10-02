@@ -153,7 +153,7 @@ export default function StatsDrop() {
                 </thead>
                 <tbody>
                   {stats.variants.map((v, i) => (
-                    <tr key={v.variant_id ?? `deleted-${i}`} className="border-t border-[var(--border-brand)]">
+                    <tr key={v.variant_id ?? `deleted-${i}`} className="border-t border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
                       <td className="pr-2 py-1">{v.product_name}</td>
                       <td className="pr-2 py-1">{v.variant_label}</td>
                       <td className="pr-2 py-1">{v.sold}</td>

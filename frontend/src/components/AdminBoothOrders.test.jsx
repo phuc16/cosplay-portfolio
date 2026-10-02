@@ -74,6 +74,15 @@ describe("AdminBoothOrders", () => {
     expect(container.textContent).toContain("Sticker")
   })
 
+  it("highlights an order card on hover to separate each line", async () => {
+    adminListBoothOrders.mockResolvedValue([order({ id: 1 })])
+    const container = await renderComponent()
+    await flush()
+
+    const card = container.querySelector('[data-testid="prepared-1"]').closest(".rounded-xl")
+    expect(card.className).toContain("hover:bg-[var(--brand-soft)]")
+  })
+
   it("shows a placeholder line for a booth order with no draws yet", async () => {
     adminListBoothOrders.mockResolvedValue([order({ items: [] })])
     const container = await renderComponent()

@@ -403,7 +403,7 @@ export default function AdminOrders() {
       )}
 
       {[...orders].sort(byActionableFirst).map((o) => (
-        <div key={o.id} data-order-id={o.id} className="mb-3 p-3 rounded-xl border border-[var(--border-brand)]">
+        <div key={o.id} data-order-id={o.id} className="mb-3 p-3 rounded-xl border border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
           <div className="flex justify-between items-start gap-3 flex-wrap">
             <div className="flex items-start gap-2">
               <input type="checkbox" className="mt-1" checked={selected.has(o.id)}

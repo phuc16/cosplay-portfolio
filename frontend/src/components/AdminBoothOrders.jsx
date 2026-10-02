@@ -115,7 +115,7 @@ export default function AdminBoothOrders() {
       )}
 
       {visibleOrders.map((o) => (
-        <div key={o.id} className="mb-4 p-3 rounded-xl border border-[var(--border-brand)]">
+        <div key={o.id} className="mb-4 p-3 rounded-xl border border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
           <div className="flex justify-between items-start gap-2 flex-wrap">
             <div>
               <p className="font-medium">{o.buyer_name}</p>

@@ -60,6 +60,16 @@ describe("StatsRestock", () => {
     expect(container.textContent).toContain("Chưa có dữ liệu")
   })
 
+  it("highlights a row on hover to separate each line", async () => {
+    adminGetRestockStats.mockResolvedValue([
+      { variant_id: 1, label: "A1", product_name: "Card", collection_id: 1, collection_title: "Drop", stock_qty: 0, unlimited: false, remaining: 0, sold: 1, velocity: 1, sell_through: 1, time_to_sellout_days: null },
+    ])
+    const container = await renderStatsRestock()
+    await flush()
+    const row = container.querySelector("tbody tr")
+    expect(row.className).toContain("hover:bg-[var(--brand-soft)]")
+  })
+
   it("renders one row per variant, in the order the API returned them", async () => {
     adminGetRestockStats.mockResolvedValue([
       { variant_id: 1, label: "A1", product_name: "Fast card", collection_id: 1, collection_title: "Drop", stock_qty: 0, unlimited: false, remaining: 0, sold: 20, velocity: 5, sell_through: 1, time_to_sellout_days: 4 },

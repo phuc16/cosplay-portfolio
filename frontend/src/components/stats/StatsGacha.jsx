@@ -87,7 +87,7 @@ export default function StatsGacha() {
               </thead>
               <tbody>
                 {stats.tiers.map((t) => (
-                  <tr key={t.tier} className="border-t border-[var(--border-brand)]">
+                  <tr key={t.tier} className="border-t border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
                     <td className="pr-2 py-1">{tierLabel(t.tier)}</td>
                     <td className="pr-2 py-1">{t.drawn_online}</td>
                     <td className="pr-2 py-1">{t.drawn_booth}</td>
@@ -114,7 +114,7 @@ export default function StatsGacha() {
               </thead>
               <tbody>
                 {stats.prizes.map((p) => (
-                  <tr key={p.id} className="border-t border-[var(--border-brand)]">
+                  <tr key={p.id} className="border-t border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
                     <td className="pr-2 py-1">{p.name}</td>
                     <td className="pr-2 py-1">{tierLabel(p.tier)}</td>
                     <td className="pr-2 py-1">{p.drawn_online}</td>

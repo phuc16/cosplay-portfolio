@@ -80,6 +80,17 @@ describe("StatsDrop", () => {
     expect(container.textContent).toContain("35.000₫")
   })
 
+  it("highlights a variant row on hover to separate each line", async () => {
+    adminGetDropStats.mockResolvedValue(dropStats())
+    const container = await renderStatsDrop()
+    await flush()
+    await selectCollectionOption(container, "Drop")
+    await flush()
+
+    const row = container.querySelector("tbody tr")
+    expect(row.className).toContain("hover:bg-[var(--brand-soft)]")
+  })
+
   it("renders the pending-COD bucket as its own labelled figure, distinct from received_total", async () => {
     adminGetDropStats.mockResolvedValue(dropStats({ received_total: 35000, pending_cod: 12000 }))
     const container = await renderStatsDrop()

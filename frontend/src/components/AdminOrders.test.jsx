@@ -308,6 +308,13 @@ describe("AdminOrders - bulk complete (Event Pickup Verification plan)", () => {
 })
 
 describe("AdminOrders - semantic status/action styling (Admin UI plan)", () => {
+  it("highlights an order row on hover to separate each line", async () => {
+    adminListOrders.mockResolvedValue([order({ id: 1 })])
+    const { container } = await renderAdminOrders()
+    const row = container.querySelector('[data-order-id="1"]')
+    expect(row.className).toContain("hover:bg-[var(--brand-soft)]")
+  })
+
   it("renders the status as a Vietnamese-labelled badge, not the raw enum", async () => {
     adminListOrders.mockResolvedValue([order({ status: "confirmed" })])
     const { container } = await renderAdminOrders()

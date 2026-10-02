@@ -95,7 +95,7 @@ export default function StatsRestock() {
             </thead>
             <tbody>
               {rows.map((v) => (
-                <tr key={v.variant_id} className="border-t border-[var(--border-brand)]">
+                <tr key={v.variant_id} className="border-t border-[var(--border-brand)] hover:bg-[var(--brand-soft)]">
                   <td className="pr-2 py-1">{v.collection_title}</td>
                   <td className="pr-2 py-1">{v.product_name}</td>
                   <td className="pr-2 py-1">{v.label}</td>

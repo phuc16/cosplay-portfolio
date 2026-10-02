@@ -81,6 +81,18 @@ describe("StatsGacha", () => {
     expect(container.textContent).toContain("100.000₫") // revenue.total
   })
 
+  it("highlights both the tier rows and the prize rows on hover to separate each line", async () => {
+    adminGetGachaDropStats.mockResolvedValue(gachaStats())
+    const container = await renderStatsGacha()
+    await flush()
+    await selectProductOption(container, "Gacha Drop · Mystery Case")
+    await flush()
+
+    const rows = container.querySelectorAll("tbody tr")
+    expect(rows.length).toBeGreaterThan(0)
+    rows.forEach((row) => expect(row.className).toContain("hover:bg-[var(--brand-soft)]"))
+  })
+
   it("shows the online/booth split per prize", async () => {
     adminGetGachaDropStats.mockResolvedValue(gachaStats())
     const container = await renderStatsGacha()
