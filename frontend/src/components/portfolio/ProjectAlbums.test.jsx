@@ -91,11 +91,11 @@ describe("ProjectAlbums list height handoff", () => {
   afterEach(() => { vi.restoreAllMocks(); delete HTMLElement.prototype.scrollHeight })
 
   it("caps the drill-in view at the measured list height", async () => {
-    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () { return { height: this.classList.contains("album-grid") ? 500 : 100 } })
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () { return { top: 0, height: this.classList.contains("album-grid") ? 500 : 100 } })
     Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 2000 })
     const { container } = await render()
     await act(async () => { cards(container)[1].click() })
-    expect(container.querySelector('[data-testid="sub-region"]').style.maxHeight).toBe("400px")
+    expect(container.querySelector('[data-testid="sub-region"]').style.maxHeight).toBe("444px")
     expect(container.querySelector('[data-testid="sub-show-more"]')).not.toBeNull()
   })
 

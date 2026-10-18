@@ -128,9 +128,11 @@ describe("height cap", () => {
   const many = { ...album, subAlbums: subs }
   let rectSpy
 
-  function mockLayout(scrollHeight, headerHeight = 100) {
+  function mockLayout(scrollHeight, regionTop = 90) {
     Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => scrollHeight })
-    rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ height: headerHeight })
+    rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () {
+      return { top: this.getAttribute("data-testid") === "sub-region" ? regionTop : 0, height: 0 }
+    })
   }
   afterEach(() => {
     delete HTMLElement.prototype.scrollHeight
@@ -140,12 +142,18 @@ describe("height cap", () => {
   const region = (c) => c.querySelector('[data-testid="sub-region"]')
   const more = (c) => c.querySelector('[data-testid="sub-show-more"]')
 
-  it("collapses to maxHeight minus header and shows the button when overflowing", async () => {
+  it("collapses to maxHeight minus region offset and show-more block and shows the button when overflowing", async () => {
     mockLayout(900)
     const c = await render({ album: many, maxHeight: 500 })
-    expect(region(c).style.maxHeight).toBe("400px")
+    expect(region(c).style.maxHeight).toBe("354px")
     expect(more(c).textContent).toBe("Xem thêm")
     expect(c.querySelector('[data-testid="sub-fade"]')).not.toBeNull()
+  })
+
+  it("reserves exactly 56px for the show-more block", async () => {
+    mockLayout(900)
+    const c = await render({ album: many, maxHeight: 500 })
+    expect(more(c).parentElement.style.height).toBe("56px")
   })
 
   it("uses an English label", async () => {
