@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect, vi, afterEach } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 
@@ -66,39 +66,12 @@ describe("SubAlbumGrid cards", () => {
 
   const makeSubs = (n) => Array.from({ length: n }, (_, i) => ({ id: 100 + i, title: `S${i}`, count: 1, cover: `/c${i}`, items: [`/f${i}`], thumbs: [`/c${i}`] }))
 
-  it("lays cards out in one scrollable row with no cap", async () => {
+  it("wraps cards in a grid with no count cap", async () => {
     const c = await render({ album: { ...album, subAlbums: makeSubs(10) } })
     expect(c.querySelectorAll('[data-testid="sub-album-card"]')).toHaveLength(10)
-    const row = c.querySelector('[data-testid="sub-album-card"]').parentElement
-    expect(row.style.flexWrap).toBe("nowrap")
-    expect(row.style.overflowX).toBe("auto")
-    expect(c.querySelector('[data-testid="sub-show-more"]')).toBeNull()
-  })
-
-  it("hides arrows at 6 cards and shows them at 7", async () => {
-    const six = await render({ album: { ...album, subAlbums: makeSubs(6) } })
-    expect(six.querySelector('[data-testid="sub-prev"]')).toBeNull()
-    expect(six.querySelector('[data-testid="sub-next"]')).toBeNull()
-    const seven = await render({ album: { ...album, subAlbums: makeSubs(7) } })
-    expect(seven.querySelector('[data-testid="sub-prev"]').getAttribute("aria-label")).toBe("Trước")
-    expect(seven.querySelector('[data-testid="sub-next"]').getAttribute("aria-label")).toBe("Sau")
-  })
-
-  it("arrows scroll the row by 80% of its width", async () => {
-    const c = await render({ album: { ...album, subAlbums: makeSubs(7) }, lang: "en" })
-    const row = c.querySelector('[data-testid="sub-album-card"]').parentElement
-    Object.defineProperty(row, "clientWidth", { value: 500 })
-    row.scrollBy = vi.fn()
-    expect(c.querySelector('[data-testid="sub-next"]').getAttribute("aria-label")).toBe("Next")
-    await act(async () => { c.querySelector('[data-testid="sub-next"]').click() })
-    expect(row.scrollBy).toHaveBeenCalledWith({ left: 400, behavior: "smooth" })
-    await act(async () => { c.querySelector('[data-testid="sub-prev"]').click() })
-    expect(row.scrollBy).toHaveBeenLastCalledWith({ left: -400, behavior: "smooth" })
-  })
-
-  it("does not throw when scrollBy is unavailable", async () => {
-    const c = await render({ album: { ...album, subAlbums: makeSubs(7) } })
-    await act(async () => { c.querySelector('[data-testid="sub-next"]').click() })
+    const grid = c.querySelector('[data-testid="sub-album-card"]').parentElement
+    expect(grid.style.display).toBe("grid")
+    expect(c.querySelector('[data-testid="sub-prev"]')).toBeNull()
   })
 
   it("Enter opens a card and the back button calls onBack", async () => {
@@ -147,5 +120,66 @@ describe("direct photos", () => {
   it("renders nothing extra when there are no direct photos", async () => {
     const c = await render()
     expect(c.querySelector('[data-testid="direct-photos-title"]')).toBeNull()
+  })
+})
+
+describe("height cap", () => {
+  const subs = Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, title: `S${i}`, count: 1, cover: `/c${i}`, items: [`/f${i}`], thumbs: [`/c${i}`] }))
+  const many = { ...album, subAlbums: subs }
+  let rectSpy
+
+  function mockLayout(scrollHeight, headerHeight = 100) {
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => scrollHeight })
+    rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ height: headerHeight })
+  }
+  afterEach(() => {
+    delete HTMLElement.prototype.scrollHeight
+    rectSpy?.mockRestore()
+  })
+
+  const region = (c) => c.querySelector('[data-testid="sub-region"]')
+  const more = (c) => c.querySelector('[data-testid="sub-show-more"]')
+
+  it("collapses to maxHeight minus header and shows the button when overflowing", async () => {
+    mockLayout(900)
+    const c = await render({ album: many, maxHeight: 500 })
+    expect(region(c).style.maxHeight).toBe("400px")
+    expect(more(c).textContent).toBe("Xem thêm")
+    expect(c.querySelector('[data-testid="sub-fade"]')).not.toBeNull()
+  })
+
+  it("uses an English label", async () => {
+    mockLayout(900)
+    const c = await render({ album: many, maxHeight: 500, lang: "en" })
+    expect(more(c).textContent).toBe("Show all")
+  })
+
+  it("never collapses below one row of cards", async () => {
+    mockLayout(900)
+    const c = await render({ album: many, maxHeight: 150 })
+    expect(region(c).style.maxHeight).toBe("260px")
+  })
+
+  it("expands on click and removes the cap", async () => {
+    mockLayout(900)
+    const c = await render({ album: many, maxHeight: 500 })
+    await act(async () => { more(c).click() })
+    expect(more(c)).toBeNull()
+    expect(region(c).style.maxHeight).toBe("")
+    expect(c.querySelector('[data-testid="sub-fade"]')).toBeNull()
+  })
+
+  it("shows no button when the content fits", async () => {
+    mockLayout(350)
+    const c = await render({ album: many, maxHeight: 500 })
+    expect(more(c)).toBeNull()
+    expect(c.querySelector('[data-testid="sub-fade"]')).toBeNull()
+  })
+
+  it("does not cap without a maxHeight", async () => {
+    mockLayout(900)
+    const c = await render({ album: many })
+    expect(region(c).style.maxHeight).toBe("")
+    expect(more(c)).toBeNull()
   })
 })

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import SubAlbumGrid from "./SubAlbumGrid"
 
 const s = {
@@ -16,16 +16,22 @@ export default function ProjectAlbums({ albums, lang, onOpenAlbum, onOpenPhotos 
   const vi = lang === "vi"
   const [hov, setHov] = useState(null)
   const [openId, setOpenId] = useState(null)
+  const [listHeight, setListHeight] = useState(0)
+  const listRef = useRef(null)
   const open = albums.find((a) => a.id === openId)
 
   if (open) {
-    return <SubAlbumGrid album={open} lang={lang} onBack={() => setOpenId(null)} onOpenPhotos={onOpenPhotos} />
+    return <SubAlbumGrid album={open} lang={lang} maxHeight={listHeight} onBack={() => setOpenId(null)} onOpenPhotos={onOpenPhotos} />
   }
 
-  const activate = (alb) => (alb.subAlbums.length > 0 ? setOpenId(alb.id) : onOpenAlbum(alb))
+  const activate = (alb) => {
+    if (alb.subAlbums.length === 0) return onOpenAlbum(alb)
+    setListHeight(listRef.current ? listRef.current.getBoundingClientRect().height : 0)
+    setOpenId(alb.id)
+  }
 
   return (
-    <div className="album-grid" style={s.grid}>
+    <div ref={listRef} className="album-grid" style={s.grid}>
       {albums.map((alb, i) => (
         <div
           key={alb.id}

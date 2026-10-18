@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect, vi, afterEach } from "vitest"
 import { createRoot } from "react-dom/client"
 import { act } from "react"
 
@@ -84,5 +84,24 @@ describe("ProjectAlbums", () => {
     const bare = { id: 5, title: "Bare", count: 0, cover: "", items: [], thumbs: [], subAlbums: [] }
     const { container } = await render({ albums: [bare], lang: "en" })
     expect(container.textContent).toContain("No photos yet")
+  })
+})
+
+describe("ProjectAlbums list height handoff", () => {
+  afterEach(() => { vi.restoreAllMocks(); delete HTMLElement.prototype.scrollHeight })
+
+  it("caps the drill-in view at the measured list height", async () => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () { return { height: this.classList.contains("album-grid") ? 500 : 100 } })
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 2000 })
+    const { container } = await render()
+    await act(async () => { cards(container)[1].click() })
+    expect(container.querySelector('[data-testid="sub-region"]').style.maxHeight).toBe("400px")
+    expect(container.querySelector('[data-testid="sub-show-more"]')).not.toBeNull()
+  })
+
+  it("does not cap when the list height is 0", async () => {
+    const { container } = await render()
+    await act(async () => { cards(container)[1].click() })
+    expect(container.querySelector('[data-testid="sub-region"]').style.maxHeight).toBe("")
   })
 })
