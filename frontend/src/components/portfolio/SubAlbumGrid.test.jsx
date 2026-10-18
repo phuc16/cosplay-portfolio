@@ -64,23 +64,41 @@ describe("SubAlbumGrid cards", () => {
     expect(c.querySelectorAll('[data-testid="direct-photo"]')).toHaveLength(1)
   })
 
-  it("caps at 8 cards and reveals the rest via show-more", async () => {
-    const many = {
-      ...album,
-      subAlbums: Array.from({ length: 11 }, (_, i) => ({ id: 100 + i, title: `S${i}`, count: 1, cover: `/c${i}`, items: [`/f${i}`], thumbs: [`/c${i}`] })),
-    }
-    const c = await render({ album: many })
-    expect(c.querySelectorAll('[data-testid="sub-album-card"]')).toHaveLength(8)
-    const btn = c.querySelector('[data-testid="sub-show-more"]')
-    expect(btn.textContent).toBe("Xem thêm (3)")
-    await act(async () => { btn.click() })
-    expect(c.querySelectorAll('[data-testid="sub-album-card"]')).toHaveLength(11)
+  const makeSubs = (n) => Array.from({ length: n }, (_, i) => ({ id: 100 + i, title: `S${i}`, count: 1, cover: `/c${i}`, items: [`/f${i}`], thumbs: [`/c${i}`] }))
+
+  it("lays cards out in one scrollable row with no cap", async () => {
+    const c = await render({ album: { ...album, subAlbums: makeSubs(10) } })
+    expect(c.querySelectorAll('[data-testid="sub-album-card"]')).toHaveLength(10)
+    const row = c.querySelector('[data-testid="sub-album-card"]').parentElement
+    expect(row.style.flexWrap).toBe("nowrap")
+    expect(row.style.overflowX).toBe("auto")
     expect(c.querySelector('[data-testid="sub-show-more"]')).toBeNull()
   })
 
-  it("has no show-more at 8 or fewer", async () => {
-    const c = await render()
-    expect(c.querySelector('[data-testid="sub-show-more"]')).toBeNull()
+  it("hides arrows at 6 cards and shows them at 7", async () => {
+    const six = await render({ album: { ...album, subAlbums: makeSubs(6) } })
+    expect(six.querySelector('[data-testid="sub-prev"]')).toBeNull()
+    expect(six.querySelector('[data-testid="sub-next"]')).toBeNull()
+    const seven = await render({ album: { ...album, subAlbums: makeSubs(7) } })
+    expect(seven.querySelector('[data-testid="sub-prev"]').getAttribute("aria-label")).toBe("Trước")
+    expect(seven.querySelector('[data-testid="sub-next"]').getAttribute("aria-label")).toBe("Sau")
+  })
+
+  it("arrows scroll the row by 80% of its width", async () => {
+    const c = await render({ album: { ...album, subAlbums: makeSubs(7) }, lang: "en" })
+    const row = c.querySelector('[data-testid="sub-album-card"]').parentElement
+    Object.defineProperty(row, "clientWidth", { value: 500 })
+    row.scrollBy = vi.fn()
+    expect(c.querySelector('[data-testid="sub-next"]').getAttribute("aria-label")).toBe("Next")
+    await act(async () => { c.querySelector('[data-testid="sub-next"]').click() })
+    expect(row.scrollBy).toHaveBeenCalledWith({ left: 400, behavior: "smooth" })
+    await act(async () => { c.querySelector('[data-testid="sub-prev"]').click() })
+    expect(row.scrollBy).toHaveBeenLastCalledWith({ left: -400, behavior: "smooth" })
+  })
+
+  it("does not throw when scrollBy is unavailable", async () => {
+    const c = await render({ album: { ...album, subAlbums: makeSubs(7) } })
+    await act(async () => { c.querySelector('[data-testid="sub-next"]').click() })
   })
 
   it("Enter opens a card and the back button calls onBack", async () => {
@@ -99,12 +117,6 @@ describe("SubAlbumGrid cards", () => {
     const c = await render({ lang: "en" })
     expect(c.textContent).toContain("Back")
     expect(c.textContent).toContain("2 photos")
-  })
-
-  it("English show-more label", async () => {
-    const many = { ...album, subAlbums: Array.from({ length: 9 }, (_, i) => ({ id: 100 + i, title: `S${i}`, count: 1, cover: `/c${i}`, items: [`/f${i}`], thumbs: [`/c${i}`] })) }
-    const c = await render({ album: many, lang: "en" })
-    expect(c.querySelector('[data-testid="sub-show-more"]').textContent).toBe("Show all (1)")
   })
 })
 
