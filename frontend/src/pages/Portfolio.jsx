@@ -6,7 +6,7 @@ import { useTheme } from "../contexts/ThemeContext"
 import { useLanguage } from "../contexts/LanguageContext"
 import { getLocalized } from "../utils/localize"
 import ProjectAlbums from "../components/portfolio/ProjectAlbums"
-import { buildAlbums, allPhotoThumbs } from "./portfolioAlbums"
+import { buildAlbums, defaultLatestPhotos } from "./portfolioAlbums"
 
 /* ── SVG ICONS ───────────────────────────────────────────────────────────── */
 const icons = {
@@ -587,8 +587,8 @@ function Lightbox({ photos, startIdx, onClose }) {
 function buildData(cfg, gallery, lang) {
   const heroImages = cfg.heroImages?.length ? cfg.heroImages : cfg.heroImageUrl ? [cfg.heroImageUrl] : []
   const albums = buildAlbums(gallery)
-  const galleryPhotos = allPhotoThumbs(gallery)
-  // Latest photos: admin-uploaded (config.latestPhotos) → gallery items → hero images
+  const galleryPhotos = defaultLatestPhotos(gallery)
+  // Latest photos: admin-uploaded (config.latestPhotos) → first photo of the first album's sub-albums (or all gallery photos) → hero images
   const latestPhotos = cfg.latestPhotos?.length ? cfg.latestPhotos : galleryPhotos.length ? galleryPhotos : heroImages
   const supportsCfg = cfg.contact?.supports || {}
   const supports = Object.keys(SUPPORT_META)
