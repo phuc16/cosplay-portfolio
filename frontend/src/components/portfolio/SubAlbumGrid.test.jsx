@@ -128,11 +128,9 @@ describe("height cap", () => {
   const many = { ...album, subAlbums: subs }
   let rectSpy
 
-  function mockLayout(scrollHeight, headerHeight = 100, cardHeight = 160) {
+  function mockLayout(scrollHeight, headerHeight = 100) {
     Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => scrollHeight })
-    rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () {
-      return { height: this.getAttribute("data-testid") === "sub-album-card" ? cardHeight : headerHeight }
-    })
+    rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ height: headerHeight })
   }
   afterEach(() => {
     delete HTMLElement.prototype.scrollHeight
@@ -156,28 +154,10 @@ describe("height cap", () => {
     expect(more(c).textContent).toBe("Show all")
   })
 
-  it("never collapses below two measured card rows plus gap", async () => {
+  it("never collapses below one row of cards", async () => {
     mockLayout(900)
     const c = await render({ album: many, maxHeight: 150 })
-    expect(region(c).style.maxHeight).toBe("332px")
-  })
-
-  it("falls back to 260px when no card can be measured", async () => {
-    mockLayout(900, 100, 0)
-    const c = await render({ album: many, maxHeight: 150 })
     expect(region(c).style.maxHeight).toBe("260px")
-  })
-
-  it("shows no button when content is exactly two rows", async () => {
-    mockLayout(332)
-    const c = await render({ album: many, maxHeight: 150 })
-    expect(more(c)).toBeNull()
-  })
-
-  it("shows the button when content is three rows", async () => {
-    mockLayout(3 * 160 + 2 * 10)
-    const c = await render({ album: many, maxHeight: 150 })
-    expect(more(c)).not.toBeNull()
   })
 
   it("expands on click and removes the cap", async () => {

@@ -1,25 +1,24 @@
 import { useLayoutEffect, useRef, useState } from "react"
 
-const COLS = "repeat(auto-fill, minmax(min(120px, calc(50% - 5px)), 1fr))"
+const COLS = "repeat(auto-fill, minmax(min(190px, calc(50% - 6px)), 1fr))"
 const MIN_COLLAPSED = 260
-const GAP = 10
 const FADE_HEIGHT = 48
 
 const s = {
   back: { background: "none", border: "none", color: "var(--text-link)", cursor: "pointer", fontSize: "var(--text-sm)", padding: 0, marginBottom: 12 },
   title: { margin: "0 0 16px", fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-link)" },
-  grid: { display: "grid", gridTemplateColumns: COLS, gap: GAP },
+  grid: { display: "grid", gridTemplateColumns: COLS, gap: 12 },
   region: { position: "relative", overflow: "hidden" },
   fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: FADE_HEIGHT, background: "linear-gradient(to top, var(--surface-card), transparent)", pointerEvents: "none" },
   more: { display: "flex", justifyContent: "center", marginTop: 16 },
   moreBtn: { background: "none", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", color: "var(--text-link)", cursor: "pointer", fontSize: "var(--text-sm)", fontWeight: 600, padding: "8px 20px" },
   card: { borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid var(--border-default)", background: "var(--bg-sunken)", position: "relative", transition: "transform .25s,box-shadow .25s" },
   img: { width: "100%", aspectRatio: "4/5", objectFit: "cover", display: "block" },
-  overlay: { position: "absolute", left: 0, right: 0, bottom: 0, padding: "24px 10px 8px", background: "linear-gradient(to top, rgba(0,0,0,.75), transparent)", pointerEvents: "none" },
-  name: { fontSize: 12, fontWeight: 600, color: "#fff", lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  count: { fontSize: 11, color: "rgba(255,255,255,.8)", marginTop: 2 },
+  overlay: { position: "absolute", left: 0, right: 0, bottom: 0, padding: "28px 10px 10px", background: "linear-gradient(to top, rgba(0,0,0,.75), transparent)", pointerEvents: "none" },
+  name: { fontSize: "var(--text-xs)", fontWeight: 600, color: "#fff", lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  count: { fontSize: "var(--text-xs)", color: "rgba(255,255,255,.8)", marginTop: 2 },
   muted: { color: "var(--text-muted)", fontSize: "var(--text-sm)", margin: 0 },
-  photoGrid: { display: "grid", gridTemplateColumns: COLS, gap: GAP, marginTop: 8 },
+  photoGrid: { display: "grid", gridTemplateColumns: COLS, gap: 12, marginTop: 8 },
   photo: { width: "100%", aspectRatio: "4/5", objectFit: "cover", display: "block", borderRadius: "var(--radius-md)", border: "1px solid var(--border-default)", cursor: "pointer" },
   sub: { margin: "24px 0 12px", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-muted)" },
 }
@@ -31,24 +30,19 @@ export default function SubAlbumGrid({ album, lang, maxHeight, onBack, onOpenPho
   const [expanded, setExpanded] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
   const [headerH, setHeaderH] = useState(0)
-  const [twoRowsH, setTwoRowsH] = useState(MIN_COLLAPSED)
   const headerRef = useRef(null)
   const regionRef = useRef(null)
   const visible = album.subAlbums.filter((sub) => sub.items.length > 0)
   const hasDirect = album.items.length > 0
   const capped = Boolean(maxHeight) && !expanded
-  const collapsedMax = Math.max((maxHeight || 0) - headerH, twoRowsH)
+  const collapsedMax = Math.max((maxHeight || 0) - headerH, MIN_COLLAPSED)
 
   useLayoutEffect(() => {
     if (!maxHeight) return undefined
     const measure = () => {
       const h = headerRef.current ? headerRef.current.getBoundingClientRect().height : 0
       setHeaderH(h)
-      const card = regionRef.current && regionRef.current.querySelector('[data-testid="sub-album-card"]')
-      const cardH = card ? card.getBoundingClientRect().height : 0
-      const rows = cardH > 0 ? Math.ceil(2 * cardH + GAP + 2) : MIN_COLLAPSED
-      setTwoRowsH(rows)
-      const limit = Math.max(maxHeight - h, rows)
+      const limit = Math.max(maxHeight - h, MIN_COLLAPSED)
       setOverflowing(Boolean(regionRef.current) && regionRef.current.scrollHeight > limit + 1)
     }
     measure()
