@@ -51,7 +51,7 @@ Invariants (enforced server-side, 400 `invalid_input` on violation):
 - Move `escapeXml`, `watermarkSvg`, and a new `applyWatermark(webpBuffer, { text })` out of `shop/images.js` into `backend/watermark.js`. `shop/images.js` imports it; shop behavior and output stay byte-for-byte equivalent (existing `shopImages.test.js` must keep passing unchanged).
 - Format is the shop's: `SHOP_NAME` (fallback `"Shop"`) tiled diagonally, rotated -30°, `fill-opacity 0.18` white, WebP quality 82 re-encode.
 - In `server.js`, `processImage(buffer, { watermark = false })`. Only `POST /image` passes `watermark: true`. `/upload/hero`, `/upload/thumbnail`, `/upload/event-image` are not watermarked.
-- Alpha is preserved (WebP), so transparent cutouts stay transparent.
+- Alpha channel is preserved (WebP). The tiled text is composited over the whole frame like the shop's, so fully transparent areas receive faint text too; this is intended (it cannot be cropped or erased out of cutouts).
 - The worker's 400px thumbnail generation derives from the stored (already watermarked) image, so thumbnails carry the mark; no worker change required (verify in plan).
 
 ## Public UI

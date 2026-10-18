@@ -83,9 +83,9 @@ Worker (node worker.js)  - single setInterval loop, guarded by an in-process fla
 
 **Collection scheduling**: `collections.start_at`/`end_at` gate visibility and orderability. Enforcement happens in two places that must stay in sync: catalog read paths lazily flip `status: 'active' → 'closed'` once `end_at` passes (`closeExpiredCollections`, write-through-on-read, no cron), and `createOrder` independently re-checks both `start_at` and `end_at` under the same row lock as the stock check - a stale cart/variant_id must never bypass either boundary. All date math in the DB layer goes through `UTC_TIMESTAMP()`/`.toISOString()`, never `NOW()` or a naive Date string - `db.js` pins the pool's session `timezone: "Z"`, so anything that skips this convention silently drifts against the browser's local time.
 
-**Caching**: `GET /api/gallery` and `GET /api/settings` (portfolio) are Redis-cached, 1h TTL, degrading gracefully to a DB read on a Redis outage. Any write to albums/images/settings calls `redis.del("gallery")`/`redis.del("settings")`. Shop catalog reads are cache-invalidated on stock/catalog changes the same way.
+**Caching**: `GET /api/gallery` (top-level albums with nested `subAlbums`; cache flushed on server start) and `GET /api/settings` (portfolio) are Redis-cached, 1h TTL, degrading gracefully to a DB read on a Redis outage. Any write to albums/images/settings calls `redis.del("gallery")`/`redis.del("settings")`. Shop catalog reads are cache-invalidated on stock/catalog changes the same way.
 
-**Image upload flow**: Frontend → base64 POST → `validateImageBuffer` (magic-byte check, rejects non-images before they ever reach sharp) → sharp (resize, re-encode, auto-rotate EXIF) → MinIO → MySQL row → relevant cache invalidated. Portfolio images additionally get a worker-generated 400px WebP thumbnail (`thumb_url IS NULL` polling).
+**Image upload flow**: Frontend → base64 POST → `validateImageBuffer` (magic-byte check, rejects non-images before they ever reach sharp) → sharp (resize, re-encode, auto-rotate EXIF) → MinIO → MySQL row → relevant cache invalidated. Portfolio album photos (`POST /api/image`) are additionally watermarked via `backend/watermark.js` (shared with the shop). Portfolio images additionally get a worker-generated 400px WebP thumbnail (`thumb_url IS NULL` polling).
 
 **Storage proxy**: `GET /api/storage/:path` proxies MinIO files through the backend - no direct public MinIO exposure.
 
@@ -105,6 +105,8 @@ Worker (node worker.js)  - single setInterval loop, guarded by an in-process fla
 | `backend/shop/orders/domain.js` | Order state machine + pure helpers (no DB access) |
 | `backend/shop/orders/orderRepo.js` | Order DB layer - `createOrder`, `transitionOrder`, `attachItems` |
 | `backend/shop/catalogRepo.js` | Collections/products/variants DB layer, including delete-guard logic |
+| `backend/watermark.js` | Shared tiled `SHOP_NAME` watermark (shop images + portfolio album photos) |
+| `backend/albums.js` | Sub-album helpers: parent validation, sort order, `buildGallery` nesting |
 | `backend/storage.js` | MinIO client wrapper |
 | `backend/redis.js` | ioredis client |
 | `backend/db.js` | mysql2 pool, pinned to UTC session timezone |

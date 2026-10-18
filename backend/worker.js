@@ -195,4 +195,4 @@ if (require.main === module) {
   setInterval(tick, TICK_INTERVAL_MS)
 }
 
-module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured, tick, lease }
+module.exports = { run, sweepExpiredOrders, dispatchEmails, warnIfMailStuckUnconfigured, tick, lease, processImage }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import sharp from "sharp"
 import { processShopImage } from "../shop/images.js"
+import { applyWatermark } from "../watermark.js"
 
 async function pngFixture(width, height) {
   return sharp({
@@ -43,5 +44,15 @@ describe("processShopImage", () => {
     const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true })
     const cornerOffset = (info.height - 5) * info.width * info.channels + (info.width - 5) * info.channels
     expect([data[cornerOffset], data[cornerOffset + 1], data[cornerOffset + 2]]).not.toEqual([200, 40, 120])
+  })
+})
+
+describe("processShopImage watermark delegates to the shared module", () => {
+  it("equals applyWatermark(plain output) byte-for-byte", async () => {
+    const input = await pngFixture(500, 400)
+    const plain = await processShopImage(input)
+    const marked = await processShopImage(input, { watermark: true })
+    const expected = await applyWatermark(plain, { text: process.env.SHOP_NAME || "Shop" })
+    expect(marked.equals(expected)).toBe(true)
   })
 })
