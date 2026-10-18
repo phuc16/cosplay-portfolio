@@ -27,6 +27,19 @@ describe("buildAlbums", () => {
     expect(a.cover).toBe("/s")
   })
 
+  it("skips empty sub-albums when picking the cover", () => {
+    const [a] = buildAlbums([{ id: 4, group: "G", items: [], subAlbums: [
+      { id: 41, title: "Empty", cover: null, items: [] },
+      { id: 42, title: "Full", cover: "/x1", items: [item(1, "/x1"), item(2, "/x2")] },
+    ] }])
+    expect(a.cover).toBe("/x1")
+  })
+
+  it("has an empty cover when no photo exists anywhere", () => {
+    const [a] = buildAlbums([{ id: 5, group: "G", items: [], subAlbums: [{ id: 51, title: "E", cover: null, items: [] }] }])
+    expect(a.cover).toBe("")
+  })
+
   it("tolerates null/undefined gallery", () => {
     expect(buildAlbums(undefined)).toEqual([])
     expect(buildAlbums(null)).toEqual([])

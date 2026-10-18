@@ -5,6 +5,7 @@ const s = {
   grid: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 },
   card: { borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid var(--border-default)", cursor: "pointer", background: "var(--bg-sunken)", position: "relative", transition: "transform .25s,box-shadow .25s" },
   img: { width: "100%", aspectRatio: "4/5", objectFit: "cover", display: "block" },
+  placeholder: { width: "100%", aspectRatio: "4/5", background: "var(--bg-sunken)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "var(--text-sm)" },
   foot: { padding: "10px 14px", borderTop: "1px solid var(--border-default)" },
   title: { fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-strong)" },
   count: { fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 },
@@ -37,7 +38,9 @@ export default function ProjectAlbums({ albums, lang, onOpenAlbum, onOpenPhotos 
           onClick={() => activate(alb)}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(alb) } }}
         >
-          <img src={alb.cover} alt={alb.title} loading="lazy" decoding="async" style={s.img} />
+          {alb.cover
+            ? <img src={alb.cover} alt={alb.title} loading="lazy" decoding="async" style={s.img} />
+            : <div data-testid="album-placeholder" style={s.placeholder}>{vi ? "Chưa có ảnh" : "No photos yet"}</div>}
           <div style={s.plus}>+</div>
           <div style={s.foot}>
             <div style={s.title}>{alb.title}</div>

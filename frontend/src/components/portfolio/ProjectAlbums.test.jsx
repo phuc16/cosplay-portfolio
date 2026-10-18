@@ -69,4 +69,20 @@ describe("ProjectAlbums", () => {
     const { container } = await render({ albums: [] })
     expect(container.textContent).toContain("Chưa có album.")
   })
+
+  it("renders a placeholder, not an img, when no photo exists anywhere, and still drills in", async () => {
+    const bare = { id: 5, title: "Bare", count: 0, cover: "", items: [], thumbs: [], subAlbums: [{ id: 51, title: "E", count: 0, cover: "", items: [], thumbs: [] }] }
+    const { container } = await render({ albums: [bare] })
+    const card = cards(container)[0]
+    expect(card.querySelector("img")).toBeNull()
+    expect(card.querySelector('[data-testid="album-placeholder"]').textContent).toBe("Chưa có ảnh")
+    await act(async () => { card.click() })
+    expect(container.querySelector('[data-testid="sub-back"]')).not.toBeNull()
+  })
+
+  it("renders English placeholder copy", async () => {
+    const bare = { id: 5, title: "Bare", count: 0, cover: "", items: [], thumbs: [], subAlbums: [] }
+    const { container } = await render({ albums: [bare], lang: "en" })
+    expect(container.textContent).toContain("No photos yet")
+  })
 })
