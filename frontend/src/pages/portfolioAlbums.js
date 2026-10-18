@@ -35,22 +35,3 @@ export function allPhotoThumbs(gallery) {
     ...(g.subAlbums || []).flatMap((s) => s.items || []),
   ]).map((it) => it.src)
 }
-
-const LATEST_COUNT = 4
-
-export function defaultLatestPhotos(gallery) {
-  const first = (gallery || [])[0]
-  if (!first) return []
-  const subs = (first.subAlbums || []).filter((s) => (s.items || []).length > 0)
-  if (subs.length === 0) return allPhotoThumbs(gallery)
-
-  const picked = subs.slice(0, LATEST_COUNT).map((s) => s.items[0].src)
-  if (picked.length >= LATEST_COUNT) return picked
-
-  const pool = [...subs.flatMap((s) => s.items), ...(first.items || [])].map((it) => it.src)
-  for (const src of pool) {
-    if (picked.length >= LATEST_COUNT) break
-    if (!picked.includes(src)) picked.push(src)
-  }
-  return picked
-}

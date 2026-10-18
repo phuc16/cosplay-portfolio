@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildAlbums, allPhotoThumbs, defaultLatestPhotos } from "./portfolioAlbums"
+import { buildAlbums, allPhotoThumbs } from "./portfolioAlbums"
 
 const item = (id, src, fullSrc) => ({ id, src, fullSrc: fullSrc || src, width: 1, height: 1 })
 
@@ -49,39 +49,5 @@ describe("buildAlbums", () => {
 describe("allPhotoThumbs", () => {
   it("includes direct and sub-album photos", () => {
     expect(allPhotoThumbs([{ id: 1, group: "A", items: [item(1, "/a")], subAlbums: [{ id: 2, title: "S", items: [item(2, "/s")] }] }])).toEqual(["/a", "/s"])
-  })
-})
-
-describe("defaultLatestPhotos", () => {
-  const sub = (id, srcs) => ({ id, title: `S${id}`, items: srcs.map((s, i) => item(id * 10 + i, s)) })
-
-  it("takes the first photo of each of the first 4 sub-albums", () => {
-    const subs = [1, 2, 3, 4, 5].map((n) => sub(n, [`/s${n}a`, `/s${n}b`]))
-    expect(defaultLatestPhotos([{ id: 1, group: "A", items: [], subAlbums: subs }, { id: 2, group: "B", items: [item(99, "/z")] }])).toEqual(["/s1a", "/s2a", "/s3a", "/s4a"])
-  })
-
-  it("pads with remaining sub-album photos then direct photos", () => {
-    const g = [{ id: 1, group: "A", items: [item(90, "/d")], subAlbums: [sub(1, ["/a1", "/a2", "/a3"]), sub(2, ["/b1", "/b2", "/b3"])] }]
-    expect(defaultLatestPhotos(g)).toEqual(["/a1", "/b1", "/a2", "/a3"])
-  })
-
-  it("falls back to direct photos when sub-album photos run out", () => {
-    const g = [{ id: 1, group: "A", items: [item(90, "/d1"), item(91, "/d2")], subAlbums: [sub(1, ["/a1"]), sub(2, ["/b1"])] }]
-    expect(defaultLatestPhotos(g)).toEqual(["/a1", "/b1", "/d1", "/d2"])
-  })
-
-  it("skips empty sub-albums", () => {
-    const g = [{ id: 1, group: "A", items: [], subAlbums: [sub(1, []), sub(2, ["/b1"]), sub(3, ["/c1"])] }]
-    expect(defaultLatestPhotos(g)).toEqual(["/b1", "/c1"])
-  })
-
-  it("keeps legacy behavior when the first album has no sub-albums", () => {
-    const g = [{ id: 1, group: "A", items: [item(1, "/a"), item(2, "/b")] }, { id: 2, group: "B", items: [item(3, "/c")] }]
-    expect(defaultLatestPhotos(g)).toEqual(allPhotoThumbs(g))
-  })
-
-  it("returns [] for empty or missing gallery", () => {
-    expect(defaultLatestPhotos([])).toEqual([])
-    expect(defaultLatestPhotos(undefined)).toEqual([])
   })
 })
