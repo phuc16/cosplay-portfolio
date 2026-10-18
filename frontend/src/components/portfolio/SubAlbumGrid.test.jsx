@@ -23,13 +23,15 @@ async function render(props) {
 }
 
 describe("SubAlbumGrid cards", () => {
-  it("renders name, count and cover per sub-album", async () => {
+  it("renders overlaid name, count and cover per visible sub-album", async () => {
     const c = await render()
     const cards = c.querySelectorAll('[data-testid="sub-album-card"]')
-    expect(cards).toHaveLength(2)
+    expect(cards).toHaveLength(1)
     expect(cards[0].textContent).toContain("Nino")
     expect(cards[0].textContent).toContain("2 ảnh")
-    expect(cards[0].querySelector("img").getAttribute("src")).toBe("/n1")
+    const img = cards[0].querySelector("img")
+    expect(img.getAttribute("src")).toBe("/n1")
+    expect(img.getAttribute("alt")).toBe("Nino")
   })
 
   it("opens the lightbox for a sub-album", async () => {
@@ -39,14 +41,46 @@ describe("SubAlbumGrid cards", () => {
     expect(onOpenPhotos).toHaveBeenCalledWith(["/n1f", "/n2f"], 0)
   })
 
-  it("empty sub-album has no image and does nothing on click", async () => {
-    const onOpenPhotos = vi.fn()
-    const c = await render({ onOpenPhotos })
-    const empty = c.querySelectorAll('[data-testid="sub-album-card"]')[1]
-    expect(empty.querySelector("img")).toBeNull()
-    expect(empty.getAttribute("aria-disabled")).toBe("true")
-    await act(async () => { empty.click() })
-    expect(onOpenPhotos).not.toHaveBeenCalled()
+  it("hides empty sub-albums entirely", async () => {
+    const c = await render()
+    expect(c.textContent).not.toContain("Empty")
+    expect(c.textContent).not.toContain("Chưa có ảnh")
+  })
+
+  it("shows one muted line when nothing has photos", async () => {
+    const onlyEmpty = { ...album, subAlbums: [album.subAlbums[1]] }
+    const c = await render({ album: onlyEmpty })
+    expect(c.querySelectorAll('[data-testid="sub-album-card"]')).toHaveLength(0)
+    expect(c.querySelector('[data-testid="sub-empty"]').textContent).toBe("Chưa có ảnh")
+    const en = await render({ album: onlyEmpty, lang: "en" })
+    expect(en.querySelector('[data-testid="sub-empty"]').textContent).toBe("No photos yet")
+  })
+
+  it("shows only direct photos when all sub-albums are empty", async () => {
+    const onlyDirect = { ...album, subAlbums: [album.subAlbums[1]], items: ["/d0f"], thumbs: ["/d0"] }
+    const c = await render({ album: onlyDirect })
+    expect(c.querySelector('[data-testid="sub-empty"]')).toBeNull()
+    expect(c.querySelector('[data-testid="direct-photos-title"]')).toBeNull()
+    expect(c.querySelectorAll('[data-testid="direct-photo"]')).toHaveLength(1)
+  })
+
+  it("caps at 8 cards and reveals the rest via show-more", async () => {
+    const many = {
+      ...album,
+      subAlbums: Array.from({ length: 11 }, (_, i) => ({ id: 100 + i, title: `S${i}`, count: 1, cover: `/c${i}`, items: [`/f${i}`], thumbs: [`/c${i}`] })),
+    }
+    const c = await render({ album: many })
+    expect(c.querySelectorAll('[data-testid="sub-album-card"]')).toHaveLength(8)
+    const btn = c.querySelector('[data-testid="sub-show-more"]')
+    expect(btn.textContent).toBe("Xem thêm (3)")
+    await act(async () => { btn.click() })
+    expect(c.querySelectorAll('[data-testid="sub-album-card"]')).toHaveLength(11)
+    expect(c.querySelector('[data-testid="sub-show-more"]')).toBeNull()
+  })
+
+  it("has no show-more at 8 or fewer", async () => {
+    const c = await render()
+    expect(c.querySelector('[data-testid="sub-show-more"]')).toBeNull()
   })
 
   it("Enter opens a card and the back button calls onBack", async () => {
@@ -65,6 +99,12 @@ describe("SubAlbumGrid cards", () => {
     const c = await render({ lang: "en" })
     expect(c.textContent).toContain("Back")
     expect(c.textContent).toContain("2 photos")
+  })
+
+  it("English show-more label", async () => {
+    const many = { ...album, subAlbums: Array.from({ length: 9 }, (_, i) => ({ id: 100 + i, title: `S${i}`, count: 1, cover: `/c${i}`, items: [`/f${i}`], thumbs: [`/c${i}`] })) }
+    const c = await render({ album: many, lang: "en" })
+    expect(c.querySelector('[data-testid="sub-show-more"]').textContent).toBe("Show all (1)")
   })
 })
 
