@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { api } from "../api/api"
 import { uploadImage } from "../api/upload"
 import { useDropzone } from "react-dropzone"
+import { findGalleryAlbum } from "./albumTree"
 
 export default function AdminAlbumImages({ album, onClose }) {
   const [gallery, setGallery] = useState([])
@@ -14,8 +15,7 @@ export default function AdminAlbumImages({ album, onClose }) {
 
   const fetchGallery = () => {
     api.get("/api/gallery").then((r) => {
-      const g = r.data.find((x) => x.id === album.id)
-      setGallery(g?.items || [])
+      setGallery(findGalleryAlbum(r.data, album.id)?.items || [])
     }).finally(() => setLoading(false))
   }
 

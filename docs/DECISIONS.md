@@ -890,3 +890,28 @@ visible rather than silent: the admin order list's
 still has undrawn turns, which is exactly the state a stuck buyer lands in,
 so staff can refund or restock by hand. Revisit if the pool is ever run close
 to the number of turns sold.
+
+## 2026-10-18 - Portfolio sub-albums (one level) and watermark on new album uploads
+
+Portfolio albums can now contain sub-albums, and photos uploaded into an
+album or sub-album are stamped with the shop's tiled `SHOP_NAME` watermark.
+
+- Watermark: this reverses the earlier "watermark declined for now"
+  decision. It applies to `POST /api/image` only and only to new uploads;
+  hero, thumbnail and event-image uploads stay unwatermarked. Existing
+  images are not re-stamped (originals are not kept, so re-stamping would
+  double-mark). Worker thumbnails are derived from the stamped original and
+  therefore carry the mark too.
+- Structure: nullable `albums.parent_id`, depth capped at 1 (a sub-album
+  cannot have children), no re-parenting via `PUT /api/albums/:id`.
+- Covers: a sub-album's cover is always its first photo - no override or
+  separate upload. A top-level album with no direct photos and only
+  sub-albums uses its first sub-album's cover, and its card count includes
+  the sub-album photos.
+- Cache: `GET /api/gallery` now nests `subAlbums`, and the `gallery` Redis
+  key is flushed on server start so a stale pre-nesting payload is never
+  served after deploy.
+- Rejected: a separate `sub_albums` table (duplicates album columns and
+  routes), image tags (no natural cover/ordering/hierarchy), serve-time
+  stamping (CPU per request and the unmarked original would still have to
+  be stored).

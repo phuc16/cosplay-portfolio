@@ -15,6 +15,8 @@ const db = require("./db")
 const redis = require("./redis")
 const auth = require("./auth")
 const storage = require("./storage")
+const { applyWatermark } = require("./watermark")
+const { AlbumInputError, resolveParentId, nextSortOrder, assertSameParent, assertAlbumExists, buildGallery } = require("./albums")
 
 const app = express()
 // Production path is client -> host Nginx -> frontend container's Nginx ->
@@ -689,18 +691,7 @@ app.get(`${API_PREFIX}/gallery`, publicLimiter, async (req, res) => {
     const [images] = await db.query("SELECT * FROM images ORDER BY sort_order ASC, id ASC")
     console.log(`[GALLERY] DB: ${albums.length} albums, ${images.length} images`)
 
-    const grouped = albums.map((a) => ({
-      id: a.id,
-      group: a.title,
-      description: a.description,
-      items: images.filter((img) => img.album_id === a.id && img.url).map((img) => ({
-        id: img.id,
-        src: img.thumb_url || img.url,
-        fullSrc: img.url,
-        width: img.width,
-        height: img.height,
-      }))
-    }))
+    const grouped = buildGallery(albums, images)
 
     const data = JSON.stringify(grouped)
     await redis.set("gallery", data, "EX", 3600)
@@ -726,15 +717,19 @@ app.get(`${API_PREFIX}/albums`, auth, async (req, res) => {
 app.post(`${API_PREFIX}/albums`, auth, async (req, res) => {
   try {
     const { title, description } = req.body
-    const [[{ nextOrder }]] = await db.query("SELECT COALESCE(MAX(sort_order), 0) + 1 AS nextOrder FROM albums")
+    const parentId = await resolveParentId(req.body.parent_id)
+    const nextOrder = await nextSortOrder(parentId)
     const [r] = await db.query(
-      "INSERT INTO albums(title, description, sort_order) VALUES(?,?,?)",
-      [title || "Untitled", description || null, nextOrder]
+      "INSERT INTO albums(title, description, sort_order, parent_id) VALUES(?,?,?,?)",
+      [title || "Untitled", description || null, nextOrder, parentId]
     )
     invalidateGallery()
-    console.log(`[ALBUMS] Created: ${title || "Untitled"} (id=${r.insertId})`)
+    console.log(`[ALBUMS] Created: ${title || "Untitled"} (id=${r.insertId}${parentId ? `, parent=${parentId}` : ""})`)
     res.json({ ok: true, id: r.insertId })
   } catch (err) {
+    if (err instanceof AlbumInputError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[ALBUMS] Lỗi create:", err)
     res.status(500).json({ error: "server_error", message: "Không tạo được album." })
   }
@@ -749,6 +744,7 @@ app.put(`${API_PREFIX}/albums/reorder`, auth, async (req, res) => {
     if (albumIds.some((id) => { const n = parseInt(id, 10); return isNaN(n) || n <= 0 || String(n) !== String(id).trim() })) {
       return res.status(400).json({ error: "invalid_input", message: "albumIds phải là số nguyên dương." })
     }
+    await assertSameParent(albumIds)
     const placeholders = albumIds.map((_, i) => `WHEN ? THEN ?`).join(" ")
     const values = albumIds.flatMap((id, i) => [id, i])
     const idsList = albumIds.map(() => "?").join(",")
@@ -760,6 +756,9 @@ app.put(`${API_PREFIX}/albums/reorder`, auth, async (req, res) => {
     console.log(`[ALBUMS] Reordered ${albumIds.length} albums`)
     res.json({ ok: true })
   } catch (err) {
+    if (err instanceof AlbumInputError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     console.error("[ALBUMS] Lỗi reorder:", err)
     res.status(500).json({ error: "server_error", message: "Không đổi thứ tự album." })
   }
@@ -804,7 +803,7 @@ const JPEG_QUALITY = 85
 // Resize (honoring EXIF orientation) and re-encode. Transparency is preserved:
 // images WITH an alpha channel are written as PNG so background-removed
 // (tách nền) uploads stay transparent; opaque images stay JPEG for size.
-async function processImage(buffer) {
+async function processImage(buffer, { watermark = false } = {}) {
   // Same magic-byte/size sniff every shop upload goes through (shop/images.js)
   // - portfolio uploads used to hand base64 straight to sharp with no check
   // beyond the outer JSON body limit.
@@ -816,7 +815,8 @@ async function processImage(buffer) {
   }
   // WebP for everything: ~10-15x smaller than PNG for transparent cutouts,
   // ~25-35% smaller than JPEG for photos, and it preserves alpha automatically.
-  return { buffer: await pipeline.webp({ quality: 82, effort: 4 }).toBuffer(), ext: "webp" }
+  const webp = await pipeline.webp({ quality: 82, effort: 4 }).toBuffer()
+  return { buffer: watermark ? await applyWatermark(webp) : webp, ext: "webp" }
 }
 
 // ── Hero accent color: computed ONCE here at upload (no client-side canvas). ──
@@ -929,11 +929,13 @@ app.post(`${API_PREFIX}/image`, auth, uploadSingleImage(), async (req, res) => {
       return res.status(400).json({ error: "invalid_input", message: "Cần album_id và ảnh" })
     }
 
+    await assertAlbumExists(album_id)
+
     const buffer = req.file.buffer
     const sizeKb = Math.round(buffer.length / 1024)
     console.log(`[IMAGE] Upload: album=${album_id}, size≈${sizeKb}KB`)
 
-    const { buffer: finalBuffer, ext } = await processImage(buffer)
+    const { buffer: finalBuffer, ext } = await processImage(buffer, { watermark: true })
     const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     const key = `images/${album_id}/${uuid}.${ext}`
     await storage.upload(key, finalBuffer)
@@ -956,6 +958,9 @@ app.post(`${API_PREFIX}/image`, auth, uploadSingleImage(), async (req, res) => {
     console.log(`[IMAGE] Đã lưu ảnh vào MinIO album ${album_id}`)
     res.json({ ok: true })
   } catch (err) {
+    if (err instanceof AlbumInputError) {
+      return res.status(400).json({ error: "invalid_input", message: err.message })
+    }
     if (err instanceof InvalidImageError) {
       return res.status(400).json({ error: "invalid_input", message: err.message })
     }
@@ -968,6 +973,10 @@ app.put(`${API_PREFIX}/image/:id`, auth, async (req, res) => {
   try {
     const { album_id } = req.body
     if (album_id !== undefined) {
+      const [[target]] = await db.query("SELECT id FROM albums WHERE id=?", [album_id])
+      if (!target) {
+        return res.status(400).json({ error: "invalid_input", message: "Album không tồn tại." })
+      }
       await db.query("UPDATE images SET album_id=? WHERE id=?", [album_id, req.params.id])
       console.log(`[IMAGE] Moved id=${req.params.id} → album ${album_id}`)
     }
@@ -1031,6 +1040,7 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   app.listen(5000, () => {
+    redis.del("gallery").catch(() => {})
     storage.ensureBucket().then(() => {
       console.log(`[SERVER] MinIO bucket ready: ${storage.BUCKET}`)
     }).catch((e) => {

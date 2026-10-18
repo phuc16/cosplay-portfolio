@@ -5,6 +5,8 @@ import { SITE_CONFIG, applyColorScheme } from "../config"
 import { useTheme } from "../contexts/ThemeContext"
 import { useLanguage } from "../contexts/LanguageContext"
 import { getLocalized } from "../utils/localize"
+import ProjectAlbums from "../components/portfolio/ProjectAlbums"
+import { buildAlbums, allPhotoThumbs } from "./portfolioAlbums"
 
 /* ── SVG ICONS ───────────────────────────────────────────────────────────── */
 const icons = {
@@ -375,22 +377,14 @@ function InfoSection({ data, onOpenPhoto, lang }) {
 }
 
 /* ── PROJECT + SCHEDULE ─────────────────────────────────────────────────── */
-function ProjectSection({ data, onOpenAlbum, lang }) {
+function ProjectSection({ data, onOpenAlbum, onOpenPhotos, lang }) {
   const vi = lang === "vi"
   const LP = { project: vi ? "Dự án" : "Project", schedule: vi ? "Lịch" : "Schedule" }
-  const [hov, setHov] = useState(null)
   const s = {
     wrap: { maxWidth: 1280, margin: "0 auto", padding: "28px 32px 0", scrollMarginTop: 80 },
     outerGrid: { display: "grid", gridTemplateColumns: "1fr 300px", gap: 20 },
     card: { background: "var(--surface-card)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)", padding: 20, boxShadow: "var(--shadow-pink-soft)" },
     secTitle: { margin: "0 0 16px", fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-link)" },
-    albumGrid: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 },
-    albumCard: { borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid var(--border-default)", cursor: "pointer", background: "var(--bg-sunken)", position: "relative", transition: "transform .25s,box-shadow .25s" },
-    albumImg: { width: "100%", aspectRatio: "4/5", objectFit: "cover", display: "block" },
-    albumFoot: { padding: "10px 14px", borderTop: "1px solid var(--border-default)" },
-    albumTitle: { fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-strong)" },
-    albumCount: { fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 },
-    plusBtn: { position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: "var(--radius-full)", background: "rgba(236,72,153,.25)", border: "1px solid rgba(236,72,153,.5)", color: "var(--pink-400)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, lineHeight: 1 },
     evList: { display: "flex", flexDirection: "column", gap: 10 },
     evRow: { display: "flex", gap: 12, padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", alignItems: "flex-start", cursor: "pointer", transition: "border-color .15s,background .15s" },
     evDot: { width: 8, height: 8, borderRadius: "var(--radius-full)", background: "var(--brand)", flexShrink: 0, marginTop: 5 },
@@ -402,22 +396,7 @@ function ProjectSection({ data, onOpenAlbum, lang }) {
       <div className="proj-grid" style={s.outerGrid}>
         <div style={s.card}>
           <h3 style={s.secTitle}>{LP.project}</h3>
-          <div className="album-grid" style={s.albumGrid}>
-            {data.albums.map((alb, i) => (
-              <div key={alb.id} style={{ ...s.albumCard, transform: hov === i ? "scale(1.02)" : "none", boxShadow: hov === i ? "var(--shadow-pink-hover)" : "none" }}
-                onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)} onClick={() => onOpenAlbum(alb)}>
-                <img src={alb.cover} alt={alb.title} loading="lazy" decoding="async" style={s.albumImg} />
-                <div style={s.plusBtn}>+</div>
-                <div style={s.albumFoot}>
-                  <div style={s.albumTitle}>{alb.title}</div>
-                  <div style={s.albumCount}>{alb.count} {vi ? "ảnh" : "photos"}</div>
-                </div>
-              </div>
-            ))}
-            {data.albums.length === 0 && (
-              <p style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)", margin: 0 }}>{vi ? "Chưa có album." : "No albums yet."}</p>
-            )}
-          </div>
+          <ProjectAlbums albums={data.albums} lang={lang} onOpenAlbum={onOpenAlbum} onOpenPhotos={onOpenPhotos} />
         </div>
         <div style={s.card}>
           <h3 style={s.secTitle}>{LP.schedule}</h3>
@@ -607,14 +586,8 @@ function Lightbox({ photos, startIdx, onClose }) {
 /* ── DATA ADAPTER (cfg + gallery → reference DATA shape) ─────────────────── */
 function buildData(cfg, gallery, lang) {
   const heroImages = cfg.heroImages?.length ? cfg.heroImages : cfg.heroImageUrl ? [cfg.heroImageUrl] : []
-  const albums = (gallery || []).map((g) => ({
-    id: g.id,
-    title: g.group,
-    count: g.items?.length || 0,
-    cover: g.items?.[0]?.src || "",
-    items: (g.items || []).map((it) => it.fullSrc || it.src),
-  }))
-  const galleryPhotos = (gallery || []).flatMap((g) => g.items || []).map((it) => it.src)
+  const albums = buildAlbums(gallery)
+  const galleryPhotos = allPhotoThumbs(gallery)
   // Latest photos: admin-uploaded (config.latestPhotos) → gallery items → hero images
   const latestPhotos = cfg.latestPhotos?.length ? cfg.latestPhotos : galleryPhotos.length ? galleryPhotos : heroImages
   const supportsCfg = cfg.contact?.supports || {}
@@ -725,7 +698,7 @@ export default function Portfolio() {
 
       {!loading && <HeroBanner data={data} theme={theme} lang={lang} />}
       {!loading && <Reveal><InfoSection data={data} lang={lang} onOpenPhoto={(src) => openPhoto(data.latestPhotos, Math.max(0, data.latestPhotos.indexOf(src)))} /></Reveal>}
-      {!loading && <Reveal><ProjectSection data={data} lang={lang} onOpenAlbum={(alb) => openPhoto(alb.items?.length ? alb.items : [alb.cover], 0)} /></Reveal>}
+      {!loading && <Reveal><ProjectSection data={data} lang={lang} onOpenAlbum={(alb) => openPhoto(alb.items?.length ? alb.items : [alb.cover], 0)} onOpenPhotos={openPhoto} /></Reveal>}
 
       <div style={{ position: "relative", isolation: "isolate" }}>
         {!loading && <Reveal><ContactSection data={data} lang={lang} /></Reveal>}

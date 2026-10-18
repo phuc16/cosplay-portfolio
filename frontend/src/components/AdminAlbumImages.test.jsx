@@ -62,3 +62,27 @@ describe("AdminAlbumImages - error handling via the shared api instance", () => 
     }
   })
 })
+
+describe("AdminAlbumImages - sub-albums", () => {
+  it("loads the photos of a sub-album nested in the gallery payload", async () => {
+    const originalAdapter = api.defaults.adapter
+    api.defaults.adapter = (config) => {
+      if (config.method === "get" && config.url === "/api/gallery") {
+        return Promise.resolve({
+          data: [{ id: 1, group: "P", items: [], subAlbums: [{ id: 5, title: "S", items: [{ id: 50, src: "/s.webp", fullSrc: "/s.webp" }] }] }],
+          status: 200, config, headers: {},
+        })
+      }
+      return Promise.reject(new Error(`unexpected request: ${config.method} ${config.url}`))
+    }
+    try {
+      const container = await renderAlbumImages({ id: 5, title: "S" })
+      await flush()
+      const imgs = container.querySelectorAll("img")
+      expect(imgs).toHaveLength(1)
+      expect(imgs[0].getAttribute("src")).toBe("/s.webp")
+    } finally {
+      api.defaults.adapter = originalAdapter
+    }
+  })
+})
