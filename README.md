@@ -1,75 +1,79 @@
 # Cosplay Portfolio
 
-Portfolio cosplay (gallery ảnh) kèm một shop bán merch (photocard, poster, sản phẩm số...) dùng chung backend/frontend.
+**English** | [Tiếng Việt](README.vi.md)
 
-## Tính năng
+A cosplay portfolio (photo gallery with albums) plus a merch shop (photocards, posters, digital goods, gacha...), sharing one backend and frontend. Live at https://kamidayhehe.com.
 
-- **Gallery**: Xem ảnh dạng grid, lightbox xem phóng to
-- **Admin**: Đăng nhập, upload ảnh kéo thả, xóa/sửa ảnh, quản lý shop
-- **Shop**: Collection (đợt mở bán, có thể đặt lịch mở/đóng) → Product → Variant, giỏ hàng, checkout, thanh toán VietQR/Momo/COD, giao hàng hoặc nhận tại sự kiện, sản phẩm số (giao link tải)
-- **Đơn hàng**: Vòng đời pending → confirmed → shipped/completed (hoặc cancelled), tự hủy đơn quá hạn thanh toán và hoàn kho, email giao dịch (đặt hàng/xác nhận/giao hàng/hủy), tra cứu đơn qua link + mã PIN
-- **Vận chuyển**: Xuất/nhập file ViettelPost, danh sách nhận hàng tại sự kiện (roster)
-- **Thumbnail tự động**: Worker tạo thumbnail cho ảnh mới
-- **Cache Redis**: Cache gallery/settings để tăng tốc truy vấn
+## Features
 
-## Yêu cầu hệ thống
+- **Gallery**: grid view, lightbox, albums with sub-albums, watermark on album photos, bilingual (vi/en) site copy
+- **Admin**: login, drag-and-drop upload, edit/delete photos, shop management, bilingual admin UI
+- **Shop**: Collection (a sale window that can be scheduled to open/close) → Product → Variant, cart, checkout, VietQR/Momo/PayPal/COD payments, delivery or event pickup, digital products (download link delivery), Digital/Physical grouping and filters, shareable product links
+- **Gacha**: gacha products with server-side weighted draws (the client never decides the prize), a practice page, and a staff-run booth kiosk for cash sales (see [docs/GACHA_ANTI_CHEAT.md](docs/GACHA_ANTI_CHEAT.md))
+- **Gift**: optional free gift for orders above a minimum total
+- **Orders**: lifecycle pending → confirmed → shipped/completed (or cancelled), automatic cancellation of unpaid orders past the deadline with stock release, transactional emails (placed/confirmed/shipped/cancelled), order lookup by link + PIN, queue numbers for packing and pickup
+- **Shipping**: ViettelPost export/import, event pickup roster with a print-ready PDF export
+- **Automatic thumbnails**: a worker generates thumbnails for new photos
+- **Redis cache**: caches gallery/settings for faster reads
 
-- **Docker** và **Docker Compose** (khuyến nghị)
-- Hoặc: **Node.js 20+**, **MySQL 8**, **Redis 7**, **MinIO** (S3-compatible object storage)
+## Requirements
+
+- **Docker** and **Docker Compose** (recommended)
+- Or: **Node.js 20+**, **MySQL 8**, **Redis 7**, **MinIO** (S3-compatible object storage)
 
 ---
 
-## Cài đặt & chạy với Docker
+## Install and run with Docker
 
-### 1. Clone & chuẩn bị
+### 1. Clone
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/phuc16/cosplay-portfolio.git
 cd cosplay-portfolio
 ```
 
-### 2. Tạo file cấu hình
+### 2. Create the config file
 
 ```bash
 cp .env.example .env
 ```
 
-Xem chi tiết từng biến trong `.env.example`. Bắt buộc phải đặt `ADMIN_USERNAME`/`ADMIN_PASSWORD` và `JWT_SECRET` - backend sẽ không khởi động nếu thiếu `ADMIN_USERNAME`/`ADMIN_PASSWORD`.
+See `.env.example` for every variable. You must set `ADMIN_USERNAME`/`ADMIN_PASSWORD` and `JWT_SECRET`; the backend refuses to start without `ADMIN_USERNAME`/`ADMIN_PASSWORD`.
 
-### 3. Build và chạy
+### 3. Build and run
 
 ```bash
 docker compose up -d --build
 ```
 
-### 4. Truy cập
+### 4. Open
 
-| Dịch vụ         | URL                     | Mô tả                          |
-|-----------------|-------------------------|--------------------------------|
-| Frontend        | http://localhost:5173   | Portfolio + shop               |
-| Backend         | http://localhost:5000   | API server                     |
-| MySQL           | localhost:3307          | Database (user: root)          |
-| Redis           | localhost:6380          | Cache                          |
-| MinIO API       | localhost:9000          | Object storage                 |
-| MinIO Console   | localhost:9001          | Giao diện quản lý MinIO        |
+| Service       | URL                   | Description                |
+|---------------|-----------------------|----------------------------|
+| Frontend      | http://localhost:5173 | Portfolio + shop           |
+| Backend       | http://localhost:5000 | API server                 |
+| MySQL         | localhost:3307        | Database (user: root)      |
+| Redis         | localhost:6380        | Cache                      |
+| MinIO API     | localhost:9000        | Object storage             |
+| MinIO Console | localhost:9001        | MinIO management UI        |
 
 ---
 
-## Chạy development (không dùng Docker)
+## Development without Docker
 
-### 1. Chạy MySQL, Redis, MinIO
+### 1. Start MySQL, Redis, MinIO
 
 ```bash
 docker compose up -d mysql redis minio
 ```
 
-### 2. Cấu hình môi trường
+### 2. Configure the environment
 
 ```bash
 cp .env.example .env
 ```
 
-Chỉnh `.env` cho phù hợp với môi trường local (host/port của MySQL, Redis, MinIO ở trên).
+Edit `.env` for your local setup (MySQL, Redis and MinIO host/port from the table above; use `DB_PORT=3307` and `REDIS_PORT=6380`).
 
 ### 3. Backend
 
@@ -80,7 +84,7 @@ npm run migrate
 node server.js
 ```
 
-Chạy thêm worker (terminal khác) - xử lý thumbnail, tự hủy đơn quá hạn, gửi email hàng đợi:
+Also run the worker (another terminal). It generates thumbnails, cancels expired unpaid orders, and sends queued emails:
 
 ```bash
 cd backend
@@ -95,141 +99,145 @@ npm install
 npm run dev
 ```
 
-Truy cập: http://localhost:5173
+Open http://localhost:5173
 
 ---
 
-## Hướng dẫn sử dụng
+## Usage
 
-### Xem gallery (người dùng)
+### Browse the gallery (visitors)
 
-1. Mở http://localhost:5173
-2. Xem ảnh dạng grid trên trang chủ
-3. Click ảnh để mở lightbox xem phóng to
-4. Đóng lightbox bằng nút X hoặc click ra ngoài
+1. Open http://localhost:5173
+2. Browse the photo grid and albums on the home page
+3. Click a photo to open the lightbox
+4. Close it with the X button or by clicking outside
 
-### Mua hàng (shop)
+### Buy merch (shop)
 
-1. Vào `/merchandise` để xem các đợt mở bán (collection)
-2. Chọn sản phẩm/mẫu (variant), thêm vào giỏ (`/cart`)
-3. Checkout: điền thông tin nhận hàng, chọn giao hàng/nhận tại sự kiện (nếu có), chọn phương thức thanh toán
-4. Sau khi đặt hàng, được chuyển thẳng tới trang đơn hàng (`/order/:token`) - đường link này và mã PIN xác thực cũng được gửi qua email
+1. Go to `/merchandise` to see the collections on sale
+2. Pick a product/variant and add it to the cart (`/cart`)
+3. Checkout: enter delivery details, choose delivery or event pickup (if available), choose a payment method
+4. After ordering you are taken straight to the order page (`/order/:token`); the link and a verification PIN are also emailed
 
-### Quản trị (admin)
+### Administration
 
-1. Vào http://localhost:5173/admin
-2. Đăng nhập bằng `ADMIN_USERNAME`/`ADMIN_PASSWORD` đã đặt trong `.env`
-3. Sau khi đăng nhập, quản lý được: ảnh portfolio, collection/product/variant của shop, đơn hàng, cài đặt thanh toán, mẫu email, thống kê, xuất/nhập vận chuyển
+1. Go to http://localhost:5173/admin
+2. Log in with the `ADMIN_USERNAME`/`ADMIN_PASSWORD` from `.env`
+3. You can then manage: portfolio photos and albums, shop collections/products/variants, gacha prizes, orders, payment settings, gift settings, shop display order, email templates, stats, and shipping import/export
 
-### Đổi thông tin đăng nhập admin
+### Change the admin login
 
-Sửa `ADMIN_USERNAME`/`ADMIN_PASSWORD` trong `.env` rồi khởi động lại backend - không có bảng `admins` hay hash mật khẩu, thông tin đăng nhập chỉ đọc trực tiếp từ biến môi trường.
+Edit `ADMIN_USERNAME`/`ADMIN_PASSWORD` in `.env` and restart the backend. There is no `admins` table or password hash; credentials are read directly from environment variables.
 
 ---
 
-## Biến môi trường
+## Environment variables
 
-Xem đầy đủ và có chú thích trong [`.env.example`](.env.example). Các nhóm chính:
+Full, commented list in [`.env.example`](.env.example). Main groups:
 
-| Nhóm | Biến |
+| Group | Variables |
 |---|---|
 | Database | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` |
 | Redis | `REDIS_HOST`, `REDIS_PORT` |
 | MinIO | `MINIO_ENDPOINT`, `MINIO_PORT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` |
-| Auth | `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` (bắt buộc, không có mặc định) |
-| Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (để trống thì email không gửi, không lỗi) |
-| Shop | `SITE_URL`, `SHOP_NAME`, `ADMIN_EMAIL`, `GOONG_API_KEY` (tùy chọn, tìm địa chỉ trong checkout) |
+| Auth | `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` (required, no defaults) |
+| Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (leave empty and emails are skipped without error) |
+| Shop | `SITE_URL`, `SHOP_NAME`, `ADMIN_EMAIL`, `GOONG_API_KEY` (optional, address search in checkout) |
 
-**Lưu ý**: Đặt `JWT_SECRET` mạnh và `ADMIN_USERNAME`/`ADMIN_PASSWORD` riêng khi deploy production.
+**Note**: use a strong `JWT_SECRET` and your own `ADMIN_USERNAME`/`ADMIN_PASSWORD` in production.
 
 ---
 
-## Cấu trúc dự án
+## Project structure
 
 ```
 cosplay-portfolio/
 ├── backend/
-│   ├── migrations/    # Knex migrations (chạy tuần tự, không sửa lại sau khi đã chạy)
+│   ├── migrations/    # Knex migrations (run in order, never edited once applied)
 │   ├── seeds/         # Seed data
-│   ├── shop/          # Domain logic của shop: catalog, orders, payments, shipping, stats, email
-│   ├── routes/        # Router: shop, orders, admin* (catalog/orders/payments/email/stats/shipping)
-│   ├── tests/         # Vitest, chạy trên MySQL + Redis thật
-│   ├── server.js      # API server + middleware
-│   └── worker.js      # Worker: thumbnail, hết hạn đơn, hàng đợi email
+│   ├── shop/          # Shop domain logic: catalog, orders, payments, shipping, gacha, stats, email
+│   ├── routes/        # Routers: shop, orders, admin* (catalog/orders/payments/gacha/gift/display/email/stats/shipping)
+│   ├── tests/         # Vitest, run against a real MySQL + Redis
+│   ├── server.js      # API server + middleware (portfolio routes inline)
+│   └── worker.js      # Worker: thumbnails, order expiry, email queue
 ├── frontend/
 │   └── src/
-│       ├── pages/       # Portfolio, Admin, Shop, Collection, Cart, Checkout, Order, Faq
-│       ├── components/  # Gallery, AdminUpload, AdminCollections/Products/Variants/Orders...
-│       └── shop/        # cart.js, faq.js, các util riêng cho shop
-├── deploy/            # Nginx config, hướng dẫn deploy
-├── docs/              # Quyết định sản phẩm (DECISIONS.md), edge case đã xử lý (EDGE_CASE_CHECKLIST.md)
-├── docker-compose.yml         # Dev (build từ source)
-├── docker-compose.pull.yml    # Production (pull image có sẵn)
+│       ├── pages/       # Portfolio, Admin, Shop, Collection, Cart, Checkout, Order, Faq, Gacha kiosk/practice
+│       ├── components/  # Gallery, admin upload/catalog/orders...
+│       ├── i18n/        # vi/en translations
+│       └── shop/        # cart.js, faq.js, shop-specific utilities
+├── deploy/            # Nginx config, deploy/backup/restore scripts, deployment guide
+├── scripts/           # build-push.sh (builds and pushes linux/amd64 images)
+├── docs/              # Decisions (DECISIONS.md), handled edge cases (EDGE_CASE_CHECKLIST.md), gacha anti-cheat reference
+├── docker-compose.yml         # Dev (build from source)
+├── docker-compose.pull.yml    # Production (pull prebuilt images)
 └── .env.example
 ```
 
-Xem `CLAUDE.md` để biết chi tiết kiến trúc (luồng đặt hàng, cơ chế auth, snapshot dữ liệu đơn hàng...).
+See `CLAUDE.md` for architecture details (order flow, auth, order data snapshotting...).
 
 ---
 
 ## API
 
-API được chia theo router, tương ứng các file trong `backend/routes/`:
+The API is split into routers matching the files in `backend/routes/`:
 
-| Router | Prefix | Auth | Mô tả |
+| Router | Prefix | Auth | Description |
 |---|---|---|---|
-| (inline trong `server.js`) | `/api/login`, `/api/refresh`, `/api/gallery`, `/api/settings`, `/api/storage/*` | - / admin | Đăng nhập admin, gallery/settings portfolio, proxy ảnh MinIO |
-| `shop.js` | `/api/shop/*` | - | Danh sách collection/product công khai, tra cứu địa chỉ |
-| `orders.js` | `/api/orders/*` | - / PIN | Đặt hàng, tra cứu đơn, upload ảnh chuyển khoản, xác thực PIN |
-| `adminCatalog.js` | `/api/admin/collections`, `/api/admin/products` | admin | Quản lý collection/product/variant |
-| `adminOrders.js` | `/api/admin/orders` | admin | Xem/xử lý đơn hàng |
-| `adminPayments.js` | `/api/admin/payment-settings` | admin | Cấu hình thanh toán (bank/Momo/PayPal/COD) |
-| `adminEmail.js` | `/api/admin/email-templates`, `/api/admin/email-queue` | admin | Mẫu email, hàng đợi email lỗi |
-| `adminStats.js` | `/api/admin/stats/*` | admin | Thống kê bán hàng |
-| `adminShipping.js` | `/api/admin/shipping/*` | admin | Xuất/nhập ViettelPost, danh sách nhận hàng tại sự kiện |
+| (inline in `server.js`) | `/api/login`, `/api/refresh`, `/api/gallery`, `/api/settings`, `/api/storage/*` | - / admin | Admin login, portfolio gallery/settings, MinIO image proxy |
+| `shop.js` | `/api/shop/*` | - | Public collections/products, address search |
+| `orders.js` | `/api/orders/*` | - / PIN | Place orders, order lookup, payment proof upload, PIN verification |
+| `adminCatalog.js` | `/api/admin/collections`, `/api/admin/products` | admin | Manage collections/products/variants |
+| `adminGacha.js` | `/api/admin/gacha-*` | admin | Gacha prizes, booth sessions, draws |
+| `adminOrders.js` | `/api/admin/orders` | admin | View/process orders |
+| `adminPayments.js` | `/api/admin/payment-settings` | admin | Payment config (bank/Momo/PayPal/COD) |
+| `adminGift.js`, `adminShopDisplay.js` | `/api/admin/*` | admin | Free-gift rule, shop group display order |
+| `adminEmail.js` | `/api/admin/email-templates`, `/api/admin/email-queue` | admin | Email templates, failed email queue |
+| `adminStats.js` | `/api/admin/stats/*` | admin | Sales stats |
+| `adminShipping.js` | `/api/admin/shipping/*` | admin | ViettelPost export/import, event pickup roster |
 
-**Headers khi cần auth (admin):**
+**Headers for authenticated (admin) calls:**
 ```
 Authorization: Bearer <token>
 ```
 
-Đơn hàng công khai (`/api/orders/:token/...`) dùng JWT xác thực PIN riêng, không dùng token admin.
+Public order endpoints (`/api/orders/:token/...`) use a separate PIN-verification JWT, not the admin token.
 
 ---
 
-## Lệnh hữu ích
+## Useful commands
 
 ```bash
-# Xem logs
+# Follow logs
 docker compose logs -f backend
 
-# Chỉ build lại backend
+# Rebuild only the backend
 docker compose build backend
 
-# Reset database (xóa volume MySQL)
+# Reset the database (delete the MySQL volume)
 docker compose down -v
 docker compose up -d
 
-# Chạy test backend (cần MySQL + Redis thật, xem CLAUDE.md để set biến môi trường)
+# Run backend tests (needs real MySQL + Redis; see CLAUDE.md for env vars)
 cd backend && npm test
 
-# Chạy test frontend
+# Run frontend tests
 cd frontend && npm test
 ```
 
 ---
 
-## Xử lý lỗi thường gặp
+## Troubleshooting
 
-**Port đã được sử dụng**
-- Đổi port trong `docker-compose.yml` (ví dụ `5174:80` cho frontend)
+**Port already in use**
+- Change the port in `docker-compose.yml` (for example `5174:80` for the frontend)
 
-**MySQL chưa sẵn sàng**
-- Backend có healthcheck, chờ vài giây rồi thử lại
-- Xem log: `docker compose logs mysql`
+**MySQL not ready**
+- The backend has a healthcheck; wait a few seconds and retry
+- Check the log: `docker compose logs mysql`
 
-**Sharp build lỗi trên Alpine**
-- Dockerfile backend dùng `node:20-slim` để tránh build sharp trên Alpine
+**Sharp fails to build on Alpine**
+- The backend Dockerfile uses `node:20-slim` to avoid building sharp on Alpine
 
-**Backend không khởi động, báo thiếu `ADMIN_USERNAME`/`ADMIN_PASSWORD`**
-- Đặt cả hai biến trong `.env` - không có mặc định, backend cố ý dừng khởi động nếu thiếu
+**Backend won't start and reports missing `ADMIN_USERNAME`/`ADMIN_PASSWORD`**
+- Set both in `.env`; there are no defaults and the backend deliberately refuses to start without them
