@@ -275,7 +275,7 @@ No license file has been added to this repository yet, so all rights are reserve
 
 ## Contact
 
-Phuc Truong Hoang - [@phuc16](https://github.com/phuc16)
+Phuc Truong Hoang - [@phuc16](https://github.com/phuc16) - [LinkedIn](https://www.linkedin.com/in/phuc-truong-hoang-33559a232)
 
 Project Link: [https://github.com/phuc16/cosplay-portfolio](https://github.com/phuc16/cosplay-portfolio)
 
@@ -287,8 +287,12 @@ Live site: [https://kamidayhehe.com](https://kamidayhehe.com)
 
 * [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
 * [Shields.io](https://shields.io)
+* [React](https://react.dev)
+* [Vite](https://vitejs.dev)
+* [Tailwind CSS](https://tailwindcss.com)
 * [Knex.js](https://knexjs.org)
 * [MinIO](https://min.io)
+* [VietQR](https://vietqr.io)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
